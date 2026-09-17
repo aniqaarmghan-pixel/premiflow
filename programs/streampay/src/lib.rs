@@ -244,6 +244,19 @@ token::transfer(cpi_context, total_amount)?;
 Ok(())
         
     }
+
+    // -----------------------------------------------------------------
+    // StreamPay V2 instructions.
+    //
+    // Thin delegations only. The accounts context, argument type, validation
+    // and handler all live in `v2::instructions`, so this block stays a
+    // readable index of the program's entry points.
+    // -----------------------------------------------------------------
+
+    /// Creates a funded contract and offers it to the freelancer.
+    pub fn create_contract(ctx: Context<CreateContract>, args: CreateContractArgs) -> Result<()> {
+        v2::instructions::create_contract::handler(ctx, args)
+    }
 }
 #[derive(Accounts)]
 pub struct Withdraw<'info> {

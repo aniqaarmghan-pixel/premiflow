@@ -35,6 +35,14 @@ pub const MAX_URI_LEN: usize = 200;
 // creation and disclosed to the freelancer before acceptance.
 // ---------------------------------------------------------------------------
 
+/// Maximum window between contract creation and the acceptance deadline
+/// (90 days).
+///
+/// Bounds how long escrowed funds can sit in an unaccepted offer, and bounds
+/// `acceptance_deadline + duration_seconds` well inside `i64` so the `end_time`
+/// resolved at acceptance can never overflow.
+pub const MAX_ACCEPTANCE_WINDOW: i64 = 7_776_000;
+
 /// Minimum streaming duration (1 minute).
 pub const MIN_DURATION_SECONDS: i64 = 60;
 

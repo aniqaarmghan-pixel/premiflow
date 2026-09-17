@@ -170,6 +170,13 @@ pub enum StreamPayV2Error {
     // -----------------------------------------------------------------
     #[msg("A math calculation overflowed.")]
     ArithmeticOverflow,
+
+    // -----------------------------------------------------------------
+    // Appended in Phase 1. New variants go at the END, always, so that no
+    // existing numeric code is ever renumbered.
+    // -----------------------------------------------------------------
+    #[msg("Escrow did not receive the full contract amount.")]
+    EscrowFundingMismatch,
 }
 
 #[cfg(test)]
@@ -197,5 +204,29 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::InvalidAmount), 6100);
         assert!(u32::from(StreamPayV2Error::ArithmeticOverflow) > 6100);
         assert!(u32::from(StreamPayV2Error::InvalidAmount) > 6004);
+    }
+
+    /// Codes that `create_contract` and its tests depend on. Pinning them
+    /// individually means an inserted or reordered variant fails here rather
+    /// than silently changing the meaning of a code already in use.
+    #[test]
+    fn v2_error_codes_in_use_are_pinned() {
+        assert_eq!(u32::from(StreamPayV2Error::InvalidAmount), 6100);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidDuration), 6101);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidCheckpointInterval), 6102);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidReviewDuration), 6103);
+        assert_eq!(u32::from(StreamPayV2Error::TooManyCheckpoints), 6104);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidMaxRevisions), 6105);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidAcceptanceDeadline), 6106);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidScheduledStart), 6107);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidMetadata), 6108);
+        assert_eq!(u32::from(StreamPayV2Error::SelfContract), 6109);
+    }
+
+    /// The last variant, which is where every future append must land.
+    #[test]
+    fn v2_error_enum_tail_is_stable() {
+        assert_eq!(u32::from(StreamPayV2Error::ArithmeticOverflow), 6144);
+        assert_eq!(u32::from(StreamPayV2Error::EscrowFundingMismatch), 6145);
     }
 }
