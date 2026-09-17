@@ -1,0 +1,353 @@
+{
+  "address": "EgZvP1pnkQFiCQkrqvEUQQLJa1hGg6UUYUUcVCZMEyhd",
+  "metadata": {
+    "name": "streampay",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "cancel_stream",
+      "discriminator": [
+        218,
+        221,
+        38,
+        25,
+        177,
+        207,
+        188,
+        91
+      ],
+      "accounts": [
+        {
+          "name": "stream",
+          "writable": true
+        },
+        {
+          "name": "employer",
+          "signer": true,
+          "relations": [
+            "stream"
+          ]
+        },
+        {
+          "name": "worker",
+          "docs": [
+            "This must match the worker stored in the stream."
+          ],
+          "relations": [
+            "stream"
+          ]
+        },
+        {
+          "name": "token_mint",
+          "relations": [
+            "stream"
+          ]
+        },
+        {
+          "name": "employer_token_account",
+          "writable": true
+        },
+        {
+          "name": "worker_token_account",
+          "writable": true
+        },
+        {
+          "name": "escrow_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "stream"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "create_stream",
+      "discriminator": [
+        71,
+        188,
+        111,
+        127,
+        108,
+        40,
+        229,
+        158
+      ],
+      "accounts": [
+        {
+          "name": "stream",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  116,
+                  114,
+                  101,
+                  97,
+                  109
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "employer"
+              },
+              {
+                "kind": "account",
+                "path": "worker"
+              },
+              {
+                "kind": "arg",
+                "path": "stream_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "employer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "worker",
+          "docs": [
+            "The worker does not need to sign when a stream is created."
+          ]
+        },
+        {
+          "name": "token_mint"
+        },
+        {
+          "name": "employer_token_account",
+          "writable": true
+        },
+        {
+          "name": "escrow_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "stream"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "stream_id",
+          "type": "u64"
+        },
+        {
+          "name": "total_amount",
+          "type": "u64"
+        },
+        {
+          "name": "duration_seconds",
+          "type": "i64"
+        }
+      ]
+    },
+    {
+      "name": "withdraw",
+      "discriminator": [
+        183,
+        18,
+        70,
+        156,
+        148,
+        109,
+        161,
+        34
+      ],
+      "accounts": [
+        {
+          "name": "stream",
+          "writable": true
+        },
+        {
+          "name": "worker",
+          "signer": true,
+          "relations": [
+            "stream"
+          ]
+        },
+        {
+          "name": "token_mint",
+          "relations": [
+            "stream"
+          ]
+        },
+        {
+          "name": "worker_token_account",
+          "writable": true
+        },
+        {
+          "name": "escrow_token_account",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "stream"
+              }
+            ]
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Stream",
+      "discriminator": [
+        166,
+        224,
+        59,
+        4,
+        202,
+        10,
+        186,
+        83
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "InvalidAmount",
+      "msg": "The stream amount must be greater than zero."
+    },
+    {
+      "code": 6001,
+      "name": "InvalidDuration",
+      "msg": "The stream duration must be greater than zero."
+    },
+    {
+      "code": 6002,
+      "name": "MathOverflow",
+      "msg": "A math calculation overflowed."
+    },
+    {
+      "code": 6003,
+      "name": "NothingToWithdraw",
+      "msg": "There is currently nothing available to withdraw."
+    },
+    {
+      "code": 6004,
+      "name": "StreamCancelled",
+      "msg": "This stream has been cancelled."
+    }
+  ],
+  "types": [
+    {
+      "name": "Stream",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "worker",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "stream_id",
+            "type": "u64"
+          },
+          {
+            "name": "total_amount",
+            "type": "u64"
+          },
+          {
+            "name": "withdrawn_amount",
+            "type": "u64"
+          },
+          {
+            "name": "is_cancelled",
+            "type": "bool"
+          },
+          {
+            "name": "start_time",
+            "type": "i64"
+          },
+          {
+            "name": "end_time",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}

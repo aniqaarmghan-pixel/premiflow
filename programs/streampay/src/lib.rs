@@ -1,0 +1,436 @@
+use anchor_lang::prelude::*;
+use anchor_spl::token::{
+    self,
+    Mint,
+    Token,
+    TokenAccount,
+    Transfer,
+};
+declare_id!("EgZvP1pnkQFiCQkrqvEUQQLJa1hGg6UUYUUcVCZMEyhd");
+
+#[program]
+pub mod streampay {
+pub fn withdraw(ctx: Context<Withdraw>) -> Result<()> {
+    let clock = Clock::get()?;
+    let current_time = clock.unix_timestamp;
+
+    let stream = &mut ctx.accounts.stream;
+
+    require!(
+        !stream.is_cancelled,
+        StreamPayError::StreamCancelled
+    );
+
+    let earned = stream.earned_amount(current_time)?;
+
+    let available = earned
+        .checked_sub(stream.withdrawn_amount)
+        .ok_or(StreamPayError::MathOverflow)?;
+
+    require!(
+        available > 0,
+        StreamPayError::NothingToWithdraw
+    );
+
+    // ---------------------------------------------------------
+    // Prepare Stream PDA signer seeds.
+    // The Stream PDA owns the escrow token account.
+    // ---------------------------------------------------------
+    let employer = stream.employer;
+    let worker = stream.worker;
+    let stream_id_bytes = stream.stream_id.to_le_bytes();
+    let bump = [stream.bump];
+
+    let signer_seeds: &[&[u8]] = &[
+        b"stream",
+        employer.as_ref(),
+        worker.as_ref(),
+        &stream_id_bytes,
+        &bump,
+    ];
+
+    let signer = &[signer_seeds];
+
+    // ---------------------------------------------------------
+    // Transfer earned tokens:
+    // Escrow -> Worker token account
+    // ---------------------------------------------------------
+    let cpi_accounts = Transfer {
+        from: ctx.accounts.escrow_token_account.to_account_info(),
+        to: ctx.accounts.worker_token_account.to_account_info(),
+        authority: stream.to_account_info(),
+    };
+
+    let cpi_context = CpiContext::new_with_signer(
+        ctx.accounts.token_program.key(),
+        cpi_accounts,
+        signer,
+    );
+
+    token::transfer(cpi_context, available)?;
+
+    // Update accounting only after the token transfer succeeds.
+    stream.withdrawn_amount = stream
+        .withdrawn_amount
+        .checked_add(available)
+        .ok_or(StreamPayError::MathOverflow)?;
+
+    Ok(())
+}
+
+pub fn cancel_stream(ctx: Context<CancelStream>) -> Result<()> {
+    let clock = Clock::get()?;
+    let current_time = clock.unix_timestamp;
+
+    // ---------------------------------------------------------
+    // Read stream information and calculate settlement.
+    // ---------------------------------------------------------
+    let stream = &ctx.accounts.stream;
+
+    require!(
+        !stream.is_cancelled,
+        StreamPayError::StreamCancelled
+    );
+
+    let earned = stream.earned_amount(current_time)?;
+
+    let worker_owed = earned
+        .checked_sub(stream.withdrawn_amount)
+        .ok_or(StreamPayError::MathOverflow)?;
+
+    let employer_refund = stream
+        .total_amount
+        .checked_sub(earned)
+        .ok_or(StreamPayError::MathOverflow)?;
+
+    // ---------------------------------------------------------
+    // Prepare Stream PDA signer seeds.
+    // The Stream PDA controls the escrow token account.
+    // ---------------------------------------------------------
+    let employer = stream.employer;
+    let worker = stream.worker;
+    let stream_id_bytes = stream.stream_id.to_le_bytes();
+    let bump = [stream.bump];
+
+    let signer_seeds: &[&[u8]] = &[
+        b"stream",
+        employer.as_ref(),
+        worker.as_ref(),
+        &stream_id_bytes,
+        &bump,
+    ];
+
+    let signer = &[signer_seeds];
+
+    // ---------------------------------------------------------
+    // Pay earned tokens to the worker.
+    // ---------------------------------------------------------
+    if worker_owed > 0 {
+        let worker_transfer = Transfer {
+            from: ctx.accounts.escrow_token_account.to_account_info(),
+            to: ctx.accounts.worker_token_account.to_account_info(),
+            authority: ctx.accounts.stream.to_account_info(),
+        };
+
+        let worker_cpi = CpiContext::new_with_signer(
+            ctx.accounts.token_program.key(),
+            worker_transfer,
+            signer,
+        );
+
+        token::transfer(worker_cpi, worker_owed)?;
+    }
+
+    // ---------------------------------------------------------
+    // Refund unearned tokens to the employer.
+    // ---------------------------------------------------------
+    if employer_refund > 0 {
+        let employer_transfer = Transfer {
+            from: ctx.accounts.escrow_token_account.to_account_info(),
+            to: ctx.accounts.employer_token_account.to_account_info(),
+            authority: ctx.accounts.stream.to_account_info(),
+        };
+
+        let employer_cpi = CpiContext::new_with_signer(
+            ctx.accounts.token_program.key(),
+            employer_transfer,
+            signer,
+        );
+
+        token::transfer(employer_cpi, employer_refund)?;
+    }
+
+    // ---------------------------------------------------------
+    // Update stream accounting after successful transfers.
+    // ---------------------------------------------------------
+    let stream = &mut ctx.accounts.stream;
+
+    stream.withdrawn_amount = stream
+        .withdrawn_amount
+        .checked_add(worker_owed)
+        .ok_or(StreamPayError::MathOverflow)?;
+
+    stream.end_time = current_time;
+    stream.is_cancelled = true;
+
+    msg!("Worker paid: {}", worker_owed);
+    msg!("Employer refunded: {}", employer_refund);
+
+    Ok(())
+}
+ 
+   use super::*;
+
+    pub fn create_stream(
+        ctx: Context<CreateStream>,
+        stream_id: u64,
+        total_amount: u64,
+        duration_seconds: i64,
+    ) -> Result<()> {
+        require!(total_amount > 0, StreamPayError::InvalidAmount);
+        require!(duration_seconds > 0, StreamPayError::InvalidDuration);
+
+        let clock = Clock::get()?;
+        let start_time = clock.unix_timestamp;
+
+        let end_time = start_time
+            .checked_add(duration_seconds)
+            .ok_or(StreamPayError::InvalidDuration)?;
+
+        let stream = &mut ctx.accounts.stream;
+
+        stream.employer = ctx.accounts.employer.key();
+        stream.worker = ctx.accounts.worker.key();
+        stream.token_mint = ctx.accounts.token_mint.key();
+
+        stream.stream_id = stream_id;
+        stream.total_amount = total_amount;
+        stream.withdrawn_amount = 0;
+        stream.is_cancelled = false;
+        stream.start_time = start_time;
+        stream.end_time = end_time;
+        stream.bump = ctx.bumps.stream;
+
+// Transfer the full stream amount from the employer's
+// token account into the StreamPay escrow token account.
+let cpi_accounts = Transfer {
+    from: ctx.accounts.employer_token_account.to_account_info(),
+    to: ctx.accounts.escrow_token_account.to_account_info(),
+    authority: ctx.accounts.employer.to_account_info(),
+};
+
+let cpi_context = CpiContext::new(
+    ctx.accounts.token_program.key(),
+    cpi_accounts,
+);
+
+token::transfer(cpi_context, total_amount)?;
+
+Ok(())
+        
+    }
+}
+#[derive(Accounts)]
+pub struct Withdraw<'info> {
+    #[account(
+        mut,
+        has_one = worker,
+        has_one = token_mint
+    )]
+    pub stream: Account<'info, Stream>,
+
+    pub worker: Signer<'info>,
+
+    pub token_mint: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        token::mint = token_mint,
+        token::authority = worker
+    )]
+    pub worker_token_account: Account<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        seeds = [
+            b"escrow",
+            stream.key().as_ref()
+        ],
+        bump,
+        token::mint = token_mint,
+        token::authority = stream
+    )]
+    pub escrow_token_account: Account<'info, TokenAccount>,
+
+    pub token_program: Program<'info, Token>,
+}
+#[derive(Accounts)]
+pub struct CancelStream<'info> {
+    #[account(
+        mut,
+        has_one = employer,
+        has_one = worker,
+        has_one = token_mint
+    )]
+    pub stream: Account<'info, Stream>,
+
+    pub employer: Signer<'info>,
+
+    /// CHECK:
+    /// This must match the worker stored in the stream.
+    pub worker: UncheckedAccount<'info>,
+
+    pub token_mint: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        token::mint = token_mint,
+        token::authority = employer
+    )]
+    pub employer_token_account: Account<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        token::mint = token_mint,
+        token::authority = worker
+    )]
+    pub worker_token_account: Account<'info, TokenAccount>,
+
+    #[account(
+        mut,
+        seeds = [
+            b"escrow",
+            stream.key().as_ref()
+        ],
+        bump,
+        token::mint = token_mint,
+        token::authority = stream
+    )]
+    pub escrow_token_account: Account<'info, TokenAccount>,
+
+    pub token_program: Program<'info, Token>,
+}
+
+#[derive(Accounts)]
+#[instruction(stream_id: u64)]
+pub struct CreateStream<'info> {
+    #[account(
+        init,
+        payer = employer,
+        space = 8 + 138,
+        seeds = [
+            b"stream",
+            employer.key().as_ref(),
+            worker.key().as_ref(),
+            &stream_id.to_le_bytes()
+        ],
+        bump
+    )]
+    pub stream: Account<'info, Stream>,
+
+    #[account(mut)]
+    pub employer: Signer<'info>,
+
+    /// CHECK:
+    /// The worker does not need to sign when a stream is created.
+    pub worker: UncheckedAccount<'info>,
+
+    pub token_mint: Account<'info, Mint>,
+
+    #[account(
+        mut,
+        token::mint = token_mint,
+        token::authority = employer
+    )]
+    pub employer_token_account: Account<'info, TokenAccount>,
+
+    #[account(
+        init,
+        payer = employer,
+        seeds = [
+            b"escrow",
+            stream.key().as_ref()
+        ],
+        bump,
+        token::mint = token_mint,
+        token::authority = stream
+    )]
+    pub escrow_token_account: Account<'info, TokenAccount>,
+
+    pub token_program: Program<'info, Token>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[account]
+pub struct Stream {
+    pub employer: Pubkey,
+    pub worker: Pubkey,
+    pub token_mint: Pubkey,
+
+    pub stream_id: u64,
+    pub total_amount: u64,
+    pub withdrawn_amount: u64,
+    pub is_cancelled: bool,
+    pub start_time: i64,
+    pub end_time: i64,
+
+    pub bump: u8,
+}
+
+impl Stream {
+    pub fn earned_amount(&self, current_time: i64) -> Result<u64> {
+        // If the current time is before the stream starts,
+        // nothing has been earned yet.
+        if current_time <= self.start_time {
+            return Ok(0);
+        }
+
+        // If the stream is already finished,
+        // the worker has earned the full amount.
+        if current_time >= self.end_time {
+            return Ok(self.total_amount);
+        }
+
+        let elapsed = current_time
+            .checked_sub(self.start_time)
+            .ok_or(StreamPayError::MathOverflow)?;
+
+        let duration = self
+            .end_time
+            .checked_sub(self.start_time)
+            .ok_or(StreamPayError::MathOverflow)?;
+
+        let elapsed_u64 =
+            u64::try_from(elapsed).map_err(|_| StreamPayError::MathOverflow)?;
+
+        let duration_u64 =
+            u64::try_from(duration).map_err(|_| StreamPayError::MathOverflow)?;
+
+        let earned = self
+            .total_amount
+            .checked_mul(elapsed_u64)
+            .ok_or(StreamPayError::MathOverflow)?
+            .checked_div(duration_u64)
+            .ok_or(StreamPayError::MathOverflow)?;
+
+        Ok(earned)
+    }
+}
+
+#[error_code]
+pub enum StreamPayError {
+    #[msg("The stream amount must be greater than zero.")]
+    InvalidAmount,
+
+    #[msg("The stream duration must be greater than zero.")]
+    InvalidDuration,
+    
+    #[msg("A math calculation overflowed.")]
+MathOverflow,
+    #[msg("There is currently nothing available to withdraw.")]
+NothingToWithdraw,
+    #[msg("This stream has been cancelled.")]
+StreamCancelled,
+}
+
