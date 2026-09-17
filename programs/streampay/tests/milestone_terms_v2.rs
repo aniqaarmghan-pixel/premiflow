@@ -330,13 +330,14 @@ fn milestone_args(contract_id: u64, total_amount: u64, now: i64) -> CreateContra
     CreateContractArgs {
         contract_id,
         payment_mode: PaymentMode::Milestone,
-        start_mode: StartMode::OnAcceptance,
+        start_mode: StartMode::OnActivation,
         total_amount,
         acceptance_deadline: now + 3_600,
         scheduled_start_time: 0,
         duration_seconds: 3_600,
         checkpoint_interval: 0,
         review_duration: 300,
+        activation_review_duration: 3_600,
         max_revisions: 2,
         metadata_uri: "ipfs://bafyContractMetadata".to_string(),
         metadata_hash: [7u8; 32],
@@ -790,7 +791,7 @@ fn reject_decreasing_due_offset() {
 }
 
 #[test]
-fn on_acceptance_due_cannot_precede_start() {
+fn on_activation_due_cannot_precede_start() {
     let mut env = setup(TOTAL_AMOUNT);
     let now = env.now();
     env.create(&milestone_args(1, TOTAL_AMOUNT, now)).unwrap();
@@ -802,7 +803,7 @@ fn on_acceptance_due_cannot_precede_start() {
 
     // The contract has not started. Offsets are durations, so any real start
     // time S produces due times S+offset that are strictly after S.
-    assert_eq!(contract.start_mode, StartMode::OnAcceptance);
+    assert_eq!(contract.start_mode, StartMode::OnActivation);
     assert_eq!(contract.start_time, 0);
     assert!(!contract.status.is_started());
 

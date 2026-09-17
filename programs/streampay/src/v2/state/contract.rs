@@ -79,8 +79,8 @@ pub struct Contract {
     pub acceptance_deadline: i64,
     /// Agreed start instant. Only read when `start_mode == Scheduled`.
     pub scheduled_start_time: i64,
-    /// Streaming length. Needed to resolve `end_time` at acceptance, since
-    /// under `OnAcceptance` the start instant is unknown at creation.
+    /// Streaming length. Needed to resolve `end_time` at activation, since
+    /// under `OnActivation` the start instant is unknown at creation.
     pub duration_seconds: i64,
     /// Streaming checkpoint period length. Only read when the payment mode
     /// uses checkpoints.
@@ -88,6 +88,10 @@ pub struct Contract {
     /// Length of both the employer review window and the freelancer
     /// resubmission window.
     pub review_duration: i64,
+    /// How long the employer has, after freelancer acceptance, to approve or
+    /// reject activation. Frozen at creation. The deadline is derived as
+    /// `accepted_at + activation_review_duration` once the freelancer accepts.
+    pub activation_review_duration: i64,
     /// Agreed cap on revision cycles per work unit. Together with
     /// `review_duration` this bounds worst-case withholding.
     pub max_revisions: u8,
@@ -96,9 +100,9 @@ pub struct Contract {
     // Lifecycle timestamps. These answer *when*, never *whether*: a lifecycle
     // question is always answered by `status` or `payment_mode`.
     // -----------------------------------------------------------------
-    /// Resolved at acceptance from `start_mode`.
+    /// Resolved at employer activation from `start_mode`.
     pub start_time: i64,
-    /// Resolved at acceptance as `start_time + duration_seconds`.
+    /// Resolved at employer activation as `start_time + duration_seconds`.
     pub end_time: i64,
     /// Streaming checkpoint cursor: the end of the most recently created
     /// period. Guarantees periods are contiguous and non-overlapping.
@@ -140,9 +144,10 @@ pub struct Contract {
     /// Upgrade headroom. Adding a field means shrinking this, which leaves
     /// account size and every client offset unchanged.
     ///
-    /// Started at 128 bytes; `voided_unit_count` (4 bytes) and
-    /// `last_milestone_due_offset` (8 bytes) were taken from it.
-    pub reserved: [u8; 116],
+    /// Started at 128 bytes; `voided_unit_count` (4),
+    /// `last_milestone_due_offset` (8) and `activation_review_duration` (8)
+    /// were taken from it.
+    pub reserved: [u8; 108],
 
     // -----------------------------------------------------------------
     // Variable length. Must remain the final field.
@@ -153,25 +158,28 @@ pub struct Contract {
 }
 
 impl Contract {
+    /// Latest instant the employer may approve or reject activation.
+    ///
+    /// Only meaningful once the freelancer has accepted (`accepted_at` is set
+    /// by `accept_contract`). Status, not a zero timestamp, is what tells a
+    /// caller whether that has happened.
+    pub fn activation_deadline(&self) -> Result<i64> {
+        self.accepted_at
+            .checked_add(self.activation_review_duration)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow.into())
+    }
+
     /// The latest instant at which this contract's term can possibly end.
     ///
-    /// Before acceptance the real `end_time` is genuinely unknown under
-    /// `StartMode::OnAcceptance`: it is fixed to `accepted_at + duration_seconds`,
-    /// and acceptance may land anywhere up to `acceptance_deadline`. The worst
-    /// case is therefore an acceptance on the deadline itself. Under
-    /// `StartMode::Scheduled` the start instant is already agreed, so the bound
-    /// is exact rather than pessimistic.
-    ///
-    /// Either way this is a *sound upper bound*, which is what makes it usable
-    /// for validating dates during `Draft` without inventing a start time. Note
-    /// that `start_mode` decides which anchor point applies — not whether some
-    /// timestamp happens to be zero.
-    ///
-    /// Phase 1 already proves this addition cannot overflow for any contract
-    /// that exists; the checked arithmetic here is belt-and-braces.
+    /// Under `OnActivation` the real start is the employer's approval, which
+    /// can land as late as `acceptance_deadline + activation_review_duration`.
+    /// Under `Scheduled` the start instant is already agreed.
     pub fn latest_possible_end(&self) -> Result<i64> {
         let anchor_point = match self.start_mode {
-            StartMode::OnAcceptance => self.acceptance_deadline,
+            StartMode::OnActivation => self
+                .acceptance_deadline
+                .checked_add(self.activation_review_duration)
+                .ok_or(StreamPayV2Error::ArithmeticOverflow)?,
             StartMode::Scheduled => self.scheduled_start_time,
         };
 

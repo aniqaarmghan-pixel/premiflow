@@ -272,6 +272,26 @@ Ok(())
     pub fn finalize_terms(ctx: Context<FinalizeTerms>) -> Result<()> {
         v2::instructions::finalize_terms::handle_finalize_terms(ctx)
     }
+
+    /// Freelancer accepts a funded offer. Does not start the main stream.
+    pub fn accept_contract(ctx: Context<AcceptContract>) -> Result<()> {
+        v2::instructions::accept_contract::handle_accept_contract(ctx)
+    }
+
+    /// Freelancer refuses a funded offer. Escrow is left in place.
+    pub fn decline_contract(ctx: Context<DeclineContract>) -> Result<()> {
+        v2::instructions::decline_contract::handle_decline_contract(ctx)
+    }
+
+    /// Employer approves activation and establishes main-contract timing.
+    pub fn approve_activation(ctx: Context<ApproveActivation>) -> Result<()> {
+        v2::instructions::approve_activation::handle_approve_activation(ctx)
+    }
+
+    /// Employer declines to activate after the trial stage. Escrow is left in place.
+    pub fn reject_activation(ctx: Context<RejectActivation>) -> Result<()> {
+        v2::instructions::reject_activation::handle_reject_activation(ctx)
+    }
 }
 #[derive(Accounts)]
 pub struct Withdraw<'info> {

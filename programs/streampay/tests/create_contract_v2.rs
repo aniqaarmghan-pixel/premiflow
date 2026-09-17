@@ -224,13 +224,14 @@ fn streaming_args(contract_id: u64, total_amount: u64, now: i64) -> CreateContra
     CreateContractArgs {
         contract_id,
         payment_mode: PaymentMode::Streaming,
-        start_mode: StartMode::OnAcceptance,
+        start_mode: StartMode::OnActivation,
         total_amount,
         acceptance_deadline: now + 3_600,
         scheduled_start_time: 0,
         duration_seconds: 3_600,
         checkpoint_interval: 900,
         review_duration: 300,
+        activation_review_duration: 3_600,
         max_revisions: 2,
         metadata_uri: "ipfs://bafyContractMetadata".to_string(),
         metadata_hash: [7u8; 32],
@@ -312,7 +313,7 @@ fn create_streaming_contract_succeeds() {
     // is immediately offerable.
     assert_eq!(contract.payment_mode, PaymentMode::Streaming);
     assert_eq!(contract.status, ContractStatus::PendingAcceptance);
-    assert_eq!(contract.start_mode, StartMode::OnAcceptance);
+    assert_eq!(contract.start_mode, StartMode::OnActivation);
 
     // Money: funded in full, nothing released or moved.
     assert_eq!(contract.total_amount, total_amount);
@@ -327,8 +328,9 @@ fn create_streaming_contract_succeeds() {
     assert_eq!(contract.checkpoint_interval, 900);
     assert_eq!(contract.review_duration, 300);
     assert_eq!(contract.max_revisions, 2);
+    assert_eq!(contract.activation_review_duration, 3_600);
 
-    // `scheduled_start_time` is normalized away under OnAcceptance: the mode,
+    // `scheduled_start_time` is normalized away under OnActivation: the mode,
     // not this value, is what later phases consult.
     assert_eq!(contract.scheduled_start_time, 0);
 
@@ -361,7 +363,7 @@ fn create_streaming_contract_succeeds() {
     assert_eq!(contract.bump, contract_bump);
     assert_eq!(contract.escrow_bump, escrow_bump);
 
-    assert_eq!(contract.reserved, [0u8; 116]);
+    assert_eq!(contract.reserved, [0u8; 108]);
 
     // Escrow holds exactly the full amount, and the employer paid exactly that.
     assert_eq!(env.token_balance(&escrow_pda), total_amount);
@@ -692,7 +694,7 @@ fn accept_scheduled_start_on_or_after_deadline() {
 
     let contract = env.read_contract(&contract_pda);
 
-    // Under Scheduled the term is retained, unlike OnAcceptance where it is
+    // Under Scheduled the term is retained, unlike OnActivation where it is
     // normalized to 0.
     assert_eq!(contract.start_mode, StartMode::Scheduled);
     assert_eq!(contract.scheduled_start_time, now + 7_200);

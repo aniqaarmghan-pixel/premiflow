@@ -23,9 +23,9 @@
 //!
 //! Due offsets, not calendar dates: a milestone is due
 //! `due_offset_seconds` after the contract actually starts. That is the same
-//! representation under `OnAcceptance` and `Scheduled`, so a late acceptance
+//! representation under `OnActivation` and `Scheduled`, so a late acceptance
 //! cannot make a milestone due before work begins. Absolute time is
-//! `start_time + due_offset_seconds`, resolved only after acceptance.
+//! `start_time + due_offset_seconds`, resolved only after employer activation.
 //!
 //! No tokens move in this instruction.
 

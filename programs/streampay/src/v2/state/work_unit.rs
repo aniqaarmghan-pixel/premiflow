@@ -56,7 +56,7 @@ pub struct WorkUnit {
     pub period_end: i64,
     /// Seconds after `Contract::start_time` when this deliverable is due.
     /// `Milestone` / `Fixed` only. Always a duration, never a calendar
-    /// timestamp, so the same field is valid under both `OnAcceptance` and
+    /// timestamp, so the same field is valid under both `OnActivation` and
     /// `Scheduled`. Absolute due time is `start_time + due_offset_seconds`
     /// once the contract has actually started.
     pub due_offset_seconds: i64,

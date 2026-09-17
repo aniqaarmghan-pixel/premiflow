@@ -4,18 +4,20 @@
 //! argument type, and its handler, so the accounts a given instruction can
 //! touch are visible in one place.
 
+pub mod accept_contract;
 pub mod add_milestone;
+pub mod approve_activation;
 pub mod create_contract;
+pub mod decline_contract;
 pub mod finalize_terms;
+pub mod reject_activation;
 
-// Glob re-exports are required rather than stylistic: `#[derive(Accounts)]`
-// generates hidden client/CPI modules that `#[program]` resolves through the
-// crate root, so naming the public types individually is not sufficient.
-//
-// That means every name in these modules lands at the crate root, which is why
-// each handler is named after its instruction instead of a shared `handler` —
-// three modules exporting `handler` would make the name ambiguous here, and
-// would get worse with every phase.
+// Glob re-exports are required: `#[derive(Accounts)]` generates hidden
+// client/CPI modules that `#[program]` resolves through the crate root.
+pub use accept_contract::*;
 pub use add_milestone::*;
+pub use approve_activation::*;
 pub use create_contract::*;
+pub use decline_contract::*;
 pub use finalize_terms::*;
+pub use reject_activation::*;

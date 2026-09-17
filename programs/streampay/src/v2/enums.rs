@@ -39,28 +39,54 @@ impl PaymentMode {
     }
 }
 
-/// When the earning clock starts.
+/// When the main earning clock starts.
+///
+/// Discriminants are stable: `OnActivation` is 0, `Scheduled` is 1. This was
+/// previously named `OnAcceptance`; it was renamed before V2 deployment because
+/// freelancer acceptance no longer starts the stream.
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum StartMode {
-    /// `start_time` becomes `accepted_at`.
-    OnAcceptance,
+    /// `start_time` becomes the instant the employer approves activation.
+    OnActivation,
     /// `start_time` becomes the pre-agreed `scheduled_start_time`, which is
     /// constrained to fall on or after the acceptance deadline so acceptance
-    /// always precedes the start.
+    /// always precedes the contractual start. Earning still cannot begin until
+    /// `current_time >= start_time`.
     Scheduled,
 }
 
 /// Authoritative contract lifecycle state.
 ///
-/// A parent contract stays `Active` while individual work units are submitted
-/// and reviewed; review state lives on `WorkUnit`, never here.
+/// Borsh unit-enum discriminants, old → new (V2 was never deployed):
+///
+/// | variant                  | old | new |
+/// |--------------------------|-----|-----|
+/// | Draft                    | 0   | 0   |
+/// | PendingAcceptance        | 1   | 1   |
+/// | PendingEmployerApproval  | —   | 2   |
+/// | Active                   | 2   | 3   |
+/// | Completed                | 3   | 4   |
+/// | Declined                 | 4   | 5   |
+/// | Expired                  | 5   | 6   |
+/// | Cancelled                | 6   | 7   |
+/// | ActivationRejected       | —   | 8   |
+///
+/// `PendingEmployerApproval` is the employer-approval gate: the freelancer has
+/// accepted, the main stream has not started. `ActivationRejected` is the
+/// employer's "no" at that gate, distinct from `Declined` (the freelancer
+/// refused the offer). Events distinguish the two paths for indexers; status
+/// distinguishes them for on-chain logic.
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ContractStatus {
     /// Funded, but terms are still being defined by the employer.
     Draft,
     /// Funded, terms locked, offered to the freelancer.
     PendingAcceptance,
-    /// Accepted. Earning and submission are permitted.
+    /// Freelancer accepted. Awaiting the employer's activation approval.
+    /// The main payment stream has not started.
+    PendingEmployerApproval,
+    /// Employer approved activation. Timing is established; earning is gated
+    /// on `current_time >= start_time`.
     Active,
     /// All obligations resolved.
     Completed,
@@ -70,12 +96,16 @@ pub enum ContractStatus {
     Expired,
     /// The employer terminated an offered or accepted contract.
     Cancelled,
+    /// The employer reviewed the trial stage and declined to activate.
+    ActivationRejected,
 }
 
 impl ContractStatus {
-    /// Whether terms are locked and the earning clock is meaningful.
+    /// Whether the main contract timing has been established.
     ///
     /// This is the authoritative replacement for a `start_time == 0` check.
+    /// `PendingEmployerApproval` is deliberately excluded: acceptance is not
+    /// activation.
     pub fn is_started(&self) -> bool {
         matches!(self, Self::Active | Self::Completed | Self::Cancelled)
     }
@@ -87,13 +117,24 @@ impl ContractStatus {
     pub fn is_terminal(&self) -> bool {
         matches!(
             self,
-            Self::Completed | Self::Declined | Self::Expired | Self::Cancelled
+            Self::Completed
+                | Self::Declined
+                | Self::Expired
+                | Self::Cancelled
+                | Self::ActivationRejected
         )
     }
 
     /// Whether the freelancer has committed to the contract.
     pub fn is_accepted(&self) -> bool {
-        !matches!(self, Self::Draft | Self::PendingAcceptance)
+        matches!(
+            self,
+            Self::PendingEmployerApproval
+                | Self::Active
+                | Self::Completed
+                | Self::Cancelled
+                | Self::ActivationRejected
+        )
     }
 
     /// Whether terms may still be edited by the employer.

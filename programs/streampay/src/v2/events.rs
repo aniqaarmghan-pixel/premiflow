@@ -6,10 +6,8 @@
 //!
 //! - Phase 1: `ContractCreated`
 //! - Phase 2: `MilestoneAdded`, `TermsFinalized`
-//! - later: `ContractAccepted`, `ContractDeclined`, `ContractExpired`,
-//!   `WorkUnitSubmitted`, `WorkUnitRevisionRequested`, `WorkUnitReleased`,
-//!   `WorkUnitVoided`, `FundsWithdrawn`, `FundsRefunded`, `ContractCancelled`,
-//!   `ContractCompleted`
+//! - Phase 3: `ContractAccepted`, `ContractDeclined`, `ContractActivated`,
+//!   `ActivationRejected`
 //!
 //! Every event carries `contract` as its first field so a client can index a
 //! single contract's full history with one filter. Off-chain metadata URIs and
@@ -64,4 +62,43 @@ pub struct TermsFinalized {
     pub work_unit_count: u32,
     pub total_amount: u64,
     pub finalized_at: i64,
+}
+
+/// The freelancer accepted a funded offer. The main stream has not started.
+#[event]
+pub struct ContractAccepted {
+    pub contract: Pubkey,
+    pub employer: Pubkey,
+    pub freelancer: Pubkey,
+    pub accepted_at: i64,
+    pub activation_deadline: i64,
+}
+
+/// The freelancer refused a funded offer.
+#[event]
+pub struct ContractDeclined {
+    pub contract: Pubkey,
+    pub employer: Pubkey,
+    pub freelancer: Pubkey,
+    pub declined_at: i64,
+}
+
+/// The employer approved activation. Main-contract timing is now established.
+#[event]
+pub struct ContractActivated {
+    pub contract: Pubkey,
+    pub employer: Pubkey,
+    pub freelancer: Pubkey,
+    pub activated_at: i64,
+    pub start_time: i64,
+    pub end_time: i64,
+}
+
+/// The employer reviewed the trial stage and declined to activate.
+#[event]
+pub struct ActivationRejected {
+    pub contract: Pubkey,
+    pub employer: Pubkey,
+    pub freelancer: Pubkey,
+    pub rejected_at: i64,
 }

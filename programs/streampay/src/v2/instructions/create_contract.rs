@@ -12,8 +12,8 @@
 //! What this instruction deliberately does not do:
 //!
 //! - It does not start the earning clock. The contract is left un-started and
-//!   `status` says so; `accept_contract` establishes `start_time` in a later
-//!   phase.
+//!   `status` says so. Freelancer acceptance and employer activation are later,
+//!   separate instructions; only activation establishes `start_time`.
 //! - It does not require the freelancer's signature. Consent is a separate,
 //!   explicit act (`accept_contract`), which is what makes the freelancer's
 //!   agreement to the terms meaningful.
@@ -24,9 +24,9 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{transfer_checked, Mint, Token, TokenAccount, TransferChecked};
 
 use crate::v2::constants::{
-    CONTRACT_ESCROW_SEED, CONTRACT_SEED, MAX_ACCEPTANCE_WINDOW, MAX_CHECKPOINTS,
-    MAX_DURATION_SECONDS, MAX_REVIEW_DURATION, MAX_REVISIONS_LIMIT, MAX_URI_LEN,
-    MIN_DURATION_SECONDS, MIN_REVIEW_DURATION, V2_LAYOUT_VERSION,
+    CONTRACT_ESCROW_SEED, CONTRACT_SEED, MAX_ACCEPTANCE_WINDOW, MAX_ACTIVATION_REVIEW,
+    MAX_CHECKPOINTS, MAX_DURATION_SECONDS, MAX_REVIEW_DURATION, MAX_REVISIONS_LIMIT, MAX_URI_LEN,
+    MIN_ACTIVATION_REVIEW, MIN_DURATION_SECONDS, MIN_REVIEW_DURATION, V2_LAYOUT_VERSION,
 };
 use crate::v2::enums::{ContractStatus, PaymentMode, StartMode};
 use crate::v2::errors::StreamPayV2Error;
@@ -71,6 +71,10 @@ pub struct CreateContractArgs {
     /// Employer review window, and equally the freelancer's resubmission
     /// window.
     pub review_duration: i64,
+
+    /// How long the employer has after freelancer acceptance to approve
+    /// activation. Does not start the stream by itself.
+    pub activation_review_duration: i64,
 
     pub max_revisions: u8,
 
@@ -139,6 +143,12 @@ impl CreateContractArgs {
             StreamPayV2Error::InvalidMaxRevisions
         );
 
+        require!(
+            (MIN_ACTIVATION_REVIEW..=MAX_ACTIVATION_REVIEW)
+                .contains(&self.activation_review_duration),
+            StreamPayV2Error::InvalidActivationReview
+        );
+
         let scheduled_start_time = self.resolve_start()?;
         let (status, checkpoint_interval) = self.resolve_payment_mode()?;
 
@@ -150,24 +160,24 @@ impl CreateContractArgs {
     }
 
     /// Resolves `scheduled_start_time`, and proves up front that the `end_time`
-    /// computed at acceptance cannot overflow. Checking that here rather than in
-    /// `accept_contract` means a contract can never be created in a state that
-    /// makes acceptance impossible.
+    /// computed at activation cannot overflow. Checking that here rather than in
+    /// `approve_activation` means a contract can never be created in a state that
+    /// makes activation impossible.
     fn resolve_start(&self) -> Result<i64> {
         match self.start_mode {
-            StartMode::OnAcceptance => {
-                // The real start instant is genuinely unknown right now, and is
-                // not invented. Acceptance can happen any time up to the
-                // deadline, so bound the worst case.
+            StartMode::OnActivation => {
+                // Latest possible start is a last-second acceptance followed by
+                // a last-second activation. Bound that worst case.
                 self.acceptance_deadline
-                    .checked_add(self.duration_seconds)
+                    .checked_add(self.activation_review_duration)
+                    .and_then(|t| t.checked_add(self.duration_seconds))
                     .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
 
                 Ok(0)
             }
             StartMode::Scheduled => {
-                // Acceptance must precede the start, otherwise the contract
-                // could begin earning before anyone agreed to it.
+                // Acceptance must precede the contractual start, otherwise the
+                // stream could be due to begin before anyone agreed to it.
                 require!(
                     self.scheduled_start_time >= self.acceptance_deadline,
                     StreamPayV2Error::InvalidScheduledStart
@@ -349,6 +359,7 @@ pub fn handle_create_contract(
         contract.duration_seconds = args.duration_seconds;
         contract.checkpoint_interval = terms.checkpoint_interval;
         contract.review_duration = args.review_duration;
+        contract.activation_review_duration = args.activation_review_duration;
         contract.max_revisions = args.max_revisions;
 
         // The contract has not started and nothing has been earned. These are
@@ -373,7 +384,7 @@ pub fn handle_create_contract(
         contract.metadata_hash = args.metadata_hash;
         contract.bump = ctx.bumps.contract;
         contract.escrow_bump = ctx.bumps.contract_escrow;
-        contract.reserved = [0u8; 116];
+        contract.reserved = [0u8; 108];
         contract.metadata_uri = args.metadata_uri;
     }
 

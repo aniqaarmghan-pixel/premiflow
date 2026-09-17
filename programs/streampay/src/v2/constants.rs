@@ -78,3 +78,16 @@ pub const MAX_MILESTONES: u32 = 64;
 /// Upper bound on negotiated revision cycles per work unit. Together with
 /// `review_duration` this bounds how long a submitted unit can be withheld.
 pub const MAX_REVISIONS_LIMIT: u8 = 5;
+
+/// Minimum employer activation-review window (1 minute).
+///
+/// Kept low so a hackathon demo can run the full accept → approve path without
+/// a program-side demo mode. Production UIs should offer 1h / 4h / 12h / 24h.
+pub const MIN_ACTIVATION_REVIEW: i64 = 60;
+
+/// Maximum employer activation-review window (24 hours).
+///
+/// Bounds how long a freelancer can be left in `PendingEmployerApproval`
+/// waiting for a yes/no. A later instruction will settle a lapsed window;
+/// this cap is what makes that wait finite.
+pub const MAX_ACTIVATION_REVIEW: i64 = 86_400;

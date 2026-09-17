@@ -186,6 +186,18 @@ pub enum StreamPayV2Error {
 
     #[msg("Milestone due offset is not a positive duration within the contract term, or is not later than the previous milestone.")]
     InvalidDueDate,
+
+    // -----------------------------------------------------------------
+    // Appended in Phase 3.
+    // -----------------------------------------------------------------
+    #[msg("Activation review duration is outside the permitted range.")]
+    InvalidActivationReview,
+
+    #[msg("The employer activation window has closed.")]
+    ApprovalWindowExpired,
+
+    #[msg("The scheduled start has already elapsed; activating now would create retroactive earnings.")]
+    ScheduledStartElapsed,
 }
 
 #[cfg(test)]
@@ -253,11 +265,20 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::InvalidDueDate), 6147);
     }
 
+    /// Codes that the Phase 3 acceptance/activation instructions depend on.
+    #[test]
+    fn v2_phase_3_error_codes_are_pinned() {
+        assert_eq!(u32::from(StreamPayV2Error::InvalidActivationReview), 6148);
+        assert_eq!(u32::from(StreamPayV2Error::ApprovalWindowExpired), 6149);
+        assert_eq!(u32::from(StreamPayV2Error::ScheduledStartElapsed), 6150);
+    }
+
     /// The last variant, which is where every future append must land.
     #[test]
     fn v2_error_enum_tail_is_stable() {
         assert_eq!(u32::from(StreamPayV2Error::ArithmeticOverflow), 6144);
         assert_eq!(u32::from(StreamPayV2Error::EscrowFundingMismatch), 6145);
         assert_eq!(u32::from(StreamPayV2Error::InvalidDueDate), 6147);
+        assert_eq!(u32::from(StreamPayV2Error::ScheduledStartElapsed), 6150);
     }
 }
