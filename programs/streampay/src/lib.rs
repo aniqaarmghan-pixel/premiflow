@@ -8,6 +8,21 @@ use anchor_spl::token::{
 };
 declare_id!("EgZvP1pnkQFiCQkrqvEUQQLJa1hGg6UUYUUcVCZMEyhd");
 
+// ---------------------------------------------------------------------------
+// StreamPay V2.
+//
+// V2 is additive: its own module tree, its own account types, its own error
+// range (6100+) and its own disjoint PDA seed namespace. It shares only the
+// program ID.
+//
+// Everything below this block is V1 and is intentionally left unchanged:
+// same `Stream` layout and discriminator, same instruction names and
+// discriminators, same seeds, same error codes 6000..=6004.
+// ---------------------------------------------------------------------------
+pub mod v2;
+
+pub use v2::*;
+
 #[program]
 pub mod streampay {
 pub fn withdraw(ctx: Context<Withdraw>) -> Result<()> {
