@@ -65,6 +65,16 @@ pub const MAX_REVIEW_DURATION: i64 = 2_592_000;
 /// child accounts directly, replacing a wall-clock interval floor.
 pub const MAX_CHECKPOINTS: u32 = 1024;
 
+/// Upper bound on milestones per milestone/fixed contract.
+///
+/// Deliberately much lower than `MAX_CHECKPOINTS`. Checkpoints are generated
+/// from a time formula, so their count follows from terms the employer already
+/// agreed. Milestones are hand-defined, each one costs the employer a rent-
+/// funded account and its own review cycle, and every negotiated deliverable
+/// has to be read by a human before acceptance. 64 is far past any realistic
+/// freelance contract while keeping the child-account footprint bounded.
+pub const MAX_MILESTONES: u32 = 64;
+
 /// Upper bound on negotiated revision cycles per work unit. Together with
 /// `review_duration` this bounds how long a submitted unit can be withheld.
 pub const MAX_REVISIONS_LIMIT: u8 = 5;

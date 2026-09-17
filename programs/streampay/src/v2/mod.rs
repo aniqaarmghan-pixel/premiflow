@@ -5,8 +5,8 @@
 //! or error codes. The V1 `Stream` implementation remains in `lib.rs`
 //! untouched; see `constants` for the disjoint V2 seed namespace.
 //!
-//! Phase 0 contains data types only. No V2 instruction exists yet and no V2
-//! account is ever created on-chain by this code.
+//! V2 instructions live in `instructions/` and are registered from `lib.rs`.
+//! They share the program ID with V1 but none of its accounts or seeds.
 
 pub mod constants;
 pub mod enums;

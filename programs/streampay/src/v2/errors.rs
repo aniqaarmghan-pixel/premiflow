@@ -177,6 +177,15 @@ pub enum StreamPayV2Error {
     // -----------------------------------------------------------------
     #[msg("Escrow did not receive the full contract amount.")]
     EscrowFundingMismatch,
+
+    // -----------------------------------------------------------------
+    // Appended in Phase 2.
+    // -----------------------------------------------------------------
+    #[msg("This contract already has the maximum number of milestones.")]
+    TooManyMilestones,
+
+    #[msg("Milestone due offset is not a positive duration within the contract term, or is not later than the previous milestone.")]
+    InvalidDueDate,
 }
 
 #[cfg(test)]
@@ -223,10 +232,32 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::SelfContract), 6109);
     }
 
+    /// Codes that `add_milestone` and `finalize_terms` depend on.
+    #[test]
+    fn v2_phase_2_error_codes_are_pinned() {
+        assert_eq!(u32::from(StreamPayV2Error::InvalidPaymentMode), 6110);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidState), 6111);
+        assert_eq!(u32::from(StreamPayV2Error::AcceptanceExpired), 6115);
+        assert_eq!(u32::from(StreamPayV2Error::Unauthorized), 6118);
+        assert_eq!(
+            u32::from(StreamPayV2Error::MilestoneAllocationExceeded),
+            6119
+        );
+        assert_eq!(
+            u32::from(StreamPayV2Error::MilestoneAllocationIncomplete),
+            6120
+        );
+        assert_eq!(u32::from(StreamPayV2Error::NoMilestones), 6121);
+        assert_eq!(u32::from(StreamPayV2Error::StreamingHasNoMilestones), 6123);
+        assert_eq!(u32::from(StreamPayV2Error::TooManyMilestones), 6146);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidDueDate), 6147);
+    }
+
     /// The last variant, which is where every future append must land.
     #[test]
     fn v2_error_enum_tail_is_stable() {
         assert_eq!(u32::from(StreamPayV2Error::ArithmeticOverflow), 6144);
         assert_eq!(u32::from(StreamPayV2Error::EscrowFundingMismatch), 6145);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidDueDate), 6147);
     }
 }

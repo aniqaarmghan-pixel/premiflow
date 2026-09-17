@@ -255,7 +255,22 @@ Ok(())
 
     /// Creates a funded contract and offers it to the freelancer.
     pub fn create_contract(ctx: Context<CreateContract>, args: CreateContractArgs) -> Result<()> {
-        v2::instructions::create_contract::handler(ctx, args)
+        v2::instructions::create_contract::handle_create_contract(ctx, args)
+    }
+
+    /// Defines one deliverable of a draft milestone contract. The index is
+    /// derived on-chain, not supplied by the caller.
+    pub fn add_milestone(
+        ctx: Context<AddMilestone>,
+        amount: u64,
+        due_offset_seconds: i64,
+    ) -> Result<()> {
+        v2::instructions::add_milestone::handle_add_milestone(ctx, amount, due_offset_seconds)
+    }
+
+    /// Locks a fully allocated milestone contract's terms and offers it.
+    pub fn finalize_terms(ctx: Context<FinalizeTerms>) -> Result<()> {
+        v2::instructions::finalize_terms::handle_finalize_terms(ctx)
     }
 }
 #[derive(Accounts)]

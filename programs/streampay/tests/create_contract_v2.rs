@@ -351,6 +351,7 @@ fn create_streaming_contract_succeeds() {
     assert_eq!(contract.released_unit_count, 0);
     assert_eq!(contract.voided_unit_count, 0);
     assert_eq!(contract.open_review_count, 0);
+    assert_eq!(contract.last_milestone_due_offset, 0);
 
     // Metadata: bounded reference plus hash, nothing more.
     assert_eq!(contract.metadata_uri, "ipfs://bafyContractMetadata");
@@ -360,7 +361,7 @@ fn create_streaming_contract_succeeds() {
     assert_eq!(contract.bump, contract_bump);
     assert_eq!(contract.escrow_bump, escrow_bump);
 
-    assert_eq!(contract.reserved, [0u8; 124]);
+    assert_eq!(contract.reserved, [0u8; 116]);
 
     // Escrow holds exactly the full amount, and the employer paid exactly that.
     assert_eq!(env.token_balance(&escrow_pda), total_amount);

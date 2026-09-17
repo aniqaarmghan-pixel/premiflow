@@ -23,6 +23,7 @@ use anchor_lang::prelude::*;
 
 use crate::v2::constants::MAX_URI_LEN;
 use crate::v2::enums::{ContractStatus, PaymentMode, StartMode};
+use crate::v2::errors::StreamPayV2Error;
 
 #[account]
 #[derive(InitSpace)]
@@ -120,6 +121,10 @@ pub struct Contract {
     /// Units currently in a non-terminal reviewable state. A non-zero value
     /// blocks employer cancellation.
     pub open_review_count: u16,
+    /// Due offset of the most recently defined milestone, in seconds after
+    /// start. Zero until the first milestone exists. Used so `add_milestone`
+    /// can enforce strictly increasing offsets without iterating children.
+    pub last_milestone_due_offset: i64,
 
     // -----------------------------------------------------------------
     // Off-chain metadata reference. Project titles, descriptions, profiles,
@@ -135,8 +140,9 @@ pub struct Contract {
     /// Upgrade headroom. Adding a field means shrinking this, which leaves
     /// account size and every client offset unchanged.
     ///
-    /// Started at 128 bytes; `voided_unit_count` (4 bytes) was taken from it.
-    pub reserved: [u8; 124],
+    /// Started at 128 bytes; `voided_unit_count` (4 bytes) and
+    /// `last_milestone_due_offset` (8 bytes) were taken from it.
+    pub reserved: [u8; 116],
 
     // -----------------------------------------------------------------
     // Variable length. Must remain the final field.
@@ -144,6 +150,37 @@ pub struct Contract {
     /// Bounded pointer to the off-chain record.
     #[max_len(MAX_URI_LEN)]
     pub metadata_uri: String,
+}
+
+impl Contract {
+    /// The latest instant at which this contract's term can possibly end.
+    ///
+    /// Before acceptance the real `end_time` is genuinely unknown under
+    /// `StartMode::OnAcceptance`: it is fixed to `accepted_at + duration_seconds`,
+    /// and acceptance may land anywhere up to `acceptance_deadline`. The worst
+    /// case is therefore an acceptance on the deadline itself. Under
+    /// `StartMode::Scheduled` the start instant is already agreed, so the bound
+    /// is exact rather than pessimistic.
+    ///
+    /// Either way this is a *sound upper bound*, which is what makes it usable
+    /// for validating dates during `Draft` without inventing a start time. Note
+    /// that `start_mode` decides which anchor point applies — not whether some
+    /// timestamp happens to be zero.
+    ///
+    /// Phase 1 already proves this addition cannot overflow for any contract
+    /// that exists; the checked arithmetic here is belt-and-braces.
+    pub fn latest_possible_end(&self) -> Result<i64> {
+        let anchor_point = match self.start_mode {
+            StartMode::OnAcceptance => self.acceptance_deadline,
+            StartMode::Scheduled => self.scheduled_start_time,
+        };
+
+        let end = anchor_point
+            .checked_add(self.duration_seconds)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+
+        Ok(end)
+    }
 }
 
 /// Documented, compiler-verified account size.

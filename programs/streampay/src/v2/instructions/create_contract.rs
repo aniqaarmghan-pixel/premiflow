@@ -304,7 +304,10 @@ pub struct CreateContract<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<CreateContract>, args: CreateContractArgs) -> Result<()> {
+pub fn handle_create_contract(
+    ctx: Context<CreateContract>,
+    args: CreateContractArgs,
+) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
 
     let employer_key = ctx.accounts.employer.key();
@@ -365,11 +368,12 @@ pub fn handler(ctx: Context<CreateContract>, args: CreateContractArgs) -> Result
         contract.released_unit_count = 0;
         contract.voided_unit_count = 0;
         contract.open_review_count = 0;
+        contract.last_milestone_due_offset = 0;
 
         contract.metadata_hash = args.metadata_hash;
         contract.bump = ctx.bumps.contract;
         contract.escrow_bump = ctx.bumps.contract_escrow;
-        contract.reserved = [0u8; 124];
+        contract.reserved = [0u8; 116];
         contract.metadata_uri = args.metadata_uri;
     }
 

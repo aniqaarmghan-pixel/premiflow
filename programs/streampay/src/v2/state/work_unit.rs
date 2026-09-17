@@ -11,7 +11,7 @@
 //! | `amount`                    | derived from the agreed vesting formula   | negotiated before acceptance         |
 //! | initial `status`            | `Submitted`                              | `Defined`                            |
 //! | `period_start`/`period_end` | the streaming period, half-open           | unused                               |
-//! | `due_date`                  | unused                                   | advisory deadline                    |
+//! | `due_offset_seconds`        | unused                                   | seconds after contract start         |
 //! | concurrency                 | serialized, one open at a time            | reviewable in parallel               |
 //!
 //! Field ordering follows the same rule as `Contract`: fixed-size fields first
@@ -22,6 +22,7 @@ use anchor_lang::prelude::*;
 
 use crate::v2::constants::MAX_URI_LEN;
 use crate::v2::enums::{ReleaseTrigger, WorkUnitKind, WorkUnitStatus};
+use crate::v2::errors::StreamPayV2Error;
 
 #[account]
 #[derive(InitSpace)]
@@ -53,8 +54,12 @@ pub struct WorkUnit {
     pub period_start: i64,
     /// Exclusive end of the streaming period. `Checkpoint` only.
     pub period_end: i64,
-    /// Advisory delivery deadline. `Milestone` / `Fixed` only.
-    pub due_date: i64,
+    /// Seconds after `Contract::start_time` when this deliverable is due.
+    /// `Milestone` / `Fixed` only. Always a duration, never a calendar
+    /// timestamp, so the same field is valid under both `OnAcceptance` and
+    /// `Scheduled`. Absolute due time is `start_time + due_offset_seconds`
+    /// once the contract has actually started.
+    pub due_offset_seconds: i64,
 
     // -----------------------------------------------------------------
     // Review lifecycle.
@@ -98,6 +103,18 @@ pub struct WorkUnit {
     /// never stored on-chain.
     #[max_len(MAX_URI_LEN)]
     pub submission_uri: String,
+}
+
+impl WorkUnit {
+    /// Calendar due instant once the contract has a real `start_time`.
+    ///
+    /// Do not call this with a fabricated start. For a defined milestone the
+    /// offset is strictly positive, so the result is always after `start_time`.
+    pub fn due_at(&self, start_time: i64) -> Result<i64> {
+        start_time
+            .checked_add(self.due_offset_seconds)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow.into())
+    }
 }
 
 /// Documented, compiler-verified account size.
