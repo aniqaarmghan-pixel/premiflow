@@ -173,6 +173,7 @@ impl Env {
                 employer_token_account: self.employer_token_account,
                 contract,
                 contract_escrow,
+                trial_work_unit: None,
                 token_program: TOKEN_ID,
                 system_program: anchor_lang::system_program::ID,
             }
@@ -339,6 +340,7 @@ fn milestone_args(contract_id: u64, total_amount: u64, now: i64) -> CreateContra
         review_duration: 300,
         activation_review_duration: 3_600,
         max_revisions: 2,
+        trial_amount: 0,
         metadata_uri: "ipfs://bafyContractMetadata".to_string(),
         metadata_hash: [7u8; 32],
     }

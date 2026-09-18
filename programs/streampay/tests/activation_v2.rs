@@ -185,6 +185,7 @@ impl Env {
                 employer_token_account: self.employer_token_account,
                 contract,
                 contract_escrow,
+                trial_work_unit: None,
                 token_program: TOKEN_ID,
                 system_program: anchor_lang::system_program::ID,
             }
@@ -330,6 +331,7 @@ impl Env {
             accounts: streampay_program::accounts::RejectActivation {
                 employer: self.employer_pk,
                 contract: self.contract_pda(contract_id),
+                trial_work_unit: None,
             }
             .to_account_metas(None),
             data: streampay_program::instruction::RejectActivation {}.data(),
@@ -345,8 +347,12 @@ impl Env {
     ) -> TransactionResult {
         let ix = Instruction {
             program_id: self.program_id,
-            accounts: streampay_program::accounts::RejectActivation { employer, contract }
-                .to_account_metas(None),
+            accounts: streampay_program::accounts::RejectActivation {
+                employer,
+                contract,
+                trial_work_unit: None,
+            }
+            .to_account_metas(None),
             data: streampay_program::instruction::RejectActivation {}.data(),
         };
         self.send(ix, signer)
@@ -382,6 +388,7 @@ fn streaming_args(contract_id: u64, now: i64) -> CreateContractArgs {
         review_duration: 300,
         activation_review_duration: 3_600,
         max_revisions: 2,
+        trial_amount: 0,
         metadata_uri: "ipfs://bafyContractMetadata".to_string(),
         metadata_hash: [7u8; 32],
     }

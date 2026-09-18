@@ -74,10 +74,11 @@ pub fn handle_finalize_terms(ctx: Context<FinalizeTerms>) -> Result<()> {
     // work, with the entire escrow unclaimable.
     require!(contract.work_unit_count > 0, StreamPayV2Error::NoMilestones);
 
-    // Exact equality. `add_milestone` already prevents the greater-than case, so
-    // in practice this rejects under-allocation.
+    // Exact equality against the main economic base. With a trial that is
+    // `allocated + trial_amount == total_amount`. Without a trial,
+    // `main_amount == total_amount` and Phase 2 behaviour is unchanged.
     require!(
-        contract.allocated_amount == contract.total_amount,
+        contract.allocated_amount == contract.main_amount,
         StreamPayV2Error::MilestoneAllocationIncomplete
     );
 

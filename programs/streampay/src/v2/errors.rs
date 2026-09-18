@@ -198,6 +198,21 @@ pub enum StreamPayV2Error {
 
     #[msg("The scheduled start has already elapsed; activating now would create retroactive earnings.")]
     ScheduledStartElapsed,
+
+    // -----------------------------------------------------------------
+    // Appended in Phase 4.
+    // -----------------------------------------------------------------
+    #[msg("Trial amount is zero, equals or exceeds the funded total, or does not match the trial account.")]
+    InvalidTrialAmount,
+
+    #[msg("This contract has no paid trial configured.")]
+    TrialNotConfigured,
+
+    #[msg("A paid trial is configured; this instruction cannot bypass it.")]
+    TrialRequired,
+
+    #[msg("The trial work unit is not in the required state for this operation.")]
+    InvalidTrialState,
 }
 
 #[cfg(test)]
@@ -273,6 +288,15 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::ScheduledStartElapsed), 6150);
     }
 
+    /// Codes that the Phase 4 trial instructions depend on.
+    #[test]
+    fn v2_phase_4_error_codes_are_pinned() {
+        assert_eq!(u32::from(StreamPayV2Error::InvalidTrialAmount), 6151);
+        assert_eq!(u32::from(StreamPayV2Error::TrialNotConfigured), 6152);
+        assert_eq!(u32::from(StreamPayV2Error::TrialRequired), 6153);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidTrialState), 6154);
+    }
+
     /// The last variant, which is where every future append must land.
     #[test]
     fn v2_error_enum_tail_is_stable() {
@@ -280,5 +304,6 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::EscrowFundingMismatch), 6145);
         assert_eq!(u32::from(StreamPayV2Error::InvalidDueDate), 6147);
         assert_eq!(u32::from(StreamPayV2Error::ScheduledStartElapsed), 6150);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidTrialState), 6154);
     }
 }

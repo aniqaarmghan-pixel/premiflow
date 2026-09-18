@@ -63,7 +63,17 @@ pub struct Contract {
     // -----------------------------------------------------------------
     /// Amount funded into escrow at creation. Immutable.
     pub total_amount: u64,
-    /// Sum of defined work unit amounts. Milestone/Fixed only.
+    /// Reserved pre-activation trial compensation, included in `total_amount`.
+    /// Zero means no trial is configured. Not a lifecycle predicate: whether a
+    /// trial WorkUnit exists is answered by this being positive *and* the
+    /// `trial_unit` PDA being initialized.
+    pub trial_amount: u64,
+    /// Main-contract economic base: `total_amount - trial_amount`. Future
+    /// streaming, fixed and milestone settlement uses this, never the trial
+    /// reservation. Equals `total_amount` when there is no trial.
+    pub main_amount: u64,
+    /// Sum of defined milestone work unit amounts. Milestone/Fixed only.
+    /// At finalize this must equal `main_amount`, not `total_amount`.
     pub allocated_amount: u64,
     /// Freelancer entitlement unlocked by approval or review timeout.
     pub released_amount: u64,
@@ -145,9 +155,9 @@ pub struct Contract {
     /// account size and every client offset unchanged.
     ///
     /// Started at 128 bytes; `voided_unit_count` (4),
-    /// `last_milestone_due_offset` (8) and `activation_review_duration` (8)
-    /// were taken from it.
-    pub reserved: [u8; 108],
+    /// `last_milestone_due_offset` (8), `activation_review_duration` (8),
+    /// `trial_amount` (8) and `main_amount` (8) were taken from it.
+    pub reserved: [u8; 92],
 
     // -----------------------------------------------------------------
     // Variable length. Must remain the final field.
@@ -158,6 +168,12 @@ pub struct Contract {
 }
 
 impl Contract {
+    /// Whether a paid trial is configured. `trial_amount` is the reservation,
+    /// not a timestamp sentinel.
+    pub fn has_trial(&self) -> bool {
+        self.trial_amount > 0
+    }
+
     /// Latest instant the employer may approve or reject activation.
     ///
     /// Only meaningful once the freelancer has accepted (`accepted_at` is set
@@ -167,6 +183,46 @@ impl Contract {
         self.accepted_at
             .checked_add(self.activation_review_duration)
             .ok_or(StreamPayV2Error::ArithmeticOverflow.into())
+    }
+
+    /// Resolve main-contract timing at employer activation.
+    ///
+    /// Enforces the approval window and the Scheduled no-retroactive-earning
+    /// rule. Does not mutate; callers write the returned values.
+    pub fn resolve_activation_timing(&self, now: i64) -> Result<(i64, i64, i64)> {
+        let activation_deadline = self.activation_deadline()?;
+        require!(
+            now < activation_deadline,
+            StreamPayV2Error::ApprovalWindowExpired
+        );
+
+        let (start_time, end_time) = match self.start_mode {
+            StartMode::OnActivation => {
+                let end = now
+                    .checked_add(self.duration_seconds)
+                    .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+                (now, end)
+            }
+            StartMode::Scheduled => {
+                require!(
+                    now <= self.scheduled_start_time,
+                    StreamPayV2Error::ScheduledStartElapsed
+                );
+                let end = self
+                    .scheduled_start_time
+                    .checked_add(self.duration_seconds)
+                    .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+                (self.scheduled_start_time, end)
+            }
+        };
+
+        let last_period_end = if self.payment_mode.uses_checkpoints() {
+            start_time
+        } else {
+            0
+        };
+
+        Ok((start_time, end_time, last_period_end))
     }
 
     /// The latest instant at which this contract's term can possibly end.

@@ -70,6 +70,7 @@ pub enum StartMode {
 /// | Expired                  | 5   | 6   |
 /// | Cancelled                | 6   | 7   |
 /// | ActivationRejected       | —   | 8   |
+/// | Disputed                 | —   | 9   |
 ///
 /// `PendingEmployerApproval` is the employer-approval gate: the freelancer has
 /// accepted, the main stream has not started. `ActivationRejected` is the
@@ -98,6 +99,10 @@ pub enum ContractStatus {
     Cancelled,
     /// The employer reviewed the trial stage and declined to activate.
     ActivationRejected,
+    /// Pre-activation trial work was submitted and then rejected. Terminal for
+    /// the main contract; token distribution is deferred so neither an instant
+    /// employer refund nor an automatic freelancer payout can be assumed.
+    Disputed,
 }
 
 impl ContractStatus {
@@ -122,6 +127,7 @@ impl ContractStatus {
                 | Self::Expired
                 | Self::Cancelled
                 | Self::ActivationRejected
+                | Self::Disputed
         )
     }
 
@@ -134,6 +140,7 @@ impl ContractStatus {
                 | Self::Completed
                 | Self::Cancelled
                 | Self::ActivationRejected
+                | Self::Disputed
         )
     }
 
@@ -156,6 +163,10 @@ pub enum WorkUnitKind {
     Milestone,
     /// The single deliverable of a fixed-price contract.
     Fixed,
+    /// Bounded paid pre-activation trial. Discriminant 3; earlier variants
+    /// keep their Phase 0–3 values. Lives at the `trial_unit` PDA, not in the
+    /// milestone/checkpoint index space.
+    Trial,
 }
 
 /// Authoritative work unit lifecycle state.

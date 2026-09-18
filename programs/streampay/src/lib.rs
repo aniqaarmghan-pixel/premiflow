@@ -292,6 +292,29 @@ Ok(())
     pub fn reject_activation(ctx: Context<RejectActivation>) -> Result<()> {
         v2::instructions::reject_activation::handle_reject_activation(ctx)
     }
+
+    /// Freelancer submits paid trial work. Does not release funds or activate.
+    pub fn submit_trial_work(
+        ctx: Context<SubmitTrialWork>,
+        submission_uri: String,
+        submission_hash: [u8; 32],
+    ) -> Result<()> {
+        v2::instructions::submit_trial_work::handle_submit_trial_work(
+            ctx,
+            submission_uri,
+            submission_hash,
+        )
+    }
+
+    /// Employer requests a bounded trial revision.
+    pub fn request_trial_revision(ctx: Context<RequestTrialRevision>) -> Result<()> {
+        v2::instructions::request_trial_revision::handle_request_trial_revision(ctx)
+    }
+
+    /// Employer approves submitted trial work and starts the main contract.
+    pub fn approve_trial_and_activate(ctx: Context<ApproveTrialAndActivate>) -> Result<()> {
+        v2::instructions::approve_trial_and_activate::handle_approve_trial_and_activate(ctx)
+    }
 }
 #[derive(Accounts)]
 pub struct Withdraw<'info> {

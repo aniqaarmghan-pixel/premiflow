@@ -188,6 +188,7 @@ impl Env {
                 employer_token_account: funding_source.unwrap_or(self.employer_token_account),
                 contract,
                 contract_escrow,
+                trial_work_unit: None,
                 token_program: TOKEN_ID,
                 system_program: anchor_lang::system_program::ID,
             }
@@ -233,6 +234,7 @@ fn streaming_args(contract_id: u64, total_amount: u64, now: i64) -> CreateContra
         review_duration: 300,
         activation_review_duration: 3_600,
         max_revisions: 2,
+        trial_amount: 0,
         metadata_uri: "ipfs://bafyContractMetadata".to_string(),
         metadata_hash: [7u8; 32],
     }
@@ -317,6 +319,8 @@ fn create_streaming_contract_succeeds() {
 
     // Money: funded in full, nothing released or moved.
     assert_eq!(contract.total_amount, total_amount);
+    assert_eq!(contract.trial_amount, 0);
+    assert_eq!(contract.main_amount, total_amount);
     assert_eq!(contract.allocated_amount, 0);
     assert_eq!(contract.released_amount, 0);
     assert_eq!(contract.withdrawn_amount, 0);
@@ -363,7 +367,7 @@ fn create_streaming_contract_succeeds() {
     assert_eq!(contract.bump, contract_bump);
     assert_eq!(contract.escrow_bump, escrow_bump);
 
-    assert_eq!(contract.reserved, [0u8; 108]);
+    assert_eq!(contract.reserved, [0u8; 92]);
 
     // Escrow holds exactly the full amount, and the employer paid exactly that.
     assert_eq!(env.token_balance(&escrow_pda), total_amount);

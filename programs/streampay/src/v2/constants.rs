@@ -16,6 +16,13 @@ pub const CONTRACT_ESCROW_SEED: &[u8] = b"contract_escrow";
 /// Full seeds: `[WORK_UNIT_SEED, contract, index.to_le_bytes()]`
 pub const WORK_UNIT_SEED: &[u8] = b"work_unit";
 
+/// Seed prefix for the optional paid-trial `WorkUnit`.
+/// Full seeds: `[TRIAL_UNIT_SEED, contract]`
+///
+/// A dedicated namespace so a trial can never collide with milestone or
+/// checkpoint units, which are indexed under `WORK_UNIT_SEED`.
+pub const TRIAL_UNIT_SEED: &[u8] = b"trial_unit";
+
 /// Current on-chain layout version written to `Contract::version` and
 /// `WorkUnit::version`. Bump only on a layout change.
 pub const V2_LAYOUT_VERSION: u8 = 1;

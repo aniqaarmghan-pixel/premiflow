@@ -138,14 +138,15 @@ pub fn handle_add_milestone(
         StreamPayV2Error::InvalidDueDate
     );
 
-    // The escrow is fixed at `total_amount`, so the milestones may never promise
-    // more than the money that is actually sitting there.
+    // Milestones spend the main-contract base, not the trial reservation.
+    // `main_amount == total_amount` when there is no trial, so Phase 2
+    // behaviour is unchanged for no-trial contracts.
     let new_allocated = contract
         .allocated_amount
         .checked_add(amount)
         .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
     require!(
-        new_allocated <= contract.total_amount,
+        new_allocated <= contract.main_amount,
         StreamPayV2Error::MilestoneAllocationExceeded
     );
 

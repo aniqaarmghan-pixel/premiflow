@@ -1,18 +1,14 @@
 //! `approve_activation`: the employer starts the main paid contract.
 //!
-//! This is the only instruction that establishes `start_time` / `end_time`.
-//! Freelancer acceptance is a prior, separate event; it does not start earning.
-//!
-//! OnActivation: start is the approval timestamp.
-//! Scheduled: start stays `scheduled_start_time`. Approval after that instant
-//! is rejected so this instruction cannot create retroactive earnings.
+//! Valid only when no paid trial is configured. A trial must be approved
+//! through `approve_trial_and_activate` so submitted work cannot be bypassed.
 //!
 //! No tokens move.
 
 use anchor_lang::prelude::*;
 
 use crate::v2::constants::CONTRACT_SEED;
-use crate::v2::enums::{ContractStatus, StartMode};
+use crate::v2::enums::ContractStatus;
 use crate::v2::errors::StreamPayV2Error;
 use crate::v2::events::ContractActivated;
 use crate::v2::state::Contract;
@@ -43,41 +39,9 @@ pub fn handle_approve_activation(ctx: Context<ApproveActivation>) -> Result<()> 
         contract.status == ContractStatus::PendingEmployerApproval,
         StreamPayV2Error::InvalidState
     );
+    require!(!contract.has_trial(), StreamPayV2Error::TrialRequired);
 
-    let activation_deadline = contract.activation_deadline()?;
-    require!(
-        now < activation_deadline,
-        StreamPayV2Error::ApprovalWindowExpired
-    );
-
-    let (start_time, end_time) = match contract.start_mode {
-        StartMode::OnActivation => {
-            let end = now
-                .checked_add(contract.duration_seconds)
-                .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
-            (now, end)
-        }
-        StartMode::Scheduled => {
-            // Approving at exactly scheduled_start_time is fine: start == now,
-            // so nothing is earned retroactively. Approving after that would
-            // make [scheduled_start, now) look like already-worked time.
-            require!(
-                now <= contract.scheduled_start_time,
-                StreamPayV2Error::ScheduledStartElapsed
-            );
-            let end = contract
-                .scheduled_start_time
-                .checked_add(contract.duration_seconds)
-                .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
-            (contract.scheduled_start_time, end)
-        }
-    };
-
-    let last_period_end = if contract.payment_mode.uses_checkpoints() {
-        start_time
-    } else {
-        0
-    };
+    let (start_time, end_time, last_period_end) = contract.resolve_activation_timing(now)?;
 
     let contract_key = contract.key();
     let employer = contract.employer;

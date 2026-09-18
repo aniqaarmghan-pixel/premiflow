@@ -8,6 +8,8 @@
 //! - Phase 2: `MilestoneAdded`, `TermsFinalized`
 //! - Phase 3: `ContractAccepted`, `ContractDeclined`, `ContractActivated`,
 //!   `ActivationRejected`
+//! - Phase 4: `TrialConfigured`, `TrialSubmitted`, `TrialRevisionRequested`,
+//!   `TrialApproved`, `TrialRejected`
 //!
 //! Every event carries `contract` as its first field so a client can index a
 //! single contract's full history with one filter. Off-chain metadata URIs and
@@ -98,6 +100,57 @@ pub struct ContractActivated {
 #[event]
 pub struct ActivationRejected {
     pub contract: Pubkey,
+    pub employer: Pubkey,
+    pub freelancer: Pubkey,
+    pub rejected_at: i64,
+}
+
+/// A paid trial was configured at contract creation.
+#[event]
+pub struct TrialConfigured {
+    pub contract: Pubkey,
+    pub trial_work_unit: Pubkey,
+    pub employer: Pubkey,
+    pub freelancer: Pubkey,
+    pub amount: u64,
+}
+
+/// The freelancer submitted (or resubmitted) trial work.
+#[event]
+pub struct TrialSubmitted {
+    pub contract: Pubkey,
+    pub trial_work_unit: Pubkey,
+    pub freelancer: Pubkey,
+    pub submitted_at: i64,
+    pub action_deadline: i64,
+    pub revision_count: u8,
+}
+
+/// The employer requested a trial revision.
+#[event]
+pub struct TrialRevisionRequested {
+    pub contract: Pubkey,
+    pub trial_work_unit: Pubkey,
+    pub employer: Pubkey,
+    pub revision_count: u8,
+    pub action_deadline: i64,
+}
+
+/// The employer approved the trial. Compensation is released, not withdrawn.
+#[event]
+pub struct TrialApproved {
+    pub contract: Pubkey,
+    pub trial_work_unit: Pubkey,
+    pub employer: Pubkey,
+    pub amount: u64,
+    pub approved_at: i64,
+}
+
+/// The employer rejected submitted trial work. No tokens moved.
+#[event]
+pub struct TrialRejected {
+    pub contract: Pubkey,
+    pub trial_work_unit: Pubkey,
     pub employer: Pubkey,
     pub freelancer: Pubkey,
     pub rejected_at: i64,

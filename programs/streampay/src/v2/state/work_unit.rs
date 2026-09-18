@@ -20,7 +20,7 @@
 
 use anchor_lang::prelude::*;
 
-use crate::v2::constants::MAX_URI_LEN;
+use crate::v2::constants::{MAX_URI_LEN, V2_LAYOUT_VERSION};
 use crate::v2::enums::{ReleaseTrigger, WorkUnitKind, WorkUnitStatus};
 use crate::v2::errors::StreamPayV2Error;
 
@@ -106,6 +106,31 @@ pub struct WorkUnit {
 }
 
 impl WorkUnit {
+    /// Populate a newly allocated trial WorkUnit. Index is 0 and is *not* a
+    /// `work_unit_count` slot; identity is the `trial_unit` PDA.
+    pub fn init_as_trial(&mut self, contract: Pubkey, amount: u64, bump: u8) {
+        self.version = V2_LAYOUT_VERSION;
+        self.contract = contract;
+        self.index = 0;
+        self.kind = WorkUnitKind::Trial;
+        self.status = WorkUnitStatus::Defined;
+        self.amount = amount;
+        self.period_start = 0;
+        self.period_end = 0;
+        // Unused for Trial; `kind` is the authority, not a zero offset.
+        self.due_offset_seconds = 0;
+        self.submitted_at = 0;
+        self.action_deadline = 0;
+        self.approved_at = 0;
+        self.released_at = 0;
+        self.revision_count = 0;
+        self.release_trigger = ReleaseTrigger::NotReleased;
+        self.submission_hash = [0u8; 32];
+        self.bump = bump;
+        self.reserved = [0u8; 64];
+        self.submission_uri = String::new();
+    }
+
     /// Calendar due instant once the contract has a real `start_time`.
     ///
     /// Do not call this with a fabricated start. For a defined milestone the

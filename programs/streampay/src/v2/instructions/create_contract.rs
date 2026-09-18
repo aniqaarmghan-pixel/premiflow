@@ -26,12 +26,13 @@ use anchor_spl::token::{transfer_checked, Mint, Token, TokenAccount, TransferChe
 use crate::v2::constants::{
     CONTRACT_ESCROW_SEED, CONTRACT_SEED, MAX_ACCEPTANCE_WINDOW, MAX_ACTIVATION_REVIEW,
     MAX_CHECKPOINTS, MAX_DURATION_SECONDS, MAX_REVIEW_DURATION, MAX_REVISIONS_LIMIT, MAX_URI_LEN,
-    MIN_ACTIVATION_REVIEW, MIN_DURATION_SECONDS, MIN_REVIEW_DURATION, V2_LAYOUT_VERSION,
+    MIN_ACTIVATION_REVIEW, MIN_DURATION_SECONDS, MIN_REVIEW_DURATION, TRIAL_UNIT_SEED,
+    V2_LAYOUT_VERSION,
 };
 use crate::v2::enums::{ContractStatus, PaymentMode, StartMode};
 use crate::v2::errors::StreamPayV2Error;
-use crate::v2::events::ContractCreated;
-use crate::v2::state::Contract;
+use crate::v2::events::{ContractCreated, TrialConfigured};
+use crate::v2::state::{Contract, WorkUnit};
 
 /// Caller-supplied terms.
 ///
@@ -78,6 +79,11 @@ pub struct CreateContractArgs {
 
     pub max_revisions: u8,
 
+    /// Paid pre-activation trial reservation, included in `total_amount`.
+    /// Zero means no trial. Must be strictly less than `total_amount` so the
+    /// main contract retains a positive economic base.
+    pub trial_amount: u64,
+
     /// Bounded reference to the off-chain contract record.
     pub metadata_uri: String,
 
@@ -94,6 +100,8 @@ struct ResolvedTerms {
     status: ContractStatus,
     scheduled_start_time: i64,
     checkpoint_interval: i64,
+    trial_amount: u64,
+    main_amount: u64,
 }
 
 impl CreateContractArgs {
@@ -151,12 +159,33 @@ impl CreateContractArgs {
 
         let scheduled_start_time = self.resolve_start()?;
         let (status, checkpoint_interval) = self.resolve_payment_mode()?;
+        let (trial_amount, main_amount) = self.resolve_trial()?;
 
         Ok(ResolvedTerms {
             status,
             scheduled_start_time,
             checkpoint_interval,
+            trial_amount,
+            main_amount,
         })
+    }
+
+    /// Trial compensation is reserved from the funded total. Zero is "no trial".
+    /// A trial equal to the whole escrow would leave the main contract with
+    /// nothing to pay, which is not a main contract.
+    fn resolve_trial(&self) -> Result<(u64, u64)> {
+        if self.trial_amount == 0 {
+            return Ok((0, self.total_amount));
+        }
+        require!(
+            self.trial_amount < self.total_amount,
+            StreamPayV2Error::InvalidTrialAmount
+        );
+        let main_amount = self
+            .total_amount
+            .checked_sub(self.trial_amount)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        Ok((self.trial_amount, main_amount))
     }
 
     /// Resolves `scheduled_start_time`, and proves up front that the `end_time`
@@ -310,6 +339,17 @@ pub struct CreateContract<'info> {
     )]
     pub contract_escrow: Account<'info, TokenAccount>,
 
+    /// Present iff `args.trial_amount > 0`. Initialized at the dedicated
+    /// `trial_unit` PDA so it cannot collide with milestone indexes.
+    #[account(
+        init,
+        payer = employer,
+        space = 8 + WorkUnit::INIT_SPACE,
+        seeds = [TRIAL_UNIT_SEED, contract.key().as_ref()],
+        bump,
+    )]
+    pub trial_work_unit: Option<Account<'info, WorkUnit>>,
+
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
@@ -349,6 +389,8 @@ pub fn handle_create_contract(
         contract.start_mode = args.start_mode;
 
         contract.total_amount = total_amount;
+        contract.trial_amount = terms.trial_amount;
+        contract.main_amount = terms.main_amount;
         contract.allocated_amount = 0;
         contract.released_amount = 0;
         contract.withdrawn_amount = 0;
@@ -384,8 +426,34 @@ pub fn handle_create_contract(
         contract.metadata_hash = args.metadata_hash;
         contract.bump = ctx.bumps.contract;
         contract.escrow_bump = ctx.bumps.contract_escrow;
-        contract.reserved = [0u8; 108];
+        contract.reserved = [0u8; 92];
         contract.metadata_uri = args.metadata_uri;
+    }
+
+    if terms.trial_amount > 0 {
+        let trial = ctx
+            .accounts
+            .trial_work_unit
+            .as_mut()
+            .ok_or(StreamPayV2Error::TrialRequired)?;
+        let trial_bump = ctx
+            .bumps
+            .trial_work_unit
+            .ok_or(StreamPayV2Error::TrialRequired)?;
+        let trial_key = trial.key();
+        trial.init_as_trial(contract_key, terms.trial_amount, trial_bump);
+        emit!(TrialConfigured {
+            contract: contract_key,
+            trial_work_unit: trial_key,
+            employer: employer_key,
+            freelancer: freelancer_key,
+            amount: terms.trial_amount,
+        });
+    } else {
+        require!(
+            ctx.accounts.trial_work_unit.is_none(),
+            StreamPayV2Error::InvalidTrialAmount
+        );
     }
 
     // Fund the escrow in full. `transfer_checked` rather than `transfer`: it
