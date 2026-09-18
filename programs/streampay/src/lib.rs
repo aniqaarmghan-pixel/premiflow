@@ -349,6 +349,12 @@ Ok(())
     pub fn release_stream_accrual(ctx: Context<ReleaseStreamAccrual>) -> Result<()> {
         v2::instructions::release_stream_accrual::handle_release_stream_accrual(ctx)
     }
+
+    /// Employer cancels an Active contract and freezes the economic split.
+    /// No SPL transfer.
+    pub fn cancel_active_contract(ctx: Context<CancelActiveContract>) -> Result<()> {
+        v2::instructions::cancel_active_contract::handle_cancel_active_contract(ctx)
+    }
 }
 #[derive(Accounts)]
 pub struct Withdraw<'info> {

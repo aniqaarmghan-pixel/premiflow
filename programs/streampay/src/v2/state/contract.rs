@@ -86,6 +86,13 @@ pub struct Contract {
     /// `released_amount` conceptually equals `trial_released + stream_released_amount`
     /// on an Active streaming contract. Never inferred from `released_amount`.
     pub stream_released_amount: u64,
+    /// Frozen freelancer entitlement after clean active-contract cancellation.
+    /// Zero until `status == Cancelled`. Equals `released_amount` at settlement.
+    pub freelancer_settlement_amount: u64,
+    /// Frozen employer refundable entitlement after clean cancellation.
+    /// Zero until `status == Cancelled`. Not tokens transferred: that is
+    /// `refunded_amount`, which Phase 8 will raise.
+    pub employer_refundable_amount: u64,
 
     // -----------------------------------------------------------------
     // Negotiated terms. Frozen once the contract leaves `Draft`.
@@ -161,9 +168,14 @@ pub struct Contract {
     ///
     /// Started at 128 bytes; `voided_unit_count` (4),
     /// `last_milestone_due_offset` (8), `activation_review_duration` (8),
-    /// `trial_amount` (8), `main_amount` (8) and `stream_released_amount` (8)
+    /// `trial_amount` (8), `main_amount` (8), `stream_released_amount` (8),
+    /// `freelancer_settlement_amount` (8) and `employer_refundable_amount` (8)
     /// were taken from it.
-    pub reserved: [u8; 84],
+    ///
+    /// Phase 7 layout (V2 never deployed): two u64 settlement fields were
+    /// inserted after `stream_released_amount`; reserved shrank 84 → 68.
+    /// `INIT_SPACE` remains 621 so the allocated account size is unchanged.
+    pub reserved: [u8; 68],
 
     // -----------------------------------------------------------------
     // Variable length. Must remain the final field.
@@ -305,6 +317,69 @@ impl Contract {
             .checked_sub(1)
             .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
         Ok(())
+    }
+
+    /// Freeze a clean active-contract cancellation split.
+    ///
+    /// Streaming: `stream_accrued_at(now)` is materialized into
+    /// `released_amount` / `stream_released_amount` first so unreleased earned
+    /// time is not lost. Fixed/Milestone: `released_amount` is left as-is —
+    /// unreleased future work is never auto-paid, and unresolved review cannot
+    /// reach this method (`open_review_count` must be 0).
+    pub fn settle_active_cancellation(&mut self, now: i64) -> Result<(u64, u64)> {
+        require!(
+            self.status == ContractStatus::Active,
+            StreamPayV2Error::InvalidState
+        );
+        require!(
+            self.open_review_count == 0,
+            StreamPayV2Error::OpenReviewBlocksCancel
+        );
+
+        if self.payment_mode.uses_checkpoints() {
+            let accrued = self.stream_accrued_at(now)?;
+            let delta = accrued
+                .checked_sub(self.stream_released_amount)
+                .ok_or(StreamPayV2Error::ReleaseAmountExceeded)?;
+            if delta > 0 {
+                self.stream_released_amount = accrued;
+                self.released_amount = self
+                    .released_amount
+                    .checked_add(delta)
+                    .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+            }
+        }
+
+        let freelancer = self.released_amount;
+        require!(
+            freelancer <= self.total_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+        let employer = self
+            .total_amount
+            .checked_sub(freelancer)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        let conserved = freelancer
+            .checked_add(employer)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        require!(
+            conserved == self.total_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+        require!(
+            self.withdrawn_amount <= freelancer,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+        require!(
+            self.refunded_amount <= employer,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+
+        self.freelancer_settlement_amount = freelancer;
+        self.employer_refundable_amount = employer;
+        self.status = ContractStatus::Cancelled;
+        self.terminated_at = now;
+        Ok((freelancer, employer))
     }
 }
 

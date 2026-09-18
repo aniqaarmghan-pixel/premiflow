@@ -331,6 +331,17 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::ReleaseAmountExceeded), 6156);
     }
 
+    /// Codes that the Phase 7 cancellation-settlement instruction depends on.
+    /// No new variants: existing codes are semantically exact.
+    #[test]
+    fn v2_phase_7_error_codes_are_pinned() {
+        assert_eq!(u32::from(StreamPayV2Error::InvalidState), 6111);
+        assert_eq!(u32::from(StreamPayV2Error::ContractTerminal), 6113);
+        assert_eq!(u32::from(StreamPayV2Error::Unauthorized), 6118);
+        assert_eq!(u32::from(StreamPayV2Error::OpenReviewBlocksCancel), 6142);
+        assert_eq!(u32::from(StreamPayV2Error::ReleaseAmountExceeded), 6156);
+    }
+
     /// The last variant, which is where every future append must land.
     #[test]
     fn v2_error_enum_tail_is_stable() {

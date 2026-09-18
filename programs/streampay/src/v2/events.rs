@@ -13,6 +13,7 @@
 //! - Phase 5: `WorkUnitSubmitted`, `WorkUnitApproved`,
 //!   `WorkUnitRevisionRequested`, `WorkUnitReviewTimedOut`
 //! - Phase 6: `StreamAccrualReleased`
+//! - Phase 7: `ContractCancellationSettled`
 //!
 //! Every event carries `contract` as its first field so a client can index a
 //! single contract's full history with one filter. Off-chain metadata URIs and
@@ -213,4 +214,19 @@ pub struct StreamAccrualReleased {
     pub cumulative_stream_released: u64,
     pub total_released: u64,
     pub accrual_time: i64,
+}
+
+/// An Active contract was cancelled and its economic split was frozen.
+/// No SPL transfer.
+#[event]
+pub struct ContractCancellationSettled {
+    pub contract: Pubkey,
+    pub employer: Pubkey,
+    pub freelancer: Pubkey,
+    pub payment_mode: PaymentMode,
+    pub settled_at: i64,
+    pub freelancer_entitlement: u64,
+    pub employer_refundable: u64,
+    pub released_amount: u64,
+    pub stream_released_amount: u64,
 }
