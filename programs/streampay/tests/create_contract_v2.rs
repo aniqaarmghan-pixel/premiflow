@@ -37,7 +37,8 @@ use solana_transaction::Transaction;
 use solana_transaction_error::TransactionError;
 
 use ::streampay::{
-    self as streampay_program, Contract, ContractStatus, CreateContractArgs, PaymentMode, StartMode,
+    self as streampay_program, Contract, ContractStatus, CreateContractArgs, PaymentMode,
+    StartMode, WorkUnit, WorkUnitKind, WorkUnitStatus,
 };
 
 // ---------------------------------------------------------------------------
@@ -162,6 +163,14 @@ impl Env {
         Address::find_program_address(&[b"contract_escrow", contract.as_ref()], &self.program_id)
     }
 
+    fn work_unit_pda(&self, contract: &Address, index: u32) -> Address {
+        Address::find_program_address(
+            &[b"work_unit", contract.as_ref(), &index.to_le_bytes()],
+            &self.program_id,
+        )
+        .0
+    }
+
     fn token_balance(&self, account: &Address) -> u64 {
         let parsed: SplTokenAccount =
             get_spl_account(&self.svm, account).expect("Could not read token account");
@@ -179,6 +188,12 @@ impl Env {
         let (contract, _) = self.contract_pda(freelancer, args.contract_id);
         let (contract_escrow, _) = self.escrow_pda(&contract);
 
+        let fixed_work_unit = if args.payment_mode == PaymentMode::Fixed {
+            Some(self.work_unit_pda(&contract, 0))
+        } else {
+            None
+        };
+
         let instruction = Instruction {
             program_id: self.program_id,
             accounts: streampay_program::accounts::CreateContract {
@@ -189,6 +204,7 @@ impl Env {
                 contract,
                 contract_escrow,
                 trial_work_unit: None,
+                fixed_work_unit,
                 token_program: TOKEN_ID,
                 system_program: anchor_lang::system_program::ID,
             }
@@ -209,6 +225,15 @@ impl Env {
             .expect("Contract account was not created");
         let mut data: &[u8] = &account.data;
         Contract::try_deserialize(&mut data).expect("Could not deserialize Contract")
+    }
+
+    fn read_work_unit(&self, work_unit: &Address) -> WorkUnit {
+        let account = self
+            .svm
+            .get_account(work_unit)
+            .expect("WorkUnit account was not created");
+        let mut data: &[u8] = &account.data;
+        WorkUnit::try_deserialize(&mut data).expect("Could not deserialize WorkUnit")
     }
 
     /// True when nothing lives at this address.
@@ -395,10 +420,22 @@ fn create_fixed_contract_succeeds() {
     let contract = env.read_contract(&contract_pda);
 
     // One deliverable at one price: terms are already complete, so offerable.
+    // The main WorkUnit is created here so the freelancer can inspect it.
     assert_eq!(contract.payment_mode, PaymentMode::Fixed);
     assert_eq!(contract.status, ContractStatus::PendingAcceptance);
     assert_eq!(contract.total_amount, total_amount);
-    assert_eq!(contract.allocated_amount, 0);
+    assert_eq!(contract.main_amount, total_amount);
+    assert_eq!(contract.allocated_amount, total_amount);
+    assert_eq!(contract.work_unit_count, 1);
+    assert_eq!(contract.last_milestone_due_offset, 3_600);
+
+    let unit = env.read_work_unit(&env.work_unit_pda(&contract_pda, 0));
+    assert_eq!(unit.kind, WorkUnitKind::Fixed);
+    assert_eq!(unit.status, WorkUnitStatus::Defined);
+    assert_eq!(unit.amount, total_amount);
+    assert_eq!(unit.index, 0);
+    assert_eq!(unit.due_offset_seconds, 3_600);
+    assert_eq!(unit.contract, contract_pda);
 
     // The caller supplied 12_345; a fixed contract has no checkpoints, so the
     // program stores 0 rather than a meaningless value.

@@ -199,6 +199,11 @@ impl Env {
         } else {
             None
         };
+        let fixed_work_unit = if args.payment_mode == PaymentMode::Fixed {
+            Some(self.work_unit_pda(&contract, 0))
+        } else {
+            None
+        };
         let ix = Instruction {
             program_id: self.program_id,
             accounts: streampay_program::accounts::CreateContract {
@@ -209,6 +214,7 @@ impl Env {
                 contract,
                 contract_escrow,
                 trial_work_unit: trial,
+                fixed_work_unit,
                 token_program: TOKEN_ID,
                 system_program: anchor_lang::system_program::ID,
             }
@@ -593,6 +599,7 @@ fn reject_trial_without_trial_account() {
             contract,
             contract_escrow: env.escrow_pda(&contract),
             trial_work_unit: None,
+            fixed_work_unit: None,
             token_program: TOKEN_ID,
             system_program: anchor_lang::system_program::ID,
         }

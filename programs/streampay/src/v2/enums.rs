@@ -21,8 +21,9 @@ pub enum PaymentMode {
     Streaming,
     /// Fixed price split across several agreed deliverables.
     Milestone,
-    /// One deliverable, one price. Implemented as a single-unit milestone
-    /// contract so it reuses the same primitives.
+    /// One deliverable, one price. The deliverable is created at
+    /// `create_contract` as a single `WorkUnit` of kind `Fixed` at index 0,
+    /// amount equal to `main_amount`.
     Fixed,
 }
 

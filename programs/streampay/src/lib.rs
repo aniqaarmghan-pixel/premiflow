@@ -315,6 +315,34 @@ Ok(())
     pub fn approve_trial_and_activate(ctx: Context<ApproveTrialAndActivate>) -> Result<()> {
         v2::instructions::approve_trial_and_activate::handle_approve_trial_and_activate(ctx)
     }
+
+    /// Freelancer submits post-activation Milestone or Fixed work.
+    pub fn submit_work_unit(
+        ctx: Context<SubmitWorkUnit>,
+        submission_uri: String,
+        submission_hash: [u8; 32],
+    ) -> Result<()> {
+        v2::instructions::submit_work_unit::handle_submit_work_unit(
+            ctx,
+            submission_uri,
+            submission_hash,
+        )
+    }
+
+    /// Employer releases a submitted post-activation work unit. No SPL transfer.
+    pub fn approve_work_unit(ctx: Context<ApproveWorkUnit>) -> Result<()> {
+        v2::instructions::approve_work_unit::handle_approve_work_unit(ctx)
+    }
+
+    /// Employer requests a bounded resubmission of post-activation work.
+    pub fn request_revision(ctx: Context<RequestRevision>) -> Result<()> {
+        v2::instructions::request_revision::handle_request_revision(ctx)
+    }
+
+    /// Permissionless auto-release of an expired post-activation review.
+    pub fn finalize_review_timeout(ctx: Context<FinalizeReviewTimeout>) -> Result<()> {
+        v2::instructions::finalize_review_timeout::handle_finalize_review_timeout(ctx)
+    }
 }
 #[derive(Accounts)]
 pub struct Withdraw<'info> {

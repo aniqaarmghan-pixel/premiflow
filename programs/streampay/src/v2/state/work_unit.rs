@@ -131,6 +131,58 @@ impl WorkUnit {
         self.submission_uri = String::new();
     }
 
+    /// Populate the single main deliverable of a Fixed contract. Lives at
+    /// `work_unit` index 0 with amount equal to `Contract::main_amount`.
+    pub fn init_as_fixed(
+        &mut self,
+        contract: Pubkey,
+        amount: u64,
+        due_offset_seconds: i64,
+        bump: u8,
+    ) {
+        self.version = V2_LAYOUT_VERSION;
+        self.contract = contract;
+        self.index = 0;
+        self.kind = WorkUnitKind::Fixed;
+        self.status = WorkUnitStatus::Defined;
+        self.amount = amount;
+        self.period_start = 0;
+        self.period_end = 0;
+        self.due_offset_seconds = due_offset_seconds;
+        self.submitted_at = 0;
+        self.action_deadline = 0;
+        self.approved_at = 0;
+        self.released_at = 0;
+        self.revision_count = 0;
+        self.release_trigger = ReleaseTrigger::NotReleased;
+        self.submission_hash = [0u8; 32];
+        self.bump = bump;
+        self.reserved = [0u8; 64];
+        self.submission_uri = String::new();
+    }
+
+    /// Phase 5 generic review is only for post-activation Milestone/Fixed units.
+    /// Trial keeps its dedicated instructions; streaming checkpoints are Phase 6.
+    pub fn require_main_deliverable(&self) -> Result<()> {
+        match self.kind {
+            WorkUnitKind::Milestone | WorkUnitKind::Fixed => Ok(()),
+            WorkUnitKind::Checkpoint | WorkUnitKind::Trial => {
+                Err(StreamPayV2Error::UnsupportedWorkUnitKind.into())
+            }
+        }
+    }
+
+    /// Credit this unit as released. Idempotency is the caller's problem:
+    /// `status` must already have been proven `Submitted`.
+    pub fn mark_released(&mut self, now: i64, trigger: ReleaseTrigger) {
+        self.status = WorkUnitStatus::Released;
+        if trigger == ReleaseTrigger::EmployerApproval {
+            self.approved_at = now;
+        }
+        self.released_at = now;
+        self.release_trigger = trigger;
+    }
+
     /// Calendar due instant once the contract has a real `start_time`.
     ///
     /// Do not call this with a fabricated start. For a defined milestone the

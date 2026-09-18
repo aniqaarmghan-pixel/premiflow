@@ -245,6 +245,52 @@ impl Contract {
 
         Ok(end)
     }
+
+    /// Credit a post-activation main-work release.
+    ///
+    /// Trial compensation already sitting in `released_amount` is not counted
+    /// again: the new main-released total cannot exceed `main_amount`, and
+    /// `released_amount + refunded_amount` cannot exceed `total_amount`.
+    /// `released_unit_count` and `open_review_count` move with the credit.
+    pub fn credit_main_release(&mut self, amount: u64) -> Result<()> {
+        let new_released = self
+            .released_amount
+            .checked_add(amount)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        let released_plus_refunded = new_released
+            .checked_add(self.refunded_amount)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        require!(
+            released_plus_refunded <= self.total_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+
+        // Once Active, a trial-configured contract has already credited
+        // `trial_amount` via `approve_trial_and_activate`.
+        let trial_released = if self.has_trial() {
+            self.trial_amount
+        } else {
+            0
+        };
+        let main_released = new_released
+            .checked_sub(trial_released)
+            .ok_or(StreamPayV2Error::ReleaseAmountExceeded)?;
+        require!(
+            main_released <= self.main_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+
+        self.released_amount = new_released;
+        self.released_unit_count = self
+            .released_unit_count
+            .checked_add(1)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        self.open_review_count = self
+            .open_review_count
+            .checked_sub(1)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        Ok(())
+    }
 }
 
 /// Documented, compiler-verified account size.

@@ -8,12 +8,16 @@ pub mod accept_contract;
 pub mod add_milestone;
 pub mod approve_activation;
 pub mod approve_trial_and_activate;
+pub mod approve_work_unit;
 pub mod create_contract;
 pub mod decline_contract;
+pub mod finalize_review_timeout;
 pub mod finalize_terms;
 pub mod reject_activation;
+pub mod request_revision;
 pub mod request_trial_revision;
 pub mod submit_trial_work;
+pub mod submit_work_unit;
 
 // Glob re-exports are required: `#[derive(Accounts)]` generates hidden
 // client/CPI modules that `#[program]` resolves through the crate root.
@@ -21,9 +25,13 @@ pub use accept_contract::*;
 pub use add_milestone::*;
 pub use approve_activation::*;
 pub use approve_trial_and_activate::*;
+pub use approve_work_unit::*;
 pub use create_contract::*;
 pub use decline_contract::*;
+pub use finalize_review_timeout::*;
 pub use finalize_terms::*;
 pub use reject_activation::*;
+pub use request_revision::*;
 pub use request_trial_revision::*;
 pub use submit_trial_work::*;
+pub use submit_work_unit::*;

@@ -10,6 +10,8 @@
 //!   `ActivationRejected`
 //! - Phase 4: `TrialConfigured`, `TrialSubmitted`, `TrialRevisionRequested`,
 //!   `TrialApproved`, `TrialRejected`
+//! - Phase 5: `WorkUnitSubmitted`, `WorkUnitApproved`,
+//!   `WorkUnitRevisionRequested`, `WorkUnitReviewTimedOut`
 //!
 //! Every event carries `contract` as its first field so a client can index a
 //! single contract's full history with one filter. Off-chain metadata URIs and
@@ -154,4 +156,48 @@ pub struct TrialRejected {
     pub employer: Pubkey,
     pub freelancer: Pubkey,
     pub rejected_at: i64,
+}
+
+/// The freelancer submitted (or resubmitted) post-activation work.
+#[event]
+pub struct WorkUnitSubmitted {
+    pub contract: Pubkey,
+    pub work_unit: Pubkey,
+    pub freelancer: Pubkey,
+    pub work_unit_index: u32,
+    pub submitted_at: i64,
+    pub action_deadline: i64,
+    pub revision_count: u8,
+}
+
+/// The employer approved a submitted work unit. Compensation is released, not withdrawn.
+#[event]
+pub struct WorkUnitApproved {
+    pub contract: Pubkey,
+    pub work_unit: Pubkey,
+    pub employer: Pubkey,
+    pub work_unit_index: u32,
+    pub amount: u64,
+    pub approved_at: i64,
+}
+
+/// The employer requested a bounded resubmission of post-activation work.
+#[event]
+pub struct WorkUnitRevisionRequested {
+    pub contract: Pubkey,
+    pub work_unit: Pubkey,
+    pub employer: Pubkey,
+    pub work_unit_index: u32,
+    pub revision_count: u8,
+    pub action_deadline: i64,
+}
+
+/// Review timed out and the submitted unit was auto-released. No SPL transfer.
+#[event]
+pub struct WorkUnitReviewTimedOut {
+    pub contract: Pubkey,
+    pub work_unit: Pubkey,
+    pub work_unit_index: u32,
+    pub amount: u64,
+    pub released_at: i64,
 }

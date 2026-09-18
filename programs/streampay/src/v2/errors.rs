@@ -213,6 +213,15 @@ pub enum StreamPayV2Error {
 
     #[msg("The trial work unit is not in the required state for this operation.")]
     InvalidTrialState,
+
+    // -----------------------------------------------------------------
+    // Appended in Phase 5.
+    // -----------------------------------------------------------------
+    #[msg("This work unit kind cannot use the post-activation review instructions.")]
+    UnsupportedWorkUnitKind,
+
+    #[msg("This release would exceed the contract's main or total amount.")]
+    ReleaseAmountExceeded,
 }
 
 #[cfg(test)]
@@ -297,6 +306,19 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::InvalidTrialState), 6154);
     }
 
+    /// Codes that the Phase 5 work-review instructions depend on.
+    #[test]
+    fn v2_phase_5_error_codes_are_pinned() {
+        assert_eq!(u32::from(StreamPayV2Error::ReviewWindowOpen), 6132);
+        assert_eq!(u32::from(StreamPayV2Error::ReviewWindowClosed), 6133);
+        assert_eq!(u32::from(StreamPayV2Error::RevisionLimitReached), 6134);
+        assert_eq!(u32::from(StreamPayV2Error::UnitNotSubmittable), 6126);
+        assert_eq!(u32::from(StreamPayV2Error::UnitNotUnderReview), 6127);
+        assert_eq!(u32::from(StreamPayV2Error::UnitAlreadyReleased), 6128);
+        assert_eq!(u32::from(StreamPayV2Error::UnsupportedWorkUnitKind), 6155);
+        assert_eq!(u32::from(StreamPayV2Error::ReleaseAmountExceeded), 6156);
+    }
+
     /// The last variant, which is where every future append must land.
     #[test]
     fn v2_error_enum_tail_is_stable() {
@@ -305,5 +327,6 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::InvalidDueDate), 6147);
         assert_eq!(u32::from(StreamPayV2Error::ScheduledStartElapsed), 6150);
         assert_eq!(u32::from(StreamPayV2Error::InvalidTrialState), 6154);
+        assert_eq!(u32::from(StreamPayV2Error::ReleaseAmountExceeded), 6156);
     }
 }

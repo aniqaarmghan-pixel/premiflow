@@ -27,7 +27,7 @@ use crate::v2::constants::{
     CONTRACT_ESCROW_SEED, CONTRACT_SEED, MAX_ACCEPTANCE_WINDOW, MAX_ACTIVATION_REVIEW,
     MAX_CHECKPOINTS, MAX_DURATION_SECONDS, MAX_REVIEW_DURATION, MAX_REVISIONS_LIMIT, MAX_URI_LEN,
     MIN_ACTIVATION_REVIEW, MIN_DURATION_SECONDS, MIN_REVIEW_DURATION, TRIAL_UNIT_SEED,
-    V2_LAYOUT_VERSION,
+    V2_LAYOUT_VERSION, WORK_UNIT_SEED,
 };
 use crate::v2::enums::{ContractStatus, PaymentMode, StartMode};
 use crate::v2::errors::StreamPayV2Error;
@@ -348,7 +348,19 @@ pub struct CreateContract<'info> {
         seeds = [TRIAL_UNIT_SEED, contract.key().as_ref()],
         bump,
     )]
-    pub trial_work_unit: Option<Account<'info, WorkUnit>>,
+    pub trial_work_unit: Option<Box<Account<'info, WorkUnit>>>,
+
+    /// Present iff `args.payment_mode == Fixed`. One main deliverable at
+    /// `work_unit` index 0, amount = `main_amount`. The freelancer can inspect
+    /// it before accepting. Seeds are independent of the trial PDA.
+    #[account(
+        init,
+        payer = employer,
+        space = 8 + WorkUnit::INIT_SPACE,
+        seeds = [WORK_UNIT_SEED, contract.key().as_ref(), &0u32.to_le_bytes()],
+        bump,
+    )]
+    pub fixed_work_unit: Option<Box<Account<'info, WorkUnit>>>,
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -453,6 +465,33 @@ pub fn handle_create_contract(
         require!(
             ctx.accounts.trial_work_unit.is_none(),
             StreamPayV2Error::InvalidTrialAmount
+        );
+    }
+
+    if payment_mode == PaymentMode::Fixed {
+        let unit = ctx
+            .accounts
+            .fixed_work_unit
+            .as_mut()
+            .ok_or(StreamPayV2Error::FixedNeedsOneUnit)?;
+        let unit_bump = ctx
+            .bumps
+            .fixed_work_unit
+            .ok_or(StreamPayV2Error::FixedNeedsOneUnit)?;
+        unit.init_as_fixed(
+            contract_key,
+            terms.main_amount,
+            args.duration_seconds,
+            unit_bump,
+        );
+        let contract = &mut ctx.accounts.contract;
+        contract.allocated_amount = terms.main_amount;
+        contract.work_unit_count = 1;
+        contract.last_milestone_due_offset = args.duration_seconds;
+    } else {
+        require!(
+            ctx.accounts.fixed_work_unit.is_none(),
+            StreamPayV2Error::InvalidPaymentMode
         );
     }
 
