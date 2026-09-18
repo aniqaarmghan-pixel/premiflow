@@ -572,6 +572,12 @@ impl Stream {
     }
 }
 
+// Anchor's IDL builder allows only one `#[error_code]` enum per program.
+// The default/SBF path keeps V1's `#[error_code]` so codes 6000..=6004 stay
+// the production wire interface. The `idl-build` shim preserves those same
+// conversions without emitting a second IDL error block, so V2 errors can
+// be generated. This is not an economic or instruction change.
+#[cfg(not(feature = "idl-build"))]
 #[error_code]
 pub enum StreamPayError {
     #[msg("The stream amount must be greater than zero.")]
@@ -588,3 +594,63 @@ NothingToWithdraw,
 StreamCancelled,
 }
 
+#[cfg(feature = "idl-build")]
+#[derive(Debug, Clone, Copy)]
+#[repr(u32)]
+pub enum StreamPayError {
+    InvalidAmount,
+    InvalidDuration,
+    MathOverflow,
+    NothingToWithdraw,
+    StreamCancelled,
+}
+
+#[cfg(feature = "idl-build")]
+impl StreamPayError {
+    pub fn name(&self) -> String {
+        match self {
+            Self::InvalidAmount => "InvalidAmount".to_string(),
+            Self::InvalidDuration => "InvalidDuration".to_string(),
+            Self::MathOverflow => "MathOverflow".to_string(),
+            Self::NothingToWithdraw => "NothingToWithdraw".to_string(),
+            Self::StreamCancelled => "StreamCancelled".to_string(),
+        }
+    }
+}
+
+#[cfg(feature = "idl-build")]
+impl From<StreamPayError> for u32 {
+    fn from(e: StreamPayError) -> u32 {
+        e as u32 + 6000
+    }
+}
+
+#[cfg(feature = "idl-build")]
+impl From<StreamPayError> for anchor_lang::error::Error {
+    fn from(error_code: StreamPayError) -> anchor_lang::error::Error {
+        anchor_lang::error::Error::from(anchor_lang::error::AnchorError {
+            error_name: error_code.name(),
+            error_code_number: error_code.into(),
+            error_msg: error_code.to_string(),
+            error_origin: None,
+            compared_values: None,
+        })
+    }
+}
+
+#[cfg(feature = "idl-build")]
+impl std::fmt::Display for StreamPayError {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::result::Result<(), std::fmt::Error> {
+        match self {
+            Self::InvalidAmount => write!(fmt, "The stream amount must be greater than zero."),
+            Self::InvalidDuration => {
+                write!(fmt, "The stream duration must be greater than zero.")
+            }
+            Self::MathOverflow => write!(fmt, "A math calculation overflowed."),
+            Self::NothingToWithdraw => {
+                write!(fmt, "There is currently nothing available to withdraw.")
+            }
+            Self::StreamCancelled => write!(fmt, "This stream has been cancelled."),
+        }
+    }
+}

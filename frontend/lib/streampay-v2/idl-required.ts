@@ -1,0 +1,25 @@
+export const REQUIRED_V2_INSTRUCTIONS = [
+  "create_contract",
+  "add_milestone",
+  "finalize_terms",
+  "accept_contract",
+  "decline_contract",
+  "approve_activation",
+  "reject_activation",
+  "submit_trial_work",
+  "request_trial_revision",
+  "approve_trial_and_activate",
+  "submit_work_unit",
+  "request_revision",
+  "approve_work_unit",
+  "finalize_review_timeout",
+  "release_stream_accrual",
+  "cancel_active_contract",
+  "withdraw_freelancer",
+  "claim_employer_refund",
+  "open_dispute",
+  "resolve_dispute",
+  "complete_contract",
+] as const;
+
+export type RequiredV2Instruction = (typeof REQUIRED_V2_INSTRUCTIONS)[number];

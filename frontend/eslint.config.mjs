@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated Anchor IDL/types (do not hand-edit):
+    "lib/streampay-v2/idl/**",
   ]),
 ]);
 
