@@ -365,6 +365,19 @@ Ok(())
     pub fn claim_employer_refund(ctx: Context<ClaimEmployerRefund>) -> Result<()> {
         v2::instructions::claim_employer_refund::handle_claim_employer_refund(ctx)
     }
+
+    /// Employer or freelancer freezes contested economics. No SPL transfer.
+    pub fn open_dispute(ctx: Context<OpenDispute>) -> Result<()> {
+        v2::instructions::open_dispute::handle_open_dispute(ctx)
+    }
+
+    /// Per-contract resolver allocates the contested remainder. No SPL transfer.
+    pub fn resolve_dispute(
+        ctx: Context<ResolveDispute>,
+        freelancer_contested_award: u64,
+    ) -> Result<()> {
+        v2::instructions::resolve_dispute::handle_resolve_dispute(ctx, freelancer_contested_award)
+    }
 }
 #[derive(Accounts)]
 pub struct Withdraw<'info> {

@@ -15,6 +15,7 @@
 //! - Phase 6: `StreamAccrualReleased`
 //! - Phase 7: `ContractCancellationSettled`
 //! - Phase 8: `FreelancerWithdrawal`, `EmployerRefundClaimed`
+//! - Phase 9: `DisputeOpened`, `DisputeResolved`
 //!
 //! Every event carries `contract` as its first field so a client can index a
 //! single contract's full history with one filter. Off-chain metadata URIs and
@@ -23,7 +24,7 @@
 
 use anchor_lang::prelude::*;
 
-use crate::v2::enums::{ContractStatus, PaymentMode};
+use crate::v2::enums::{ContractStatus, DisputeParty, PaymentMode};
 
 /// A contract was created and fully funded into escrow.
 ///
@@ -252,4 +253,33 @@ pub struct EmployerRefundClaimed {
     pub amount: u64,
     pub refunded_amount: u64,
     pub remaining_refundable: u64,
+}
+
+/// A party froze the contract into Disputed. No SPL transfer.
+#[event]
+pub struct DisputeOpened {
+    pub contract: Pubkey,
+    pub employer: Pubkey,
+    pub freelancer: Pubkey,
+    pub initiator: DisputeParty,
+    pub resolver: Pubkey,
+    pub disputed_at: i64,
+    pub contested_amount: u64,
+    pub released_amount: u64,
+    pub stream_released_amount: u64,
+}
+
+/// The contract resolver allocated the contested remainder. No SPL transfer.
+#[event]
+pub struct DisputeResolved {
+    pub contract: Pubkey,
+    pub employer: Pubkey,
+    pub freelancer: Pubkey,
+    pub resolver: Pubkey,
+    pub resolved_at: i64,
+    pub contested_amount: u64,
+    pub freelancer_contested_award: u64,
+    pub employer_contested_award: u64,
+    pub final_freelancer_entitlement: u64,
+    pub final_employer_entitlement: u64,
 }

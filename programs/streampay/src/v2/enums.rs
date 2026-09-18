@@ -74,6 +74,7 @@ pub enum StartMode {
 /// | Cancelled                | 6   | 7   |
 /// | ActivationRejected       | —   | 8   |
 /// | Disputed                 | —   | 9   |
+/// | Resolved                 | —   | 10  |
 ///
 /// `PendingEmployerApproval` is the employer-approval gate: the freelancer has
 /// accepted, the main stream has not started. `ActivationRejected` is the
@@ -102,10 +103,12 @@ pub enum ContractStatus {
     Cancelled,
     /// The employer reviewed the trial stage and declined to activate.
     ActivationRejected,
-    /// Pre-activation trial work was submitted and then rejected. Terminal for
-    /// the main contract; token distribution is deferred so neither an instant
-    /// employer refund nor an automatic freelancer payout can be assumed.
+    /// Economic disagreement is frozen. No new entitlement; no clean refund.
+    /// Opened by `open_dispute` or by rejecting a submitted paid trial.
     Disputed,
+    /// A disputed contract was resolved. Settlement fields are frozen and
+    /// Phase 8 claims are allowed. Appended; previous discriminants unchanged.
+    Resolved,
 }
 
 impl ContractStatus {
@@ -131,6 +134,7 @@ impl ContractStatus {
                 | Self::Cancelled
                 | Self::ActivationRejected
                 | Self::Disputed
+                | Self::Resolved
         )
     }
 
@@ -144,6 +148,7 @@ impl ContractStatus {
                 | Self::Cancelled
                 | Self::ActivationRejected
                 | Self::Disputed
+                | Self::Resolved
         )
     }
 
@@ -151,6 +156,22 @@ impl ContractStatus {
     pub fn allows_term_changes(&self) -> bool {
         matches!(self, Self::Draft)
     }
+
+    /// Whether Phase 8 may pay frozen settlement (clean cancel or resolved dispute).
+    pub fn allows_settlement_claims(&self) -> bool {
+        matches!(self, Self::Cancelled | Self::Resolved)
+    }
+}
+
+/// Who opened an on-chain dispute. `None` until `open_dispute` / trial reject.
+#[derive(
+    AnchorSerialize, AnchorDeserialize, InitSpace, Clone, Copy, PartialEq, Eq, Debug, Default,
+)]
+pub enum DisputeParty {
+    #[default]
+    None,
+    Employer,
+    Freelancer,
 }
 
 /// Which flavour of work unit this account represents.
@@ -221,4 +242,34 @@ pub enum ReleaseTrigger {
     EmployerApproval,
     /// The review deadline lapsed and finalization was invoked.
     ReviewTimeout,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::ContractStatus;
+    use anchor_lang::AnchorSerialize;
+
+    fn disc(status: ContractStatus) -> u8 {
+        let mut bytes = Vec::new();
+        status.serialize(&mut bytes).expect("unit enum serializes");
+        assert_eq!(bytes.len(), 1);
+        bytes[0]
+    }
+
+    /// Existing variants keep their Phase 0–8 discriminants; `Resolved` is
+    /// appended as 10. Reordering would silently break every stored Contract.
+    #[test]
+    fn contract_status_discriminants_are_appended_only() {
+        assert_eq!(disc(ContractStatus::Draft), 0);
+        assert_eq!(disc(ContractStatus::PendingAcceptance), 1);
+        assert_eq!(disc(ContractStatus::PendingEmployerApproval), 2);
+        assert_eq!(disc(ContractStatus::Active), 3);
+        assert_eq!(disc(ContractStatus::Completed), 4);
+        assert_eq!(disc(ContractStatus::Declined), 5);
+        assert_eq!(disc(ContractStatus::Expired), 6);
+        assert_eq!(disc(ContractStatus::Cancelled), 7);
+        assert_eq!(disc(ContractStatus::ActivationRejected), 8);
+        assert_eq!(disc(ContractStatus::Disputed), 9);
+        assert_eq!(disc(ContractStatus::Resolved), 10);
+    }
 }

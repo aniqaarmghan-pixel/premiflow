@@ -228,6 +228,21 @@ pub enum StreamPayV2Error {
     // -----------------------------------------------------------------
     #[msg("Escrow holds fewer tokens than the entitlement being claimed.")]
     InsufficientEscrowBalance,
+
+    // -----------------------------------------------------------------
+    // Appended in Phase 9.
+    // -----------------------------------------------------------------
+    #[msg("Resolver must be a distinct non-default public key.")]
+    InvalidResolver,
+
+    #[msg("A dispute cannot be opened in this contract state.")]
+    DisputeNotAllowed,
+
+    #[msg("This contract is already disputed.")]
+    ContractAlreadyDisputed,
+
+    #[msg("The dispute award exceeds the contested amount.")]
+    InvalidDisputeAward,
 }
 
 #[cfg(test)]
@@ -361,6 +376,19 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::InsufficientEscrowBalance), 6157);
     }
 
+    /// Codes that the Phase 9 dispute instructions depend on.
+    #[test]
+    fn v2_phase_9_error_codes_are_pinned() {
+        assert_eq!(u32::from(StreamPayV2Error::InvalidState), 6111);
+        assert_eq!(u32::from(StreamPayV2Error::ContractTerminal), 6113);
+        assert_eq!(u32::from(StreamPayV2Error::Unauthorized), 6118);
+        assert_eq!(u32::from(StreamPayV2Error::ReleaseAmountExceeded), 6156);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidResolver), 6158);
+        assert_eq!(u32::from(StreamPayV2Error::DisputeNotAllowed), 6159);
+        assert_eq!(u32::from(StreamPayV2Error::ContractAlreadyDisputed), 6160);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidDisputeAward), 6161);
+    }
+
     /// The last variant, which is where every future append must land.
     #[test]
     fn v2_error_enum_tail_is_stable() {
@@ -371,5 +399,6 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::InvalidTrialState), 6154);
         assert_eq!(u32::from(StreamPayV2Error::ReleaseAmountExceeded), 6156);
         assert_eq!(u32::from(StreamPayV2Error::InsufficientEscrowBalance), 6157);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidDisputeAward), 6161);
     }
 }

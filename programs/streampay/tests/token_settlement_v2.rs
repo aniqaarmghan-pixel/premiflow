@@ -533,6 +533,7 @@ fn streaming_args(contract_id: u64, total_amount: u64, now: i64) -> CreateContra
         activation_review_duration: 3_600,
         max_revisions: 2,
         trial_amount: 0,
+        resolver: Pubkey::new_from_array([0x11; 32]),
         metadata_uri: "ipfs://bafyContractMetadata".to_string(),
         metadata_hash: [7u8; 32],
     }

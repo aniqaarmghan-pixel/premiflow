@@ -22,7 +22,7 @@
 use anchor_lang::prelude::*;
 
 use crate::v2::constants::MAX_URI_LEN;
-use crate::v2::enums::{ContractStatus, PaymentMode, StartMode};
+use crate::v2::enums::{ContractStatus, DisputeParty, PaymentMode, StartMode};
 use crate::v2::errors::StreamPayV2Error;
 
 #[account]
@@ -89,10 +89,20 @@ pub struct Contract {
     /// Frozen freelancer entitlement after clean active-contract cancellation.
     /// Zero until `status == Cancelled`. Equals `released_amount` at settlement.
     pub freelancer_settlement_amount: u64,
-    /// Frozen employer refundable entitlement after clean cancellation.
-    /// Zero until `status == Cancelled`. Not tokens transferred: that is
-    /// `refunded_amount`, which Phase 8 will raise.
+    /// Frozen employer refundable entitlement after clean cancellation or
+    /// dispute resolution. Zero until settlement. Not tokens transferred:
+    /// that is `refunded_amount`.
     pub employer_refundable_amount: u64,
+
+    /// Per-contract arbitrator. Bound at creation; never the employer,
+    /// freelancer, or default. Immutable after `create_contract`.
+    pub resolver: Pubkey,
+    /// Unresolved remainder at dispute open:
+    /// `total_amount - released_amount - refunded_amount` after any stream freeze.
+    pub contested_amount: u64,
+    /// Instant `open_dispute` (or submitted-trial reject) froze economics.
+    pub disputed_at: i64,
+    pub dispute_initiator: DisputeParty,
 
     // -----------------------------------------------------------------
     // Negotiated terms. Frozen once the contract leaves `Draft`.
@@ -172,10 +182,11 @@ pub struct Contract {
     /// `freelancer_settlement_amount` (8) and `employer_refundable_amount` (8)
     /// were taken from it.
     ///
-    /// Phase 7 layout (V2 never deployed): two u64 settlement fields were
-    /// inserted after `stream_released_amount`; reserved shrank 84 → 68.
-    /// `INIT_SPACE` remains 621 so the allocated account size is unchanged.
-    pub reserved: [u8; 68],
+    /// Phase 7 layout: two u64 settlement fields after `stream_released_amount`;
+    /// reserved 84 → 68. Phase 9 consumed 49 more bytes for `resolver` (32),
+    /// `contested_amount` (8), `disputed_at` (8) and `dispute_initiator` (1);
+    /// reserved 68 → 19. `INIT_SPACE` remains 621.
+    pub reserved: [u8; 19],
 
     // -----------------------------------------------------------------
     // Variable length. Must remain the final field.
@@ -337,17 +348,7 @@ impl Contract {
         );
 
         if self.payment_mode.uses_checkpoints() {
-            let accrued = self.stream_accrued_at(now)?;
-            let delta = accrued
-                .checked_sub(self.stream_released_amount)
-                .ok_or(StreamPayV2Error::ReleaseAmountExceeded)?;
-            if delta > 0 {
-                self.stream_released_amount = accrued;
-                self.released_amount = self
-                    .released_amount
-                    .checked_add(delta)
-                    .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
-            }
+            self.materialize_stream_at(now)?;
         }
 
         let freelancer = self.released_amount;
@@ -382,6 +383,125 @@ impl Contract {
         Ok((freelancer, employer))
     }
 
+    /// Materialize canonical stream accrual into released accounting.
+    /// Used by Phase 7 cancel and Phase 9 dispute freeze. Status is unchanged.
+    pub fn materialize_stream_at(&mut self, now: i64) -> Result<()> {
+        let accrued = self.stream_accrued_at(now)?;
+        let delta = accrued
+            .checked_sub(self.stream_released_amount)
+            .ok_or(StreamPayV2Error::ReleaseAmountExceeded)?;
+        if delta > 0 {
+            self.stream_released_amount = accrued;
+            self.released_amount = self
+                .released_amount
+                .checked_add(delta)
+                .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        }
+        Ok(())
+    }
+
+    /// Freeze economics for a dispute. Streaming accrual is materialized at
+    /// `now` first. Contested remainder is everything not already released or
+    /// refunded. Does not set `terminated_at`.
+    pub fn freeze_for_dispute(
+        &mut self,
+        now: i64,
+        initiator: DisputeParty,
+    ) -> Result<(u64, u64, u64)> {
+        match self.status {
+            ContractStatus::Active => {}
+            ContractStatus::PendingEmployerApproval if self.open_review_count > 0 => {}
+            ContractStatus::Disputed => {
+                return Err(StreamPayV2Error::ContractAlreadyDisputed.into());
+            }
+            other if other.is_terminal() => {
+                return Err(StreamPayV2Error::ContractTerminal.into());
+            }
+            _ => return Err(StreamPayV2Error::DisputeNotAllowed.into()),
+        }
+
+        if self.payment_mode.uses_checkpoints() && self.status == ContractStatus::Active {
+            self.materialize_stream_at(now)?;
+        }
+
+        let protected_freelancer = self.released_amount;
+        let protected_employer = self.refunded_amount;
+        let allocated = protected_freelancer
+            .checked_add(protected_employer)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        require!(
+            allocated <= self.total_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+        let contested = self
+            .total_amount
+            .checked_sub(allocated)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        require!(contested > 0, StreamPayV2Error::DisputeNotAllowed);
+
+        self.contested_amount = contested;
+        self.disputed_at = now;
+        self.dispute_initiator = initiator;
+        self.status = ContractStatus::Disputed;
+        Ok((protected_freelancer, protected_employer, contested))
+    }
+
+    /// Apply the resolver's split of `contested_amount` and freeze settlement.
+    pub fn apply_dispute_resolution(
+        &mut self,
+        now: i64,
+        freelancer_contested_award: u64,
+    ) -> Result<(u64, u64, u64, u64)> {
+        require!(
+            self.status == ContractStatus::Disputed,
+            StreamPayV2Error::InvalidState
+        );
+        require!(
+            freelancer_contested_award <= self.contested_amount,
+            StreamPayV2Error::InvalidDisputeAward
+        );
+        let employer_contested_award = self
+            .contested_amount
+            .checked_sub(freelancer_contested_award)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+
+        let freelancer_final = self
+            .released_amount
+            .checked_add(freelancer_contested_award)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        let employer_final = self
+            .refunded_amount
+            .checked_add(employer_contested_award)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        let conserved = freelancer_final
+            .checked_add(employer_final)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        require!(
+            conserved == self.total_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+        require!(
+            freelancer_final >= self.withdrawn_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+        require!(
+            employer_final >= self.refunded_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+
+        self.released_amount = freelancer_final;
+        self.freelancer_settlement_amount = freelancer_final;
+        self.employer_refundable_amount = employer_final;
+        self.status = ContractStatus::Resolved;
+        self.terminated_at = now;
+        Ok((
+            freelancer_contested_award,
+            employer_contested_award,
+            freelancer_final,
+            employer_final,
+        ))
+    }
+
     /// Cap on freelancer SPL that may ever leave escrow in the current status.
     ///
     /// Active: currently released accounting. Cancelled: frozen Phase 7
@@ -390,7 +510,7 @@ impl Contract {
     pub fn freelancer_withdraw_cap(&self) -> Result<u64> {
         match self.status {
             ContractStatus::Active => Ok(self.released_amount),
-            ContractStatus::Cancelled => {
+            status if status.allows_settlement_claims() => {
                 require!(
                     self.freelancer_settlement_amount == self.released_amount,
                     StreamPayV2Error::ReleaseAmountExceeded
@@ -413,7 +533,7 @@ impl Contract {
     /// Active contracts have no refund path.
     pub fn available_to_refund(&self) -> Result<u64> {
         match self.status {
-            ContractStatus::Cancelled => {}
+            status if status.allows_settlement_claims() => {}
             other if other.is_terminal() => {
                 return Err(StreamPayV2Error::ContractTerminal.into());
             }

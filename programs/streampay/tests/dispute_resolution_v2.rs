@@ -1,7 +1,6 @@
-//! StreamPay V2 Phase 7 tests: active-contract cancellation settlement.
+//! StreamPay V2 Phase 9 tests: dispute freeze and resolver settlement.
 //!
-//! Employer cancellation freezes freelancer vs employer entitlements.
-//! No SPL tokens move. Open reviews cannot be bypassed.
+//! Opening and resolving move zero SPL tokens. Phase 8 claims the frozen split.
 
 use anchor_lang::prelude::*;
 use anchor_lang::{AccountDeserialize, InstructionData, ToAccountMetas};
@@ -22,14 +21,19 @@ use solana_transaction::Transaction;
 use solana_transaction_error::TransactionError;
 
 use ::streampay::{
-    self as streampay_program, Contract, ContractStatus, CreateContractArgs, PaymentMode, StartMode,
+    self as streampay_program, Contract, ContractStatus, CreateContractArgs, DisputeParty,
+    PaymentMode, StartMode,
 };
 
 const E_INVALID_STATE: u32 = 6111;
 const E_CONTRACT_TERMINAL: u32 = 6113;
-const E_OPEN_REVIEW_BLOCKS: u32 = 6142;
-const E_CONSTRAINT_SEEDS: u32 = 2006;
+const E_UNAUTHORIZED: u32 = 6118;
 const E_ACCOUNT_NOT_INITIALIZED: u32 = 3012;
+const E_NOTHING_TO_WITHDRAW: u32 = 6139;
+const E_NOTHING_TO_REFUND: u32 = 6140;
+const E_DISPUTE_NOT_ALLOWED: u32 = 6159;
+const E_ALREADY_DISPUTED: u32 = 6160;
+const E_INVALID_AWARD: u32 = 6161;
 
 const MINT_DECIMALS: u8 = 6;
 const BASE_TS: i64 = 1_700_000_000;
@@ -40,8 +44,8 @@ const DURATION: i64 = 60;
 const INTERVAL: i64 = 20;
 const REVIEW: i64 = 10;
 const OFFSET: i64 = 30;
-const SUBMISSION_URI: &str = "ipfs://bafyCancelWork";
-const SUBMISSION_HASH: [u8; 32] = [14u8; 32];
+const SUBMISSION_URI: &str = "ipfs://bafyDisputeWork";
+const SUBMISSION_HASH: [u8; 32] = [16u8; 32];
 
 fn clone_kp(kp: &Keypair) -> Keypair {
     kp.insecure_clone()
@@ -54,10 +58,13 @@ struct Env {
     employer_pk: Address,
     freelancer: Keypair,
     freelancer_pk: Address,
+    resolver: Keypair,
+    resolver_pk: Address,
     outsider: Keypair,
     outsider_pk: Address,
     token_mint: Address,
     employer_token_account: Address,
+    freelancer_token_account: Address,
 }
 
 fn setup(employer_tokens: u64) -> Env {
@@ -76,12 +83,15 @@ fn setup(employer_tokens: u64) -> Env {
 
     let employer = Keypair::new();
     let freelancer = Keypair::new();
+    let resolver = Keypair::new();
     let outsider = Keypair::new();
     let employer_pk = employer.pubkey();
     let freelancer_pk = freelancer.pubkey();
+    let resolver_pk = resolver.pubkey();
     let outsider_pk = outsider.pubkey();
     svm.airdrop(&employer_pk, 10_000_000_000).unwrap();
     svm.airdrop(&freelancer_pk, 1_000_000_000).unwrap();
+    svm.airdrop(&resolver_pk, 1_000_000_000).unwrap();
     svm.airdrop(&outsider_pk, 1_000_000_000).unwrap();
 
     let token_mint = CreateMint::new(&mut svm, &employer)
@@ -91,6 +101,10 @@ fn setup(employer_tokens: u64) -> Env {
         .unwrap();
     let employer_token_account = CreateAccount::new(&mut svm, &employer, &token_mint)
         .owner(&employer_pk)
+        .send()
+        .unwrap();
+    let freelancer_token_account = CreateAccount::new(&mut svm, &employer, &token_mint)
+        .owner(&freelancer_pk)
         .send()
         .unwrap();
     if employer_tokens > 0 {
@@ -113,10 +127,13 @@ fn setup(employer_tokens: u64) -> Env {
         employer_pk,
         freelancer,
         freelancer_pk,
+        resolver,
+        resolver_pk,
         outsider,
         outsider_pk,
         token_mint,
         employer_token_account,
+        freelancer_token_account,
     }
 }
 
@@ -183,6 +200,10 @@ impl Env {
 
     fn send_freelancer(&mut self, instruction: Instruction) -> TransactionResult {
         self.send(instruction, &clone_kp(&self.freelancer))
+    }
+
+    fn send_resolver(&mut self, instruction: Instruction) -> TransactionResult {
+        self.send(instruction, &clone_kp(&self.resolver))
     }
 
     fn create(&mut self, args: &CreateContractArgs) -> TransactionResult {
@@ -317,7 +338,7 @@ impl Env {
         self.send_employer(ix)
     }
 
-    fn reject(&mut self, contract_id: u64, with_trial: bool) -> TransactionResult {
+    fn reject_activation(&mut self, contract_id: u64, with_trial: bool) -> TransactionResult {
         let contract = self.contract_pda(contract_id);
         let trial_work_unit = if with_trial {
             Some(self.trial_pda(&contract))
@@ -414,18 +435,94 @@ impl Env {
         self.send_freelancer(ix)
     }
 
-    fn cancel_ix(&self, employer: Address, contract: Address) -> Instruction {
+    fn cancel(&mut self, contract_id: u64) -> TransactionResult {
+        let ix = Instruction {
+            program_id: self.program_id,
+            accounts: streampay_program::accounts::CancelActiveContract {
+                employer: self.employer_pk,
+                contract: self.contract_pda(contract_id),
+            }
+            .to_account_metas(None),
+            data: streampay_program::instruction::CancelActiveContract {}.data(),
+        };
+        self.send_employer(ix)
+    }
+
+    fn withdraw(&mut self, contract_id: u64) -> TransactionResult {
+        let contract = self.contract_pda(contract_id);
+        let ix = Instruction {
+            program_id: self.program_id,
+            accounts: streampay_program::accounts::WithdrawFreelancer {
+                freelancer: self.freelancer_pk,
+                contract,
+                token_mint: self.token_mint,
+                contract_escrow: self.escrow_pda(&contract),
+                freelancer_token_account: self.freelancer_token_account,
+                token_program: TOKEN_ID,
+            }
+            .to_account_metas(None),
+            data: streampay_program::instruction::WithdrawFreelancer {}.data(),
+        };
+        self.send_freelancer(ix)
+    }
+
+    fn refund(&mut self, contract_id: u64) -> TransactionResult {
+        let contract = self.contract_pda(contract_id);
+        let ix = Instruction {
+            program_id: self.program_id,
+            accounts: streampay_program::accounts::ClaimEmployerRefund {
+                employer: self.employer_pk,
+                contract,
+                token_mint: self.token_mint,
+                contract_escrow: self.escrow_pda(&contract),
+                employer_token_account: self.employer_token_account,
+                token_program: TOKEN_ID,
+            }
+            .to_account_metas(None),
+            data: streampay_program::instruction::ClaimEmployerRefund {}.data(),
+        };
+        self.send_employer(ix)
+    }
+
+    fn open_ix(&self, party: Address, contract: Address) -> Instruction {
         Instruction {
             program_id: self.program_id,
-            accounts: streampay_program::accounts::CancelActiveContract { employer, contract }
+            accounts: streampay_program::accounts::OpenDispute { party, contract }
                 .to_account_metas(None),
-            data: streampay_program::instruction::CancelActiveContract {}.data(),
+            data: streampay_program::instruction::OpenDispute {}.data(),
         }
     }
 
-    fn cancel(&mut self, contract_id: u64) -> TransactionResult {
-        let ix = self.cancel_ix(self.employer_pk, self.contract_pda(contract_id));
+    fn open_as_employer(&mut self, contract_id: u64) -> TransactionResult {
+        let ix = self.open_ix(self.employer_pk, self.contract_pda(contract_id));
         self.send_employer(ix)
+    }
+
+    fn open_as_freelancer(&mut self, contract_id: u64) -> TransactionResult {
+        let ix = self.open_ix(self.freelancer_pk, self.contract_pda(contract_id));
+        self.send_freelancer(ix)
+    }
+
+    fn resolve_ix(
+        &self,
+        resolver: Address,
+        contract: Address,
+        freelancer_contested_award: u64,
+    ) -> Instruction {
+        Instruction {
+            program_id: self.program_id,
+            accounts: streampay_program::accounts::ResolveDispute { resolver, contract }
+                .to_account_metas(None),
+            data: streampay_program::instruction::ResolveDispute {
+                freelancer_contested_award,
+            }
+            .data(),
+        }
+    }
+
+    fn resolve(&mut self, contract_id: u64, award: u64) -> TransactionResult {
+        let ix = self.resolve_ix(self.resolver_pk, self.contract_pda(contract_id), award);
+        self.send_resolver(ix)
     }
 
     fn read_contract(&self, contract: &Address) -> Contract {
@@ -434,37 +531,12 @@ impl Env {
         Contract::try_deserialize(&mut data).expect("deserialize contract")
     }
 
-    fn assert_settled(&self, contract_id: u64, freelancer: u64, employer: u64, escrow: u64) {
-        let c = self.read_contract(&self.contract_pda(contract_id));
-        assert_eq!(c.status, ContractStatus::Cancelled);
-        assert!(c.status.is_terminal());
-        assert_eq!(c.freelancer_settlement_amount, freelancer);
-        assert_eq!(c.employer_refundable_amount, employer);
-        assert_eq!(c.released_amount, freelancer);
-        assert_eq!(
-            c.freelancer_settlement_amount + c.employer_refundable_amount,
-            c.total_amount
-        );
-        assert!(c.freelancer_settlement_amount <= c.total_amount);
-        assert!(c.employer_refundable_amount <= c.total_amount);
-        assert!(c.withdrawn_amount <= c.freelancer_settlement_amount);
-        assert!(c.refunded_amount <= c.employer_refundable_amount);
-        assert_eq!(c.withdrawn_amount, 0);
-        assert_eq!(c.refunded_amount, 0);
-        assert_eq!(c.completed_at, 0);
-        assert_eq!(self.escrow_amount(contract_id), escrow);
-        assert_eq!(
-            self.svm
-                .get_account(&self.contract_pda(contract_id))
-                .unwrap()
-                .data
-                .len(),
-            8 + 621
-        );
+    fn assert_escrow_unchanged(&self, contract_id: u64, expected: u64) {
+        assert_eq!(self.escrow_amount(contract_id), expected);
     }
 }
 
-fn streaming_args(contract_id: u64, total_amount: u64, now: i64) -> CreateContractArgs {
+fn streaming_args(env: &Env, contract_id: u64, total_amount: u64, now: i64) -> CreateContractArgs {
     CreateContractArgs {
         contract_id,
         payment_mode: PaymentMode::Streaming,
@@ -478,29 +550,29 @@ fn streaming_args(contract_id: u64, total_amount: u64, now: i64) -> CreateContra
         activation_review_duration: 3_600,
         max_revisions: 2,
         trial_amount: 0,
-        resolver: Pubkey::new_from_array([0x11; 32]),
+        resolver: env.resolver_pk,
         metadata_uri: "ipfs://bafyContractMetadata".to_string(),
         metadata_hash: [7u8; 32],
     }
 }
 
-fn fixed_args(contract_id: u64, total_amount: u64, now: i64) -> CreateContractArgs {
+fn fixed_args(env: &Env, contract_id: u64, total_amount: u64, now: i64) -> CreateContractArgs {
     CreateContractArgs {
         payment_mode: PaymentMode::Fixed,
         checkpoint_interval: 12_345,
         duration_seconds: 3_600,
         review_duration: 300,
-        ..streaming_args(contract_id, total_amount, now)
+        ..streaming_args(env, contract_id, total_amount, now)
     }
 }
 
-fn milestone_args(contract_id: u64, total_amount: u64, now: i64) -> CreateContractArgs {
+fn milestone_args(env: &Env, contract_id: u64, total_amount: u64, now: i64) -> CreateContractArgs {
     CreateContractArgs {
         payment_mode: PaymentMode::Milestone,
         checkpoint_interval: 12_345,
         duration_seconds: 3_600,
         review_duration: 300,
-        ..streaming_args(contract_id, total_amount, now)
+        ..streaming_args(env, contract_id, total_amount, now)
     }
 }
 
@@ -528,31 +600,16 @@ fn assert_rejected(result: TransactionResult, expected: u32, what: &str) {
     );
 }
 
-fn expected_accrued(main: u64, start: i64, end: i64, now: i64) -> u64 {
-    if now <= start {
-        return 0;
-    }
-    if now >= end {
-        return main;
-    }
-    let elapsed = (now - start) as u128;
-    let duration = (end - start) as u128;
-    ((main as u128) * elapsed / duration) as u64
-}
-
-fn activate_streaming(env: &mut Env, total_amount: u64) -> (u64, i64) {
-    let id = 1u64;
-    env.create(&streaming_args(id, total_amount, env.now()))
-        .unwrap();
+fn activate_streaming(env: &mut Env, id: u64, total: u64) -> i64 {
+    let args = streaming_args(env, id, total, env.now());
+    env.create(&args).unwrap();
     env.accept(id).unwrap();
     env.approve_activation(id).unwrap();
-    let start = env.read_contract(&env.contract_pda(id)).start_time;
-    (id, start)
+    env.read_contract(&env.contract_pda(id)).start_time
 }
 
-fn activate_fixed(env: &mut Env, total_amount: u64, trial: u64) -> u64 {
-    let id = 1u64;
-    let mut args = fixed_args(id, total_amount, env.now());
+fn activate_fixed(env: &mut Env, id: u64, total: u64, trial: u64) {
+    let mut args = fixed_args(env, id, total, env.now());
     args.trial_amount = trial;
     env.create(&args).unwrap();
     env.accept(id).unwrap();
@@ -562,13 +619,12 @@ fn activate_fixed(env: &mut Env, total_amount: u64, trial: u64) -> u64 {
     } else {
         env.approve_activation(id).unwrap();
     }
-    id
 }
 
-fn activate_milestone(env: &mut Env, amounts: &[u64]) -> u64 {
-    let id = 1u64;
+fn activate_milestone(env: &mut Env, id: u64, amounts: &[u64]) {
     let total: u64 = amounts.iter().sum();
-    env.create(&milestone_args(id, total, env.now())).unwrap();
+    let args = milestone_args(env, id, total, env.now());
+    env.create(&args).unwrap();
     let mut offset = OFFSET;
     for amount in amounts {
         env.add_milestone(id, *amount, offset).unwrap();
@@ -577,119 +633,129 @@ fn activate_milestone(env: &mut Env, amounts: &[u64]) -> u64 {
     env.finalize_terms(id).unwrap();
     env.accept(id).unwrap();
     env.approve_activation(id).unwrap();
-    id
 }
 
 #[test]
-fn employer_cancels_active_streaming_halfway() {
-    let mut env = setup(TOTAL_AMOUNT);
-    let (id, start) = activate_streaming(&mut env, TOTAL_AMOUNT);
-    let end = start + DURATION;
-    env.warp(start + DURATION / 2);
-    let accrued = expected_accrued(TOTAL_AMOUNT, start, end, env.now());
-    env.cancel(id).unwrap();
-    env.assert_settled(id, accrued, TOTAL_AMOUNT - accrued, TOTAL_AMOUNT);
-    let c = env.read_contract(&env.contract_pda(id));
-    assert_eq!(c.stream_released_amount, accrued);
-    assert_eq!(c.terminated_at, env.now());
-}
+fn parties_can_open_outsiders_cannot() {
+    let mut env = setup(TOTAL_AMOUNT * 2);
+    activate_fixed(&mut env, 1, TOTAL_AMOUNT, 0);
+    env.submit_work(1, 0).unwrap();
+    env.open_as_employer(1).unwrap();
+    let c = env.read_contract(&env.contract_pda(1));
+    assert_eq!(c.status, ContractStatus::Disputed);
+    assert_eq!(c.dispute_initiator, DisputeParty::Employer);
+    assert_eq!(c.contested_amount, TOTAL_AMOUNT);
+    assert_eq!(c.resolver, env.resolver_pk);
+    env.assert_escrow_unchanged(1, TOTAL_AMOUNT);
+    assert_rejected(env.open_as_freelancer(1), E_ALREADY_DISPUTED, "second open");
 
-#[test]
-fn freelancer_and_third_party_cannot_cancel() {
-    let mut env = setup(TOTAL_AMOUNT);
-    let (id, _) = activate_streaming(&mut env, TOTAL_AMOUNT);
-    let contract = env.contract_pda(id);
+    activate_fixed(&mut env, 2, TOTAL_AMOUNT, 0);
+    env.open_as_freelancer(2).unwrap();
+    assert_eq!(
+        env.read_contract(&env.contract_pda(2)).dispute_initiator,
+        DisputeParty::Freelancer
+    );
+
+    let contract = env.contract_pda(2);
+    let outsider = clone_kp(&env.outsider);
     assert_rejected(
-        env.send_freelancer(env.cancel_ix(env.freelancer_pk, contract)),
-        E_CONSTRAINT_SEEDS,
-        "freelancer cancel",
+        env.send(env.open_ix(env.outsider_pk, contract), &outsider),
+        E_UNAUTHORIZED,
+        "third party open",
+    );
+    assert_rejected(
+        env.send_employer(env.open_ix(env.employer_pk, Keypair::new().pubkey())),
+        E_ACCOUNT_NOT_INITIALIZED,
+        "fake contract",
+    );
+}
+
+#[test]
+fn only_canonical_resolver_can_resolve() {
+    let mut env = setup(TOTAL_AMOUNT);
+    activate_fixed(&mut env, 1, TOTAL_AMOUNT, 0);
+    env.open_as_employer(1).unwrap();
+    let contract = env.contract_pda(1);
+    let before = env.read_contract(&contract);
+
+    assert_rejected(
+        env.send_employer(env.resolve_ix(env.employer_pk, contract, 0)),
+        E_UNAUTHORIZED,
+        "employer resolve",
+    );
+    assert_rejected(
+        env.send_freelancer(env.resolve_ix(env.freelancer_pk, contract, 0)),
+        E_UNAUTHORIZED,
+        "freelancer resolve",
     );
     let outsider = clone_kp(&env.outsider);
     assert_rejected(
-        env.send(env.cancel_ix(env.outsider_pk, contract), &outsider),
-        E_CONSTRAINT_SEEDS,
-        "third party cancel",
+        env.send(env.resolve_ix(env.outsider_pk, contract, 0), &outsider),
+        E_UNAUTHORIZED,
+        "third party resolve",
     );
-}
-
-#[test]
-fn fake_contract_pda_rejected() {
-    let mut env = setup(TOTAL_AMOUNT);
-    let _ = activate_streaming(&mut env, TOTAL_AMOUNT);
-    let fake = Keypair::new().pubkey();
-    assert_rejected(
-        env.send_employer(env.cancel_ix(env.employer_pk, fake)),
-        E_ACCOUNT_NOT_INITIALIZED,
-        "fake contract PDA",
-    );
-}
-
-#[test]
-fn streaming_boundary_start_mid_end_after() {
-    let cases: &[(i64, u64)] = &[
-        (0, 0),
-        (1, expected_accrued(10, 0, 60, 1)),
-        (20, 3),
-        (40, 6),
-        (59, expected_accrued(10, 0, 60, 59)),
-        (60, 10),
-        (10_000, 10),
-    ];
-    for (elapsed, want) in cases {
-        let mut env = setup(10);
-        let (id, start) = activate_streaming(&mut env, 10);
-        env.warp(start + *elapsed);
-        env.cancel(id).unwrap();
-        env.assert_settled(id, *want, 10 - *want, 10);
-        assert_eq!(
-            env.read_contract(&env.contract_pda(id))
-                .stream_released_amount,
-            *want
-        );
-    }
-}
-
-#[test]
-fn no_trial_stream_exact_four_hundred() {
-    let mut env = setup(1_000);
-    let (id, start) = activate_streaming(&mut env, 1_000);
-    env.warp(start + 24);
-    env.cancel(id).unwrap();
-    env.assert_settled(id, 400, 600, 1_000);
-}
-
-#[test]
-fn no_prior_release_still_preserves_accrual() {
-    let mut env = setup(TOTAL_AMOUNT);
-    let (id, start) = activate_streaming(&mut env, TOTAL_AMOUNT);
-    env.warp(start + DURATION / 2);
-    env.cancel(id).unwrap();
-    let want = TOTAL_AMOUNT / 2;
-    env.assert_settled(id, want, TOTAL_AMOUNT - want, TOTAL_AMOUNT);
-}
-
-#[test]
-fn partial_prior_release_then_cancel_adds_delta_once() {
-    let mut env = setup(10);
-    let (id, start) = activate_streaming(&mut env, 10);
-    env.warp(start + 20);
-    env.release_stream(id).unwrap();
+    assert_eq!(env.read_contract(&contract).status, before.status);
+    env.resolve(1, 0).unwrap();
     assert_eq!(
-        env.read_contract(&env.contract_pda(id))
+        env.read_contract(&contract).status,
+        ContractStatus::Resolved
+    );
+}
+
+#[test]
+fn resolver_is_stored_and_immutable() {
+    let mut env = setup(TOTAL_AMOUNT);
+    activate_streaming(&mut env, 1, TOTAL_AMOUNT);
+    let c = env.read_contract(&env.contract_pda(1));
+    assert_eq!(c.resolver, env.resolver_pk);
+    assert_ne!(c.resolver, c.employer);
+    assert_ne!(c.resolver, c.freelancer);
+    assert_ne!(c.resolver, Pubkey::default());
+}
+
+#[test]
+fn streaming_dispute_freezes_accrual() {
+    let mut env = setup(10);
+    let start = activate_streaming(&mut env, 1, 10);
+    env.warp(start + 20);
+    env.open_as_employer(1).unwrap();
+    let c = env.read_contract(&env.contract_pda(1));
+    assert_eq!(c.stream_released_amount, 3);
+    assert_eq!(c.released_amount, 3);
+    assert_eq!(c.contested_amount, 7);
+    env.assert_escrow_unchanged(1, 10);
+
+    env.warp(start + 10_000);
+    assert_rejected(
+        env.release_stream(1),
+        E_INVALID_STATE,
+        "post-dispute stream",
+    );
+    assert_eq!(
+        env.read_contract(&env.contract_pda(1))
             .stream_released_amount,
         3
     );
-    env.warp(start + 40);
-    env.cancel(id).unwrap();
-    env.assert_settled(id, 6, 4, 10);
-    let c = env.read_contract(&env.contract_pda(id));
-    assert_eq!(c.stream_released_amount, 6);
 }
 
 #[test]
-fn paid_trial_plus_stream_conserves() {
+fn streaming_partial_release_then_dispute_adds_delta() {
+    let mut env = setup(10);
+    let start = activate_streaming(&mut env, 1, 10);
+    env.warp(start + 20);
+    env.release_stream(1).unwrap();
+    env.warp(start + 40);
+    env.open_as_freelancer(1).unwrap();
+    let c = env.read_contract(&env.contract_pda(1));
+    assert_eq!(c.stream_released_amount, 6);
+    assert_eq!(c.released_amount, 6);
+    assert_eq!(c.contested_amount, 4);
+}
+
+#[test]
+fn trial_plus_stream_dispute_does_not_double_count() {
     let mut env = setup(TOTAL_AMOUNT);
-    let mut args = streaming_args(1, TOTAL_AMOUNT, env.now());
+    let mut args = streaming_args(&env, 1, TOTAL_AMOUNT, env.now());
     args.trial_amount = TRIAL_AMOUNT;
     env.create(&args).unwrap();
     env.accept(1).unwrap();
@@ -697,175 +763,214 @@ fn paid_trial_plus_stream_conserves() {
     env.approve_trial(1).unwrap();
     let start = env.read_contract(&env.contract_pda(1)).start_time;
     env.warp(start + DURATION / 2);
-    let stream = expected_accrued(MAIN_AMOUNT, start, start + DURATION, env.now());
-    env.cancel(1).unwrap();
-    let freelancer = TRIAL_AMOUNT + stream;
-    env.assert_settled(1, freelancer, TOTAL_AMOUNT - freelancer, TOTAL_AMOUNT);
+    env.open_as_employer(1).unwrap();
     let c = env.read_contract(&env.contract_pda(1));
+    let stream = MAIN_AMOUNT / 2;
+    assert_eq!(c.released_amount, TRIAL_AMOUNT + stream);
     assert_eq!(c.stream_released_amount, stream);
-    assert_ne!(c.stream_released_amount, c.released_amount);
+    assert_eq!(c.contested_amount, TOTAL_AMOUNT - TRIAL_AMOUNT - stream);
 }
 
 #[test]
-fn second_cancel_and_post_settlement_stream_release_rejected() {
-    let mut env = setup(TOTAL_AMOUNT);
-    let (id, start) = activate_streaming(&mut env, TOTAL_AMOUNT);
-    env.warp(start + DURATION / 2);
-    env.cancel(id).unwrap();
-    let before = env.read_contract(&env.contract_pda(id));
-    assert_rejected(env.cancel(id), E_CONTRACT_TERMINAL, "second cancel");
-    env.warp(start + DURATION);
-    assert_rejected(
-        env.release_stream(id),
-        E_INVALID_STATE,
-        "stream release after cancel",
-    );
-    let after = env.read_contract(&env.contract_pda(id));
-    assert_eq!(
-        after.freelancer_settlement_amount,
-        before.freelancer_settlement_amount
-    );
-    assert_eq!(
-        after.employer_refundable_amount,
-        before.employer_refundable_amount
-    );
-    assert_eq!(after.stream_released_amount, before.stream_released_amount);
-}
-
-#[test]
-fn unused_fixed_becomes_refundable() {
-    let mut env = setup(TOTAL_AMOUNT);
-    let id = activate_fixed(&mut env, TOTAL_AMOUNT, 0);
-    env.cancel(id).unwrap();
-    env.assert_settled(id, 0, TOTAL_AMOUNT, TOTAL_AMOUNT);
-}
-
-#[test]
-fn approved_fixed_stays_with_freelancer() {
-    let mut env = setup(TOTAL_AMOUNT);
-    let id = activate_fixed(&mut env, TOTAL_AMOUNT, 0);
-    env.submit_work(id, 0).unwrap();
-    env.approve_work(id, 0).unwrap();
-    env.cancel(id).unwrap();
-    env.assert_settled(id, TOTAL_AMOUNT, 0, TOTAL_AMOUNT);
-}
-
-#[test]
-fn fixed_under_review_or_revising_blocks_cancel() {
-    let mut env = setup(TOTAL_AMOUNT);
-    let id = activate_fixed(&mut env, TOTAL_AMOUNT, 0);
-    env.submit_work(id, 0).unwrap();
-    assert_rejected(env.cancel(id), E_OPEN_REVIEW_BLOCKS, "fixed under review");
-    env.request_revision(id, 0).unwrap();
-    assert_rejected(env.cancel(id), E_OPEN_REVIEW_BLOCKS, "fixed revising");
-}
-
-#[test]
-fn paid_trial_plus_unused_fixed_keeps_trial() {
-    let mut env = setup(TOTAL_AMOUNT);
-    let id = activate_fixed(&mut env, TOTAL_AMOUNT, TRIAL_AMOUNT);
-    env.cancel(id).unwrap();
-    env.assert_settled(id, TRIAL_AMOUNT, MAIN_AMOUNT, TOTAL_AMOUNT);
-}
-
-#[test]
-fn zero_released_milestones_refundable() {
-    let mut env = setup(TOTAL_AMOUNT);
-    let id = activate_milestone(&mut env, &[400_000, 600_000]);
-    env.cancel(id).unwrap();
-    env.assert_settled(id, 0, TOTAL_AMOUNT, TOTAL_AMOUNT);
-}
-
-#[test]
-fn released_milestones_kept_remainder_refundable() {
-    let mut env = setup(TOTAL_AMOUNT);
-    let id = activate_milestone(&mut env, &[400_000, 600_000]);
-    env.submit_work(id, 0).unwrap();
-    env.approve_work(id, 0).unwrap();
-    env.cancel(id).unwrap();
-    env.assert_settled(id, 400_000, 600_000, TOTAL_AMOUNT);
-}
-
-#[test]
-fn both_milestones_released_zero_refundable() {
-    let mut env = setup(TOTAL_AMOUNT);
-    let id = activate_milestone(&mut env, &[400_000, 600_000]);
-    env.submit_work(id, 0).unwrap();
-    env.approve_work(id, 0).unwrap();
-    env.submit_work(id, 1).unwrap();
-    env.approve_work(id, 1).unwrap();
-    env.cancel(id).unwrap();
-    env.assert_settled(id, TOTAL_AMOUNT, 0, TOTAL_AMOUNT);
-}
-
-#[test]
-fn milestone_under_review_blocks_cancel() {
-    let mut env = setup(TOTAL_AMOUNT);
-    let id = activate_milestone(&mut env, &[TOTAL_AMOUNT]);
-    env.submit_work(id, 0).unwrap();
-    assert_rejected(
-        env.cancel(id),
-        E_OPEN_REVIEW_BLOCKS,
-        "milestone under review",
-    );
-}
-
-#[test]
-fn pending_states_cannot_cancel() {
-    let mut env = setup(TOTAL_AMOUNT);
-    env.create(&streaming_args(1, TOTAL_AMOUNT, env.now()))
-        .unwrap();
-    assert_rejected(env.cancel(1), E_INVALID_STATE, "pending acceptance");
-    env.accept(1).unwrap();
-    assert_rejected(env.cancel(1), E_INVALID_STATE, "pending employer approval");
-}
-
-#[test]
-fn activation_rejected_and_disputed_cannot_cancel() {
+fn fixed_and_milestone_dispute_protects_released_and_blocks_review() {
     let mut env = setup(TOTAL_AMOUNT * 2);
-    let mut args = streaming_args(1, TOTAL_AMOUNT, env.now());
+    activate_fixed(&mut env, 1, TOTAL_AMOUNT, TRIAL_AMOUNT);
+    env.submit_work(1, 0).unwrap();
+    let escrow = env.escrow_amount(1);
+    env.open_as_employer(1).unwrap();
+    let c = env.read_contract(&env.contract_pda(1));
+    assert_eq!(c.released_amount, TRIAL_AMOUNT);
+    assert_eq!(c.contested_amount, MAIN_AMOUNT);
+    assert_rejected(env.approve_work(1, 0), E_INVALID_STATE, "approve bypass");
+    assert_rejected(env.timeout(1, 0), E_INVALID_STATE, "timeout bypass");
+    assert_rejected(
+        env.request_revision(1, 0),
+        E_INVALID_STATE,
+        "revision bypass",
+    );
+    assert_rejected(env.submit_work(1, 0), E_INVALID_STATE, "submit bypass");
+    env.assert_escrow_unchanged(1, escrow);
+
+    activate_milestone(&mut env, 2, &[400_000, 600_000]);
+    env.submit_work(2, 0).unwrap();
+    env.approve_work(2, 0).unwrap();
+    env.submit_work(2, 1).unwrap();
+    env.open_as_freelancer(2).unwrap();
+    let m = env.read_contract(&env.contract_pda(2));
+    assert_eq!(m.released_amount, 400_000);
+    assert_eq!(m.contested_amount, 600_000);
+    env.resolve(2, 0).unwrap();
+    let resolved = env.read_contract(&env.contract_pda(2));
+    assert_eq!(resolved.freelancer_settlement_amount, 400_000);
+    assert_eq!(resolved.employer_refundable_amount, 600_000);
+}
+
+#[test]
+fn unresolved_trial_reject_is_resolvable_dispute() {
+    let mut env = setup(TOTAL_AMOUNT);
+    let mut args = streaming_args(&env, 1, TOTAL_AMOUNT, env.now());
     args.trial_amount = TRIAL_AMOUNT;
     env.create(&args).unwrap();
     env.accept(1).unwrap();
-    env.reject(1, true).unwrap();
+    env.submit_trial(1).unwrap();
+    env.reject_activation(1, true).unwrap();
+    let c = env.read_contract(&env.contract_pda(1));
+    assert_eq!(c.status, ContractStatus::Disputed);
+    assert_eq!(c.contested_amount, TOTAL_AMOUNT);
+    assert_eq!(c.released_amount, 0);
+    env.resolve(1, TRIAL_AMOUNT).unwrap();
+    let r = env.read_contract(&env.contract_pda(1));
+    assert_eq!(r.status, ContractStatus::Resolved);
+    assert_eq!(r.freelancer_settlement_amount, TRIAL_AMOUNT);
+    assert_eq!(r.employer_refundable_amount, MAIN_AMOUNT);
+}
+
+#[test]
+fn withdrawn_trial_cannot_be_clawed_back() {
+    let mut env = setup(TOTAL_AMOUNT);
+    activate_fixed(&mut env, 1, TOTAL_AMOUNT, TRIAL_AMOUNT);
+    env.withdraw(1).unwrap();
+    env.open_as_employer(1).unwrap();
+    env.resolve(1, 0).unwrap();
+    let c = env.read_contract(&env.contract_pda(1));
+    assert_eq!(c.freelancer_settlement_amount, TRIAL_AMOUNT);
+    assert_eq!(c.withdrawn_amount, TRIAL_AMOUNT);
+    assert!(c.freelancer_settlement_amount >= c.withdrawn_amount);
+    assert_eq!(c.employer_refundable_amount, MAIN_AMOUNT);
+}
+
+#[test]
+fn resolution_extremes_conservation_and_zero_tokens() {
+    fn run(award: u64) -> (u64, u64, u64) {
+        let mut env = setup(10);
+        activate_fixed(&mut env, 1, 10, 0);
+        env.open_as_employer(1).unwrap();
+        let escrow_before = env.escrow_amount(1);
+        env.resolve(1, award).unwrap();
+        let c = env.read_contract(&env.contract_pda(1));
+        assert_eq!(env.escrow_amount(1), escrow_before);
+        assert_eq!(
+            c.freelancer_settlement_amount + c.employer_refundable_amount,
+            10
+        );
+        assert_eq!(c.released_amount, c.freelancer_settlement_amount);
+        (
+            c.freelancer_settlement_amount,
+            c.employer_refundable_amount,
+            env.escrow_amount(1),
+        )
+    }
+    assert_eq!(run(10), (10, 0, 10));
+    assert_eq!(run(0), (0, 10, 10));
+    assert_eq!(run(4), (4, 6, 10));
+}
+
+#[test]
+fn invalid_award_and_second_resolution_rejected() {
+    let mut env = setup(10);
+    activate_fixed(&mut env, 1, 10, 0);
+    env.open_as_employer(1).unwrap();
+    let before = env.read_contract(&env.contract_pda(1));
+    assert_rejected(
+        env.resolve(1, 11),
+        E_INVALID_AWARD,
+        "award exceeds contested",
+    );
     assert_eq!(
         env.read_contract(&env.contract_pda(1)).status,
-        ContractStatus::ActivationRejected
+        before.status
     );
-    assert_rejected(env.cancel(1), E_CONTRACT_TERMINAL, "activation rejected");
-
-    let mut args = streaming_args(2, TOTAL_AMOUNT, env.now());
-    args.trial_amount = TRIAL_AMOUNT;
-    env.create(&args).unwrap();
-    env.accept(2).unwrap();
-    env.submit_trial(2).unwrap();
-    env.reject(2, true).unwrap();
-    assert_eq!(
-        env.read_contract(&env.contract_pda(2)).status,
-        ContractStatus::Disputed
-    );
-    assert_rejected(env.cancel(2), E_CONTRACT_TERMINAL, "disputed");
+    env.resolve(1, 3).unwrap();
+    assert_rejected(env.resolve(1, 3), E_INVALID_STATE, "second resolution");
 }
 
 #[test]
-fn post_settlement_work_review_rejected() {
+fn phase_eight_claims_after_resolution_are_order_independent() {
+    fn settle(freelancer_first: bool) -> (u64, u64, u64, u64, u64) {
+        let mut env = setup(10);
+        let start = activate_streaming(&mut env, 1, 10);
+        env.warp(start + 20);
+        env.release_stream(1).unwrap();
+        env.withdraw(1).unwrap();
+        env.open_as_employer(1).unwrap();
+        // frozen released=3, contested=7; award 3 more to freelancer → 6 / 4
+        env.resolve(1, 3).unwrap();
+        if freelancer_first {
+            env.withdraw(1).unwrap();
+            env.refund(1).unwrap();
+        } else {
+            env.refund(1).unwrap();
+            env.withdraw(1).unwrap();
+        }
+        let c = env.read_contract(&env.contract_pda(1));
+        assert_eq!(c.freelancer_settlement_amount, 6);
+        assert_eq!(c.employer_refundable_amount, 4);
+        assert_eq!(c.withdrawn_amount, 6);
+        assert_eq!(c.refunded_amount, 4);
+        assert_eq!(env.escrow_amount(1), 0);
+        (
+            c.withdrawn_amount,
+            c.refunded_amount,
+            env.escrow_amount(1),
+            env.token_balance(&env.freelancer_token_account),
+            env.token_balance(&env.employer_token_account),
+        )
+    }
+    assert_eq!(settle(true), settle(false));
+}
+
+#[test]
+fn disputed_blocks_cancel_refund_withdraw_and_lifecycle() {
     let mut env = setup(TOTAL_AMOUNT);
-    let id = activate_fixed(&mut env, TOTAL_AMOUNT, 0);
-    env.cancel(id).unwrap();
+    activate_fixed(&mut env, 1, TOTAL_AMOUNT, 0);
+    env.submit_work(1, 0).unwrap();
+    env.open_as_employer(1).unwrap();
+    assert_rejected(env.cancel(1), E_CONTRACT_TERMINAL, "cancel while disputed");
+    assert_rejected(env.refund(1), E_CONTRACT_TERMINAL, "refund while disputed");
     assert_rejected(
-        env.submit_work(id, 0),
-        E_INVALID_STATE,
-        "submit after cancel",
+        env.withdraw(1),
+        E_CONTRACT_TERMINAL,
+        "withdraw while disputed",
     );
+    assert_rejected(env.approve_work(1, 0), E_INVALID_STATE, "approve");
+    assert_rejected(env.timeout(1, 0), E_INVALID_STATE, "timeout");
+}
+
+#[test]
+fn pending_and_cancelled_cannot_open_dispute() {
+    let mut env = setup(TOTAL_AMOUNT * 2);
+    env.create(&streaming_args(&env, 1, TOTAL_AMOUNT, env.now()))
+        .unwrap();
     assert_rejected(
-        env.approve_work(id, 0),
-        E_INVALID_STATE,
-        "approve after cancel",
+        env.open_as_employer(1),
+        E_DISPUTE_NOT_ALLOWED,
+        "pending acceptance",
     );
+    env.accept(1).unwrap();
     assert_rejected(
-        env.request_revision(id, 0),
-        E_INVALID_STATE,
-        "revision after cancel",
+        env.open_as_employer(1),
+        E_DISPUTE_NOT_ALLOWED,
+        "pending approval without open review",
     );
-    assert_rejected(env.timeout(id, 0), E_INVALID_STATE, "timeout after cancel");
+
+    activate_fixed(&mut env, 2, TOTAL_AMOUNT, 0);
+    env.cancel(2).unwrap();
+    assert_rejected(
+        env.open_as_employer(2),
+        E_CONTRACT_TERMINAL,
+        "cancelled reopen",
+    );
+}
+
+#[test]
+fn full_claims_after_resolution_reject_doubles() {
+    let mut env = setup(10);
+    activate_fixed(&mut env, 1, 10, 0);
+    env.open_as_employer(1).unwrap();
+    env.resolve(1, 4).unwrap();
+    env.withdraw(1).unwrap();
+    env.refund(1).unwrap();
+    assert_eq!(env.escrow_amount(1), 0);
+    assert_rejected(env.withdraw(1), E_NOTHING_TO_WITHDRAW, "double withdraw");
+    assert_rejected(env.refund(1), E_NOTHING_TO_REFUND, "double refund");
 }

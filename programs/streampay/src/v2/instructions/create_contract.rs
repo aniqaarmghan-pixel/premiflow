@@ -29,7 +29,7 @@ use crate::v2::constants::{
     MIN_ACTIVATION_REVIEW, MIN_DURATION_SECONDS, MIN_REVIEW_DURATION, TRIAL_UNIT_SEED,
     V2_LAYOUT_VERSION, WORK_UNIT_SEED,
 };
-use crate::v2::enums::{ContractStatus, PaymentMode, StartMode};
+use crate::v2::enums::{ContractStatus, DisputeParty, PaymentMode, StartMode};
 use crate::v2::errors::StreamPayV2Error;
 use crate::v2::events::{ContractCreated, TrialConfigured};
 use crate::v2::state::{Contract, WorkUnit};
@@ -83,6 +83,10 @@ pub struct CreateContractArgs {
     /// Zero means no trial. Must be strictly less than `total_amount` so the
     /// main contract retains a positive economic base.
     pub trial_amount: u64,
+
+    /// Per-contract dispute resolver. Must differ from employer, freelancer,
+    /// and the default pubkey. Frozen at creation.
+    pub resolver: Pubkey,
 
     /// Bounded reference to the off-chain contract record.
     pub metadata_uri: String,
@@ -379,6 +383,20 @@ pub fn handle_create_contract(
     // A self-contract would let one wallet play both roles, making every
     // two-party protection meaningless.
     require_keys_neq!(employer_key, freelancer_key, StreamPayV2Error::SelfContract);
+    require!(
+        args.resolver != Pubkey::default(),
+        StreamPayV2Error::InvalidResolver
+    );
+    require_keys_neq!(
+        args.resolver,
+        employer_key,
+        StreamPayV2Error::InvalidResolver
+    );
+    require_keys_neq!(
+        args.resolver,
+        freelancer_key,
+        StreamPayV2Error::InvalidResolver
+    );
 
     let terms = args.resolve(now)?;
 
@@ -410,6 +428,10 @@ pub fn handle_create_contract(
         contract.stream_released_amount = 0;
         contract.freelancer_settlement_amount = 0;
         contract.employer_refundable_amount = 0;
+        contract.resolver = args.resolver;
+        contract.contested_amount = 0;
+        contract.disputed_at = 0;
+        contract.dispute_initiator = DisputeParty::None;
 
         contract.acceptance_deadline = args.acceptance_deadline;
         contract.scheduled_start_time = terms.scheduled_start_time;
@@ -441,7 +463,7 @@ pub fn handle_create_contract(
         contract.metadata_hash = args.metadata_hash;
         contract.bump = ctx.bumps.contract;
         contract.escrow_bump = ctx.bumps.contract_escrow;
-        contract.reserved = [0u8; 68];
+        contract.reserved = [0u8; 19];
         contract.metadata_uri = args.metadata_uri;
     }
 

@@ -55,6 +55,7 @@ const E_INVALID_ACCEPTANCE_DEADLINE: u32 = 6106;
 const E_INVALID_SCHEDULED_START: u32 = 6107;
 const E_INVALID_METADATA: u32 = 6108;
 const E_SELF_CONTRACT: u32 = 6109;
+const E_INVALID_RESOLVER: u32 = 6158;
 
 // anchor_lang::error::ErrorCode, constraint range.
 const E_CONSTRAINT_TOKEN_MINT: u32 = 2014;
@@ -260,6 +261,7 @@ fn streaming_args(contract_id: u64, total_amount: u64, now: i64) -> CreateContra
         activation_review_duration: 3_600,
         max_revisions: 2,
         trial_amount: 0,
+        resolver: Pubkey::new_from_array([0x11; 32]),
         metadata_uri: "ipfs://bafyContractMetadata".to_string(),
         metadata_hash: [7u8; 32],
     }
@@ -353,6 +355,9 @@ fn create_streaming_contract_succeeds() {
     assert_eq!(contract.stream_released_amount, 0);
     assert_eq!(contract.freelancer_settlement_amount, 0);
     assert_eq!(contract.employer_refundable_amount, 0);
+    assert_eq!(contract.resolver, Pubkey::new_from_array([0x11; 32]));
+    assert_eq!(contract.contested_amount, 0);
+    assert_eq!(contract.disputed_at, 0);
 
     // Terms stored as agreed.
     assert_eq!(contract.acceptance_deadline, now + 3_600);
@@ -395,7 +400,7 @@ fn create_streaming_contract_succeeds() {
     assert_eq!(contract.bump, contract_bump);
     assert_eq!(contract.escrow_bump, escrow_bump);
 
-    assert_eq!(contract.reserved, [0u8; 68]);
+    assert_eq!(contract.reserved, [0u8; 19]);
 
     // Escrow holds exactly the full amount, and the employer paid exactly that.
     assert_eq!(env.token_balance(&escrow_pda), total_amount);
@@ -520,6 +525,43 @@ fn reject_same_employer_and_freelancer() {
         env.create(&freelancer, &args, None),
         E_SELF_CONTRACT,
         "self-dealing contract",
+    );
+}
+
+#[test]
+fn reject_invalid_resolver() {
+    let mut env = setup(1_000_000);
+    let now = env.now();
+    let freelancer = Keypair::new().pubkey();
+
+    let default_resolver = CreateContractArgs {
+        resolver: Pubkey::default(),
+        ..streaming_args(1, 1_000_000, now)
+    };
+    assert_rejected(
+        env.create(&freelancer, &default_resolver, None),
+        E_INVALID_RESOLVER,
+        "default resolver",
+    );
+
+    let employer_resolver = CreateContractArgs {
+        resolver: env.employer_pk,
+        ..streaming_args(2, 1_000_000, now)
+    };
+    assert_rejected(
+        env.create(&freelancer, &employer_resolver, None),
+        E_INVALID_RESOLVER,
+        "employer as resolver",
+    );
+
+    let freelancer_resolver = CreateContractArgs {
+        resolver: freelancer,
+        ..streaming_args(3, 1_000_000, now)
+    };
+    assert_rejected(
+        env.create(&freelancer, &freelancer_resolver, None),
+        E_INVALID_RESOLVER,
+        "freelancer as resolver",
     );
 }
 

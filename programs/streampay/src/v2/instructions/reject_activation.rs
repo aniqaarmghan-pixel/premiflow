@@ -7,9 +7,9 @@
 use anchor_lang::prelude::*;
 
 use crate::v2::constants::{CONTRACT_SEED, TRIAL_UNIT_SEED};
-use crate::v2::enums::{ContractStatus, WorkUnitKind, WorkUnitStatus};
+use crate::v2::enums::{ContractStatus, DisputeParty, WorkUnitKind, WorkUnitStatus};
 use crate::v2::errors::StreamPayV2Error;
-use crate::v2::events::{ActivationRejected, TrialRejected};
+use crate::v2::events::{ActivationRejected, DisputeOpened, TrialRejected};
 use crate::v2::state::{Contract, WorkUnit};
 
 #[derive(Accounts)]
@@ -75,10 +75,10 @@ pub fn handle_reject_activation(ctx: Context<RejectActivation>) -> Result<()> {
     };
 
     let contract = &mut ctx.accounts.contract;
-    contract.status = new_status;
-    contract.terminated_at = now;
-
     if new_status == ContractStatus::Disputed {
+        let (_protected_f, _protected_e, contested) =
+            contract.freeze_for_dispute(now, DisputeParty::Employer)?;
+        contract.terminated_at = now;
         let trial_key = ctx.accounts.trial_work_unit.as_ref().unwrap().key();
         emit!(TrialRejected {
             contract: contract_key,
@@ -87,7 +87,20 @@ pub fn handle_reject_activation(ctx: Context<RejectActivation>) -> Result<()> {
             freelancer,
             rejected_at: now,
         });
+        emit!(DisputeOpened {
+            contract: contract_key,
+            employer,
+            freelancer,
+            initiator: DisputeParty::Employer,
+            resolver: contract.resolver,
+            disputed_at: now,
+            contested_amount: contested,
+            released_amount: contract.released_amount,
+            stream_released_amount: contract.stream_released_amount,
+        });
     } else {
+        contract.status = new_status;
+        contract.terminated_at = now;
         emit!(ActivationRejected {
             contract: contract_key,
             employer,
