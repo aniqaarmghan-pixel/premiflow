@@ -222,6 +222,12 @@ pub enum StreamPayV2Error {
 
     #[msg("This release would exceed the contract's main or total amount.")]
     ReleaseAmountExceeded,
+
+    // -----------------------------------------------------------------
+    // Appended in Phase 8.
+    // -----------------------------------------------------------------
+    #[msg("Escrow holds fewer tokens than the entitlement being claimed.")]
+    InsufficientEscrowBalance,
 }
 
 #[cfg(test)]
@@ -342,6 +348,19 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::ReleaseAmountExceeded), 6156);
     }
 
+    /// Codes that the Phase 8 SPL settlement instructions depend on.
+    #[test]
+    fn v2_phase_8_error_codes_are_pinned() {
+        assert_eq!(u32::from(StreamPayV2Error::InvalidState), 6111);
+        assert_eq!(u32::from(StreamPayV2Error::ContractTerminal), 6113);
+        assert_eq!(u32::from(StreamPayV2Error::Unauthorized), 6118);
+        assert_eq!(u32::from(StreamPayV2Error::NothingToWithdraw), 6139);
+        assert_eq!(u32::from(StreamPayV2Error::NothingToRefund), 6140);
+        assert_eq!(u32::from(StreamPayV2Error::ArithmeticOverflow), 6144);
+        assert_eq!(u32::from(StreamPayV2Error::ReleaseAmountExceeded), 6156);
+        assert_eq!(u32::from(StreamPayV2Error::InsufficientEscrowBalance), 6157);
+    }
+
     /// The last variant, which is where every future append must land.
     #[test]
     fn v2_error_enum_tail_is_stable() {
@@ -351,5 +370,6 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::ScheduledStartElapsed), 6150);
         assert_eq!(u32::from(StreamPayV2Error::InvalidTrialState), 6154);
         assert_eq!(u32::from(StreamPayV2Error::ReleaseAmountExceeded), 6156);
+        assert_eq!(u32::from(StreamPayV2Error::InsufficientEscrowBalance), 6157);
     }
 }

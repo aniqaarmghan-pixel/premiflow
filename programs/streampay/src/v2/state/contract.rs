@@ -381,6 +381,48 @@ impl Contract {
         self.terminated_at = now;
         Ok((freelancer, employer))
     }
+
+    /// Cap on freelancer SPL that may ever leave escrow in the current status.
+    ///
+    /// Active: currently released accounting. Cancelled: frozen Phase 7
+    /// settlement, which Phase 7 already reconciled with `released_amount`.
+    /// Other statuses cannot withdraw.
+    pub fn freelancer_withdraw_cap(&self) -> Result<u64> {
+        match self.status {
+            ContractStatus::Active => Ok(self.released_amount),
+            ContractStatus::Cancelled => {
+                require!(
+                    self.freelancer_settlement_amount == self.released_amount,
+                    StreamPayV2Error::ReleaseAmountExceeded
+                );
+                Ok(self.freelancer_settlement_amount)
+            }
+            other if other.is_terminal() => Err(StreamPayV2Error::ContractTerminal.into()),
+            _ => Err(StreamPayV2Error::InvalidState.into()),
+        }
+    }
+
+    /// `cap - withdrawn_amount`. Caller must still reject a zero result.
+    pub fn available_to_withdraw(&self) -> Result<u64> {
+        let cap = self.freelancer_withdraw_cap()?;
+        cap.checked_sub(self.withdrawn_amount)
+            .ok_or(StreamPayV2Error::ReleaseAmountExceeded.into())
+    }
+
+    /// Remaining employer SPL after Phase 7 freeze: `refundable - refunded`.
+    /// Active contracts have no refund path.
+    pub fn available_to_refund(&self) -> Result<u64> {
+        match self.status {
+            ContractStatus::Cancelled => {}
+            other if other.is_terminal() => {
+                return Err(StreamPayV2Error::ContractTerminal.into());
+            }
+            _ => return Err(StreamPayV2Error::InvalidState.into()),
+        }
+        self.employer_refundable_amount
+            .checked_sub(self.refunded_amount)
+            .ok_or(StreamPayV2Error::ReleaseAmountExceeded.into())
+    }
 }
 
 /// Floor-division streaming accrual: `floor(main_amount * elapsed / duration)`.

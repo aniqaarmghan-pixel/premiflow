@@ -355,6 +355,16 @@ Ok(())
     pub fn cancel_active_contract(ctx: Context<CancelActiveContract>) -> Result<()> {
         v2::instructions::cancel_active_contract::handle_cancel_active_contract(ctx)
     }
+
+    /// Freelancer withdraws all currently available released/settled entitlement.
+    pub fn withdraw_freelancer(ctx: Context<WithdrawFreelancer>) -> Result<()> {
+        v2::instructions::withdraw_freelancer::handle_withdraw_freelancer(ctx)
+    }
+
+    /// Employer claims remaining Phase 7 frozen refundable entitlement.
+    pub fn claim_employer_refund(ctx: Context<ClaimEmployerRefund>) -> Result<()> {
+        v2::instructions::claim_employer_refund::handle_claim_employer_refund(ctx)
+    }
 }
 #[derive(Accounts)]
 pub struct Withdraw<'info> {

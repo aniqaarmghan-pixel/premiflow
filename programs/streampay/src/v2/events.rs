@@ -14,6 +14,7 @@
 //!   `WorkUnitRevisionRequested`, `WorkUnitReviewTimedOut`
 //! - Phase 6: `StreamAccrualReleased`
 //! - Phase 7: `ContractCancellationSettled`
+//! - Phase 8: `FreelancerWithdrawal`, `EmployerRefundClaimed`
 //!
 //! Every event carries `contract` as its first field so a client can index a
 //! single contract's full history with one filter. Off-chain metadata URIs and
@@ -229,4 +230,26 @@ pub struct ContractCancellationSettled {
     pub employer_refundable: u64,
     pub released_amount: u64,
     pub stream_released_amount: u64,
+}
+
+/// SPL tokens left escrow for the freelancer. Real token movement.
+#[event]
+pub struct FreelancerWithdrawal {
+    pub contract: Pubkey,
+    pub freelancer: Pubkey,
+    pub mint: Pubkey,
+    pub amount: u64,
+    pub withdrawn_amount: u64,
+    pub remaining_entitlement: u64,
+}
+
+/// SPL tokens left escrow back to the employer. Real token movement.
+#[event]
+pub struct EmployerRefundClaimed {
+    pub contract: Pubkey,
+    pub employer: Pubkey,
+    pub mint: Pubkey,
+    pub amount: u64,
+    pub refunded_amount: u64,
+    pub remaining_refundable: u64,
 }
