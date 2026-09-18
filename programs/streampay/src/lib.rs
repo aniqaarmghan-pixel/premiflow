@@ -378,6 +378,11 @@ Ok(())
     ) -> Result<()> {
         v2::instructions::resolve_dispute::handle_resolve_dispute(ctx, freelancer_contested_award)
     }
+
+    /// Permissionless successful completion. No SPL transfer.
+    pub fn complete_contract(ctx: Context<CompleteContract>) -> Result<()> {
+        v2::instructions::complete_contract::handle_complete_contract(ctx)
+    }
 }
 #[derive(Accounts)]
 pub struct Withdraw<'info> {

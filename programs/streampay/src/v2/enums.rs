@@ -157,9 +157,10 @@ impl ContractStatus {
         matches!(self, Self::Draft)
     }
 
-    /// Whether Phase 8 may pay frozen settlement (clean cancel or resolved dispute).
+    /// Whether Phase 8 may pay frozen settlement (cancel, resolved dispute, or
+    /// successful completion).
     pub fn allows_settlement_claims(&self) -> bool {
-        matches!(self, Self::Cancelled | Self::Resolved)
+        matches!(self, Self::Cancelled | Self::Resolved | Self::Completed)
     }
 }
 

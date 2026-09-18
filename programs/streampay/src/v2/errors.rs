@@ -243,6 +243,21 @@ pub enum StreamPayV2Error {
 
     #[msg("The dispute award exceeds the contested amount.")]
     InvalidDisputeAward,
+
+    // -----------------------------------------------------------------
+    // Appended in Phase 10.
+    // -----------------------------------------------------------------
+    #[msg("Successful completion is not allowed in this contract state.")]
+    CompletionNotAllowed,
+
+    #[msg("Required work is still unresolved, so the contract cannot complete.")]
+    UnresolvedWorkRemaining,
+
+    #[msg("The contract has not reached an objectively completable point.")]
+    ContractNotReadyForCompletion,
+
+    #[msg("This contract is already completed.")]
+    ContractAlreadyCompleted,
 }
 
 #[cfg(test)]
@@ -389,6 +404,22 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::InvalidDisputeAward), 6161);
     }
 
+    /// Codes that the Phase 10 completion instruction depends on.
+    #[test]
+    fn v2_phase_10_error_codes_are_pinned() {
+        assert_eq!(u32::from(StreamPayV2Error::InvalidState), 6111);
+        assert_eq!(u32::from(StreamPayV2Error::ContractTerminal), 6113);
+        assert_eq!(u32::from(StreamPayV2Error::NothingToRefund), 6140);
+        assert_eq!(u32::from(StreamPayV2Error::ReleaseAmountExceeded), 6156);
+        assert_eq!(u32::from(StreamPayV2Error::CompletionNotAllowed), 6162);
+        assert_eq!(u32::from(StreamPayV2Error::UnresolvedWorkRemaining), 6163);
+        assert_eq!(
+            u32::from(StreamPayV2Error::ContractNotReadyForCompletion),
+            6164
+        );
+        assert_eq!(u32::from(StreamPayV2Error::ContractAlreadyCompleted), 6165);
+    }
+
     /// The last variant, which is where every future append must land.
     #[test]
     fn v2_error_enum_tail_is_stable() {
@@ -400,5 +431,6 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::ReleaseAmountExceeded), 6156);
         assert_eq!(u32::from(StreamPayV2Error::InsufficientEscrowBalance), 6157);
         assert_eq!(u32::from(StreamPayV2Error::InvalidDisputeAward), 6161);
+        assert_eq!(u32::from(StreamPayV2Error::ContractAlreadyCompleted), 6165);
     }
 }

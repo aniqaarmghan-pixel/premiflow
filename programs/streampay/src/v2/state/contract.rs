@@ -86,12 +86,13 @@ pub struct Contract {
     /// `released_amount` conceptually equals `trial_released + stream_released_amount`
     /// on an Active streaming contract. Never inferred from `released_amount`.
     pub stream_released_amount: u64,
-    /// Frozen freelancer entitlement after clean active-contract cancellation.
-    /// Zero until `status == Cancelled`. Equals `released_amount` at settlement.
+    /// Frozen freelancer entitlement after cancellation, dispute resolution,
+    /// or successful completion. Zero until those terminal settlements.
+    /// Equals `released_amount` at freeze.
     pub freelancer_settlement_amount: u64,
-    /// Frozen employer refundable entitlement after clean cancellation or
-    /// dispute resolution. Zero until settlement. Not tokens transferred:
-    /// that is `refunded_amount`.
+    /// Frozen employer refundable entitlement after cancellation, dispute
+    /// resolution, or successful completion. Zero until settlement. Not tokens
+    /// transferred: that is `refunded_amount`.
     pub employer_refundable_amount: u64,
 
     /// Per-contract arbitrator. Bound at creation; never the employer,
@@ -380,6 +381,7 @@ impl Contract {
         self.employer_refundable_amount = employer;
         self.status = ContractStatus::Cancelled;
         self.terminated_at = now;
+        self.assert_terminal_settlement_invariants()?;
         Ok((freelancer, employer))
     }
 
@@ -494,6 +496,7 @@ impl Contract {
         self.employer_refundable_amount = employer_final;
         self.status = ContractStatus::Resolved;
         self.terminated_at = now;
+        self.assert_terminal_settlement_invariants()?;
         Ok((
             freelancer_contested_award,
             employer_contested_award,
@@ -502,11 +505,151 @@ impl Contract {
         ))
     }
 
+    /// Freeze a successful completion split. Permissionless callers reach this
+    /// only after objective on-chain conditions are already true.
+    ///
+    /// Streaming: `now >= end_time`, then remaining canonical accrual is
+    /// materialized at `end_time`. Fixed/Milestone: every required main work
+    /// unit must already be released; open reviews and unsubmitted units block.
+    /// Successful completion pays the full agreed `total_amount` to the
+    /// freelancer; unused remainder is a cancellation or dispute path, not
+    /// this one. `refunded_amount` must still be zero because Active contracts
+    /// have no refund instruction.
+    pub fn settle_successful_completion(&mut self, now: i64) -> Result<(u64, u64)> {
+        match self.status {
+            ContractStatus::Active => {}
+            ContractStatus::Completed => {
+                return Err(StreamPayV2Error::ContractAlreadyCompleted.into());
+            }
+            other if other.is_terminal() => {
+                return Err(StreamPayV2Error::ContractTerminal.into());
+            }
+            _ => return Err(StreamPayV2Error::CompletionNotAllowed.into()),
+        }
+
+        match self.payment_mode {
+            PaymentMode::Streaming => {
+                require!(
+                    now >= self.end_time,
+                    StreamPayV2Error::ContractNotReadyForCompletion
+                );
+                self.materialize_stream_at(self.end_time)?;
+                require!(
+                    self.stream_released_amount == self.main_amount,
+                    StreamPayV2Error::UnresolvedWorkRemaining
+                );
+            }
+            PaymentMode::Fixed | PaymentMode::Milestone => {
+                require!(
+                    self.open_review_count == 0,
+                    StreamPayV2Error::UnresolvedWorkRemaining
+                );
+                require!(
+                    self.work_unit_count > 0,
+                    StreamPayV2Error::UnresolvedWorkRemaining
+                );
+                require!(
+                    self.allocated_amount == self.main_amount,
+                    StreamPayV2Error::UnresolvedWorkRemaining
+                );
+                let trial_units: u32 = if self.has_trial() { 1 } else { 0 };
+                let expected_released_units = self
+                    .work_unit_count
+                    .checked_add(trial_units)
+                    .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+                require!(
+                    self.released_unit_count == expected_released_units,
+                    StreamPayV2Error::UnresolvedWorkRemaining
+                );
+            }
+        }
+
+        self.assert_live_invariants()?;
+        require!(
+            self.released_amount == self.total_amount,
+            StreamPayV2Error::UnresolvedWorkRemaining
+        );
+        require!(
+            self.refunded_amount == 0,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+
+        let freelancer = self.released_amount;
+        let employer = 0u64;
+        require!(
+            freelancer >= self.withdrawn_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+
+        self.freelancer_settlement_amount = freelancer;
+        self.employer_refundable_amount = employer;
+        self.status = ContractStatus::Completed;
+        self.completed_at = now;
+        self.terminated_at = now;
+        self.assert_terminal_settlement_invariants()?;
+        Ok((freelancer, employer))
+    }
+
+    /// Always-on money bounds. Independent of status.
+    pub fn assert_live_invariants(&self) -> Result<()> {
+        require!(
+            self.withdrawn_amount <= self.released_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+        require!(
+            self.released_amount <= self.total_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+        require!(
+            self.refunded_amount <= self.total_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+        let moved = self
+            .withdrawn_amount
+            .checked_add(self.refunded_amount)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        require!(
+            moved <= self.total_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+        Ok(())
+    }
+
+    /// Frozen settlement after Cancelled, Resolved, or Completed.
+    pub fn assert_terminal_settlement_invariants(&self) -> Result<()> {
+        self.assert_live_invariants()?;
+        require!(
+            self.status.allows_settlement_claims(),
+            StreamPayV2Error::InvalidState
+        );
+        let conserved = self
+            .freelancer_settlement_amount
+            .checked_add(self.employer_refundable_amount)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        require!(
+            conserved == self.total_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+        require!(
+            self.released_amount == self.freelancer_settlement_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+        require!(
+            self.withdrawn_amount <= self.freelancer_settlement_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+        require!(
+            self.refunded_amount <= self.employer_refundable_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+        Ok(())
+    }
+
     /// Cap on freelancer SPL that may ever leave escrow in the current status.
     ///
-    /// Active: currently released accounting. Cancelled: frozen Phase 7
-    /// settlement, which Phase 7 already reconciled with `released_amount`.
-    /// Other statuses cannot withdraw.
+    /// Active: currently released accounting. Cancelled / Resolved / Completed:
+    /// frozen settlement, already reconciled with `released_amount`. Other
+    /// statuses cannot withdraw.
     pub fn freelancer_withdraw_cap(&self) -> Result<u64> {
         match self.status {
             ContractStatus::Active => Ok(self.released_amount),

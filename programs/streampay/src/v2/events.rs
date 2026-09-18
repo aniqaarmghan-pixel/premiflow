@@ -16,6 +16,7 @@
 //! - Phase 7: `ContractCancellationSettled`
 //! - Phase 8: `FreelancerWithdrawal`, `EmployerRefundClaimed`
 //! - Phase 9: `DisputeOpened`, `DisputeResolved`
+//! - Phase 10: `ContractCompleted`
 //!
 //! Every event carries `contract` as its first field so a client can index a
 //! single contract's full history with one filter. Off-chain metadata URIs and
@@ -282,4 +283,18 @@ pub struct DisputeResolved {
     pub employer_contested_award: u64,
     pub final_freelancer_entitlement: u64,
     pub final_employer_entitlement: u64,
+}
+
+/// Successful completion froze the agreed economic end. No SPL transfer.
+#[event]
+pub struct ContractCompleted {
+    pub contract: Pubkey,
+    pub employer: Pubkey,
+    pub freelancer: Pubkey,
+    pub completed_at: i64,
+    pub final_freelancer_entitlement: u64,
+    pub final_employer_entitlement: u64,
+    pub released_amount: u64,
+    pub withdrawn_amount: u64,
+    pub refunded_amount: u64,
 }
