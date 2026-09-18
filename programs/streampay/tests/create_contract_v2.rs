@@ -350,6 +350,7 @@ fn create_streaming_contract_succeeds() {
     assert_eq!(contract.released_amount, 0);
     assert_eq!(contract.withdrawn_amount, 0);
     assert_eq!(contract.refunded_amount, 0);
+    assert_eq!(contract.stream_released_amount, 0);
 
     // Terms stored as agreed.
     assert_eq!(contract.acceptance_deadline, now + 3_600);
@@ -392,7 +393,7 @@ fn create_streaming_contract_succeeds() {
     assert_eq!(contract.bump, contract_bump);
     assert_eq!(contract.escrow_bump, escrow_bump);
 
-    assert_eq!(contract.reserved, [0u8; 92]);
+    assert_eq!(contract.reserved, [0u8; 84]);
 
     // Escrow holds exactly the full amount, and the employer paid exactly that.
     assert_eq!(env.token_balance(&escrow_pda), total_amount);

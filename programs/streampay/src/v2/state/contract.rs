@@ -81,6 +81,11 @@ pub struct Contract {
     pub withdrawn_amount: u64,
     /// Unreleased funds already returned to the employer.
     pub refunded_amount: u64,
+    /// Streaming main-work already materialized into `released_amount`.
+    /// Independent of any trial credit, so
+    /// `released_amount` conceptually equals `trial_released + stream_released_amount`
+    /// on an Active streaming contract. Never inferred from `released_amount`.
+    pub stream_released_amount: u64,
 
     // -----------------------------------------------------------------
     // Negotiated terms. Frozen once the contract leaves `Draft`.
@@ -156,8 +161,9 @@ pub struct Contract {
     ///
     /// Started at 128 bytes; `voided_unit_count` (4),
     /// `last_milestone_due_offset` (8), `activation_review_duration` (8),
-    /// `trial_amount` (8) and `main_amount` (8) were taken from it.
-    pub reserved: [u8; 92],
+    /// `trial_amount` (8), `main_amount` (8) and `stream_released_amount` (8)
+    /// were taken from it.
+    pub reserved: [u8; 84],
 
     // -----------------------------------------------------------------
     // Variable length. Must remain the final field.
@@ -246,6 +252,15 @@ impl Contract {
         Ok(end)
     }
 
+    /// Canonical streaming accrual at `now`, using only `main_amount`.
+    ///
+    /// Cumulative from `start_time`, never per-interval, so repeated
+    /// materialization cannot change the total entitlement. `last_period_end`
+    /// is not consulted: it remains a checkpoint cursor, not an accrual clock.
+    pub fn stream_accrued_at(&self, now: i64) -> Result<u64> {
+        canonical_stream_accrued(self.main_amount, self.start_time, self.end_time, now)
+    }
+
     /// Credit a post-activation main-work release.
     ///
     /// Trial compensation already sitting in `released_amount` is not counted
@@ -290,6 +305,70 @@ impl Contract {
             .checked_sub(1)
             .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
         Ok(())
+    }
+}
+
+/// Floor-division streaming accrual: `floor(main_amount * elapsed / duration)`.
+///
+/// `now <= start_time` → 0. `now >= end_time` → `main_amount` exactly.
+/// Intermediate arithmetic is `u128` so `main_amount * elapsed` cannot wrap.
+pub fn canonical_stream_accrued(
+    main_amount: u64,
+    start_time: i64,
+    end_time: i64,
+    now: i64,
+) -> Result<u64> {
+    if now <= start_time {
+        return Ok(0);
+    }
+
+    let duration = end_time
+        .checked_sub(start_time)
+        .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+    require!(duration > 0, StreamPayV2Error::InvalidDuration);
+
+    if now >= end_time {
+        return Ok(main_amount);
+    }
+
+    let elapsed = now
+        .checked_sub(start_time)
+        .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+    let product = (main_amount as u128)
+        .checked_mul(elapsed as u128)
+        .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+    let accrued = product
+        .checked_div(duration as u128)
+        .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+    u64::try_from(accrued).map_err(|_| StreamPayV2Error::ArithmeticOverflow.into())
+}
+
+#[cfg(test)]
+mod accrual_tests {
+    use super::canonical_stream_accrued;
+
+    #[test]
+    fn ten_over_three_seconds_is_3_6_10() {
+        assert_eq!(canonical_stream_accrued(10, 0, 3, 0).unwrap(), 0);
+        assert_eq!(canonical_stream_accrued(10, 0, 3, 1).unwrap(), 3);
+        assert_eq!(canonical_stream_accrued(10, 0, 3, 2).unwrap(), 6);
+        assert_eq!(canonical_stream_accrued(10, 0, 3, 3).unwrap(), 10);
+        assert_eq!(canonical_stream_accrued(10, 0, 3, 100).unwrap(), 10);
+    }
+
+    #[test]
+    fn three_over_ten_seconds_reaches_exactly_three() {
+        assert_eq!(canonical_stream_accrued(3, 0, 10, 0).unwrap(), 0);
+        assert_eq!(canonical_stream_accrued(3, 0, 10, 3).unwrap(), 0);
+        assert_eq!(canonical_stream_accrued(3, 0, 10, 4).unwrap(), 1);
+        assert_eq!(canonical_stream_accrued(3, 0, 10, 9).unwrap(), 2);
+        assert_eq!(canonical_stream_accrued(3, 0, 10, 10).unwrap(), 3);
+    }
+
+    #[test]
+    fn before_or_at_start_is_zero() {
+        assert_eq!(canonical_stream_accrued(1_000, 50, 110, 49).unwrap(), 0);
+        assert_eq!(canonical_stream_accrued(1_000, 50, 110, 50).unwrap(), 0);
     }
 }
 

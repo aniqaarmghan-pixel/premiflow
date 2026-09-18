@@ -17,7 +17,9 @@ use anchor_lang::prelude::*;
 /// serve all three.
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum PaymentMode {
-    /// Compensation accrues continuously with time; released per checkpoint.
+    /// Compensation accrues continuously with time. Phase 6 materializes
+    /// earnings into `released_amount` from the canonical cumulative formula;
+    /// checkpoint WorkUnits are not the release mechanism.
     Streaming,
     /// Fixed price split across several agreed deliverables.
     Milestone,

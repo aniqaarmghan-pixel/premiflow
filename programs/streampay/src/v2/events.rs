@@ -12,6 +12,7 @@
 //!   `TrialApproved`, `TrialRejected`
 //! - Phase 5: `WorkUnitSubmitted`, `WorkUnitApproved`,
 //!   `WorkUnitRevisionRequested`, `WorkUnitReviewTimedOut`
+//! - Phase 6: `StreamAccrualReleased`
 //!
 //! Every event carries `contract` as its first field so a client can index a
 //! single contract's full history with one filter. Off-chain metadata URIs and
@@ -200,4 +201,16 @@ pub struct WorkUnitReviewTimedOut {
     pub work_unit_index: u32,
     pub amount: u64,
     pub released_at: i64,
+}
+
+/// Time-based streaming earnings were materialized into released accounting.
+/// No SPL transfer.
+#[event]
+pub struct StreamAccrualReleased {
+    pub contract: Pubkey,
+    pub freelancer: Pubkey,
+    pub newly_released: u64,
+    pub cumulative_stream_released: u64,
+    pub total_released: u64,
+    pub accrual_time: i64,
 }

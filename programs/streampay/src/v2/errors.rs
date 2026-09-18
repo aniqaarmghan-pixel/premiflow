@@ -319,6 +319,18 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::ReleaseAmountExceeded), 6156);
     }
 
+    /// Codes that the Phase 6 streaming-accrual instruction depends on.
+    /// No new variants: existing codes are semantically exact.
+    #[test]
+    fn v2_phase_6_error_codes_are_pinned() {
+        assert_eq!(u32::from(StreamPayV2Error::InvalidDuration), 6101);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidPaymentMode), 6110);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidState), 6111);
+        assert_eq!(u32::from(StreamPayV2Error::ContractNotStarted), 6112);
+        assert_eq!(u32::from(StreamPayV2Error::ArithmeticOverflow), 6144);
+        assert_eq!(u32::from(StreamPayV2Error::ReleaseAmountExceeded), 6156);
+    }
+
     /// The last variant, which is where every future append must land.
     #[test]
     fn v2_error_enum_tail_is_stable() {

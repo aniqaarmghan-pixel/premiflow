@@ -162,7 +162,8 @@ impl WorkUnit {
     }
 
     /// Phase 5 generic review is only for post-activation Milestone/Fixed units.
-    /// Trial keeps its dedicated instructions; streaming checkpoints are Phase 6.
+    /// Trial keeps its dedicated instructions. Streaming earnings are
+    /// contract-level time accrual (`release_stream_accrual`), not a WorkUnit.
     pub fn require_main_deliverable(&self) -> Result<()> {
         match self.kind {
             WorkUnitKind::Milestone | WorkUnitKind::Fixed => Ok(()),

@@ -407,6 +407,7 @@ pub fn handle_create_contract(
         contract.released_amount = 0;
         contract.withdrawn_amount = 0;
         contract.refunded_amount = 0;
+        contract.stream_released_amount = 0;
 
         contract.acceptance_deadline = args.acceptance_deadline;
         contract.scheduled_start_time = terms.scheduled_start_time;
@@ -438,7 +439,7 @@ pub fn handle_create_contract(
         contract.metadata_hash = args.metadata_hash;
         contract.bump = ctx.bumps.contract;
         contract.escrow_bump = ctx.bumps.contract_escrow;
-        contract.reserved = [0u8; 92];
+        contract.reserved = [0u8; 84];
         contract.metadata_uri = args.metadata_uri;
     }
 

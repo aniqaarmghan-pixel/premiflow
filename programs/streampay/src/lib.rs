@@ -343,6 +343,12 @@ Ok(())
     pub fn finalize_review_timeout(ctx: Context<FinalizeReviewTimeout>) -> Result<()> {
         v2::instructions::finalize_review_timeout::handle_finalize_review_timeout(ctx)
     }
+
+    /// Materialize currently accrued streaming earnings into released accounting.
+    /// Permissionless and deterministic. No SPL transfer.
+    pub fn release_stream_accrual(ctx: Context<ReleaseStreamAccrual>) -> Result<()> {
+        v2::instructions::release_stream_accrual::handle_release_stream_accrual(ctx)
+    }
 }
 #[derive(Accounts)]
 pub struct Withdraw<'info> {

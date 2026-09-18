@@ -1,8 +1,9 @@
 //! `submit_work_unit`: the freelancer delivers post-activation normal work.
 //!
 //! Applies to Milestone and Fixed work units only. Does not release money and
-//! does not move SPL tokens. Trial work keeps `submit_trial_work`; streaming
-//! checkpoints are deferred to Phase 6.
+//! does not move SPL tokens. Trial work keeps `submit_trial_work`. Streaming
+//! earnings are time-based (`release_stream_accrual`); checkpoint WorkUnits
+//! are not a Phase 6 release path.
 
 use anchor_lang::prelude::*;
 
