@@ -98,3 +98,23 @@ pub const MIN_ACTIVATION_REVIEW: i64 = 60;
 /// waiting for a yes/no. A later instruction will settle a lapsed window;
 /// this cap is what makes that wait finite.
 pub const MAX_ACTIVATION_REVIEW: i64 = 86_400;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn pda_seeds_and_structural_bounds_are_frozen() {
+        assert_eq!(CONTRACT_SEED, b"contract");
+        assert_eq!(CONTRACT_ESCROW_SEED, b"contract_escrow");
+        assert_eq!(WORK_UNIT_SEED, b"work_unit");
+        assert_eq!(TRIAL_UNIT_SEED, b"trial_unit");
+        assert_eq!(V2_LAYOUT_VERSION, 1);
+        assert_eq!(MAX_URI_LEN, 200);
+        assert_eq!(MAX_MILESTONES, 64);
+        assert_eq!(MAX_CHECKPOINTS, 1024);
+        assert_eq!(MAX_REVISIONS_LIMIT, 5);
+        assert_eq!(MIN_DURATION_SECONDS, 60);
+        assert_eq!(MIN_REVIEW_DURATION, 10);
+    }
+}

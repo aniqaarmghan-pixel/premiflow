@@ -750,6 +750,51 @@ mod accrual_tests {
         assert_eq!(canonical_stream_accrued(1_000, 50, 110, 49).unwrap(), 0);
         assert_eq!(canonical_stream_accrued(1_000, 50, 110, 50).unwrap(), 0);
     }
+
+    #[test]
+    fn primes_and_uneven_durations_reach_exact_total() {
+        for amount in [1u64, 2, 3, 7, 10, 11, 13, 97] {
+            let start = 1_000i64;
+            let duration = 10i64;
+            let end = start + duration;
+            let mut previous = 0u64;
+            for elapsed in 0..=duration {
+                let accrued =
+                    canonical_stream_accrued(amount, start, end, start + elapsed).unwrap();
+                assert!(accrued >= previous, "monotonic {amount} @{elapsed}");
+                assert!(accrued <= amount);
+                previous = accrued;
+            }
+            assert_eq!(
+                canonical_stream_accrued(amount, start, end, end).unwrap(),
+                amount
+            );
+            assert_eq!(
+                canonical_stream_accrued(amount, start, end, end + 1_000).unwrap(),
+                amount
+            );
+        }
+        assert_eq!(canonical_stream_accrued(1, 0, 60, 59).unwrap(), 0);
+        assert_eq!(canonical_stream_accrued(1, 0, 60, 60).unwrap(), 1);
+        assert_eq!(canonical_stream_accrued(7, 0, 10, 5).unwrap(), 3);
+        assert_eq!(canonical_stream_accrued(7, 0, 10, 10).unwrap(), 7);
+    }
+
+    #[test]
+    fn large_safe_u64_values_do_not_overflow_or_over_accrue() {
+        let amount = 1_000_000_000_000u64;
+        assert_eq!(canonical_stream_accrued(amount, 0, 3, 0).unwrap(), 0);
+        assert_eq!(
+            canonical_stream_accrued(amount, 0, 3, 1).unwrap(),
+            333_333_333_333
+        );
+        assert_eq!(
+            canonical_stream_accrued(amount, 0, 3, 2).unwrap(),
+            666_666_666_666
+        );
+        assert_eq!(canonical_stream_accrued(amount, 0, 3, 3).unwrap(), amount);
+        assert_eq!(canonical_stream_accrued(amount, 0, 3, 30).unwrap(), amount);
+    }
 }
 
 /// Documented, compiler-verified account size.

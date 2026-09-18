@@ -247,12 +247,15 @@ pub enum ReleaseTrigger {
 
 #[cfg(test)]
 mod tests {
-    use super::ContractStatus;
+    use super::{
+        ContractStatus, DisputeParty, PaymentMode, ReleaseTrigger, StartMode, WorkUnitKind,
+        WorkUnitStatus,
+    };
     use anchor_lang::AnchorSerialize;
 
-    fn disc(status: ContractStatus) -> u8 {
+    fn disc<T: AnchorSerialize>(value: T) -> u8 {
         let mut bytes = Vec::new();
-        status.serialize(&mut bytes).expect("unit enum serializes");
+        value.serialize(&mut bytes).expect("unit enum serializes");
         assert_eq!(bytes.len(), 1);
         bytes[0]
     }
@@ -272,5 +275,34 @@ mod tests {
         assert_eq!(disc(ContractStatus::ActivationRejected), 8);
         assert_eq!(disc(ContractStatus::Disputed), 9);
         assert_eq!(disc(ContractStatus::Resolved), 10);
+    }
+
+    #[test]
+    fn companion_enum_discriminants_are_stable() {
+        assert_eq!(disc(PaymentMode::Streaming), 0);
+        assert_eq!(disc(PaymentMode::Milestone), 1);
+        assert_eq!(disc(PaymentMode::Fixed), 2);
+
+        assert_eq!(disc(StartMode::OnActivation), 0);
+        assert_eq!(disc(StartMode::Scheduled), 1);
+
+        assert_eq!(disc(WorkUnitKind::Checkpoint), 0);
+        assert_eq!(disc(WorkUnitKind::Milestone), 1);
+        assert_eq!(disc(WorkUnitKind::Fixed), 2);
+        assert_eq!(disc(WorkUnitKind::Trial), 3);
+
+        assert_eq!(disc(WorkUnitStatus::Defined), 0);
+        assert_eq!(disc(WorkUnitStatus::Submitted), 1);
+        assert_eq!(disc(WorkUnitStatus::Revising), 2);
+        assert_eq!(disc(WorkUnitStatus::Released), 3);
+        assert_eq!(disc(WorkUnitStatus::Void), 4);
+
+        assert_eq!(disc(ReleaseTrigger::NotReleased), 0);
+        assert_eq!(disc(ReleaseTrigger::EmployerApproval), 1);
+        assert_eq!(disc(ReleaseTrigger::ReviewTimeout), 2);
+
+        assert_eq!(disc(DisputeParty::None), 0);
+        assert_eq!(disc(DisputeParty::Employer), 1);
+        assert_eq!(disc(DisputeParty::Freelancer), 2);
     }
 }

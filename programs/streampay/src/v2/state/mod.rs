@@ -68,4 +68,18 @@ mod tests {
         assert_ne!(WorkUnit::DISCRIMINATOR, Stream::DISCRIMINATOR);
         assert_ne!(Contract::DISCRIMINATOR, WorkUnit::DISCRIMINATOR);
     }
+
+    #[test]
+    fn v2_init_space_is_frozen() {
+        assert_eq!(super::CONTRACT_INIT_SPACE, 621);
+        assert_eq!(super::WORK_UNIT_INIT_SPACE, 406);
+        assert_eq!(
+            <Contract as anchor_lang::Space>::INIT_SPACE,
+            super::CONTRACT_INIT_SPACE
+        );
+        assert_eq!(
+            <WorkUnit as anchor_lang::Space>::INIT_SPACE,
+            super::WORK_UNIT_INIT_SPACE
+        );
+    }
 }
