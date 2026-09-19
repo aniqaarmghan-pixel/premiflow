@@ -9,6 +9,7 @@ import { Identicon } from "@/components/ui/Identicon";
 import { Progress } from "@/components/ui/Progress";
 import { StatusBadge } from "./StatusBadge";
 import { formatTokenAmount } from "@/lib/app/money";
+import { contractCardNextHint } from "@/lib/app/dispute-ux";
 import {
   counterparty,
   financialProgress,
@@ -17,7 +18,7 @@ import {
   roleForContract,
   roleLabel,
 } from "@/lib/app/view-model";
-import type { ContractRole, ContractStatus, ContractType, ContractView } from "@/lib/streampay-v2";
+import type { ContractView } from "@/lib/streampay-v2";
 
 export function ContractCard({
   contract,
@@ -82,22 +83,9 @@ export function ContractCard({
           <Progress value={progress.releasedPct} label="Released of funded total" />
         </div>
         <p className="mt-3 text-xs font-medium text-accent">
-          {nextHint(role, contract.status, contract.paymentMode)}
+          {contractCardNextHint(role, contract)}
         </p>
       </Card>
     </Link>
   );
-}
-
-function nextHint(role: ContractRole, status: ContractStatus, type: ContractType): string {
-  if (status === "PendingAcceptance" && role === "freelancer") return "Next: accept or decline";
-  if (status === "PendingEmployerApproval" && role === "employer") return "Next: review activation";
-  if (status === "Active" && type === "Streaming") return "Next: watch the stream";
-  if (status === "Active" && role === "freelancer") return "Next: submit work when ready";
-  if (status === "Active" && role === "employer") return "Next: review deliverables";
-  if (status === "Disputed") return "Next: resolver award";
-  if (status === "Completed" || status === "Cancelled" || status === "Resolved") {
-    return "Next: withdraw or refund remaining claims";
-  }
-  return "Open contract";
 }

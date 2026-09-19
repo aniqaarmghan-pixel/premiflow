@@ -139,7 +139,7 @@ export function ContractsPage() {
           }
         }}
       >
-        <Field label="Open by contract address" hint="Useful for the named resolver.">
+        <Field label="Open by contract address" hint="Useful for the designated resolver.">
           <Input
             value={lookup}
             onChange={(e) => setLookup(e.target.value)}

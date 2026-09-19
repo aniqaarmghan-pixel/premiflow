@@ -308,6 +308,14 @@ export function lifecycleStages(contract: ContractView): LifecycleStage[] {
     reached: contract.releasedAmount > 0n || contract.status === "Completed",
   });
 
+  if (contract.status === "Disputed" || contract.status === "Resolved") {
+    stages.push({
+      id: "dispute",
+      label: contract.status === "Disputed" ? "Disputed" : "Dispute resolved",
+      reached: true,
+    });
+  }
+
   stages.push({
     id: "complete",
     label: terminalLabel(contract.status),
@@ -334,12 +342,12 @@ export function lifecycleStages(contract: ContractView): LifecycleStage[] {
 
   return stages.map((stage, i) => {
     let state: LifecycleStage["state"] = "future";
-    if (disputed && !stage.reached) state = "blocked";
+    if (disputed && stage.id === "dispute") state = "current";
+    else if (disputed && !stage.reached) state = "blocked";
     else if (stage.reached && i < currentIndex) state = "done";
     else if (stage.reached && i === currentIndex) {
       state = finished && !disputed ? "done" : "current";
     } else if (stage.reached) state = "done";
-    if (disputed && i === currentIndex) state = "blocked";
     return { id: stage.id, label: stage.label, state };
   });
 }
@@ -415,6 +423,7 @@ export function actionLabel(
 
 export function confirmTitle(action: UiAction): string {
   if (action === "voidStaleRevision") return "End expired revision?";
+  if (action === "openDispute") return "Open dispute?";
   return actionLabel(action);
 }
 

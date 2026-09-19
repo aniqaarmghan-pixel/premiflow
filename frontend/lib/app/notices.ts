@@ -70,7 +70,7 @@ export const NOTICE_CATALOG: Record<NoticeKind, NoticeCopy> = {
   activation_rejected_disputed: {
     kind: "activation_rejected_disputed",
     title: "Activation declined, dispute opened",
-    body: "The submitted trial is now frozen in dispute for the named resolver. No tokens moved.",
+    body: "The submitted trial is now frozen in dispute for the designated resolver. No tokens moved.",
   },
   trial_submitted: {
     kind: "trial_submitted",
@@ -140,12 +140,12 @@ export const NOTICE_CATALOG: Record<NoticeKind, NoticeCopy> = {
   dispute_opened: {
     kind: "dispute_opened",
     title: "Dispute opened",
-    body: "Contested value is frozen until the named resolver awards a split.",
+    body: "The contract is frozen for the designated resolver. Opening the dispute did not transfer tokens.",
   },
   dispute_resolved: {
     kind: "dispute_resolved",
     title: "Dispute resolved",
-    body: "Settlement accounting was recorded. Withdraw and refund remain separate claims.",
+    body: "Settlement accounting was recorded. It did not transfer tokens. Collect pay and claim refund remain separate.",
   },
   contract_completed: {
     kind: "contract_completed",

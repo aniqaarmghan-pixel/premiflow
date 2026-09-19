@@ -238,6 +238,35 @@ export function validateDisputeAward(
   return null;
 }
 
+/**
+ * Parse the resolver's freelancer award from a UI decimal string.
+ * Allows zero (Rust accepts `0..=contested`). Rejects empty, signed,
+ * non-decimal, excess precision, and NaN-like input before Phantom.
+ */
+export function parseDisputeAwardInput(
+  awardUi: string,
+  decimals: number,
+  contestedAmount: bigint
+): { amount?: bigint; error?: string } {
+  const trimmed = awardUi.trim();
+  if (trimmed.length === 0) {
+    return { error: "Enter the freelancer award from the disputed amount." };
+  }
+  if (trimmed === "NaN" || trimmed === "Infinity" || trimmed === "-Infinity") {
+    return { error: "Award is not a valid number." };
+  }
+  try {
+    const amount = uiAmountToBaseUnits(trimmed, decimals);
+    const invalid = validateDisputeAward(amount, contestedAmount);
+    if (invalid) return { error: invalid };
+    return { amount };
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Award is invalid.",
+    };
+  }
+}
+
 export function validateCreateDraft(
   employer: PublicKey,
   draft: CreateWizardDraft,

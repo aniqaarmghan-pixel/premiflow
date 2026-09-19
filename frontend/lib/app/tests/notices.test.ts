@@ -297,8 +297,9 @@ test("approve, timeout, stream, cancel, complete, dispute, withdraw, and refund 
   const resolved = NOTICE_CATALOG.dispute_resolved;
   assert.equal(noticeKindForAction("resolveDispute"), "dispute_resolved");
   assert.match(resolved.body, /Settlement accounting was recorded/i);
-  assert.match(resolved.body, /Withdraw and refund remain separate claims/i);
-  assert.doesNotMatch(resolved.body, /\bpaid\b|\btransferred\b|\breceived in wallet\b/i);
+  assert.match(resolved.body, /did not transfer tokens/i);
+  assert.match(resolved.body, /Collect pay and claim refund remain separate/i);
+  assert.doesNotMatch(resolved.body, /resolver (receives|received|is paid)|escrow to the resolver/i);
 
   const voided = NOTICE_CATALOG.expired_revision_ended;
   assert.match(voided.body, /No payment was released, transferred, or refunded/i);

@@ -251,6 +251,7 @@ test("lifecycle stages distinguish current and blocked dispute", () => {
   assert.ok(stages.some((s) => s.id === "payment" && s.state !== "future"));
   const disputed = makeContract({ status: "Disputed" });
   const blocked = lifecycleStages(disputed);
+  assert.ok(blocked.some((s) => s.id === "dispute" && s.state === "current"));
   assert.ok(blocked.some((s) => s.state === "blocked"));
 });
 

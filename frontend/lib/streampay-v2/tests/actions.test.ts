@@ -123,6 +123,22 @@ test("request revision follows the review window and revision cap", () => {
   assert.ok(capped.includes("approveWorkUnit"));
 });
 
+test("resolver does not receive Open dispute merely because they are the resolver", () => {
+  const active = makeContract({
+    status: "Active",
+    paymentMode: "Fixed",
+    totalAmount: 10n,
+    releasedAmount: 4n,
+  });
+  const resolver = availableActions({
+    wallet: RESOLVER,
+    contract: active,
+    now: 1_000,
+  });
+  assert.ok(!resolver.includes("openDispute"));
+  assert.ok(!resolver.includes("resolveDispute"));
+});
+
 test("open dispute requires a positive contested remainder", () => {
   const contested = makeContract({
     status: "Active",

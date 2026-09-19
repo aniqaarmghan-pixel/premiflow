@@ -5,6 +5,7 @@ import { useReducer } from "react";
 import { useNotices } from "@/components/shell/NoticeProvider";
 import type { NoticeKind } from "@/lib/app/notices";
 import { unlockNoticeAudio } from "@/lib/app/notice-sound";
+import { withDisputeRaceMessage } from "@/lib/app/dispute-ux";
 import {
   parseClientError,
   withDeliverableRaceMessage,
@@ -55,9 +56,9 @@ export function useTx() {
       }
       return true;
     } catch (err) {
-      const parsed = withDeliverableRaceMessage(
+      const parsed = withDisputeRaceMessage(
         resolved.action,
-        parseClientError(err)
+        withDeliverableRaceMessage(resolved.action, parseClientError(err))
       );
       if (parsed.kind === "pending_confirmation") {
         dispatch({
