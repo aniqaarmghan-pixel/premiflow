@@ -197,6 +197,16 @@ pub struct WorkUnitRevisionRequested {
     pub action_deadline: i64,
 }
 
+/// The employer voided a stale Revising main deliverable. No SPL transfer.
+#[event]
+pub struct WorkUnitStaleRevisionVoided {
+    pub contract: Pubkey,
+    pub work_unit: Pubkey,
+    pub employer: Pubkey,
+    pub work_unit_index: u32,
+    pub voided_at: i64,
+}
+
 /// Review timed out and the submitted unit was auto-released. No SPL transfer.
 #[event]
 pub struct WorkUnitReviewTimedOut {

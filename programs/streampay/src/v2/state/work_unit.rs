@@ -184,6 +184,13 @@ impl WorkUnit {
         self.release_trigger = trigger;
     }
 
+    /// Terminate a stale Revising unit. Idempotency is the caller's problem:
+    /// `status` must already have been proven `Revising`. Submission evidence,
+    /// revision_count, action_deadline, and amount are left untouched.
+    pub fn mark_voided(&mut self) {
+        self.status = WorkUnitStatus::Void;
+    }
+
     /// Calendar due instant once the contract has a real `start_time`.
     ///
     /// Do not call this with a fabricated start. For a defined milestone the

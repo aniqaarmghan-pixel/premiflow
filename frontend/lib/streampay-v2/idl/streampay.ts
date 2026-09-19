@@ -1994,6 +1994,101 @@ export type Streampay = {
       ]
     },
     {
+      "name": "voidStaleRevision",
+      "docs": [
+        "Employer voids a stale Revising main deliverable. No SPL transfer."
+      ],
+      "discriminator": [
+        218,
+        41,
+        214,
+        129,
+        255,
+        79,
+        60,
+        139
+      ],
+      "accounts": [
+        {
+          "name": "employer",
+          "signer": true,
+          "relations": [
+            "contract"
+          ]
+        },
+        {
+          "name": "contract",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  116,
+                  114,
+                  97,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "employer"
+              },
+              {
+                "kind": "account",
+                "path": "contract.freelancer",
+                "account": "contract"
+              },
+              {
+                "kind": "account",
+                "path": "contract.contractId",
+                "account": "contract"
+              }
+            ]
+          },
+          "relations": [
+            "workUnit"
+          ]
+        },
+        {
+          "name": "workUnit",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  119,
+                  111,
+                  114,
+                  107,
+                  95,
+                  117,
+                  110,
+                  105,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "contract"
+              },
+              {
+                "kind": "account",
+                "path": "workUnit.index",
+                "account": "workUnit"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "withdraw",
       "discriminator": [
         183,
@@ -2499,6 +2594,19 @@ export type Streampay = {
         181,
         185,
         45
+      ]
+    },
+    {
+      "name": "workUnitStaleRevisionVoided",
+      "discriminator": [
+        127,
+        55,
+        118,
+        220,
+        159,
+        214,
+        133,
+        1
       ]
     },
     {
@@ -4559,6 +4667,37 @@ export type Streampay = {
           },
           {
             "name": "actionDeadline",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "workUnitStaleRevisionVoided",
+      "docs": [
+        "The employer voided a stale Revising main deliverable. No SPL transfer."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "workUnit",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "workUnitIndex",
+            "type": "u32"
+          },
+          {
+            "name": "voidedAt",
             "type": "i64"
           }
         ]

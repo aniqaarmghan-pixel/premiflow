@@ -284,6 +284,26 @@ export class StreamPayV2Client {
     });
   }
 
+  async voidStaleRevision(params: {
+    contract: PublicKey;
+    workUnit: PublicKey;
+  }): Promise<TransactionResult> {
+    const employer = connectedWallet(this.program);
+    const signature = await sendV2Method(this.program, this.program.methods
+      .voidStaleRevision()
+      .accountsPartial({
+        employer,
+        contract: params.contract,
+        workUnit: params.workUnit,
+      })
+    );
+    return txResult({
+      signature,
+      contract: params.contract,
+      workUnit: params.workUnit,
+    });
+  }
+
   async approveWorkUnit(params: {
     contract: PublicKey;
     workUnit: PublicKey;

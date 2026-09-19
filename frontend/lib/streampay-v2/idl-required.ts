@@ -11,6 +11,7 @@ export const REQUIRED_V2_INSTRUCTIONS = [
   "approve_trial_and_activate",
   "submit_work_unit",
   "request_revision",
+  "void_stale_revision",
   "approve_work_unit",
   "finalize_review_timeout",
   "release_stream_accrual",

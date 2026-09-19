@@ -339,6 +339,11 @@ Ok(())
         v2::instructions::request_revision::handle_request_revision(ctx)
     }
 
+    /// Employer voids a stale Revising main deliverable. No SPL transfer.
+    pub fn void_stale_revision(ctx: Context<VoidStaleRevision>) -> Result<()> {
+        v2::instructions::void_stale_revision::handle_void_stale_revision(ctx)
+    }
+
     /// Permissionless auto-release of an expired post-activation review.
     pub fn finalize_review_timeout(ctx: Context<FinalizeReviewTimeout>) -> Result<()> {
         v2::instructions::finalize_review_timeout::handle_finalize_review_timeout(ctx)

@@ -24,6 +24,7 @@ pub mod request_trial_revision;
 pub mod resolve_dispute;
 pub mod submit_trial_work;
 pub mod submit_work_unit;
+pub mod void_stale_revision;
 pub mod withdraw_freelancer;
 
 // Glob re-exports are required: `#[derive(Accounts)]` generates hidden
@@ -48,4 +49,5 @@ pub use request_trial_revision::*;
 pub use resolve_dispute::*;
 pub use submit_trial_work::*;
 pub use submit_work_unit::*;
+pub use void_stale_revision::*;
 pub use withdraw_freelancer::*;

@@ -351,6 +351,8 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::UnitNotSubmittable), 6126);
         assert_eq!(u32::from(StreamPayV2Error::UnitNotUnderReview), 6127);
         assert_eq!(u32::from(StreamPayV2Error::UnitAlreadyReleased), 6128);
+        assert_eq!(u32::from(StreamPayV2Error::UnitVoided), 6129);
+        assert_eq!(u32::from(StreamPayV2Error::UnitNotStale), 6130);
         assert_eq!(u32::from(StreamPayV2Error::UnsupportedWorkUnitKind), 6155);
         assert_eq!(u32::from(StreamPayV2Error::ReleaseAmountExceeded), 6156);
     }
