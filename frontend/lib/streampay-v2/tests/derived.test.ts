@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  contestedRemainder,
   estimateStreamAccrualDisplayOnly,
   partitionContractsByRole,
   remainingEmployerRefund,
@@ -82,6 +83,27 @@ test("remaining refund calculation exact", () => {
     freelancerSettlementAmount: 100n,
   });
   assert.equal(remainingEmployerRefund(completed), 0n);
+});
+
+test("contested remainder matches freeze-for-dispute accounting", () => {
+  assert.equal(
+    contestedRemainder(
+      makeContract({ totalAmount: 10n, releasedAmount: 4n, refundedAmount: 0n })
+    ),
+    6n
+  );
+  assert.equal(
+    contestedRemainder(
+      makeContract({ totalAmount: 10n, releasedAmount: 10n, refundedAmount: 0n })
+    ),
+    0n
+  );
+  assert.equal(
+    contestedRemainder(
+      makeContract({ totalAmount: 10n, releasedAmount: 6n, refundedAmount: 4n })
+    ),
+    0n
+  );
 });
 
 test("display stream accrual matches the Rust floor formula", () => {

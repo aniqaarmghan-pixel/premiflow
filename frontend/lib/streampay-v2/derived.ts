@@ -47,6 +47,20 @@ function saturatingSub(left: bigint, right: bigint): bigint {
 }
 
 /**
+ * Display/UX remainder matching Rust `freeze_for_dispute` contested math:
+ * `total_amount - released_amount - refunded_amount`.
+ * Streaming freeze materializes accrual first; this helper does not.
+ */
+export function contestedRemainder(
+  contract: Pick<ContractView, "totalAmount" | "releasedAmount" | "refundedAmount">
+): bigint {
+  return saturatingSub(
+    contract.totalAmount,
+    contract.releasedAmount + contract.refundedAmount
+  );
+}
+
+/**
  * Remaining freelancer SPL the program would currently allow to withdraw.
  * Display/UX only — the program is authoritative.
  */

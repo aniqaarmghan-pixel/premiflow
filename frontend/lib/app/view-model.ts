@@ -257,13 +257,21 @@ export function lifecycleStages(contract: ContractView): LifecycleStage[] {
     (acc, stage, i) => (stage.reached ? i : acc),
     0
   );
+  const finished =
+    contract.status === "Completed" ||
+    contract.status === "Cancelled" ||
+    contract.status === "Resolved" ||
+    contract.status === "Declined" ||
+    contract.status === "Expired" ||
+    contract.status === "ActivationRejected";
 
   return stages.map((stage, i) => {
     let state: LifecycleStage["state"] = "future";
     if (disputed && !stage.reached) state = "blocked";
     else if (stage.reached && i < currentIndex) state = "done";
-    else if (stage.reached && i === currentIndex) state = "current";
-    else if (stage.reached) state = "done";
+    else if (stage.reached && i === currentIndex) {
+      state = finished && !disputed ? "done" : "current";
+    } else if (stage.reached) state = "done";
     if (disputed && i === currentIndex) state = "blocked";
     return { id: stage.id, label: stage.label, state };
   });
@@ -418,6 +426,59 @@ export function officialDeliverableCopy(
     messagesHint:
       "Drafts and progress updates belong in Messages. Use this action only when you are ready to start official review.",
     recordedReference: "The submission reference is recorded with the contract.",
+  };
+}
+
+export type CompleteContractCopy = {
+  intro: string;
+  points: readonly string[];
+  wallet: string;
+  notPayment: string;
+};
+
+export function completeContractCopy(): CompleteContractCopy {
+  return {
+    intro:
+      "Completing the contract records the final settlement on-chain and marks the agreement terminal.",
+    points: [
+      "Records final settlement amounts from current on-chain accounting.",
+      "Does not transfer tokens.",
+      "Does not withdraw funds.",
+      "Does not refund funds.",
+      "Moves the contract into terminal Completed status.",
+    ],
+    wallet: "Your wallet will ask you to approve this transaction.",
+    notPayment:
+      "This does not pay the freelancer. Tokens leave escrow only when Withdraw is sent.",
+  };
+}
+
+export type WithdrawFreelancerCopy = {
+  intro: string;
+  released: string;
+  withdrawn: string;
+  remaining: string;
+  points: readonly string[];
+  wallet: string;
+};
+
+export function withdrawFreelancerCopy(
+  released: string,
+  withdrawn: string,
+  remaining: string
+): WithdrawFreelancerCopy {
+  return {
+    intro:
+      "Withdraw transfers already-released tokens from the contract escrow to your token account.",
+    released,
+    withdrawn,
+    remaining,
+    points: [
+      "Released amount is an accounting credit. Withdrawn amount is tokens that have already left escrow.",
+      "Approving work, releasing after timeout, or completing the contract does not itself move SPL tokens.",
+      "This withdraws only the currently claimable remainder.",
+    ],
+    wallet: "Phantom will request transaction approval.",
   };
 }
 

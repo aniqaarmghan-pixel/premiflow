@@ -71,6 +71,128 @@ test("action availability for representative states", () => {
   assert.ok(!freelancerSubmit.includes("approveWorkUnit"));
 });
 
+test("request revision follows the review window and revision cap", () => {
+  const active = makeContract({
+    status: "Active",
+    paymentMode: "Fixed",
+    maxRevisions: 2,
+  });
+  const submitted = makeWorkUnit({
+    kind: "Fixed",
+    status: "Submitted",
+    actionDeadline: 2_000,
+    revisionCount: 0,
+  });
+  const before = availableActions({
+    wallet: WALLET_A,
+    contract: active,
+    workUnit: submitted,
+    now: 1_999,
+  });
+  assert.ok(before.includes("requestWorkRevision"));
+  assert.ok(before.includes("approveWorkUnit"));
+  assert.ok(!before.includes("finalizeReviewTimeout"));
+
+  const atDeadline = availableActions({
+    wallet: WALLET_A,
+    contract: active,
+    workUnit: submitted,
+    now: 2_000,
+  });
+  assert.ok(!atDeadline.includes("requestWorkRevision"));
+  assert.ok(atDeadline.includes("approveWorkUnit"));
+  assert.ok(atDeadline.includes("finalizeReviewTimeout"));
+
+  const afterDeadline = availableActions({
+    wallet: WALLET_A,
+    contract: active,
+    workUnit: submitted,
+    now: 2_001,
+  });
+  assert.ok(!afterDeadline.includes("requestWorkRevision"));
+  assert.ok(afterDeadline.includes("approveWorkUnit"));
+  assert.ok(afterDeadline.includes("finalizeReviewTimeout"));
+
+  const capped = availableActions({
+    wallet: WALLET_A,
+    contract: active,
+    workUnit: { ...submitted, revisionCount: 2 },
+    now: 1_000,
+  });
+  assert.ok(!capped.includes("requestWorkRevision"));
+  assert.ok(capped.includes("approveWorkUnit"));
+});
+
+test("open dispute requires a positive contested remainder", () => {
+  const contested = makeContract({
+    status: "Active",
+    paymentMode: "Fixed",
+    totalAmount: 10n,
+    releasedAmount: 4n,
+    refundedAmount: 0n,
+  });
+  assert.ok(
+    availableActions({ wallet: WALLET_A, contract: contested, now: 1_000 }).includes(
+      "openDispute"
+    )
+  );
+  assert.ok(
+    availableActions({ wallet: WALLET_B, contract: contested, now: 1_000 }).includes(
+      "openDispute"
+    )
+  );
+  assert.ok(
+    !availableActions({ wallet: WALLET_C, contract: contested, now: 1_000 }).includes(
+      "openDispute"
+    )
+  );
+
+  const fullyReleased = makeContract({
+    status: "Active",
+    paymentMode: "Fixed",
+    totalAmount: 10n,
+    releasedAmount: 10n,
+    refundedAmount: 0n,
+    openReviewCount: 0,
+    releasedUnitCount: 1,
+    workUnitCount: 1,
+    allocatedAmount: 10n,
+    mainAmount: 10n,
+  });
+  const employerFull = availableActions({
+    wallet: WALLET_A,
+    contract: fullyReleased,
+    now: 1_000,
+  });
+  const freelancerFull = availableActions({
+    wallet: WALLET_B,
+    contract: fullyReleased,
+    now: 1_000,
+  });
+  assert.ok(!employerFull.includes("openDispute"));
+  assert.ok(!freelancerFull.includes("openDispute"));
+  assert.ok(employerFull.includes("completeContract"));
+  assert.ok(freelancerFull.includes("completeContract"));
+
+  const completed = makeContract({
+    status: "Completed",
+    totalAmount: 10n,
+    releasedAmount: 10n,
+    withdrawnAmount: 10n,
+    refundedAmount: 0n,
+    freelancerSettlementAmount: 10n,
+    employerRefundableAmount: 0n,
+  });
+  assert.deepEqual(
+    availableActions({ wallet: WALLET_A, contract: completed, now: 1_000 }),
+    []
+  );
+  assert.deepEqual(
+    availableActions({ wallet: WALLET_B, contract: completed, now: 1_000 }),
+    []
+  );
+});
+
 test("terminal states expose no mutation actions except legitimate claims", () => {
   const cancelled = makeContract({
     status: "Cancelled",

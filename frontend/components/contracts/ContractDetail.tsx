@@ -26,6 +26,7 @@ import { localMetadataStore } from "@/lib/app/local-metadata";
 import { formatTokenAmount } from "@/lib/app/money";
 import {
   actionLabel,
+  completeContractCopy,
   counterparty,
   isEconomicAction,
   officialDeliverableCopy,
@@ -34,6 +35,7 @@ import {
   roleForContract,
   roleLabel,
   splitTrialUnits,
+  withdrawFreelancerCopy,
 } from "@/lib/app/view-model";
 import {
   employerRemainder,
@@ -711,12 +713,35 @@ function ConfirmBody({
     );
   }
   if (action === "withdrawFreelancer") {
+    const copy = withdrawFreelancerCopy(
+      formatTokenAmount(contract.releasedAmount, decimals),
+      formatTokenAmount(contract.withdrawnAmount, decimals),
+      formatTokenAmount(remainingFreelancerClaim(contract), decimals)
+    );
     return (
-      <p>
-        Withdraws the currently claimable released amount to your associated token account. Already
-        withdrawn: {formatTokenAmount(contract.withdrawnAmount, decimals)}. Remaining claim:{" "}
-        {formatTokenAmount(remainingFreelancerClaim(contract), decimals)}.
-      </p>
+      <div className="space-y-3 text-sm leading-6 text-ink-soft">
+        <p>{copy.intro}</p>
+        <dl className="grid gap-2 sm:grid-cols-3">
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-ink-faint">Released</dt>
+            <dd className="font-medium text-ink">{copy.released}</dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-ink-faint">Already withdrawn</dt>
+            <dd className="font-medium text-ink">{copy.withdrawn}</dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-ink-faint">Claimable now</dt>
+            <dd className="font-medium text-ink">{copy.remaining}</dd>
+          </div>
+        </dl>
+        <ul className="list-disc space-y-1 pl-5">
+          {copy.points.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+        <p className="font-medium text-ink">{copy.wallet}</p>
+      </div>
     );
   }
   if (action === "claimEmployerRefund") {
@@ -729,11 +754,18 @@ function ConfirmBody({
     );
   }
   if (action === "completeContract") {
+    const copy = completeContractCopy();
     return (
-      <p>
-        Completion records final entitlements. It does not itself transfer tokens. Withdraw and
-        refund remain separate claims.
-      </p>
+      <div className="space-y-3 text-sm leading-6 text-ink-soft">
+        <p>{copy.intro}</p>
+        <ul className="list-disc space-y-1 pl-5">
+          {copy.points.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+        <p className="font-medium text-ink">{copy.notPayment}</p>
+        <p>{copy.wallet}</p>
+      </div>
     );
   }
   if (action === "releaseStreamAccrual") {

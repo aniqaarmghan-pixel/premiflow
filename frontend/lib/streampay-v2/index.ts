@@ -86,6 +86,7 @@ export {
   partitionContractsByRole,
   remainingFreelancerClaim,
   remainingEmployerRefund,
+  contestedRemainder,
   estimateStreamAccrualDisplayOnly,
   estimatedStreamAccrualForContract,
   isStreamCurrentlyAccruing,

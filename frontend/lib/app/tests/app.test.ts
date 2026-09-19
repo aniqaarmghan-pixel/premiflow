@@ -3,10 +3,12 @@ import test from "node:test";
 import { PublicKey } from "@solana/web3.js";
 
 import { formatReviewPeriod } from "../datetime";
+import { NOTICE_CATALOG, noticeKindForAction } from "../notices";
 import { assertMetadataUri } from "../../streampay-v2/metadata";
 import { availableActions } from "../../streampay-v2/actions";
 import {
   actionLabel,
+  completeContractCopy,
   dashboardSummary,
   filterContracts,
   financialProgress,
@@ -17,6 +19,7 @@ import {
   presentType,
   roleLabel,
   terminalMutationActions,
+  withdrawFreelancerCopy,
 } from "../view-model";
 import { isTxBusy, txPhaseLabel, txReducer, initialTxState } from "../tx-state";
 import {
@@ -249,6 +252,56 @@ test("lifecycle stages distinguish current and blocked dispute", () => {
   const disputed = makeContract({ status: "Disputed" });
   const blocked = lifecycleStages(disputed);
   assert.ok(blocked.some((s) => s.state === "blocked"));
+});
+
+test("completed lifecycle renders terminal wording", () => {
+  const completed = makeContract({
+    status: "Completed",
+    releasedAmount: 10n,
+    withdrawnAmount: 10n,
+    freelancerSettlementAmount: 10n,
+    employerRefundableAmount: 0n,
+  });
+  const stages = lifecycleStages(completed);
+  const last = stages.find((s) => s.id === "complete");
+  assert.equal(last?.label, "Completed");
+  assert.equal(last?.state, "done");
+  assert.ok(!stages.some((s) => s.state === "current"));
+});
+
+test("complete contract confirmation copy does not imply payment", () => {
+  const copy = completeContractCopy();
+  assert.match(copy.intro, /records the final settlement/i);
+  assert.ok(copy.points.some((line) => /does not transfer tokens/i.test(line)));
+  assert.ok(copy.points.some((line) => /does not withdraw funds/i.test(line)));
+  assert.ok(copy.points.some((line) => /does not refund funds/i.test(line)));
+  assert.ok(copy.points.some((line) => /terminal Completed status/i.test(line)));
+  assert.match(copy.notPayment, /does not pay the freelancer/i);
+  assert.match(copy.wallet, /wallet will ask you to approve/i);
+});
+
+test("withdraw confirmation copy distinguishes release from transfer", () => {
+  const copy = withdrawFreelancerCopy("10", "4", "6");
+  assert.match(copy.intro, /transfers already-released tokens from the contract escrow/i);
+  assert.equal(copy.released, "10");
+  assert.equal(copy.withdrawn, "4");
+  assert.equal(copy.remaining, "6");
+  assert.ok(copy.points.some((line) => /does not itself move SPL tokens/i.test(line)));
+  assert.match(copy.wallet, /Phantom will request transaction approval/i);
+});
+
+test("notice catalog covers the planned lifecycle events", () => {
+  assert.equal(noticeKindForAction("acceptContract"), "contract_accepted");
+  assert.equal(noticeKindForAction("submitWorkUnit"), "work_submitted");
+  assert.equal(noticeKindForAction("approveWorkUnit"), "work_approved");
+  assert.equal(noticeKindForAction("requestWorkRevision"), "revision_requested");
+  assert.equal(noticeKindForAction("finalizeReviewTimeout"), "payment_released");
+  assert.equal(noticeKindForAction("withdrawFreelancer"), "withdrawal_completed");
+  assert.equal(noticeKindForAction("openDispute"), "dispute_opened");
+  assert.equal(noticeKindForAction("resolveDispute"), "dispute_resolved");
+  assert.equal(noticeKindForAction("completeContract"), "contract_completed");
+  assert.match(NOTICE_CATALOG.contract_completed.body, /does not transfer tokens/i);
+  assert.match(NOTICE_CATALOG.withdrawal_completed.body, /left escrow/i);
 });
 
 test("official deliverable label appears for a submittable Fixed unit", () => {

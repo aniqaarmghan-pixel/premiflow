@@ -1,6 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 
 import {
+  contestedRemainder,
   isReviewDeadlineActive,
   isStreamCurrentlyAccruing,
   mayAttemptCompletion,
@@ -104,14 +105,18 @@ export function availableActions(input: ActionAvailabilityInput): UiAction[] {
     }
     if (
       (role === "employer" || role === "freelancer") &&
-      contract.openReviewCount > 0
+      contract.openReviewCount > 0 &&
+      contestedRemainder(contract) > 0n
     ) {
       actions.add("openDispute");
     }
   }
 
   if (contract.status === "Active") {
-    if (role === "employer" || role === "freelancer") {
+    if (
+      (role === "employer" || role === "freelancer") &&
+      contestedRemainder(contract) > 0n
+    ) {
       actions.add("openDispute");
     }
     if (role === "employer") {
@@ -120,7 +125,12 @@ export function availableActions(input: ActionAvailabilityInput): UiAction[] {
       }
       if (unit?.status === "Submitted") {
         actions.add("approveWorkUnit");
-        actions.add("requestWorkRevision");
+        if (
+          now < unit.actionDeadline &&
+          unit.revisionCount < contract.maxRevisions
+        ) {
+          actions.add("requestWorkRevision");
+        }
       }
     }
     if (role === "freelancer") {
