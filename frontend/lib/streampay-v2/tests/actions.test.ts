@@ -59,6 +59,16 @@ test("action availability for representative states", () => {
   });
   assert.ok(employerReview.includes("approveWorkUnit"));
   assert.ok(employerReview.includes("requestWorkRevision"));
+
+  const defined = makeWorkUnit({ kind: "Fixed", status: "Defined" });
+  const freelancerSubmit = availableActions({
+    wallet: WALLET_B,
+    contract: active,
+    workUnit: defined,
+    now: 1_700_000_100,
+  });
+  assert.ok(freelancerSubmit.includes("submitWorkUnit"));
+  assert.ok(!freelancerSubmit.includes("approveWorkUnit"));
 });
 
 test("terminal states expose no mutation actions except legitimate claims", () => {

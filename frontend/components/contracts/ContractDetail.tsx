@@ -28,6 +28,7 @@ import {
   actionLabel,
   counterparty,
   isEconomicAction,
+  officialDeliverableCopy,
   presentStatus,
   presentType,
   roleForContract,
@@ -386,6 +387,10 @@ export function ContractDetail({ address }: { address: string }) {
             <h2 className="font-display text-2xl">
               {contract.paymentMode === "Milestone" ? "Milestones" : "Deliverable"}
             </h2>
+            <p className="mt-1 text-sm text-ink-soft">
+              Official review starts only from this card. Drafts and progress updates belong in
+              Messages.
+            </p>
             <div className="mt-4 space-y-3">
               {main.length === 0 ? (
                 <p className="text-sm text-ink-faint">No work units loaded.</p>
@@ -616,11 +621,53 @@ function ConfirmBody({
   awardUi: string;
   setAwardUi: (v: string) => void;
 }) {
-  if (action === "submitWorkUnit" || action === "submitTrialWork") {
+  if (action === "submitWorkUnit") {
+    const copy = officialDeliverableCopy(contract);
+    return (
+      <div className="space-y-4 text-sm leading-6 text-ink-soft">
+        <p>{copy.intro}</p>
+        <p>{copy.messagesHint}</p>
+        <dl className="grid gap-2 sm:grid-cols-2">
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-ink-faint">
+              {copy.reviewPeriodLabel}
+            </dt>
+            <dd className="font-medium text-ink">{copy.reviewPeriod}</dd>
+          </div>
+          <div>
+            <dt className="text-xs uppercase tracking-wide text-ink-faint">
+              {copy.revisionRequestsLabel}
+            </dt>
+            <dd className="font-medium text-ink">{copy.revisionRequests}</dd>
+          </div>
+        </dl>
+        <Field label={copy.fieldLabel} hint={copy.fieldHint}>
+          <Input
+            value={uri}
+            onChange={(e) => setUri(e.target.value)}
+            placeholder="https://…"
+          />
+        </Field>
+        <div>
+          <p className="text-xs font-medium uppercase tracking-wide text-ink-faint">
+            After submission
+          </p>
+          <ul className="mt-1 list-disc space-y-1 pl-5">
+            {copy.consequences.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        </div>
+        <p>{copy.recordedReference}</p>
+        <p className="font-medium text-ink">{copy.acknowledgement}</p>
+      </div>
+    );
+  }
+  if (action === "submitTrialWork") {
     return (
       <Field
         label="Submission URI"
-        hint="A link to the deliverable. This app does not host files. Max 200 characters."
+        hint="A link to the trial deliverable. This app does not host files. Max 200 characters."
       >
         <Input value={uri} onChange={(e) => setUri(e.target.value)} placeholder="https://…" />
       </Field>

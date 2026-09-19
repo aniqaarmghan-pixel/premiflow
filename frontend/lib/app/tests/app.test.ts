@@ -2,12 +2,17 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { PublicKey } from "@solana/web3.js";
 
+import { formatReviewPeriod } from "../datetime";
+import { assertMetadataUri } from "../../streampay-v2/metadata";
+import { availableActions } from "../../streampay-v2/actions";
 import {
+  actionLabel,
   dashboardSummary,
   filterContracts,
   financialProgress,
   groupContractsByRole,
   lifecycleStages,
+  officialDeliverableCopy,
   presentStatus,
   presentType,
   roleLabel,
@@ -33,6 +38,7 @@ import {
   WALLET_B,
   WALLET_C,
   makeContract,
+  makeWorkUnit,
 } from "../../streampay-v2/tests/fixtures";
 import { estimateStreamAccrualDisplayMs } from "../stream-display";
 
@@ -243,6 +249,78 @@ test("lifecycle stages distinguish current and blocked dispute", () => {
   const disputed = makeContract({ status: "Disputed" });
   const blocked = lifecycleStages(disputed);
   assert.ok(blocked.some((s) => s.state === "blocked"));
+});
+
+test("official deliverable label appears for a submittable Fixed unit", () => {
+  assert.equal(actionLabel("submitWorkUnit"), "Submit official deliverable");
+  const contract = makeContract({
+    status: "Active",
+    paymentMode: "Fixed",
+    reviewDuration: 3_600,
+    maxRevisions: 2,
+    startTime: 1,
+  });
+  const unit = makeWorkUnit({ kind: "Fixed", status: "Defined" });
+  const actions = availableActions({
+    wallet: WALLET_B,
+    contract,
+    workUnit: unit,
+    now: 2_000,
+  });
+  assert.ok(actions.includes("submitWorkUnit"));
+  assert.equal(actionLabel("submitWorkUnit"), "Submit official deliverable");
+  assert.ok(!actions.includes("cancelActiveContract"));
+});
+
+test("official deliverable copy uses contract review terms and does not overclaim", () => {
+  const liveLike = officialDeliverableCopy(
+    makeContract({ reviewDuration: 3_600, maxRevisions: 2 })
+  );
+  assert.equal(liveLike.title, "Submit official deliverable");
+  assert.match(liveLike.intro, /official submission for employer review/i);
+  assert.match(liveLike.intro, /different from sending a message or draft/i);
+  assert.equal(liveLike.fieldLabel, "Final project / deliverable link");
+  assert.match(liveLike.fieldHint, /Maximum 200 characters/);
+  assert.match(liveLike.fieldHint, /does not host the file/i);
+  assert.equal(liveLike.reviewPeriod, "1 hour");
+  assert.equal(liveLike.revisionRequests, "2");
+  assert.ok(liveLike.consequences.some((line) => /does not immediately transfer payment/i.test(line)));
+  assert.ok(liveLike.consequences.some((line) => /cancellation is blocked/i.test(line)));
+  assert.ok(liveLike.consequences.some((line) => /withdrawn separately/i.test(line)));
+  assert.match(liveLike.acknowledgement, /version you want the employer to review/i);
+  assert.match(liveLike.messagesHint, /belong in Messages/);
+  assert.equal(
+    liveLike.recordedReference,
+    "The submission reference is recorded with the contract."
+  );
+  assert.doesNotMatch(liveLike.recordedReference, /cryptographically verified|immutable|proves the exact file/i);
+  assert.doesNotMatch(liveLike.fieldHint, /permanently stored|file contents are immutable/i);
+
+  const other = officialDeliverableCopy(
+    makeContract({ reviewDuration: 600, maxRevisions: 5 })
+  );
+  assert.equal(other.reviewPeriod, "10 minutes");
+  assert.equal(other.revisionRequests, "5");
+});
+
+test("review period formatting is human-readable", () => {
+  assert.equal(formatReviewPeriod(3_600), "1 hour");
+  assert.equal(formatReviewPeriod(7_200), "2 hours");
+  assert.equal(formatReviewPeriod(90), "1 minute 30 seconds");
+  assert.equal(formatReviewPeriod(0), "0 seconds");
+});
+
+test("existing URI validation still accepts a 200-character reference", () => {
+  const ok = "https://example.com/" + "a".repeat(180);
+  assert.equal(ok.length, 200);
+  assert.equal(assertMetadataUri(ok), ok);
+  assert.throws(() => assertMetadataUri(""));
+  assert.throws(() => assertMetadataUri(ok + "x"));
+});
+
+test("official deliverable action remains submitWorkUnit for the transaction path", () => {
+  assert.equal(actionLabel("submitWorkUnit"), "Submit official deliverable");
+  assert.notEqual("submitWorkUnit", actionLabel("submitWorkUnit"));
 });
 
 test("stream display accrual is local estimate only", () => {

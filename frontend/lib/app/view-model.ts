@@ -1,5 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 
+import { formatReviewPeriod } from "@/lib/app/datetime";
 import {
   availableActions,
   contractStatusLabel,
@@ -306,7 +307,7 @@ export function actionLabel(action: UiAction): string {
     case "approveTrialAndActivate":
       return "Approve trial & activate";
     case "submitWorkUnit":
-      return "Submit work";
+      return "Submit official deliverable";
     case "requestWorkRevision":
       return "Request revision";
     case "approveWorkUnit":
@@ -369,6 +370,55 @@ export function typeBlurb(type: ContractType): string {
     case "Streaming":
       return "Pay accrues with time while the contract is active. The program is the clock.";
   }
+}
+
+export type OfficialDeliverableCopy = {
+  title: string;
+  intro: string;
+  fieldLabel: string;
+  fieldHint: string;
+  reviewPeriodLabel: string;
+  reviewPeriod: string;
+  revisionRequestsLabel: string;
+  revisionRequests: string;
+  consequences: readonly string[];
+  acknowledgement: string;
+  messagesHint: string;
+  recordedReference: string;
+};
+
+/**
+ * Official Fixed/Milestone submission copy. Review numbers come from the
+ * contract account. Does not describe file-content proofs the program does not
+ * make.
+ */
+export function officialDeliverableCopy(
+  contract: Pick<ContractView, "reviewDuration" | "maxRevisions">
+): OfficialDeliverableCopy {
+  return {
+    title: actionLabel("submitWorkUnit"),
+    intro:
+      "This is your official submission for employer review. It is different from sending a message or draft.",
+    fieldLabel: "Final project / deliverable link",
+    fieldHint:
+      "Paste a link to the final project, file, repository, design, deployment, or other deliverable. Maximum 200 characters. PREMIFLOW does not host the file.",
+    reviewPeriodLabel: "Review period",
+    reviewPeriod: formatReviewPeriod(contract.reviewDuration),
+    revisionRequestsLabel: "Revision requests allowed",
+    revisionRequests: String(contract.maxRevisions),
+    consequences: [
+      "Employer review begins.",
+      "Normal contract cancellation is blocked while this deliverable is under review.",
+      "The employer may approve, request a revision, or open a dispute.",
+      "Submitting does not immediately transfer payment.",
+      "Approved or released payment is withdrawn separately.",
+    ],
+    acknowledgement:
+      "By submitting, you confirm this is the version you want the employer to review.",
+    messagesHint:
+      "Drafts and progress updates belong in Messages. Use this action only when you are ready to start official review.",
+    recordedReference: "The submission reference is recorded with the contract.",
+  };
 }
 
 export function splitTrialUnits(units: WorkUnitView[]): {
