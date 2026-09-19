@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   Activity,
+  CircleHelp,
   FilePlus2,
   LayoutDashboard,
   Menu,
@@ -24,6 +25,7 @@ const NAV = [
   { href: "/contracts", label: "Contracts", icon: ScrollText },
   { href: "/create", label: "Create contract", icon: FilePlus2 },
   { href: "/activity", label: "Activity", icon: Activity },
+  { href: "/support", label: "Help & Support", icon: CircleHelp },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

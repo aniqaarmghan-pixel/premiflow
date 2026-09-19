@@ -351,8 +351,8 @@ test("ContractDetail wires dispute copy and does not imply resolver receives esc
     new URL("../../../components/contracts/ContractDetail.tsx", import.meta.url),
     "utf8"
   );
-  assert.match(detail, /OPEN_DISPUTE_COPY/);
-  assert.match(detail, /DISPUTED_STATE_COPY/);
+  assert.match(detail, /openDisputePresentation/);
+  assert.match(detail, /ResolutionCenter/);
   assert.match(detail, /RESOLVE_DISPUTE_COPY/);
   assert.match(detail, /resolutionPreview/);
   assert.match(detail, /parseDisputeAwardInput/);

@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 
 import { Lifecycle } from "@/components/contracts/Lifecycle";
 import { PaymentProgress } from "@/components/contracts/PaymentProgress";
+import { ResolutionCenter } from "@/components/contracts/ResolutionCenter";
 import { StatusBadge } from "@/components/contracts/StatusBadge";
 import { StreamShowcase } from "@/components/contracts/StreamShowcase";
 import { ConnectPrompt } from "@/components/shell/ConnectPrompt";
@@ -21,23 +22,24 @@ import { Modal } from "@/components/ui/Modal";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { TransactionStatus } from "@/components/ui/TransactionStatus";
 import {
-  DISPUTE_LIFECYCLE_STEPS,
-  DISPUTED_STATE_COPY,
-  OPEN_DISPUTE_COPY,
-  OPEN_DISPUTE_TITLE,
   POST_RESOLUTION_COLLECT_COPY,
   POST_RESOLUTION_REFUND_COPY,
   RESOLVE_DISPUTE_COPY,
-  displayContestedAmount,
   openDisputePresentation,
   postResolutionCollectAvailable,
   postResolutionRefundAvailable,
   presentResolver,
   resolutionPreview,
   shouldOfferOpenDispute,
-  shouldOfferResolveDispute,
   shouldRefreshAfterDisputeFailure,
 } from "@/lib/app/dispute-ux";
+import {
+  CASE_PREPARATION_COPY,
+  DISPUTE_CATEGORIES,
+  SUPPORT_VS_DISPUTE_COPY,
+  type DisputeCategoryId,
+} from "@/lib/app/resolution-center";
+import { supportTopicHref } from "@/lib/app/support";
 import { formatUnix } from "@/lib/app/datetime";
 import { localMetadataStore } from "@/lib/app/local-metadata";
 import { formatTokenAmount } from "@/lib/app/money";
@@ -125,6 +127,8 @@ export function ContractDetail({ address }: { address: string }) {
   const [awardUi, setAwardUi] = useState("");
   const [milestoneAmountUi, setMilestoneAmountUi] = useState("");
   const [milestoneDue, setMilestoneDue] = useState("3600");
+  const [disputeCategory, setDisputeCategory] = useState<DisputeCategoryId | "">("");
+  const [disputeDescription, setDisputeDescription] = useState("");
 
   const load = useCallback(async () => {
     if (!wallet) return;
@@ -200,7 +204,6 @@ export function ContractDetail({ address }: { address: string }) {
   const trialStarted = streamingTrialStartedCopy(contract);
   const resolver = presentResolver(contract.resolver);
   const openDisputeShown = shouldOfferOpenDispute(role, actions);
-  const resolveDisputeShown = shouldOfferResolveDispute(role, actions);
   const openPresentation = openDisputePresentation(contract, now);
   const resolveParsed =
     decimals != null
@@ -388,46 +391,21 @@ export function ContractDetail({ address }: { address: string }) {
           <StatusBadge status={contract.status} label={presentStatus(contract.status)} />
         </header>
 
-        {contract.status === "Disputed" ? (
-          <Card className="border-danger/40 bg-[linear-gradient(180deg,rgba(232,93,117,0.10),transparent)] p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-danger">
-              {DISPUTED_STATE_COPY.heading}
-            </p>
-            <h2 className="mt-1 font-display text-2xl">This contract is frozen</h2>
-            <p className="mt-2 text-sm leading-6 text-ink-soft">{DISPUTED_STATE_COPY.frozen}</p>
-            <p className="mt-2 text-sm leading-6 text-ink-soft">{DISPUTED_STATE_COPY.noTransfer}</p>
-            <p className="mt-2 text-sm leading-6 text-ink-soft">{DISPUTED_STATE_COPY.next}</p>
-            <dl className="mt-4 grid gap-3 sm:grid-cols-2">
-              <Row label="Total funded" value={formatTokenAmount(contract.totalAmount, decimals)} />
-              <Row
-                label="Already released"
-                value={formatTokenAmount(contract.releasedAmount, decimals)}
-              />
-              <Row
-                label="Already collected"
-                value={formatTokenAmount(contract.withdrawnAmount, decimals)}
-              />
-              <Row
-                label="Already refunded"
-                value={formatTokenAmount(contract.refundedAmount, decimals)}
-              />
-              <Row
-                label="Amount under dispute"
-                value={formatTokenAmount(contract.contestedAmount, decimals)}
-              />
-              <Row
-                label={resolver.roleTitle}
-                value={
-                  resolver.isTrustedLabel ? resolver.displayName : <Address value={resolver.address} />
-                }
-              />
-            </dl>
-            <ol className="mt-4 list-decimal space-y-1 pl-5 text-sm leading-6 text-ink-soft">
-              {DISPUTE_LIFECYCLE_STEPS.map((step) => (
-                <li key={step}>{step}</li>
-              ))}
-            </ol>
-          </Card>
+        {openDisputeShown ||
+        contract.status === "Disputed" ||
+        contract.status === "Resolved" ? (
+          <ResolutionCenter
+            contract={contract}
+            units={units}
+            now={now}
+            decimals={decimals}
+            role={role}
+            showOpenGuidance={openDisputeShown}
+            category={disputeCategory}
+            onCategoryChange={setDisputeCategory}
+            description={disputeDescription}
+            onDescriptionChange={setDisputeDescription}
+          />
         ) : null}
 
         <Card className="p-5">
@@ -555,85 +533,6 @@ export function ContractDetail({ address }: { address: string }) {
                 ))
               )}
             </div>
-          </Card>
-        ) : null}
-
-        {openDisputeShown ? (
-          <Card className="p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-danger">
-              Open a dispute
-            </p>
-            <h2 className="mt-1 font-display text-2xl">{OPEN_DISPUTE_TITLE}</h2>
-            <p className="mt-2 text-sm leading-6 text-ink-soft">{OPEN_DISPUTE_COPY.lead}</p>
-            <p className="mt-2 text-sm leading-6 text-ink-soft">{OPEN_DISPUTE_COPY.noTransfer}</p>
-            <p className="mt-2 text-sm leading-6 text-ink-soft">{OPEN_DISPUTE_COPY.resolver}</p>
-            <dl className="mt-4 grid gap-3 sm:grid-cols-2">
-              <Row
-                label={OPEN_DISPUTE_COPY.contestedLabel}
-                value={formatTokenAmount(displayContestedAmount(contract, now), decimals)}
-              />
-              <Row
-                label={resolver.roleTitle}
-                value={
-                  resolver.isTrustedLabel ? resolver.displayName : <Address value={resolver.address} />
-                }
-              />
-            </dl>
-            {contract.paymentMode === "Streaming" && contract.status === "Active" ? (
-              <p className="mt-3 text-sm leading-6 text-ink-soft">
-                {OPEN_DISPUTE_COPY.streamingNote}
-              </p>
-            ) : null}
-          </Card>
-        ) : null}
-
-        {resolveDisputeShown ? (
-          <Card className="border-gold/40 bg-[linear-gradient(180deg,rgba(214,176,90,0.10),transparent)] p-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-gold">
-              {RESOLVE_DISPUTE_COPY.heading}
-            </p>
-            <h2 className="mt-1 font-display text-2xl">{RESOLVE_DISPUTE_COPY.youAre}</h2>
-            <p className="mt-2 text-sm leading-6 text-ink-soft">{RESOLVE_DISPUTE_COPY.decides}</p>
-            <p className="mt-2 text-sm leading-6 text-ink-soft">{RESOLVE_DISPUTE_COPY.noEscrow}</p>
-            <dl className="mt-4 grid gap-3 sm:grid-cols-2">
-              <Row
-                label="Disputed amount"
-                value={formatTokenAmount(contract.contestedAmount, decimals)}
-              />
-              <Row
-                label={resolver.roleTitle}
-                value={
-                  resolver.isTrustedLabel ? resolver.displayName : <Address value={resolver.address} />
-                }
-              />
-            </dl>
-          </Card>
-        ) : null}
-
-        {contract.status === "Disputed" || contract.status === "Resolved" ? (
-          <Card className="p-5">
-            <h2 className="font-display text-2xl">
-              {contract.status === "Disputed" ? "Dispute record" : "Dispute decision"}
-            </h2>
-            <p className="mt-2 text-sm text-ink-soft">
-              {contract.status === "Disputed"
-                ? DISPUTED_STATE_COPY.frozen
-                : RESOLVE_DISPUTE_COPY.noEscrow}
-            </p>
-            <dl className="mt-4 grid gap-3 sm:grid-cols-2">
-              <Row label="Initiator" value={contract.disputeInitiator} />
-              <Row label="Opened" value={formatUnix(contract.disputedAt)} />
-              <Row
-                label="Amount under dispute"
-                value={formatTokenAmount(contract.contestedAmount, decimals)}
-              />
-              <Row
-                label={resolver.roleTitle}
-                value={
-                  resolver.isTrustedLabel ? resolver.displayName : <Address value={resolver.address} />
-                }
-              />
-            </dl>
           </Card>
         ) : null}
 
@@ -782,6 +681,7 @@ export function ContractDetail({ address }: { address: string }) {
             setUri={setUri}
             awardUi={awardUi}
             setAwardUi={setAwardUi}
+            disputeCategory={disputeCategory}
           />
         ) : null}
       </Modal>
@@ -890,6 +790,7 @@ function ConfirmBody({
   setUri,
   awardUi,
   setAwardUi,
+  disputeCategory,
 }: {
   action: UiAction;
   contract: ContractView;
@@ -899,6 +800,7 @@ function ConfirmBody({
   setUri: (v: string) => void;
   awardUi: string;
   setAwardUi: (v: string) => void;
+  disputeCategory: DisputeCategoryId | "";
 }) {
   if (action === "submitWorkUnit") {
     const copy = officialDeliverableCopy(contract);
@@ -963,8 +865,16 @@ function ConfirmBody({
   }
   if (action === "openDispute") {
     const presentation = openDisputePresentation(contract, now);
+    const selected = DISPUTE_CATEGORIES.find((item) => item.id === disputeCategory);
     return (
       <div className="space-y-3 text-sm leading-6 text-ink-soft">
+        <p>{SUPPORT_VS_DISPUTE_COPY.whenToDispute}</p>
+        <p>{SUPPORT_VS_DISPUTE_COPY.supportFirst}</p>
+        <p>
+          <a className="font-medium text-accent underline" href={supportTopicHref("disputes")}>
+            {SUPPORT_VS_DISPUTE_COPY.helpLabel}
+          </a>
+        </p>
         <p>{presentation.lead}</p>
         <ul className="list-disc space-y-1 pl-5">
           {presentation.points.map((line) => (
@@ -978,6 +888,13 @@ function ConfirmBody({
           </span>
         </p>
         {presentation.streamingNote ? <p>{presentation.streamingNote}</p> : null}
+        {selected ? (
+          <p>
+            Optional page note: {selected.label}. {CASE_PREPARATION_COPY.notStored}
+          </p>
+        ) : (
+          <p>{CASE_PREPARATION_COPY.notStored}</p>
+        )}
         <p className="font-medium text-ink">{presentation.wallet}</p>
       </div>
     );
