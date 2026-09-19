@@ -24,6 +24,7 @@ export type UiAction =
   | "submitWorkUnit"
   | "requestWorkRevision"
   | "approveWorkUnit"
+  | "voidStaleRevision"
   | "finalizeReviewTimeout"
   | "releaseStreamAccrual"
   | "cancelActiveContract"
@@ -54,6 +55,7 @@ const LIFECYCLE_ACTIONS: readonly UiAction[] = [
   "submitWorkUnit",
   "requestWorkRevision",
   "approveWorkUnit",
+  "voidStaleRevision",
   "cancelActiveContract",
   "openDispute",
 ] as const;
@@ -132,6 +134,9 @@ export function availableActions(input: ActionAvailabilityInput): UiAction[] {
           actions.add("requestWorkRevision");
         }
       }
+      if (canOfferVoidStaleRevision(contract, unit, now)) {
+        actions.add("voidStaleRevision");
+      }
     }
     if (role === "freelancer") {
       if (
@@ -179,4 +184,24 @@ export function hasLifecycleMutation(actions: readonly UiAction[]): boolean {
   return actions.some((action) =>
     (LIFECYCLE_ACTIONS as readonly string[]).includes(action)
   );
+}
+
+/**
+ * UX convenience for `void_stale_revision`. The program still authorizes.
+ * Employer, Active, Fixed/Milestone main unit, Revising, deadline reached.
+ */
+function canOfferVoidStaleRevision(
+  contract: ContractView,
+  unit: WorkUnitView | null | undefined,
+  now: number
+): boolean {
+  if (!unit) return false;
+  if (contract.status !== "Active") return false;
+  if (contract.paymentMode !== "Fixed" && contract.paymentMode !== "Milestone") {
+    return false;
+  }
+  if (unit.kind !== "Fixed" && unit.kind !== "Milestone") return false;
+  if (unit.status !== "Revising") return false;
+  if (unit.actionDeadline <= 0) return false;
+  return now >= unit.actionDeadline;
 }

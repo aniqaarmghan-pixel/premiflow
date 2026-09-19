@@ -8,6 +8,7 @@ import {
   remainingEmployerRefund,
   remainingFreelancerClaim,
   roleForContract,
+  workUnitStatusLabel,
 } from "../derived";
 import { WALLET_A, WALLET_B, WALLET_C, makeContract } from "./fixtures";
 
@@ -104,6 +105,11 @@ test("contested remainder matches freeze-for-dispute accounting", () => {
     ),
     0n
   );
+});
+
+test("void work unit label is revision-ended, not paid", () => {
+  assert.equal(workUnitStatusLabel("Void"), "Revision ended");
+  assert.equal(workUnitStatusLabel("Released"), "Released");
 });
 
 test("display stream accrual matches the Rust floor formula", () => {

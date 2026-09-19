@@ -151,7 +151,18 @@ export function isReviewDeadlineActive(
  * The program still decides eligibility.
  */
 export function mayAttemptCompletion(
-  contract: ContractView,
+  contract: Pick<
+    ContractView,
+    | "status"
+    | "paymentMode"
+    | "endTime"
+    | "openReviewCount"
+    | "workUnitCount"
+    | "allocatedAmount"
+    | "mainAmount"
+    | "trialAmount"
+    | "releasedUnitCount"
+  >,
   now: number
 ): boolean {
   if (contract.status !== "Active") return false;
@@ -214,6 +225,17 @@ export function workUnitStatusLabel(status: WorkUnitStatus): string {
     case "Released":
       return "Released";
     case "Void":
-      return "Void";
+      // Currently the only on-chain path to Void is void_stale_revision.
+      return "Revision ended";
   }
+}
+
+/**
+ * Extra status copy. Void is currently only produced by ending a stale revision.
+ */
+export function workUnitStatusDetail(status: WorkUnitStatus): string | null {
+  if (status === "Void") {
+    return "This deliverable was ended after the revision deadline. No payment was released for it.";
+  }
+  return null;
 }

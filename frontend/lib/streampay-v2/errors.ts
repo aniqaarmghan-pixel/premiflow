@@ -256,6 +256,30 @@ function extractNumericCode(text: string): number | undefined {
   return undefined;
 }
 
+export const DELIVERABLE_STATE_CHANGED_MESSAGE =
+  "The deliverable state changed before this action was confirmed. Refresh and review the latest contract state.";
+
+const DELIVERABLE_RACE_CODES: Record<string, readonly number[]> = {
+  voidStaleRevision: [6111, 6127, 6128, 6129],
+  submitWorkUnit: [6111, 6126, 6129],
+};
+
+/**
+ * When a late resubmit and End expired revision race, the losing tx fails
+ * because the unit already moved. Keep original messages for other actions.
+ */
+export function withDeliverableRaceMessage(
+  action: string | undefined,
+  parsed: ParsedClientError
+): ParsedClientError {
+  if (!action) return parsed;
+  const codes = DELIVERABLE_RACE_CODES[action];
+  if (!codes || parsed.code === undefined || !codes.includes(parsed.code)) {
+    return parsed;
+  }
+  return { ...parsed, uiMessage: DELIVERABLE_STATE_CHANGED_MESSAGE };
+}
+
 export function parseClientError(err: unknown): ParsedClientError {
   const parsed = asError(err);
   const raw = [parsed.message, ...(parsed.logs ?? [])].join("\n");

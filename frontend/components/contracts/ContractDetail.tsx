@@ -27,14 +27,19 @@ import { formatTokenAmount } from "@/lib/app/money";
 import {
   actionLabel,
   completeContractCopy,
+  confirmTitle,
   counterparty,
-  isEconomicAction,
+  needsConfirmation,
   officialDeliverableCopy,
   presentStatus,
   presentType,
+  revisionDeadlinePresentation,
+  revisionsUsedLabel,
   roleForContract,
   roleLabel,
   splitTrialUnits,
+  voidDeliverableCopy,
+  voidStaleRevisionCopy,
   withdrawFreelancerCopy,
 } from "@/lib/app/view-model";
 import {
@@ -57,6 +62,7 @@ import {
   settlementView,
   workUnitStatusLabel,
   type ContractMetadata,
+  type ContractRole,
   type ContractView,
   type UiAction,
   type WorkUnitView,
@@ -66,6 +72,7 @@ const UNIT_ACTIONS: UiAction[] = [
   "submitWorkUnit",
   "requestWorkRevision",
   "approveWorkUnit",
+  "voidStaleRevision",
   "finalizeReviewTimeout",
 ];
 
@@ -179,7 +186,9 @@ export function ContractDetail({ address }: { address: string }) {
 
   async function execute(action: UiAction, unit?: WorkUnitView) {
     if (!client || !contract) return;
-    const ok = await tx.run(actionLabel(action), async () => {
+    const ok = await tx.run(
+      actionLabel(action, { workUnitStatus: unit?.status }),
+      async () => {
       switch (action) {
         case "finalizeTerms":
           return client.finalizeTerms(contract.address);
@@ -222,6 +231,12 @@ export function ContractDetail({ address }: { address: string }) {
         case "approveWorkUnit":
           if (!unit) throw new Error("Choose a work unit.");
           return client.approveWorkUnit({
+            contract: contract.address,
+            workUnit: unit.address,
+          });
+        case "voidStaleRevision":
+          if (!unit) throw new Error("Choose a work unit.");
+          return client.voidStaleRevision({
             contract: contract.address,
             workUnit: unit.address,
           });
@@ -273,13 +288,19 @@ export function ContractDetail({ address }: { address: string }) {
         default:
           throw new Error("Unsupported action");
       }
-    });
+      },
+      action
+    );
     setConfirm(null);
     if (ok) await afterSuccess(successCopy(action));
+    else if (action === "voidStaleRevision" || action === "submitWorkUnit") {
+      await load();
+      await refreshList();
+    }
   }
 
   function requestAction(action: UiAction, unit?: WorkUnitView) {
-    if (isEconomicAction(action) || action === "submitWorkUnit" || action === "submitTrialWork") {
+    if (needsConfirmation(action)) {
       setConfirm({ action, unit });
       return;
     }
@@ -368,7 +389,10 @@ export function ContractDetail({ address }: { address: string }) {
             {trial ? (
               <WorkUnitPanel
                 unit={trial}
+                contract={contract}
                 decimals={decimals}
+                role={role}
+                now={now}
                 actions={availableActions({
                   wallet: publicKey,
                   contract,
@@ -401,7 +425,10 @@ export function ContractDetail({ address }: { address: string }) {
                   <WorkUnitPanel
                     key={unit.address.toBase58()}
                     unit={unit}
+                    contract={contract}
                     decimals={decimals}
+                    role={role}
+                    now={now}
                     actions={availableActions({
                       wallet: publicKey,
                       contract,
@@ -519,7 +546,7 @@ export function ContractDetail({ address }: { address: string }) {
 
       <Modal
         open={confirm != null}
-        title={confirm ? actionLabel(confirm.action) : ""}
+        title={confirm ? confirmTitle(confirm.action) : ""}
         onClose={() => setConfirm(null)}
         footer={
           <>
@@ -529,7 +556,9 @@ export function ContractDetail({ address }: { address: string }) {
             <Button
               disabled={tx.busy}
               variant={
-                confirm?.action === "openDispute" || confirm?.action === "cancelActiveContract"
+                confirm?.action === "openDispute" ||
+                confirm?.action === "cancelActiveContract" ||
+                confirm?.action === "voidStaleRevision"
                   ? "danger"
                   : "primary"
               }
@@ -565,17 +594,33 @@ export function ContractDetail({ address }: { address: string }) {
 
 function WorkUnitPanel({
   unit,
+  contract,
   decimals,
+  role,
+  now,
   actions,
   busy,
   onAction,
 }: {
   unit: WorkUnitView;
+  contract: ContractView;
   decimals?: number;
+  role: ContractRole;
+  now: number;
   actions: UiAction[];
   busy: boolean;
   onAction: (action: UiAction) => void;
 }) {
+  const revision =
+    unit.status === "Revising"
+      ? revisionDeadlinePresentation({
+          actionDeadline: unit.actionDeadline,
+          now,
+          role,
+        })
+      : null;
+  const voidCopy = voidDeliverableCopy({ contract, unit, now });
+
   return (
     <div className="rounded-2xl border border-line bg-paper p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -587,17 +632,50 @@ function WorkUnitPanel({
         </div>
         <p className="font-display text-2xl">{formatTokenAmount(unit.amount, decimals)}</p>
       </div>
+      {revision ? (
+        <div
+          className={`mt-3 rounded-xl border p-3 ${
+            revision.expired ? "border-danger bg-danger-soft" : "border-gold bg-gold-soft"
+          }`}
+        >
+          <p className="text-sm font-medium text-ink">{revision.heading}</p>
+          <p className="mt-1 text-sm text-ink-soft">
+            {revision.deadlineLabel}: {revision.deadlineText}
+          </p>
+          <p className="mt-1 text-sm text-ink-soft">{revision.remainingText}</p>
+          {revision.detail ? (
+            <p className="mt-2 text-sm leading-6 text-ink-soft">{revision.detail}</p>
+          ) : null}
+        </div>
+      ) : null}
+      {voidCopy ? (
+        <div className="mt-3 space-y-2 text-sm leading-6 text-ink-soft">
+          <p>{voidCopy.body}</p>
+          {voidCopy.contractNote ? <p>{voidCopy.contractNote}</p> : null}
+          {voidCopy.nextStep ? <p>{voidCopy.nextStep}</p> : null}
+        </div>
+      ) : null}
       <dl className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
         <Row label="Submitted" value={formatUnix(unit.submittedAt)} />
-        <Row label="Review deadline" value={formatUnix(unit.actionDeadline)} />
-        <Row label="Revisions used" value={String(unit.revisionCount)} />
+        {unit.status === "Revising" ? null : (
+          <Row label="Review deadline" value={formatUnix(unit.actionDeadline)} />
+        )}
+        <Row
+          label="Revisions used"
+          value={revisionsUsedLabel(unit.revisionCount, contract.maxRevisions)}
+        />
         <Row label="Submission URI" value={unit.submissionUri || "None"} />
       </dl>
       {actions.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2">
           {actions.map((action) => (
-            <Button key={action} disabled={busy} variant="secondary" onClick={() => onAction(action)}>
-              {actionLabel(action)}
+            <Button
+              key={action}
+              disabled={busy}
+              variant={action === "voidStaleRevision" ? "danger" : "secondary"}
+              onClick={() => onAction(action)}
+            >
+              {actionLabel(action, { workUnitStatus: unit.status })}
             </Button>
           ))}
         </div>
@@ -768,6 +846,19 @@ function ConfirmBody({
       </div>
     );
   }
+  if (action === "voidStaleRevision") {
+    const copy = voidStaleRevisionCopy();
+    return (
+      <div className="space-y-3 text-sm leading-6 text-ink-soft">
+        <ul className="list-disc space-y-1 pl-5">
+          {copy.points.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+        <p className="font-medium text-ink">{copy.wallet}</p>
+      </div>
+    );
+  }
   if (action === "releaseStreamAccrual") {
     return (
       <p>
@@ -801,6 +892,8 @@ function successCopy(action: UiAction): string {
       return "Contract completed";
     case "claimEmployerRefund":
       return "Refund claimed";
+    case "voidStaleRevision":
+      return "Expired revision ended";
     default:
       return "Transaction confirmed";
   }

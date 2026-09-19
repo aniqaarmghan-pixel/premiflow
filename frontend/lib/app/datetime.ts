@@ -23,6 +23,39 @@ export function formatDuration(totalSeconds: number): string {
   return `${seconds}s`;
 }
 
+/**
+ * Informational revision-window remaining text from a stored unix deadline.
+ * Local clock only — not on-chain Clock, not second-perfect.
+ */
+export function formatRevisionRemaining(
+  deadlineUnix: number,
+  nowUnix: number
+): string {
+  if (deadlineUnix <= 0) return "Not set";
+  if (nowUnix >= deadlineUnix) return "Revision deadline passed";
+  const remaining = deadlineUnix - nowUnix;
+  const days = Math.floor(remaining / 86_400);
+  if (days >= 1) {
+    return days === 1 ? "1 day remaining" : `${days} days remaining`;
+  }
+  const hours = Math.floor(remaining / 3600);
+  if (hours >= 1) {
+    return hours === 1 ? "1 hour remaining" : `${hours} hours remaining`;
+  }
+  const minutes = Math.floor(remaining / 60);
+  if (minutes >= 1) {
+    return minutes === 1 ? "1 minute remaining" : `${minutes} minutes remaining`;
+  }
+  return "Less than 1 minute remaining";
+}
+
+export function isUnixDeadlinePassed(
+  deadlineUnix: number,
+  nowUnix: number
+): boolean {
+  return deadlineUnix > 0 && nowUnix >= deadlineUnix;
+}
+
 /** Human-readable review window from on-chain `review_duration` seconds. */
 export function formatReviewPeriod(totalSeconds: number): string {
   const seconds = Math.max(0, Math.floor(totalSeconds));

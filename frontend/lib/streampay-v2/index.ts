@@ -95,12 +95,18 @@ export {
   contractStatusLabel,
   paymentModeLabel,
   workUnitStatusLabel,
+  workUnitStatusDetail,
 } from "./derived";
 
 export { availableActions, hasLifecycleMutation } from "./actions";
 export type { UiAction, ActionAvailabilityInput } from "./actions";
 
-export { parseClientError, V2_ERROR_MESSAGES } from "./errors";
+export {
+  parseClientError,
+  withDeliverableRaceMessage,
+  DELIVERABLE_STATE_CHANGED_MESSAGE,
+  V2_ERROR_MESSAGES,
+} from "./errors";
 export type { ParsedClientError } from "./errors";
 
 export {

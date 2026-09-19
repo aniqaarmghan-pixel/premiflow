@@ -10,6 +10,10 @@ export type NoticeKind =
   | "work_submitted"
   | "work_approved"
   | "revision_requested"
+  | "revision_approaching_deadline"
+  | "revision_deadline_passed"
+  | "expired_revision_ended"
+  | "revised_deliverable_submitted"
   | "payment_released"
   | "withdrawal_completed"
   | "dispute_opened"
@@ -44,6 +48,26 @@ export const NOTICE_CATALOG: Record<NoticeKind, NoticeCopy> = {
     kind: "revision_requested",
     title: "Revision requested",
     body: "The deliverable is waiting for a new official submission.",
+  },
+  revision_approaching_deadline: {
+    kind: "revision_approaching_deadline",
+    title: "Revision deadline approaching",
+    body: "The resubmission window is nearly over. After it passes, the employer can end this revision.",
+  },
+  revision_deadline_passed: {
+    kind: "revision_deadline_passed",
+    title: "Revision deadline passed",
+    body: "The employer can now end this revision. A late resubmission may still land until that action is confirmed on-chain.",
+  },
+  expired_revision_ended: {
+    kind: "expired_revision_ended",
+    title: "Expired revision ended",
+    body: "The deliverable was marked Void. No payment was released, transferred, or refunded.",
+  },
+  revised_deliverable_submitted: {
+    kind: "revised_deliverable_submitted",
+    title: "Revised deliverable submitted",
+    body: "A new official submission is under review. Payment is not transferred yet.",
   },
   payment_released: {
     kind: "payment_released",
@@ -85,6 +109,8 @@ export function noticeKindForAction(action: UiAction): NoticeKind | null {
     case "requestWorkRevision":
     case "requestTrialRevision":
       return "revision_requested";
+    case "voidStaleRevision":
+      return "expired_revision_ended";
     case "finalizeReviewTimeout":
     case "releaseStreamAccrual":
       return "payment_released";

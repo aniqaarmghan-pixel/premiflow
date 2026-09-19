@@ -1,18 +1,25 @@
 import { PublicKey } from "@solana/web3.js";
 
-import { formatReviewPeriod } from "@/lib/app/datetime";
+import {
+  formatReviewPeriod,
+  formatRevisionRemaining,
+  formatUnix,
+} from "@/lib/app/datetime";
 import {
   availableActions,
   contractStatusLabel,
+  mayAttemptCompletion,
   paymentModeLabel,
   remainingEmployerRefund,
   remainingFreelancerClaim,
   roleForContract,
+  workUnitStatusDetail,
   type ContractRole,
   type ContractStatus,
   type ContractType,
   type ContractView,
   type UiAction,
+  type WorkUnitStatus,
   type WorkUnitView,
 } from "@/lib/streampay-v2";
 
@@ -294,7 +301,10 @@ function terminalLabel(status: ContractStatus): string {
   }
 }
 
-export function actionLabel(action: UiAction): string {
+export function actionLabel(
+  action: UiAction,
+  context?: { workUnitStatus?: WorkUnitStatus }
+): string {
   switch (action) {
     case "addMilestone":
       return "Add milestone";
@@ -315,11 +325,15 @@ export function actionLabel(action: UiAction): string {
     case "approveTrialAndActivate":
       return "Approve trial & activate";
     case "submitWorkUnit":
-      return "Submit official deliverable";
+      return context?.workUnitStatus === "Revising"
+        ? "Submit revised deliverable"
+        : "Submit official deliverable";
     case "requestWorkRevision":
       return "Request revision";
     case "approveWorkUnit":
       return "Approve work";
+    case "voidStaleRevision":
+      return "End expired revision";
     case "finalizeReviewTimeout":
       return "Release after timeout";
     case "releaseStreamAccrual":
@@ -339,6 +353,59 @@ export function actionLabel(action: UiAction): string {
   }
 }
 
+export function confirmTitle(action: UiAction): string {
+  if (action === "voidStaleRevision") return "End expired revision?";
+  return actionLabel(action);
+}
+
+/** Client method on StreamPayV2Client used by the matching UI action. */
+export function clientMethodForAction(action: UiAction): string {
+  switch (action) {
+    case "addMilestone":
+      return "addMilestone";
+    case "finalizeTerms":
+      return "finalizeTerms";
+    case "acceptContract":
+      return "acceptContract";
+    case "declineContract":
+      return "declineContract";
+    case "approveActivation":
+      return "approveActivation";
+    case "rejectActivation":
+      return "rejectActivation";
+    case "submitTrialWork":
+      return "submitTrialWork";
+    case "requestTrialRevision":
+      return "requestTrialRevision";
+    case "approveTrialAndActivate":
+      return "approveTrialAndActivate";
+    case "submitWorkUnit":
+      return "submitWorkUnit";
+    case "requestWorkRevision":
+      return "requestWorkRevision";
+    case "approveWorkUnit":
+      return "approveWorkUnit";
+    case "voidStaleRevision":
+      return "voidStaleRevision";
+    case "finalizeReviewTimeout":
+      return "finalizeReviewTimeout";
+    case "releaseStreamAccrual":
+      return "releaseStreamAccrual";
+    case "cancelActiveContract":
+      return "cancelActiveContract";
+    case "withdrawFreelancer":
+      return "withdrawFreelancer";
+    case "claimEmployerRefund":
+      return "claimEmployerRefund";
+    case "openDispute":
+      return "openDispute";
+    case "resolveDispute":
+      return "resolveDispute";
+    case "completeContract":
+      return "completeContract";
+  }
+}
+
 export function isEconomicAction(action: UiAction): boolean {
   return (
     action === "cancelActiveContract" ||
@@ -353,6 +420,15 @@ export function isEconomicAction(action: UiAction): boolean {
     action === "finalizeReviewTimeout" ||
     action === "declineContract" ||
     action === "rejectActivation"
+  );
+}
+
+export function needsConfirmation(action: UiAction): boolean {
+  return (
+    isEconomicAction(action) ||
+    action === "submitWorkUnit" ||
+    action === "submitTrialWork" ||
+    action === "voidStaleRevision"
   );
 }
 
@@ -435,6 +511,140 @@ export type CompleteContractCopy = {
   wallet: string;
   notPayment: string;
 };
+
+export type VoidStaleRevisionCopy = {
+  title: string;
+  points: readonly string[];
+  wallet: string;
+};
+
+export function voidStaleRevisionCopy(): VoidStaleRevisionCopy {
+  return {
+    title: "End expired revision?",
+    points: [
+      "The revision deadline has passed.",
+      "This marks this deliverable as Void.",
+      "It does not approve or release payment.",
+      "It does not transfer or refund tokens.",
+      "After it succeeds, this revision cannot be resubmitted.",
+      "The contract remains Active.",
+      "Other contract actions may become available depending on the remaining contract state.",
+    ],
+    wallet: "Phantom will ask for approval.",
+  };
+}
+
+export type RevisionDeadlinePresentation = {
+  heading: string;
+  deadlineLabel: string;
+  deadlineText: string;
+  remainingText: string;
+  detail: string;
+  expired: boolean;
+};
+
+/**
+ * Uses WorkUnit.actionDeadline only. Does not derive a deadline from review_duration.
+ */
+export function revisionDeadlinePresentation(input: {
+  actionDeadline: number;
+  now: number;
+  role: ContractRole;
+}): RevisionDeadlinePresentation | null {
+  if (input.actionDeadline <= 0) return null;
+  const expired = input.now >= input.actionDeadline;
+  const remainingText = formatRevisionRemaining(input.actionDeadline, input.now);
+  const deadlineText = formatUnix(input.actionDeadline);
+  if (input.role === "freelancer") {
+    return {
+      heading: expired ? "Revision deadline passed" : "Revision requested",
+      deadlineLabel: "Resubmit by",
+      deadlineText,
+      remainingText,
+      detail: expired
+        ? "The employer can now end this revision. You may still try to resubmit until that action is confirmed on-chain."
+        : "Employer requested changes to this deliverable. Submit the revised official deliverable before the deadline.",
+      expired,
+    };
+  }
+  if (input.role === "employer") {
+    return {
+      heading: expired ? "Revision deadline passed" : "Waiting for revised deliverable",
+      deadlineLabel: "Revision deadline",
+      deadlineText,
+      remainingText,
+      detail: expired
+        ? "You can end this expired revision without approving, releasing, transferring, or refunding tokens."
+        : "Waiting for the freelancer to submit a revised official deliverable.",
+      expired,
+    };
+  }
+  return {
+    heading: expired ? "Revision deadline passed" : "Revision requested",
+    deadlineLabel: "Revision deadline",
+    deadlineText,
+    remainingText,
+    detail: "",
+    expired,
+  };
+}
+
+export function revisionsUsedLabel(used: number, maximum: number): string {
+  return `${used} / ${maximum}`;
+}
+
+export type VoidDeliverableCopy = {
+  heading: string;
+  body: string;
+  contractNote: string | null;
+  nextStep: string | null;
+};
+
+/**
+ * Void is unit-local. Cancel-to-settle wording is Fixed-only, and only when
+ * cancel is already allowed and successful completion is not.
+ */
+export function voidDeliverableCopy(input: {
+  contract: Pick<
+    ContractView,
+    | "status"
+    | "paymentMode"
+    | "openReviewCount"
+    | "workUnitCount"
+    | "releasedUnitCount"
+    | "allocatedAmount"
+    | "mainAmount"
+    | "trialAmount"
+    | "endTime"
+  >;
+  unit: Pick<WorkUnitView, "status">;
+  now?: number;
+}): VoidDeliverableCopy | null {
+  if (input.unit.status !== "Void") return null;
+  const body = workUnitStatusDetail("Void") ?? "";
+  if (input.contract.status !== "Active") {
+    return {
+      heading: "Revision ended",
+      body,
+      contractNote: null,
+      nextStep: null,
+    };
+  }
+  const cancelAvailable = input.contract.openReviewCount === 0;
+  const completionAvailable = mayAttemptCompletion(input.contract, input.now ?? 0);
+  const nextStep =
+    input.contract.paymentMode === "Fixed" &&
+    cancelAvailable &&
+    !completionAvailable
+      ? "The employer can now cancel the contract to begin settlement."
+      : null;
+  return {
+    heading: "Revision ended",
+    body,
+    contractNote: "The contract is still active.",
+    nextStep,
+  };
+}
 
 export function completeContractCopy(): CompleteContractCopy {
   return {

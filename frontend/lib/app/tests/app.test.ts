@@ -302,6 +302,9 @@ test("notice catalog covers the planned lifecycle events", () => {
   assert.equal(noticeKindForAction("completeContract"), "contract_completed");
   assert.match(NOTICE_CATALOG.contract_completed.body, /does not transfer tokens/i);
   assert.match(NOTICE_CATALOG.withdrawal_completed.body, /left escrow/i);
+  assert.equal(noticeKindForAction("voidStaleRevision"), "expired_revision_ended");
+  assert.ok(NOTICE_CATALOG.revision_deadline_passed);
+  assert.ok(NOTICE_CATALOG.revised_deliverable_submitted);
 });
 
 test("official deliverable label appears for a submittable Fixed unit", () => {

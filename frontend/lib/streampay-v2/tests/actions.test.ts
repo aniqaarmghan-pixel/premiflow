@@ -259,3 +259,234 @@ test("disputed state does not expose ordinary lifecycle actions", () => {
   assert.deepEqual(resolver, ["resolveDispute"]);
   assert.deepEqual(stranger, []);
 });
+
+function postVoidFixedContract() {
+  return makeContract({
+    status: "Active",
+    paymentMode: "Fixed",
+    openReviewCount: 0,
+    voidedUnitCount: 1,
+    releasedUnitCount: 0,
+    workUnitCount: 1,
+    allocatedAmount: 100n,
+    mainAmount: 100n,
+    totalAmount: 100n,
+    releasedAmount: 0n,
+    withdrawnAmount: 0n,
+    refundedAmount: 0n,
+  });
+}
+
+function postVoidFixedUnit() {
+  return makeWorkUnit({
+    kind: "Fixed",
+    status: "Void",
+    actionDeadline: 1_000,
+    revisionCount: 1,
+  });
+}
+
+test("post-Void Fixed unit hides stale-revision and resubmit actions", () => {
+  const contract = postVoidFixedContract();
+  const unit = postVoidFixedUnit();
+  const employer = availableActions({
+    wallet: WALLET_A,
+    contract,
+    workUnit: unit,
+    now: 2_000,
+  });
+  const freelancer = availableActions({
+    wallet: WALLET_B,
+    contract,
+    workUnit: unit,
+    now: 2_000,
+  });
+  assert.ok(!employer.includes("voidStaleRevision"));
+  assert.ok(!freelancer.includes("voidStaleRevision"));
+  assert.ok(!freelancer.includes("submitWorkUnit"));
+  assert.ok(!employer.includes("submitWorkUnit"));
+});
+
+test("post-Void Fixed gating matches Rust cancel, complete, dispute, and withdraw rules", () => {
+  const contract = postVoidFixedContract();
+  const unit = postVoidFixedUnit();
+  const employer = availableActions({
+    wallet: WALLET_A,
+    contract,
+    workUnit: unit,
+    now: 2_000,
+  });
+  const freelancer = availableActions({
+    wallet: WALLET_B,
+    contract,
+    workUnit: unit,
+    now: 2_000,
+  });
+  assert.ok(employer.includes("cancelActiveContract"));
+  assert.ok(!freelancer.includes("cancelActiveContract"));
+  assert.ok(!employer.includes("completeContract"));
+  assert.ok(!freelancer.includes("completeContract"));
+  assert.ok(employer.includes("openDispute"));
+  assert.ok(freelancer.includes("openDispute"));
+  assert.ok(!freelancer.includes("withdrawFreelancer"));
+  assert.ok(!employer.includes("claimEmployerRefund"));
+});
+
+function revisingUnit(overrides: Parameters<typeof makeWorkUnit>[0] = {}) {
+  return makeWorkUnit({
+    kind: "Fixed",
+    status: "Revising",
+    actionDeadline: 2_000,
+    revisionCount: 1,
+    ...overrides,
+  });
+}
+
+test("employer does not see End expired revision before the revision deadline", () => {
+  const active = makeContract({ status: "Active", paymentMode: "Fixed" });
+  const actions = availableActions({
+    wallet: WALLET_A,
+    contract: active,
+    workUnit: revisingUnit(),
+    now: 1_999,
+  });
+  assert.ok(!actions.includes("voidStaleRevision"));
+});
+
+test("employer sees End expired revision at the revision deadline", () => {
+  const active = makeContract({ status: "Active", paymentMode: "Fixed" });
+  const actions = availableActions({
+    wallet: WALLET_A,
+    contract: active,
+    workUnit: revisingUnit(),
+    now: 2_000,
+  });
+  assert.ok(actions.includes("voidStaleRevision"));
+});
+
+test("employer sees End expired revision after the revision deadline", () => {
+  const active = makeContract({ status: "Active", paymentMode: "Milestone" });
+  const actions = availableActions({
+    wallet: WALLET_A,
+    contract: active,
+    workUnit: revisingUnit({ kind: "Milestone" }),
+    now: 2_001,
+  });
+  assert.ok(actions.includes("voidStaleRevision"));
+});
+
+test("freelancer never sees End expired revision", () => {
+  const active = makeContract({ status: "Active", paymentMode: "Fixed" });
+  const before = availableActions({
+    wallet: WALLET_B,
+    contract: active,
+    workUnit: revisingUnit(),
+    now: 1_999,
+  });
+  const after = availableActions({
+    wallet: WALLET_B,
+    contract: active,
+    workUnit: revisingUnit(),
+    now: 2_001,
+  });
+  assert.ok(!before.includes("voidStaleRevision"));
+  assert.ok(!after.includes("voidStaleRevision"));
+  assert.ok(before.includes("submitWorkUnit"));
+  assert.ok(after.includes("submitWorkUnit"));
+});
+
+test("Submitted, Void, and Released units do not offer End expired revision", () => {
+  const active = makeContract({ status: "Active", paymentMode: "Fixed" });
+  for (const status of ["Submitted", "Void", "Released"] as const) {
+    const actions = availableActions({
+      wallet: WALLET_A,
+      contract: active,
+      workUnit: makeWorkUnit({
+        kind: "Fixed",
+        status,
+        actionDeadline: 1_000,
+      }),
+      now: 2_000,
+    });
+    assert.ok(!actions.includes("voidStaleRevision"), status);
+  }
+});
+
+test("Trial and Streaming checkpoint units do not offer End expired revision", () => {
+  const fixed = makeContract({ status: "Active", paymentMode: "Fixed" });
+  const trial = availableActions({
+    wallet: WALLET_A,
+    contract: fixed,
+    workUnit: revisingUnit({ kind: "Trial" }),
+    now: 2_001,
+  });
+  assert.ok(!trial.includes("voidStaleRevision"));
+
+  const streaming = makeContract({ status: "Active", paymentMode: "Streaming" });
+  const checkpoint = availableActions({
+    wallet: WALLET_A,
+    contract: streaming,
+    workUnit: revisingUnit({ kind: "Checkpoint" }),
+    now: 2_001,
+  });
+  assert.ok(!checkpoint.includes("voidStaleRevision"));
+});
+
+test("terminal contracts do not offer End expired revision", () => {
+  const unit = revisingUnit();
+  for (const status of ["Completed", "Cancelled", "Disputed", "Resolved"] as const) {
+    const contract = makeContract({
+      status,
+      paymentMode: "Fixed",
+      freelancerSettlementAmount: 10n,
+      employerRefundableAmount: 0n,
+    });
+    const actions = availableActions({
+      wallet: WALLET_A,
+      contract,
+      workUnit: unit,
+      now: 2_001,
+    });
+    assert.ok(!actions.includes("voidStaleRevision"), status);
+  }
+});
+
+test("voiding one Milestone does not hide remaining Defined unit submission", () => {
+  const contract = makeContract({
+    status: "Active",
+    paymentMode: "Milestone",
+    openReviewCount: 0,
+    voidedUnitCount: 1,
+    releasedUnitCount: 0,
+    workUnitCount: 2,
+    allocatedAmount: 100n,
+    mainAmount: 100n,
+  });
+  const voided = makeWorkUnit({
+    kind: "Milestone",
+    status: "Void",
+    index: 0,
+  });
+  const remaining = makeWorkUnit({
+    kind: "Milestone",
+    status: "Defined",
+    index: 1,
+  });
+  const employerVoided = availableActions({
+    wallet: WALLET_A,
+    contract,
+    workUnit: voided,
+    now: 2_000,
+  });
+  const freelancerRemaining = availableActions({
+    wallet: WALLET_B,
+    contract,
+    workUnit: remaining,
+    now: 2_000,
+  });
+  assert.ok(!employerVoided.includes("voidStaleRevision"));
+  assert.ok(employerVoided.includes("cancelActiveContract"));
+  assert.ok(!employerVoided.includes("completeContract"));
+  assert.ok(freelancerRemaining.includes("submitWorkUnit"));
+  assert.ok(!freelancerRemaining.includes("voidStaleRevision"));
+});

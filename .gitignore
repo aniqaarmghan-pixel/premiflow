@@ -34,6 +34,7 @@ id.json
 *.tsbuildinfo
 
 # Local StreamPay backups
+/artifacts/
 backups/
 frontend-before-stitch-20260914-131252/
 frontend-working-backup/

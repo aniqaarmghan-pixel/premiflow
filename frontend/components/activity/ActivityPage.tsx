@@ -55,7 +55,7 @@ export function ActivityPage() {
       <h1 className="mt-1 font-display text-4xl">Deterministic timeline</h1>
       <p className="mt-2 max-w-2xl text-sm text-ink-soft">
         This is not an indexer. It only lists timestamps already stored on loaded contract
-        accounts. Full historical event feeds belong in a later phase.
+        accounts. Program events such as WorkUnitStaleRevisionVoided are not retrieved.
       </p>
       {stamps.length === 0 ? (
         <div className="mt-6">

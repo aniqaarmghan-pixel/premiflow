@@ -2,7 +2,11 @@
 
 import { useReducer } from "react";
 
-import { parseClientError } from "@/lib/streampay-v2";
+import {
+  parseClientError,
+  withDeliverableRaceMessage,
+  type UiAction,
+} from "@/lib/streampay-v2";
 import {
   initialTxState,
   isTxBusy,
@@ -13,7 +17,11 @@ import {
 export function useTx() {
   const [state, dispatch] = useReducer(txReducer, initialTxState);
 
-  async function run(label: string, fn: () => Promise<{ signature: string }>): Promise<boolean> {
+  async function run(
+    label: string,
+    fn: () => Promise<{ signature: string }>,
+    action?: UiAction
+  ): Promise<boolean> {
     if (isTxBusy(state.phase)) return false;
     dispatch({ type: "wallet" });
     try {
@@ -23,7 +31,7 @@ export function useTx() {
       dispatch({ type: "success", signature: result.signature });
       return true;
     } catch (err) {
-      const parsed = parseClientError(err);
+      const parsed = withDeliverableRaceMessage(action, parseClientError(err));
       if (parsed.kind === "pending_confirmation") {
         dispatch({
           type: "pending",
