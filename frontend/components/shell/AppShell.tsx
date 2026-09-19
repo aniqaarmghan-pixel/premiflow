@@ -16,6 +16,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { brand } from "@/lib/brand";
 import { BrandMark } from "@/components/brand/BrandMark";
 import { ClientOnly } from "./ClientOnly";
+import { SoundPreference } from "./SoundPreference";
 import { WalletControl } from "./WalletControl";
 
 const NAV = [
@@ -64,8 +65,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             );
           })}
         </nav>
-        <div className="mt-auto rounded-2xl bg-white/5 px-3 py-3 text-[11px] leading-5 text-white/50">
-          Value stays in the contract until work is verified.
+        <div className="mt-auto space-y-3 rounded-2xl bg-white/5 px-3 py-3 text-[11px] leading-5 text-white/50">
+          <p>Value stays in the contract until work is verified.</p>
+          <SoundPreference compact />
         </div>
       </aside>
 
@@ -131,6 +133,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   {item.label}
                 </Link>
               ))}
+              <div className="mt-6 border-t border-white/10 pt-4">
+                <SoundPreference compact />
+              </div>
             </motion.nav>
           </motion.div>
         ) : null}

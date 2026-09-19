@@ -10,6 +10,7 @@ import { PhantomWalletAdapter } from "@solana/wallet-adapter-wallets";
 import { MotionConfig } from "framer-motion";
 
 import { AppShell } from "@/components/shell/AppShell";
+import { NoticeProvider } from "@/components/shell/NoticeProvider";
 import { ContractsProvider } from "@/lib/hooks/ContractsProvider";
 import { RPC_CONNECTION_CONFIG, browserRpcEndpoint } from "@/lib/network";
 
@@ -25,7 +26,9 @@ export default function Providers({ children }: { children: ReactNode }) {
         <WalletProvider wallets={wallets} autoConnect>
           <WalletModalProvider>
             <ContractsProvider>
-              <AppShell>{children}</AppShell>
+              <NoticeProvider>
+                <AppShell>{children}</AppShell>
+              </NoticeProvider>
             </ContractsProvider>
           </WalletModalProvider>
         </WalletProvider>

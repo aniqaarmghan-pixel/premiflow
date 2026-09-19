@@ -300,11 +300,25 @@ test("notice catalog covers the planned lifecycle events", () => {
   assert.equal(noticeKindForAction("openDispute"), "dispute_opened");
   assert.equal(noticeKindForAction("resolveDispute"), "dispute_resolved");
   assert.equal(noticeKindForAction("completeContract"), "contract_completed");
-  assert.match(NOTICE_CATALOG.contract_completed.body, /does not transfer tokens/i);
-  assert.match(NOTICE_CATALOG.withdrawal_completed.body, /left escrow/i);
+  assert.match(NOTICE_CATALOG.contract_completed.body, /did not itself transfer tokens/i);
+  assert.match(NOTICE_CATALOG.withdrawal_completed.body, /transferred to your wallet/i);
+  assert.match(NOTICE_CATALOG.payment_released.body, /Released accounting increased/i);
+  assert.match(NOTICE_CATALOG.contract_cancelled.body, /Tokens move only when withdraw or refund is claimed/i);
+  assert.match(NOTICE_CATALOG.dispute_resolved.body, /Settlement accounting was recorded/i);
   assert.equal(noticeKindForAction("voidStaleRevision"), "expired_revision_ended");
   assert.ok(NOTICE_CATALOG.revision_deadline_passed);
   assert.ok(NOTICE_CATALOG.revised_deliverable_submitted);
+  assert.equal(noticeKindForAction("approveActivation"), "activation_approved");
+  assert.equal(noticeKindForAction("approveWorkUnit"), "work_approved");
+  assert.equal(
+    noticeKindForAction("approveTrialAndActivate"),
+    "trial_approved_and_activated"
+  );
+  assert.equal(noticeKindForAction("cancelActiveContract"), "contract_cancelled");
+  assert.equal(
+    noticeKindForAction("submitWorkUnit", { workUnitStatus: "Revising" }),
+    "revised_deliverable_submitted"
+  );
 });
 
 test("official deliverable label appears for a submittable Fixed unit", () => {

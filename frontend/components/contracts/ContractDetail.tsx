@@ -9,7 +9,6 @@ import { Lifecycle } from "@/components/contracts/Lifecycle";
 import { PaymentProgress } from "@/components/contracts/PaymentProgress";
 import { StatusBadge } from "@/components/contracts/StatusBadge";
 import { StreamShowcase } from "@/components/contracts/StreamShowcase";
-import { SuccessMoment } from "@/components/contracts/SuccessMoment";
 import { ConnectPrompt } from "@/components/shell/ConnectPrompt";
 import { PageFade } from "@/components/shell/PageFade";
 import { Address } from "@/components/ui/Address";
@@ -104,7 +103,6 @@ export function ContractDetail({ address }: { address: string }) {
   const [awardUi, setAwardUi] = useState("");
   const [milestoneAmountUi, setMilestoneAmountUi] = useState("");
   const [milestoneDue, setMilestoneDue] = useState("3600");
-  const [successTitle, setSuccessTitle] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!wallet) return;
@@ -178,8 +176,7 @@ export function ContractDetail({ address }: { address: string }) {
   const other = counterparty(publicKey, contract);
   const settlement = settlementView(contract);
 
-  async function afterSuccess(title: string) {
-    setSuccessTitle(title);
+  async function afterSuccess() {
     await load();
     await refreshList();
   }
@@ -289,10 +286,15 @@ export function ContractDetail({ address }: { address: string }) {
           throw new Error("Unsupported action");
       }
       },
-      action
+      {
+        action,
+        workUnitStatus:
+          unit?.status ??
+          (action === "rejectActivation" ? trial?.status : undefined),
+      }
     );
     setConfirm(null);
-    if (ok) await afterSuccess(successCopy(action));
+    if (ok) await afterSuccess();
     else if (action === "voidStaleRevision" || action === "submitWorkUnit") {
       await load();
       await refreshList();
@@ -581,13 +583,6 @@ export function ContractDetail({ address }: { address: string }) {
           />
         ) : null}
       </Modal>
-
-      <SuccessMoment
-        open={successTitle != null}
-        title={successTitle ?? ""}
-        body="On-chain state will refresh. Explorer links appear with the signature."
-        onClose={() => setSuccessTitle(null)}
-      />
     </PageFade>
   );
 }
@@ -877,24 +872,4 @@ function Row({ label, value }: { label: string; value: ReactNode }) {
       <dd className="min-w-0 text-right text-ink">{value}</dd>
     </div>
   );
-}
-
-function successCopy(action: UiAction): string {
-  switch (action) {
-    case "approveWorkUnit":
-    case "approveTrialAndActivate":
-      return "Approved";
-    case "releaseStreamAccrual":
-      return "Payment released";
-    case "withdrawFreelancer":
-      return "Withdrawal complete";
-    case "completeContract":
-      return "Contract completed";
-    case "claimEmployerRefund":
-      return "Refund claimed";
-    case "voidStaleRevision":
-      return "Expired revision ended";
-    default:
-      return "Transaction confirmed";
-  }
 }

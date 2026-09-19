@@ -170,7 +170,9 @@ export function CreateWizard() {
       draft.paymentMode === "Streaming" ? draft.checkpointInterval : 0;
     const contractId = BigInt(Date.now());
 
-    const ok = await tx.run("Create contract", async () => {
+    const ok = await tx.run(
+      "Create contract",
+      async () => {
       setProgressNote("Creating contract…");
       const created = await client.createContract({
         freelancer,
@@ -207,7 +209,9 @@ export function CreateWizard() {
       }
       setCreatedAddress(created.contract?.toBase58() ?? null);
       return created;
-    });
+    },
+      { suppressNotice: true }
+    );
     setProgressNote(null);
     if (ok) setSuccessOpen(true);
   }
