@@ -6,6 +6,7 @@ import {
   TransactionFailedOnChainError,
 } from "../confirm";
 import { parseClientError } from "../errors";
+import { TransactionExpiredBeforeSubmitError } from "../send";
 import { toCreateContractArgs } from "../instructions";
 import type { CreateContractRequest } from "../types";
 import { RESOLVER, makeContract } from "./fixtures";
@@ -99,6 +100,12 @@ test("error parser maps StreamPayV2Error codes and wallet rejection", () => {
   assert.equal(onChain.kind, "streampay_v2");
   assert.equal(onChain.code, 6111);
   assert.equal(onChain.signature, SIG);
+
+  const expired = parseClientError(
+    new TransactionExpiredBeforeSubmitError("fetchedHash", "signedHash", 0)
+  );
+  assert.equal(expired.kind, "expired_before_submit");
+  assert.match(expired.uiMessage, /expired before submission/i);
 });
 
 test("contract decode converts Anchor BN/enum representation", () => {

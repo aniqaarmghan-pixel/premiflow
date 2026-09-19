@@ -114,7 +114,12 @@ export {
   sendV2Transaction,
   sendV2Method,
   V2_SEND_COMMITMENT,
+  BLOCKHASH_NEAR_EXPIRY_REMAINING,
+  TRANSACTION_EXPIRED_BEFORE_SUBMIT_MESSAGE,
+  TransactionExpiredBeforeSubmitError,
+  recentBlockhashFromSerialized,
 } from "./send";
+export type { BlockhashBoundarySnapshot, LatestBlockhash, V2SendDeps } from "./send";
 export type {
   ConfirmSignatureOutcome,
   ConfirmSignatureOptions,

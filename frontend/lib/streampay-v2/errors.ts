@@ -2,6 +2,7 @@ import {
   TransactionConfirmationUnknownError,
   TransactionFailedOnChainError,
 } from "./confirm";
+import { TransactionExpiredBeforeSubmitError } from "./send";
 
 export type ParsedClientError = {
   kind:
@@ -13,6 +14,7 @@ export type ParsedClientError = {
     | "missing_ata"
     | "simulation"
     | "pending_confirmation"
+    | "expired_before_submit"
     | "unknown";
   code?: number;
   name?: string;
@@ -258,6 +260,15 @@ export function parseClientError(err: unknown): ParsedClientError {
   const parsed = asError(err);
   const raw = [parsed.message, ...(parsed.logs ?? [])].join("\n");
   console.error("[streampay-v2]", err);
+
+  if (err instanceof TransactionExpiredBeforeSubmitError) {
+    return {
+      kind: "expired_before_submit",
+      name: err.name,
+      uiMessage: err.message,
+      raw,
+    };
+  }
 
   if (err instanceof TransactionConfirmationUnknownError) {
     return {
