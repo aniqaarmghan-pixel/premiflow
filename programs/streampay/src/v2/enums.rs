@@ -11,10 +11,11 @@ use anchor_lang::prelude::*;
 
 /// How compensation is structured and released.
 ///
-/// The three modes are mutually exclusive: a streaming contract never has
-/// milestones, and a milestone/fixed contract never has checkpoints. That
-/// exclusivity is what lets a single `WorkUnit` type and a single index space
-/// serve all three.
+/// Existing modes are mutually exclusive: a streaming contract never has
+/// milestones, and a milestone/fixed contract never has checkpoints. Hourly
+/// is appended as discriminant 3 and uses its own `HourlyState` /
+/// `HourlySession` PDAs, not WorkUnits. H1 does not implement Hourly
+/// instructions; existing handlers must reject it explicitly.
 #[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Clone, Copy, PartialEq, Eq, Debug)]
 pub enum PaymentMode {
     /// Compensation accrues continuously with time. Phase 6 materializes
@@ -27,10 +28,15 @@ pub enum PaymentMode {
     /// `create_contract` as a single `WorkUnit` of kind `Fixed` at index 0,
     /// amount equal to `main_amount`.
     Fixed,
+    /// Pay for recorded work sessions at an agreed hourly rate.
+    /// Discriminant 3; Streaming/Milestone/Fixed keep 0/1/2.
+    /// H1 architecture only — no live create/start/stop path yet.
+    Hourly,
 }
 
 impl PaymentMode {
     /// Whether this mode derives work units from elapsed time.
+    /// Hourly is session-based, not a wall-clock stream.
     pub fn uses_checkpoints(&self) -> bool {
         matches!(self, Self::Streaming)
     }
@@ -231,6 +237,18 @@ impl WorkUnitStatus {
     }
 }
 
+/// Lifecycle of one Hourly work session. H1 defines the states only;
+/// Start/Stop instructions that transition them belong to H2.
+#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum HourlySessionStatus {
+    /// Freelancer has started; Clock is the start authority. Not yet paid.
+    Open,
+    /// Freelancer stopped; duration and cumulative earnings are recorded.
+    Recorded,
+    /// Abandoned or voided without pay (cancel/dispute of an open session).
+    Void,
+}
+
 /// Why a work unit's amount became released.
 ///
 /// A typed "not yet" variant rather than a sentinel value; only meaningful
@@ -248,7 +266,8 @@ pub enum ReleaseTrigger {
 #[cfg(test)]
 mod tests {
     use super::{
-        ContractStatus, DisputeParty, PaymentMode, ReleaseTrigger, StartMode, WorkUnitKind,
+        ContractStatus, DisputeParty, HourlySessionStatus, PaymentMode, ReleaseTrigger, StartMode,
+        WorkUnitKind,
         WorkUnitStatus,
     };
     use anchor_lang::AnchorSerialize;
@@ -282,6 +301,11 @@ mod tests {
         assert_eq!(disc(PaymentMode::Streaming), 0);
         assert_eq!(disc(PaymentMode::Milestone), 1);
         assert_eq!(disc(PaymentMode::Fixed), 2);
+        assert_eq!(disc(PaymentMode::Hourly), 3);
+
+        assert_eq!(disc(HourlySessionStatus::Open), 0);
+        assert_eq!(disc(HourlySessionStatus::Recorded), 1);
+        assert_eq!(disc(HourlySessionStatus::Void), 2);
 
         assert_eq!(disc(StartMode::OnActivation), 0);
         assert_eq!(disc(StartMode::Scheduled), 1);
@@ -304,5 +328,15 @@ mod tests {
         assert_eq!(disc(DisputeParty::None), 0);
         assert_eq!(disc(DisputeParty::Employer), 1);
         assert_eq!(disc(DisputeParty::Freelancer), 2);
+    }
+
+    #[test]
+    fn hourly_is_not_a_stream_or_allocation_mode() {
+        assert!(!PaymentMode::Hourly.uses_checkpoints());
+        assert!(!PaymentMode::Hourly.requires_allocation());
+        assert!(PaymentMode::Streaming.uses_checkpoints());
+        assert!(PaymentMode::Fixed.requires_allocation());
+        assert!(PaymentMode::Milestone.requires_allocation());
+        assert!(!PaymentMode::Streaming.requires_allocation());
     }
 }

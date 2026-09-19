@@ -4,6 +4,8 @@ export {
   CONTRACT_ESCROW_SEED,
   WORK_UNIT_SEED,
   TRIAL_UNIT_SEED,
+  HOURLY_STATE_SEED,
+  HOURLY_SESSION_SEED,
   CONTRACT_ACCOUNT,
   WORK_UNIT_ACCOUNT,
 } from "./constants";
@@ -15,6 +17,8 @@ export {
   deriveFixedWorkUnitPda,
   deriveMilestoneWorkUnitPda,
   deriveTrialWorkUnitPda,
+  deriveHourlyStatePda,
+  deriveHourlySessionPda,
   deriveContractAddresses,
 } from "./pda";
 export type { Pda } from "./pda";

@@ -23,6 +23,19 @@ pub const WORK_UNIT_SEED: &[u8] = b"work_unit";
 /// checkpoint units, which are indexed under `WORK_UNIT_SEED`.
 pub const TRIAL_UNIT_SEED: &[u8] = b"trial_unit";
 
+/// Seed prefix for the Hourly-only labor-clock account.
+/// Full seeds: `[HOURLY_STATE_SEED, contract]`
+///
+/// Disjoint from `work_unit` / `trial_unit` so existing contracts never
+/// collide with Hourly state.
+pub const HOURLY_STATE_SEED: &[u8] = b"hourly_state";
+
+/// Seed prefix for one Hourly work session.
+/// Full seeds: `[HOURLY_SESSION_SEED, contract, session_index.to_le_bytes()]`
+///
+/// `session_index` is a little-endian `u32`, same width as `WorkUnit::index`.
+pub const HOURLY_SESSION_SEED: &[u8] = b"hourly_session";
+
 /// Current on-chain layout version written to `Contract::version` and
 /// `WorkUnit::version`. Bump only on a layout change.
 pub const V2_LAYOUT_VERSION: u8 = 1;
@@ -99,6 +112,21 @@ pub const MIN_ACTIVATION_REVIEW: i64 = 60;
 /// this cap is what makes that wait finite.
 pub const MAX_ACTIVATION_REVIEW: i64 = 86_400;
 
+/// Upper bound on Hourly session PDAs per contract. Same order as
+/// `MAX_MILESTONES`: enough for a real engagement, bounded rent.
+pub const MAX_HOURLY_SESSIONS: u32 = 64;
+
+/// Shortest Hourly session H2 will accept (1 minute). Anti-spam; not a
+/// billing floor for Collect.
+pub const MIN_HOURLY_SESSION_SECONDS: u64 = 60;
+
+/// Longest single Hourly session (8 hours). Forgotten-timer safety guard.
+/// Enforcement belongs to H2 Start/Stop.
+pub const MAX_HOURLY_SESSION_SECONDS: u64 = 8 * 60 * 60;
+
+/// `HourlyState::active_session_index` when no session is open.
+pub const HOURLY_NO_ACTIVE_SESSION: u32 = u32::MAX;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,9 +137,15 @@ mod tests {
         assert_eq!(CONTRACT_ESCROW_SEED, b"contract_escrow");
         assert_eq!(WORK_UNIT_SEED, b"work_unit");
         assert_eq!(TRIAL_UNIT_SEED, b"trial_unit");
+        assert_eq!(HOURLY_STATE_SEED, b"hourly_state");
+        assert_eq!(HOURLY_SESSION_SEED, b"hourly_session");
         assert_eq!(V2_LAYOUT_VERSION, 1);
         assert_eq!(MAX_URI_LEN, 200);
         assert_eq!(MAX_MILESTONES, 64);
+        assert_eq!(MAX_HOURLY_SESSIONS, 64);
+        assert_eq!(MIN_HOURLY_SESSION_SECONDS, 60);
+        assert_eq!(MAX_HOURLY_SESSION_SECONDS, 28_800);
+        assert_eq!(HOURLY_NO_ACTIVE_SESSION, u32::MAX);
         assert_eq!(MAX_CHECKPOINTS, 1024);
         assert_eq!(MAX_REVISIONS_LIMIT, 5);
         assert_eq!(MIN_DURATION_SECONDS, 60);

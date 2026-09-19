@@ -6,7 +6,7 @@
 use anchor_lang::prelude::*;
 
 use crate::v2::constants::{CONTRACT_SEED, TRIAL_UNIT_SEED};
-use crate::v2::enums::{ContractStatus, ReleaseTrigger, WorkUnitKind, WorkUnitStatus};
+use crate::v2::enums::{ContractStatus, PaymentMode, ReleaseTrigger, WorkUnitKind, WorkUnitStatus};
 use crate::v2::errors::StreamPayV2Error;
 use crate::v2::events::{ContractActivated, TrialApproved};
 use crate::v2::state::{Contract, WorkUnit};
@@ -46,6 +46,10 @@ pub fn handle_approve_trial_and_activate(ctx: Context<ApproveTrialAndActivate>) 
     require!(
         contract.status == ContractStatus::PendingEmployerApproval,
         StreamPayV2Error::InvalidState
+    );
+    require!(
+        contract.payment_mode != PaymentMode::Hourly,
+        StreamPayV2Error::InvalidPaymentMode
     );
     require!(contract.has_trial(), StreamPayV2Error::TrialNotConfigured);
     require!(

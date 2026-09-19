@@ -4,6 +4,8 @@ import { u32ToLeBytes, u64ToLeBytes } from "./bytes";
 import {
   CONTRACT_ESCROW_SEED,
   CONTRACT_SEED,
+  HOURLY_SESSION_SEED,
+  HOURLY_STATE_SEED,
   STREAMPAY_PROGRAM_ID,
   TRIAL_UNIT_SEED,
   WORK_UNIT_SEED,
@@ -76,6 +78,26 @@ export function deriveTrialWorkUnitPda(
   programId: PublicKey = STREAMPAY_PROGRAM_ID
 ): Pda {
   return findPda([TRIAL_UNIT_SEED, contract.toBuffer()], programId);
+}
+
+/** Hourly labor-clock PDA: `[hourly_state, contract]`. */
+export function deriveHourlyStatePda(
+  contract: PublicKey,
+  programId: PublicKey = STREAMPAY_PROGRAM_ID
+): Pda {
+  return findPda([HOURLY_STATE_SEED, contract.toBuffer()], programId);
+}
+
+/** Hourly session PDA: `[hourly_session, contract, index_le]`. */
+export function deriveHourlySessionPda(
+  contract: PublicKey,
+  sessionIndex: number,
+  programId: PublicKey = STREAMPAY_PROGRAM_ID
+): Pda {
+  return findPda(
+    [HOURLY_SESSION_SEED, contract.toBuffer(), u32ToLeBytes(sessionIndex)],
+    programId
+  );
 }
 
 export function deriveContractAddresses(

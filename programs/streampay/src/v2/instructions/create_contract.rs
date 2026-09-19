@@ -277,6 +277,9 @@ impl CreateContractArgs {
 
             // Terms incomplete until milestones are defined and finalized.
             PaymentMode::Milestone => Ok((ContractStatus::Draft, 0)),
+
+            // H1: Hourly create args/state wiring belongs to H2.
+            PaymentMode::Hourly => Err(StreamPayV2Error::InvalidPaymentMode.into()),
         }
     }
 }
@@ -561,4 +564,51 @@ pub fn handle_create_contract(
     });
 
     Ok(())
+}
+
+#[cfg(test)]
+mod hourly_h1_create {
+    use super::{CreateContractArgs, PaymentMode, StartMode};
+    use anchor_lang::prelude::Pubkey;
+
+    fn valid_non_hourly(mode: PaymentMode) -> CreateContractArgs {
+        CreateContractArgs {
+            contract_id: 1,
+            payment_mode: mode,
+            start_mode: StartMode::OnActivation,
+            total_amount: 100,
+            acceptance_deadline: 10_000,
+            scheduled_start_time: 0,
+            duration_seconds: 3_600,
+            checkpoint_interval: if mode == PaymentMode::Streaming { 600 } else { 0 },
+            review_duration: 60,
+            activation_review_duration: 120,
+            max_revisions: 1,
+            trial_amount: 0,
+            resolver: Pubkey::new_from_array([2u8; 32]),
+            metadata_uri: "https://example.test/meta".into(),
+            metadata_hash: [3u8; 32],
+        }
+    }
+
+    #[test]
+    fn hourly_create_args_are_rejected_in_h1() {
+        assert!(
+            valid_non_hourly(PaymentMode::Hourly).resolve(1_000).is_err(),
+            "Hourly create is H2"
+        );
+    }
+
+    #[test]
+    fn existing_modes_still_resolve() {
+        valid_non_hourly(PaymentMode::Fixed)
+            .resolve(1_000)
+            .expect("Fixed create remains valid");
+        valid_non_hourly(PaymentMode::Milestone)
+            .resolve(1_000)
+            .expect("Milestone create remains valid");
+        valid_non_hourly(PaymentMode::Streaming)
+            .resolve(1_000)
+            .expect("Streaming create remains valid");
+    }
 }

@@ -31,6 +31,12 @@ export const WORK_UNIT_SEED = new TextEncoder().encode("work_unit");
 /** Rust `TRIAL_UNIT_SEED` = b"trial_unit" */
 export const TRIAL_UNIT_SEED = new TextEncoder().encode("trial_unit");
 
+/** Rust `HOURLY_STATE_SEED` = b"hourly_state" */
+export const HOURLY_STATE_SEED = new TextEncoder().encode("hourly_state");
+
+/** Rust `HOURLY_SESSION_SEED` = b"hourly_session" */
+export const HOURLY_SESSION_SEED = new TextEncoder().encode("hourly_session");
+
 export const V2_LAYOUT_VERSION = 1;
 export const MAX_URI_LEN = 200;
 export const MAX_MILESTONES = 64;
@@ -43,6 +49,10 @@ export const MIN_REVIEW_DURATION = 10;
 export const MAX_REVIEW_DURATION = 2_592_000;
 export const MIN_ACTIVATION_REVIEW = 60;
 export const MAX_ACTIVATION_REVIEW = 86_400;
+export const MAX_HOURLY_SESSIONS = 64;
+export const MIN_HOURLY_SESSION_SECONDS = 60;
+export const MAX_HOURLY_SESSION_SECONDS = 8 * 60 * 60;
+export const HOURLY_NO_ACTIVE_SESSION = 0xffff_ffff;
 
 /**
  * Contract account memcmp offsets after the 8-byte Anchor discriminator.

@@ -347,6 +347,10 @@ impl Contract {
             self.open_review_count == 0,
             StreamPayV2Error::OpenReviewBlocksCancel
         );
+        require!(
+            self.payment_mode != PaymentMode::Hourly,
+            StreamPayV2Error::InvalidPaymentMode
+        );
 
         if self.payment_mode.uses_checkpoints() {
             self.materialize_stream_at(now)?;
@@ -421,6 +425,10 @@ impl Contract {
             }
             _ => return Err(StreamPayV2Error::DisputeNotAllowed.into()),
         }
+        require!(
+            self.payment_mode != PaymentMode::Hourly,
+            StreamPayV2Error::InvalidPaymentMode
+        );
 
         if self.payment_mode.uses_checkpoints() && self.status == ContractStatus::Active {
             self.materialize_stream_at(now)?;
@@ -562,6 +570,7 @@ impl Contract {
                     StreamPayV2Error::UnresolvedWorkRemaining
                 );
             }
+            PaymentMode::Hourly => return Err(StreamPayV2Error::InvalidPaymentMode.into()),
         }
 
         self.assert_live_invariants()?;

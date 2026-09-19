@@ -53,7 +53,9 @@ pub fn handle_finalize_terms(ctx: Context<FinalizeTerms>) -> Result<()> {
     match contract.payment_mode {
         PaymentMode::Milestone => {}
         PaymentMode::Streaming => return Err(StreamPayV2Error::StreamingHasNoMilestones.into()),
-        PaymentMode::Fixed => return Err(StreamPayV2Error::InvalidPaymentMode.into()),
+        PaymentMode::Fixed | PaymentMode::Hourly => {
+            return Err(StreamPayV2Error::InvalidPaymentMode.into())
+        }
     }
 
     // Only a draft can be finalized, which is also what makes re-finalization

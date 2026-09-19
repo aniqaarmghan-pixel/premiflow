@@ -12,6 +12,7 @@ pub mod constants;
 pub mod enums;
 pub mod errors;
 pub mod events;
+pub mod hourly;
 pub mod instructions;
 pub mod state;
 
@@ -19,5 +20,6 @@ pub use constants::*;
 pub use enums::*;
 pub use errors::*;
 pub use events::*;
+pub use hourly::*;
 pub use instructions::*;
 pub use state::*;

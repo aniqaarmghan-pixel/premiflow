@@ -55,7 +55,9 @@ pub fn handle_finalize_review_timeout(ctx: Context<FinalizeReviewTimeout>) -> Re
     );
     match contract.payment_mode {
         PaymentMode::Milestone | PaymentMode::Fixed => {}
-        PaymentMode::Streaming => return Err(StreamPayV2Error::InvalidPaymentMode.into()),
+        PaymentMode::Streaming | PaymentMode::Hourly => {
+            return Err(StreamPayV2Error::InvalidPaymentMode.into())
+        }
     }
     work_unit.require_main_deliverable()?;
     require!(

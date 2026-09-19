@@ -7,6 +7,11 @@ import {
   CANONICAL_PROGRAM_ID,
   CONTRACT_ESCROW_SEED,
   CONTRACT_SEED,
+  HOURLY_SESSION_SEED,
+  HOURLY_STATE_SEED,
+  MAX_HOURLY_SESSION_SECONDS,
+  MAX_HOURLY_SESSIONS,
+  MIN_HOURLY_SESSION_SECONDS,
   STREAMPAY_PROGRAM_ID,
   TRIAL_UNIT_SEED,
   WORK_UNIT_SEED,
@@ -15,6 +20,8 @@ import {
   deriveContractEscrowPda,
   deriveContractPda,
   deriveFixedWorkUnitPda,
+  deriveHourlySessionPda,
+  deriveHourlyStatePda,
   deriveMilestoneWorkUnitPda,
   deriveTrialWorkUnitPda,
   deriveWorkUnitPda,
@@ -103,6 +110,42 @@ test("same contract ID for different employer/freelancer pair derives differentl
   assert.notEqual(a.address.toBase58(), b.address.toBase58());
   assert.notEqual(a.address.toBase58(), c.address.toBase58());
   assert.notEqual(b.address.toBase58(), c.address.toBase58());
+});
+
+test("HourlyState PDA matches Rust seed layout [hourly_state, contract]", () => {
+  const contract = deriveContractPda(EMPLOYER, FREELANCER, 11n).address;
+  const expected = rustPda([HOURLY_STATE_SEED, contract.toBuffer()]);
+  const actual = deriveHourlyStatePda(contract);
+  assert.equal(actual.address.toBase58(), expected.address.toBase58());
+  assert.equal(actual.bump, expected.bump);
+  assert.notEqual(actual.address.toBase58(), deriveTrialWorkUnitPda(contract).address.toBase58());
+});
+
+test("HourlySession PDA differs by little-endian session index", () => {
+  const contract = deriveContractPda(EMPLOYER, FREELANCER, 12n).address;
+  const zero = rustPda([
+    HOURLY_SESSION_SEED,
+    contract.toBuffer(),
+    u32ToLeBytes(0),
+  ]);
+  const one = rustPda([
+    HOURLY_SESSION_SEED,
+    contract.toBuffer(),
+    u32ToLeBytes(1),
+  ]);
+  assert.equal(deriveHourlySessionPda(contract, 0).address.toBase58(), zero.address.toBase58());
+  assert.equal(deriveHourlySessionPda(contract, 1).address.toBase58(), one.address.toBase58());
+  assert.notEqual(zero.address.toBase58(), one.address.toBase58());
+  assert.notEqual(
+    deriveHourlyStatePda(contract).address.toBase58(),
+    zero.address.toBase58()
+  );
+});
+
+test("Hourly architecture constants match the V1 protocol bounds", () => {
+  assert.equal(MAX_HOURLY_SESSIONS, 64);
+  assert.equal(MIN_HOURLY_SESSION_SECONDS, 60);
+  assert.equal(MAX_HOURLY_SESSION_SECONDS, 28_800);
 });
 
 test("hardcoded Rust/web3 test vector for contract id 1", () => {
