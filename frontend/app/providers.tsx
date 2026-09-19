@@ -11,17 +11,17 @@ import { MotionConfig } from "framer-motion";
 
 import { AppShell } from "@/components/shell/AppShell";
 import { ContractsProvider } from "@/lib/hooks/ContractsProvider";
-import { NETWORK } from "@/lib/network";
+import { RPC_CONNECTION_CONFIG, browserRpcEndpoint } from "@/lib/network";
 
 import "@solana/wallet-adapter-react-ui/styles.css";
 
 export default function Providers({ children }: { children: ReactNode }) {
-  const endpoint = useMemo(() => NETWORK.endpoint, []);
+  const endpoint = useMemo(() => browserRpcEndpoint(), []);
   const wallets = useMemo(() => [new PhantomWalletAdapter()], []);
 
   return (
     <MotionConfig reducedMotion="user">
-      <ConnectionProvider endpoint={endpoint}>
+      <ConnectionProvider endpoint={endpoint} config={RPC_CONNECTION_CONFIG}>
         <WalletProvider wallets={wallets} autoConnect>
           <WalletModalProvider>
             <ContractsProvider>
