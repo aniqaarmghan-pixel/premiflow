@@ -15,17 +15,15 @@ import { TransactionStatus } from "@/components/ui/TransactionStatus";
 import { localMetadataStore } from "@/lib/app/local-metadata";
 import { formatTokenAmount } from "@/lib/app/money";
 import {
-  defaultPaymentToken,
-  defaultResolver,
+  lockedCreatePayment,
   paymentTokenLabel,
-  resolverLabel,
-  SUPPORTED_PAYMENT_TOKENS,
 } from "@/lib/app/premiflow";
 import {
   typeBlurb,
   presentType,
 } from "@/lib/app/view-model";
 import {
+  applyCreateDraftPatch,
   defaultCreateDraft,
   parsePubkey,
   validateCreateDraft,
@@ -53,7 +51,6 @@ const STEPS = [
   "Work",
   "Trial",
   "Schedule",
-  "Dispute",
   "Review",
 ] as const;
 
@@ -93,26 +90,11 @@ export function CreateWizard() {
       : null;
 
   function patch(partial: Partial<CreateWizardDraft>) {
-    setDraft((prev) => ({ ...prev, ...partial }));
+    setDraft((prev) => applyCreateDraftPatch(prev, partial));
   }
 
   useEffect(() => {
-    const token = defaultPaymentToken();
-    const resolver = defaultResolver();
-    setDraft((prev) => {
-      const next = { ...prev };
-      let changed = false;
-      if (!next.mint) {
-        next.mint = token.mint.toBase58();
-        next.decimals = token.decimals;
-        changed = true;
-      }
-      if (!next.resolver) {
-        next.resolver = resolver.address.toBase58();
-        changed = true;
-      }
-      return changed ? next : prev;
-    });
+    setDraft((prev) => applyCreateDraftPatch(prev, {}));
   }, []);
 
   useEffect(() => {
@@ -122,7 +104,7 @@ export function CreateWizard() {
         setTokenBalanceUi(null);
         return;
       }
-      const token = defaultPaymentToken();
+      const token = lockedCreatePayment().token;
       try {
         const ata = deriveEmployerSourceAta(publicKey, token.mint);
         const account = await getAccount(connection, ata);
@@ -143,11 +125,18 @@ export function CreateWizard() {
     if (!publicKey || !client) return;
     if (Object.keys(errors).length > 0) return;
     const freelancer = parsePubkey(draft.freelancer, "Freelancer");
-    const resolver = parsePubkey(draft.resolver, "Resolver");
-    const mint = parsePubkey(draft.mint, "Mint");
-    const totalAmount = uiAmountToBaseUnits(draft.totalAmountUi, draft.decimals);
+    let payment;
+    try {
+      payment = lockedCreatePayment();
+    } catch (err) {
+      setProgressNote(
+        err instanceof Error ? err.message : "PREMIFLOW payment configuration is missing."
+      );
+      return;
+    }
+    const totalAmount = uiAmountToBaseUnits(draft.totalAmountUi, payment.decimals);
     const trialAmount = draft.trialEnabled
-      ? uiAmountToBaseUnits(draft.trialAmountUi, draft.decimals)
+      ? uiAmountToBaseUnits(draft.trialAmountUi, payment.decimals)
       : 0n;
     const metadata = {
       ...emptyMetadata(),
@@ -176,7 +165,7 @@ export function CreateWizard() {
       setProgressNote("Creating contract…");
       const created = await client.createContract({
         freelancer,
-        tokenMint: mint,
+        tokenMint: payment.mint,
         request: {
           contractId,
           paymentMode: draft.paymentMode,
@@ -190,7 +179,7 @@ export function CreateWizard() {
           activationReviewDuration: draft.activationReviewDuration,
           maxRevisions: draft.maxRevisions,
           trialAmount,
-          resolver,
+          resolver: payment.resolver.address,
           metadataUri: stored.uri,
           metadataHash: stored.hash,
         },
@@ -200,7 +189,7 @@ export function CreateWizard() {
           setProgressNote(`Adding milestone ${i + 1} of ${draft.milestones.length}…`);
           await client.addMilestone({
             contract: created.contract,
-            amount: uiAmountToBaseUnits(milestone.amountUi, draft.decimals),
+            amount: uiAmountToBaseUnits(milestone.amountUi, payment.decimals),
             dueOffsetSeconds: milestone.dueOffsetSeconds,
           });
         }
@@ -275,48 +264,17 @@ export function CreateWizard() {
             ) : null}
             {step === 2 ? (
               <div className="space-y-4">
-                <Field
-                  label="Payment token"
-                  error={errors.mint}
-                  hint="PREMIFLOW selects the supported Devnet test token. You do not need a mint address."
-                >
-                  <div className="space-y-2">
-                    {SUPPORTED_PAYMENT_TOKENS.map((token) => {
-                      const selected = draft.mint === token.mint.toBase58();
-                      return (
-                        <button
-                          key={token.id}
-                          type="button"
-                          onClick={() =>
-                            patch({ mint: token.mint.toBase58(), decimals: token.decimals })
-                          }
-                          className={`w-full rounded-2xl border px-4 py-3 text-left ${
-                            selected
-                              ? "border-accent bg-accent-soft"
-                              : "border-line bg-card"
-                          }`}
-                        >
-                          <p className="font-medium text-ink">{token.name}</p>
-                          <p className="mt-1 text-xs text-ink-faint">
-                            {token.symbol} · {token.cluster}
-                            {token.testToken ? " test token" : ""}
-                            {selected && tokenBalanceUi != null
-                              ? ` · wallet balance ${tokenBalanceUi}`
-                              : ""}
-                          </p>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </Field>
-                <details className="rounded-2xl border border-line bg-card px-4 py-3 text-sm">
-                  <summary className="cursor-pointer font-medium text-ink-soft">
-                    Advanced token details
-                  </summary>
-                  <div className="mt-3">
-                    <Address value={draft.mint} label="Mint" />
-                  </div>
-                </details>
+                <div className="rounded-2xl border border-line bg-card px-4 py-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                    Payment token
+                  </p>
+                  <p className="mt-1 font-medium text-ink">{paymentTokenLabel(draft.mint)}</p>
+                  <p className="mt-1 text-xs text-ink-faint">
+                    Configured automatically for this Devnet version
+                    {tokenBalanceUi != null ? ` · wallet balance ${tokenBalanceUi}` : ""}.
+                  </p>
+                  {errors.mint ? <p className="mt-2 text-xs text-danger">{errors.mint}</p> : null}
+                </div>
                 <Field label="Total funded amount" error={errors.totalAmountUi} hint="Includes any paid trial.">
                   <Input
                     value={draft.totalAmountUi}
@@ -473,34 +431,6 @@ export function CreateWizard() {
               </div>
             ) : null}
             {step === 6 ? (
-              <div className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-ink">Dispute resolution</p>
-                  <p className="mt-1 text-sm text-ink-soft">
-                    PREMIFLOW Resolver is used only if a dispute needs an independent
-                    resolution. It is configured automatically.
-                  </p>
-                </div>
-                <div className="rounded-2xl border border-accent bg-accent-soft px-4 py-3">
-                  <p className="font-medium text-ink">{resolverLabel(draft.resolver)}</p>
-                  <p className="mt-1 text-xs text-ink-faint">
-                    Selected automatically for this Devnet version.
-                  </p>
-                </div>
-                {errors.resolver ? (
-                  <p className="text-xs text-danger">{errors.resolver}</p>
-                ) : null}
-                <details className="rounded-2xl border border-line bg-card px-4 py-3 text-sm">
-                  <summary className="cursor-pointer font-medium text-ink-soft">
-                    Advanced details
-                  </summary>
-                  <div className="mt-3">
-                    <Address value={draft.resolver} label="Resolver" />
-                  </div>
-                </details>
-              </div>
-            ) : null}
-            {step === 7 ? (
               <ReviewPanel
                 draft={draft}
                 errors={errors}
@@ -727,19 +657,29 @@ function ReviewPanel({
         milestone and lock terms in follow-up signatures.
       </p>
       <ul className="mt-4 space-y-2 text-sm">
-        <li>Type: {presentType(draft.paymentMode)}</li>
-        <li>Title: {draft.title || "—"}</li>
-        <li>Freelancer: {draft.freelancer || "—"}</li>
-        <li>Payment token: {paymentTokenLabel(draft.mint)}</li>
-        <li>Resolver: {resolverLabel(draft.resolver)}</li>
-        <li>Total: {draft.totalAmountUi || "—"}</li>
+        <li>Worker: {draft.freelancer || "—"}</li>
+        <li>Payment type: {presentType(draft.paymentMode)}</li>
+        <li>Token: {paymentTokenLabel(draft.mint)}</li>
+        <li>Amount: {draft.totalAmountUi || "—"}</li>
         <li>Main: {formatTokenAmount(mainAmount, draft.decimals)}</li>
         <li>Trial: {draft.trialEnabled ? formatTokenAmount(trialAmount, draft.decimals) : "None"}</li>
+        <li>Title: {draft.title || "—"}</li>
         <li>Start: {draft.startMode}</li>
+        <li>Duration: {draft.durationSeconds}s</li>
+        <li>Review window: {draft.reviewDuration}s</li>
+        <li>Revisions: {draft.maxRevisions}</li>
+        <li>
+          Deliverables:{" "}
+          {draft.paymentMode === "Milestone"
+            ? `${draft.milestones.length} milestone${draft.milestones.length === 1 ? "" : "s"}`
+            : draft.deliverables.trim()
+              ? draft.deliverables.split("\n").filter((line) => line.trim()).length
+              : "—"}
+        </li>
       </ul>
       <details className="mt-4 rounded-2xl border border-line bg-paper px-4 py-3 text-sm">
         <summary className="cursor-pointer font-medium text-ink-soft">
-          Advanced addresses
+          Advanced contract details
         </summary>
         <div className="mt-3 space-y-2">
           <Address value={draft.mint} label="Mint" />
@@ -787,6 +727,5 @@ function stepReady(
       !errors.checkpointInterval
     );
   }
-  if (step === 6) return !errors.resolver;
   return Object.keys(errors).length === 0;
 }

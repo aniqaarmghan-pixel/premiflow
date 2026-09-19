@@ -3,10 +3,8 @@ import { PublicKey } from "@solana/web3.js";
 import { toDatetimeLocalValue } from "@/lib/app/datetime";
 import {
   assertResolverDistinct,
-  defaultPaymentToken,
-  defaultResolver,
-  findPaymentToken,
   findResolver,
+  lockedCreatePayment,
 } from "@/lib/app/premiflow";
 import {
   uiAmountToBaseUnits,
@@ -55,15 +53,32 @@ export type CreateWizardDraft = {
   milestones: MilestoneDraft[];
 };
 
-export function defaultCreateDraft(): CreateWizardDraft {
-  const token = defaultPaymentToken();
-  const resolver = defaultResolver();
+export function withLockedCreatePayment(draft: CreateWizardDraft): CreateWizardDraft {
+  const locked = lockedCreatePayment();
   return {
+    ...draft,
+    mint: locked.mint.toBase58(),
+    resolver: locked.resolver.address.toBase58(),
+    decimals: locked.decimals,
+  };
+}
+
+/** Mint, resolver, and decimals come from trusted config, never from the form. */
+export function applyCreateDraftPatch(
+  prev: CreateWizardDraft,
+  partial: Partial<CreateWizardDraft>
+): CreateWizardDraft {
+  const { mint: _mint, resolver: _resolver, decimals: _decimals, ...unlocked } = partial;
+  return withLockedCreatePayment({ ...prev, ...unlocked });
+}
+
+export function defaultCreateDraft(): CreateWizardDraft {
+  return withLockedCreatePayment({
     paymentMode: "Fixed",
     freelancer: "",
-    resolver: resolver.address.toBase58(),
-    mint: token.mint.toBase58(),
-    decimals: token.decimals,
+    resolver: "",
+    mint: "",
+    decimals: 0,
     totalAmountUi: "",
     trialEnabled: false,
     trialAmountUi: "",
@@ -81,7 +96,7 @@ export function defaultCreateDraft(): CreateWizardDraft {
     milestones: [
       { label: "Milestone 1", amountUi: "", dueOffsetSeconds: 43_200 },
     ],
-  };
+  });
 }
 
 export type FieldErrors = Record<string, string>;
@@ -229,13 +244,21 @@ export function validateCreateDraft(
   nowSeconds: number
 ): FieldErrors {
   const errors = validateParties(employer, draft.freelancer, draft.resolver);
-  if (!tryParsePubkey(draft.mint) || !findPaymentToken(draft.mint)) {
-    errors.mint = "Select a supported PREMIFLOW payment token.";
-  } else {
-    const token = findPaymentToken(draft.mint);
-    if (token && draft.decimals !== token.decimals) {
-      errors.decimals = "Mint decimals must match the selected PREMIFLOW token.";
+  try {
+    const locked = lockedCreatePayment();
+    if (draft.mint !== locked.mint.toBase58()) {
+      errors.mint = "Payment token is configured by PREMIFLOW and cannot be changed.";
     }
+    if (draft.decimals !== locked.decimals) {
+      errors.decimals = "Mint decimals must match the configured PREMIFLOW token.";
+    }
+    if (draft.resolver !== locked.resolver.address.toBase58()) {
+      errors.resolver = "Resolver is configured by PREMIFLOW and cannot be changed.";
+    }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "PREMIFLOW payment configuration is missing.";
+    if (!errors.mint) errors.mint = message;
+    if (!errors.resolver) errors.resolver = message;
   }
   if (!Number.isInteger(draft.decimals) || draft.decimals < 0 || draft.decimals > 18) {
     errors.decimals = "Mint decimals must be between 0 and 18.";

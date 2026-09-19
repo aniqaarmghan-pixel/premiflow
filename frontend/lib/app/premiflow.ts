@@ -1,10 +1,21 @@
-import { PublicKey } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
+
+import { STREAMPAY_PROGRAM_ID } from "@/lib/streampay-v2/constants";
 
 /** Devnet test mint already used by the live PREMIFLOW Fixed contract. */
 const TEST_TOKEN_MINT = "9JTBN7QLcoam7LkN44YDhtMQsYt4zKLW7KUE4FscgZtx";
 
 /** Devnet resolver already bound on the live PREMIFLOW Fixed contract. */
 const DEFAULT_RESOLVER = "BiSDjVKLTHm4nLVCtpaibahpoqF4nXLsZ8iBBUr3nKaF";
+
+const PLACEHOLDER_PUBKEYS = [
+  PublicKey.default,
+  SystemProgram.programId,
+  TOKEN_PROGRAM_ID,
+  SYSVAR_RENT_PUBKEY,
+  STREAMPAY_PROGRAM_ID,
+] as const;
 
 export type SupportedPaymentToken = {
   id: string;
@@ -22,20 +33,25 @@ export type SupportedResolver = {
   address: PublicKey;
 };
 
-function requirePubkey(raw: string, label: string): PublicKey {
-  try {
-    const key = new PublicKey(raw);
-    if (key.equals(PublicKey.default)) {
-      throw new Error(`${label} cannot be the default public key`);
-    }
-    return key;
-  } catch (err) {
-    throw new Error(
-      `${label} is not a valid Solana public key: ${
-        err instanceof Error ? err.message : String(err)
-      }`
-    );
+export function parseTrustedCreatePubkey(raw: string | null | undefined, label: string): PublicKey {
+  const trimmed = raw?.trim() ?? "";
+  if (!trimmed) {
+    throw new Error(`${label} is not configured.`);
   }
+  let key: PublicKey;
+  try {
+    key = new PublicKey(trimmed);
+  } catch {
+    throw new Error(`${label} is not a valid Solana public key.`);
+  }
+  if (PLACEHOLDER_PUBKEYS.some((placeholder) => key.equals(placeholder))) {
+    throw new Error(`${label} cannot be a placeholder program or system address.`);
+  }
+  return key;
+}
+
+function requirePubkey(raw: string, label: string): PublicKey {
+  return parseTrustedCreatePubkey(raw, label);
 }
 
 export const PREMIFLOW_TEST_TOKEN: SupportedPaymentToken = {
@@ -62,16 +78,51 @@ export const SUPPORTED_RESOLVERS: readonly SupportedResolver[] = [
   PREMIFLOW_RESOLVER,
 ];
 
-export function defaultPaymentToken(): SupportedPaymentToken {
-  const token = SUPPORTED_PAYMENT_TOKENS[0];
-  if (!token) throw new Error("No PREMIFLOW payment token is configured");
+export function defaultPaymentToken(
+  tokens: readonly SupportedPaymentToken[] = SUPPORTED_PAYMENT_TOKENS
+): SupportedPaymentToken {
+  const token = tokens[0];
+  if (!token) throw new Error("PREMIFLOW payment token is not configured.");
+  parseTrustedCreatePubkey(token.mint.toBase58(), "PREMIFLOW payment token mint");
   return token;
 }
 
-export function defaultResolver(): SupportedResolver {
-  const resolver = SUPPORTED_RESOLVERS[0];
-  if (!resolver) throw new Error("No PREMIFLOW resolver is configured");
+export function defaultResolver(
+  resolvers: readonly SupportedResolver[] = SUPPORTED_RESOLVERS
+): SupportedResolver {
+  const resolver = resolvers[0];
+  if (!resolver) throw new Error("PREMIFLOW resolver is not configured.");
+  parseTrustedCreatePubkey(resolver.address.toBase58(), "PREMIFLOW resolver");
   return resolver;
+}
+
+export type LockedCreatePayment = {
+  token: SupportedPaymentToken;
+  resolver: SupportedResolver;
+  mint: PublicKey;
+  decimals: number;
+  tokenName: string;
+  resolverName: string;
+};
+
+/**
+ * Trusted create-path mint and resolver. Never reads URL, localStorage,
+ * form fields, or freelancer input.
+ */
+export function lockedCreatePayment(
+  tokens: readonly SupportedPaymentToken[] = SUPPORTED_PAYMENT_TOKENS,
+  resolvers: readonly SupportedResolver[] = SUPPORTED_RESOLVERS
+): LockedCreatePayment {
+  const token = defaultPaymentToken(tokens);
+  const resolver = defaultResolver(resolvers);
+  return {
+    token,
+    resolver,
+    mint: token.mint,
+    decimals: token.decimals,
+    tokenName: token.name,
+    resolverName: resolver.name,
+  };
 }
 
 export function findPaymentToken(mint: string | PublicKey): SupportedPaymentToken | null {
