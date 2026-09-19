@@ -9,6 +9,7 @@ import { Lifecycle } from "@/components/contracts/Lifecycle";
 import { PaymentProgress } from "@/components/contracts/PaymentProgress";
 import { ResolutionCenter } from "@/components/contracts/ResolutionCenter";
 import { StatusBadge } from "@/components/contracts/StatusBadge";
+import { ContractMessages } from "@/components/contracts/ContractMessages";
 import { HourlyShowcase } from "@/components/contracts/HourlyShowcase";
 import { StreamShowcase } from "@/components/contracts/StreamShowcase";
 import { ConnectPrompt } from "@/components/shell/ConnectPrompt";
@@ -472,6 +473,8 @@ export function ContractDetail({ address }: { address: string }) {
           <Lifecycle contract={contract} />
         </Card>
 
+        <ContractMessages role={role} paymentMode={contract.paymentMode} />
+
         {contract.paymentMode === "Hourly" ? (
           <HourlyShowcase
             contract={contract}
@@ -585,8 +588,8 @@ export function ContractDetail({ address }: { address: string }) {
               {contract.paymentMode === "Milestone" ? "Milestones" : "Deliverable"}
             </h2>
             <p className="mt-1 text-sm text-ink-soft">
-              Official review starts only from this card. Drafts and progress updates belong in
-              Messages.
+              Official review starts only from this card. Drafts and progress updates will belong
+              in Messages when messaging is connected.
             </p>
             <div className="mt-4 space-y-3">
               {main.length === 0 ? (

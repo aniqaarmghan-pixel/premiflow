@@ -73,8 +73,15 @@ export const COMING_LATER_EVIDENCE = [
   "Off-chain party statements",
   "File attachments",
   "Support or chat message references",
+  "Selected contract-message snapshots",
   "AI case summaries",
 ] as const;
+
+export const MESSAGE_EVIDENCE_COPY = {
+  comingLater: true,
+  actionLabel: "Add to dispute evidence",
+  body: "A future action will let a participant submit a selected message snapshot. The resolver will not automatically read the private conversation.",
+} as const;
 
 export const PARTY_STATEMENTS_COPY = {
   heading: "Party statements",

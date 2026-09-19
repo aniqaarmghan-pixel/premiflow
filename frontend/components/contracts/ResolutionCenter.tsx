@@ -11,6 +11,7 @@ import {
   COMING_LATER_EVIDENCE,
   DISPUTE_CATEGORIES,
   EVIDENCE_COPY,
+  MESSAGE_EVIDENCE_COPY,
   PARTY_STATEMENTS_COPY,
   PREMIFLOW_ASSISTANT,
   RESOLUTION_CENTER_COPY,
@@ -209,6 +210,9 @@ export function ResolutionCenter({
             <li key={item}>{item}</li>
           ))}
         </ul>
+        <p className="mt-3 text-sm leading-6 text-ink-soft">
+          {MESSAGE_EVIDENCE_COPY.actionLabel}: {MESSAGE_EVIDENCE_COPY.body}
+        </p>
       </Card>
 
       {disputed || resolved ? (

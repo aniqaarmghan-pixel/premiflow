@@ -12,6 +12,7 @@ export type SupportTopicId =
   | "payment"
   | "revisions"
   | "streaming"
+  | "messages"
   | "disputes"
   | "resolver"
   | "wallet";
@@ -28,7 +29,7 @@ export const SUPPORT_TOPICS: readonly SupportTopic[] = [
     title: "How contracts work",
     body: [
       "The employer funds the contract first. Tokens sit in escrow until released amounts are collected or refunded.",
-      "Fixed uses one official deliverable. Milestone uses stages. Streaming accrues with elapsed contract time.",
+      "Fixed uses one official deliverable. Milestone uses stages. Streaming accrues with elapsed contract time. Hourly records explicit Start work / Stop work sessions.",
       "Accepting a contract is consent. Activation is a separate employer step.",
     ],
   },
@@ -56,6 +57,15 @@ export const SUPPORT_TOPICS: readonly SupportTopic[] = [
       "Streaming pay accrues from the contract clock, not from start/stop work sessions.",
       "Record earned pay writes accrued value into released accounting. Collect pay transfers it.",
       "Confusion about the clock or recorded amount is often a support question, not a contractual dispute.",
+    ],
+  },
+  {
+    id: "messages",
+    title: "Contract Messages",
+    body: [
+      "Contract Messages will be employer and freelancer communication about one contract. That is not Help & Support, not Resolution Center, and not PREMIFLOW Assistant.",
+      "Ordinary message text will not be stored on Solana. Messaging is not connected yet, so PREMIFLOW does not show a Send control that would lose text on refresh.",
+      "The resolver will not automatically read private chat. A later “Add to dispute evidence” action would submit a selected snapshot, not the entire conversation.",
     ],
   },
   {
