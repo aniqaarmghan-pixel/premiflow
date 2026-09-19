@@ -451,6 +451,163 @@ test("terminal contracts do not offer End expired revision", () => {
   }
 });
 
+test("Streaming does not offer Submit work", () => {
+  const contract = makeContract({
+    status: "Active",
+    paymentMode: "Streaming",
+    startTime: 1_000,
+    endTime: 4_600,
+    mainAmount: 100n,
+    totalAmount: 100n,
+  });
+  const freelancer = availableActions({
+    wallet: WALLET_B,
+    contract,
+    workUnit: makeWorkUnit({ kind: "Checkpoint", status: "Defined" }),
+    now: 2_000,
+  });
+  const mismatchedUnit = availableActions({
+    wallet: WALLET_B,
+    contract,
+    workUnit: makeWorkUnit({ kind: "Fixed", status: "Defined" }),
+    now: 2_000,
+  });
+  assert.ok(!freelancer.includes("submitWorkUnit"));
+  assert.ok(!mismatchedUnit.includes("submitWorkUnit"));
+});
+
+test("Streaming open dispute uses projected stream accrual", () => {
+  const start = 1_000;
+  const end = 2_000;
+  const mid = 1_500;
+  const unrecorded = makeContract({
+    status: "Active",
+    paymentMode: "Streaming",
+    startTime: start,
+    endTime: end,
+    durationSeconds: 1_000,
+    mainAmount: 100n,
+    totalAmount: 100n,
+    releasedAmount: 0n,
+    streamReleasedAmount: 0n,
+  });
+  const employerMid = availableActions({
+    wallet: WALLET_A,
+    contract: unrecorded,
+    now: mid,
+  });
+  const freelancerMid = availableActions({
+    wallet: WALLET_B,
+    contract: unrecorded,
+    now: mid,
+  });
+  assert.ok(employerMid.includes("openDispute"));
+  assert.ok(freelancerMid.includes("openDispute"));
+  assert.ok(employerMid.includes("releaseStreamAccrual"));
+
+  const fullyAccrued = makeContract({
+    status: "Active",
+    paymentMode: "Streaming",
+    startTime: start,
+    endTime: end,
+    durationSeconds: 1_000,
+    mainAmount: 100n,
+    totalAmount: 100n,
+    releasedAmount: 0n,
+    streamReleasedAmount: 0n,
+  });
+  const employerEnd = availableActions({
+    wallet: WALLET_A,
+    contract: fullyAccrued,
+    now: end,
+  });
+  const freelancerEnd = availableActions({
+    wallet: WALLET_B,
+    contract: fullyAccrued,
+    now: end,
+  });
+  assert.ok(!employerEnd.includes("openDispute"));
+  assert.ok(!freelancerEnd.includes("openDispute"));
+  assert.ok(employerEnd.includes("completeContract"));
+
+  const trialStarted = makeContract({
+    status: "Active",
+    paymentMode: "Streaming",
+    startTime: start,
+    endTime: end,
+    durationSeconds: 1_000,
+    trialAmount: 10n,
+    mainAmount: 100n,
+    totalAmount: 110n,
+    releasedAmount: 10n,
+    streamReleasedAmount: 0n,
+  });
+  assert.ok(
+    !availableActions({
+      wallet: WALLET_A,
+      contract: trialStarted,
+      now: end,
+    }).includes("openDispute")
+  );
+
+  const recorded = makeContract({
+    status: "Active",
+    paymentMode: "Streaming",
+    startTime: start,
+    endTime: end,
+    mainAmount: 100n,
+    totalAmount: 100n,
+    releasedAmount: 100n,
+    streamReleasedAmount: 100n,
+    withdrawnAmount: 40n,
+  });
+  assert.ok(
+    !availableActions({
+      wallet: WALLET_A,
+      contract: recorded,
+      now: mid,
+    }).includes("openDispute")
+  );
+  assert.ok(
+    availableActions({
+      wallet: WALLET_B,
+      contract: recorded,
+      now: mid,
+    }).includes("withdrawFreelancer")
+  );
+});
+
+test("Fixed and Milestone open-dispute gating is unchanged by stream clocks", () => {
+  const fixed = makeContract({
+    status: "Active",
+    paymentMode: "Fixed",
+    totalAmount: 10n,
+    releasedAmount: 4n,
+    startTime: 0,
+    endTime: 10,
+  });
+  assert.ok(
+    availableActions({ wallet: WALLET_A, contract: fixed, now: 10 }).includes(
+      "openDispute"
+    )
+  );
+  const milestoneFull = makeContract({
+    status: "Active",
+    paymentMode: "Milestone",
+    totalAmount: 10n,
+    releasedAmount: 10n,
+    startTime: 0,
+    endTime: 10,
+  });
+  assert.ok(
+    !availableActions({
+      wallet: WALLET_A,
+      contract: milestoneFull,
+      now: 10,
+    }).includes("openDispute")
+  );
+});
+
 test("voiding one Milestone does not hide remaining Defined unit submission", () => {
   const contract = makeContract({
     status: "Active",

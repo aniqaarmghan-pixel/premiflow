@@ -1,10 +1,10 @@
 import { PublicKey } from "@solana/web3.js";
 
 import {
-  contestedRemainder,
   isReviewDeadlineActive,
   isStreamCurrentlyAccruing,
   mayAttemptCompletion,
+  projectedContestedRemainder,
   remainingEmployerRefund,
   remainingFreelancerClaim,
   roleForContract,
@@ -108,7 +108,7 @@ export function availableActions(input: ActionAvailabilityInput): UiAction[] {
     if (
       (role === "employer" || role === "freelancer") &&
       contract.openReviewCount > 0 &&
-      contestedRemainder(contract) > 0n
+      projectedContestedRemainder(contract, now) > 0n
     ) {
       actions.add("openDispute");
     }
@@ -117,7 +117,7 @@ export function availableActions(input: ActionAvailabilityInput): UiAction[] {
   if (contract.status === "Active") {
     if (
       (role === "employer" || role === "freelancer") &&
-      contestedRemainder(contract) > 0n
+      projectedContestedRemainder(contract, now) > 0n
     ) {
       actions.add("openDispute");
     }
@@ -140,6 +140,7 @@ export function availableActions(input: ActionAvailabilityInput): UiAction[] {
     }
     if (role === "freelancer") {
       if (
+        contract.paymentMode !== "Streaming" &&
         unit &&
         (unit.status === "Defined" || unit.status === "Revising") &&
         (unit.kind === "Fixed" || unit.kind === "Milestone")

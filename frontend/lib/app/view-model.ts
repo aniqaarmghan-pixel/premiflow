@@ -8,11 +8,16 @@ import {
 import {
   availableActions,
   contractStatusLabel,
+  equivalentHourlyRateDisplayOnly,
+  estimatedStreamAccrualForContract,
   mayAttemptCompletion,
   paymentModeLabel,
   remainingEmployerRefund,
   remainingFreelancerClaim,
   roleForContract,
+  streamDurationSeconds,
+  streamElapsedSeconds,
+  streamRemainingSeconds,
   workUnitStatusDetail,
   type ContractRole,
   type ContractStatus,
@@ -141,6 +146,60 @@ export function financialProgress(contract: ContractView): FinancialProgress {
     releasedPct: pct(contract.releasedAmount, contract.totalAmount),
     withdrawnPct: pct(contract.withdrawnAmount, contract.totalAmount),
   };
+}
+
+export type StreamingDashboard = {
+  totalFundedStream: bigint;
+  durationSeconds: number;
+  startTime: number;
+  endTime: number;
+  elapsedSeconds: number;
+  remainingSeconds: number;
+  equivalentHourlyRate: bigint;
+  earnedSoFar: bigint;
+  alreadyRecorded: bigint;
+  alreadyCollected: bigint;
+  availableToCollect: bigint;
+  remainingEscrow: bigint;
+};
+
+/**
+ * Streaming contract-detail dashboard. Amounts are display-only.
+ * Earned so far uses the same floor formula as Rust `canonical_stream_accrued`.
+ */
+export function streamingDashboard(
+  contract: ContractView,
+  now: number
+): StreamingDashboard {
+  const durationSeconds = streamDurationSeconds(contract);
+  const progress = financialProgress(contract);
+  return {
+    totalFundedStream: contract.mainAmount,
+    durationSeconds,
+    startTime: contract.startTime,
+    endTime: contract.endTime,
+    elapsedSeconds: streamElapsedSeconds(contract, now),
+    remainingSeconds: streamRemainingSeconds(contract, now),
+    equivalentHourlyRate: equivalentHourlyRateDisplayOnly(
+      contract.mainAmount,
+      durationSeconds
+    ),
+    earnedSoFar: estimatedStreamAccrualForContract(contract, now),
+    alreadyRecorded: contract.releasedAmount,
+    alreadyCollected: contract.withdrawnAmount,
+    availableToCollect: remainingFreelancerClaim(contract),
+    remainingEscrow: progress.remainingInEscrow,
+  };
+}
+
+export function contractActionVariant(
+  action: UiAction
+): "primary" | "secondary" | "danger" {
+  if (action === "openDispute" || action === "cancelActiveContract") {
+    return "danger";
+  }
+  if (action === "completeContract") return "secondary";
+  return "primary";
 }
 
 export type DashboardSummary = {
@@ -337,11 +396,11 @@ export function actionLabel(
     case "finalizeReviewTimeout":
       return "Release after timeout";
     case "releaseStreamAccrual":
-      return "Release accrued payment";
+      return "Record earned pay";
     case "cancelActiveContract":
       return "Cancel contract";
     case "withdrawFreelancer":
-      return "Withdraw";
+      return "Collect pay";
     case "claimEmployerRefund":
       return "Claim refund";
     case "openDispute":
@@ -349,7 +408,7 @@ export function actionLabel(
     case "resolveDispute":
       return "Resolve dispute";
     case "completeContract":
-      return "Complete contract";
+      return "Mark contract finished";
   }
 }
 
@@ -452,7 +511,7 @@ export function typeBlurb(type: ContractType): string {
     case "Milestone":
       return "Several independently reviewed pieces of work, each with its own amount.";
     case "Streaming":
-      return "Pay accrues with time while the contract is active. The program is the clock.";
+      return "Pay accrues automatically with time while the contract is active. Recording earned pay does not transfer tokens.";
   }
 }
 
@@ -659,7 +718,7 @@ export function completeContractCopy(): CompleteContractCopy {
     ],
     wallet: "Your wallet will ask you to approve this transaction.",
     notPayment:
-      "This does not pay the freelancer. Tokens leave escrow only when Withdraw is sent.",
+      "This does not pay the freelancer. Tokens leave escrow only when Collect pay is sent.",
   };
 }
 

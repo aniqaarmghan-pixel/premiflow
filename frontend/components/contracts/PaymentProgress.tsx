@@ -12,14 +12,27 @@ export function PaymentProgress({
   decimals?: number;
 }) {
   const progress = financialProgress(contract);
+  const streaming = contract.paymentMode === "Streaming";
   const rows: Array<{ label: string; value: bigint }> = [
     { label: "Total contract value", value: progress.total },
-    { label: "Released", value: progress.released },
-    { label: "Withdrawn", value: progress.withdrawn },
+    {
+      label: streaming ? "Recorded for collection" : "Released",
+      value: progress.released,
+    },
+    {
+      label: streaming ? "Already collected" : "Withdrawn",
+      value: progress.withdrawn,
+    },
     { label: "Already refunded", value: progress.refunded },
-    { label: "Available to withdraw", value: progress.claimRemaining },
+    {
+      label: streaming ? "Available to collect" : "Available to withdraw",
+      value: progress.claimRemaining,
+    },
     { label: "Employer refundable", value: progress.refundableRemaining },
-    { label: "Remaining in escrow", value: progress.remainingInEscrow },
+    {
+      label: streaming ? "Remaining escrow" : "Remaining in escrow",
+      value: progress.remainingInEscrow,
+    },
   ];
 
   return (
@@ -30,7 +43,10 @@ export function PaymentProgress({
         Displayed from the contract account. The program remains authoritative.
       </p>
       <div className="mt-4">
-        <Progress value={progress.releasedPct} label="Released of total" />
+        <Progress
+          value={progress.releasedPct}
+          label={streaming ? "Recorded of total" : "Released of total"}
+        />
       </div>
       <dl className="mt-5 grid gap-3 sm:grid-cols-2">
         {rows.map((row) => (

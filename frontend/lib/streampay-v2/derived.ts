@@ -50,6 +50,7 @@ function saturatingSub(left: bigint, right: bigint): bigint {
  * Display/UX remainder matching Rust `freeze_for_dispute` contested math:
  * `total_amount - released_amount - refunded_amount`.
  * Streaming freeze materializes accrual first; this helper does not.
+ * Use `projectedContestedRemainder` when gating Streaming Open dispute.
  */
 export function contestedRemainder(
   contract: Pick<ContractView, "totalAmount" | "releasedAmount" | "refundedAmount">
@@ -58,6 +59,88 @@ export function contestedRemainder(
     contract.totalAmount,
     contract.releasedAmount + contract.refundedAmount
   );
+}
+
+/**
+ * Released amount Rust would have after `materialize_stream_at(now)`.
+ * Streaming + Active only. Display/UX — the program is authoritative.
+ */
+export function projectedMaterializedReleasedAmount(
+  contract: ContractView,
+  now: number
+): bigint {
+  if (contract.paymentMode !== "Streaming" || contract.status !== "Active") {
+    return contract.releasedAmount;
+  }
+  if (contract.startTime === 0 || contract.endTime <= contract.startTime) {
+    return contract.releasedAmount;
+  }
+  const accrued = estimateStreamAccrualDisplayOnly(
+    contract.mainAmount,
+    contract.startTime,
+    contract.endTime,
+    now
+  );
+  const delta = saturatingSub(accrued, contract.streamReleasedAmount);
+  return contract.releasedAmount + delta;
+}
+
+/**
+ * Contested remainder after applying the amount Rust would materialize at
+ * `now` for an Active Streaming contract. Fixed/Milestone and pre-activation
+ * Streaming keep on-chain released/refunded accounting unchanged.
+ */
+export function projectedContestedRemainder(
+  contract: ContractView,
+  now: number
+): bigint {
+  const released = projectedMaterializedReleasedAmount(contract, now);
+  return saturatingSub(
+    contract.totalAmount,
+    released + contract.refundedAmount
+  );
+}
+
+/** `end_time - start_time` once the clock exists; otherwise stored duration. */
+export function streamDurationSeconds(
+  contract: Pick<ContractView, "startTime" | "endTime" | "durationSeconds">
+): number {
+  if (contract.endTime > contract.startTime) {
+    return contract.endTime - contract.startTime;
+  }
+  return Math.max(0, contract.durationSeconds);
+}
+
+export function streamElapsedSeconds(
+  contract: Pick<ContractView, "startTime" | "endTime">,
+  now: number
+): number {
+  if (contract.startTime <= 0 || contract.endTime <= contract.startTime) return 0;
+  if (now <= contract.startTime) return 0;
+  if (now >= contract.endTime) return contract.endTime - contract.startTime;
+  return now - contract.startTime;
+}
+
+export function streamRemainingSeconds(
+  contract: Pick<ContractView, "startTime" | "endTime">,
+  now: number
+): number {
+  if (contract.startTime <= 0 || contract.endTime <= contract.startTime) return 0;
+  if (now <= contract.startTime) return contract.endTime - contract.startTime;
+  if (now >= contract.endTime) return 0;
+  return contract.endTime - now;
+}
+
+/**
+ * Display-only equivalent hourly rate: `(main_amount * 3600) / duration`.
+ * Same floor division as token arithmetic. Never a settlement input.
+ */
+export function equivalentHourlyRateDisplayOnly(
+  mainAmount: bigint,
+  durationSeconds: number
+): bigint {
+  if (durationSeconds <= 0) return 0n;
+  return (mainAmount * 3600n) / BigInt(durationSeconds);
 }
 
 /**

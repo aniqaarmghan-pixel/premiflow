@@ -24,9 +24,14 @@ import { formatUnix } from "@/lib/app/datetime";
 import { localMetadataStore } from "@/lib/app/local-metadata";
 import { formatTokenAmount } from "@/lib/app/money";
 import {
+  STREAMING_PAY_EXPLAINER,
+  streamingTrialStartedCopy,
+} from "@/lib/app/stream-display";
+import {
   actionLabel,
   completeContractCopy,
   confirmTitle,
+  contractActionVariant,
   counterparty,
   needsConfirmation,
   officialDeliverableCopy,
@@ -175,6 +180,7 @@ export function ContractDetail({ address }: { address: string }) {
   const role = roleForContract(publicKey, contract);
   const other = counterparty(publicKey, contract);
   const settlement = settlementView(contract);
+  const trialStarted = streamingTrialStartedCopy(contract);
 
   async function afterSuccess() {
     await load();
@@ -309,9 +315,13 @@ export function ContractDetail({ address }: { address: string }) {
     void execute(action, unit);
   }
 
-  const contractButtons = actions.filter(
-    (a) => !UNIT_ACTIONS.includes(a) && !TRIAL_ACTIONS.includes(a)
-  );
+  const contractButtons = actions
+    .filter((a) => !UNIT_ACTIONS.includes(a) && !TRIAL_ACTIONS.includes(a))
+    .sort((a, b) => {
+      if (a === "completeContract") return 1;
+      if (b === "completeContract") return -1;
+      return 0;
+    });
 
   return (
     <PageFade>
@@ -340,14 +350,25 @@ export function ContractDetail({ address }: { address: string }) {
         </Card>
 
         {contract.paymentMode === "Streaming" ? (
-          <StreamShowcase
-            contract={contract}
-            now={now}
-            decimals={decimals}
-            canRelease={actions.includes("releaseStreamAccrual")}
-            busy={tx.busy}
-            onRelease={() => requestAction("releaseStreamAccrual")}
-          />
+          <>
+            {trialStarted ? (
+              <Card className="border-cyan/30 bg-[linear-gradient(180deg,rgba(46,230,214,0.08),transparent)] p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan">
+                  Paid trial
+                </p>
+                <h2 className="mt-1 font-display text-2xl">{trialStarted.headline}</h2>
+                <p className="mt-2 text-sm leading-6 text-ink-soft">{trialStarted.body}</p>
+              </Card>
+            ) : null}
+            <StreamShowcase
+              contract={contract}
+              now={now}
+              decimals={decimals}
+              canRelease={actions.includes("releaseStreamAccrual")}
+              busy={tx.busy}
+              onRelease={() => requestAction("releaseStreamAccrual")}
+            />
+          </>
         ) : null}
 
         <div className="grid gap-4 lg:grid-cols-2">
@@ -504,7 +525,7 @@ export function ContractDetail({ address }: { address: string }) {
               contractButtons.map((action) => (
                 <Button
                   key={action}
-                  variant={action === "openDispute" || action === "cancelActiveContract" ? "danger" : "primary"}
+                  variant={contractActionVariant(action)}
                   disabled={tx.busy}
                   onClick={() => requestAction(action)}
                 >
@@ -562,7 +583,9 @@ export function ContractDetail({ address }: { address: string }) {
                 confirm?.action === "cancelActiveContract" ||
                 confirm?.action === "voidStaleRevision"
                   ? "danger"
-                  : "primary"
+                  : confirm?.action === "completeContract"
+                    ? "secondary"
+                    : "primary"
               }
               onClick={() => confirm && void execute(confirm.action, confirm.unit)}
             >
@@ -786,6 +809,7 @@ function ConfirmBody({
     );
   }
   if (action === "withdrawFreelancer") {
+    const streaming = contract.paymentMode === "Streaming";
     const copy = withdrawFreelancerCopy(
       formatTokenAmount(contract.releasedAmount, decimals),
       formatTokenAmount(contract.withdrawnAmount, decimals),
@@ -794,17 +818,24 @@ function ConfirmBody({
     return (
       <div className="space-y-3 text-sm leading-6 text-ink-soft">
         <p>{copy.intro}</p>
+        {streaming ? <p>{STREAMING_PAY_EXPLAINER}</p> : null}
         <dl className="grid gap-2 sm:grid-cols-3">
           <div>
-            <dt className="text-xs uppercase tracking-wide text-ink-faint">Released</dt>
+            <dt className="text-xs uppercase tracking-wide text-ink-faint">
+              {streaming ? "Recorded for collection" : "Released"}
+            </dt>
             <dd className="font-medium text-ink">{copy.released}</dd>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-wide text-ink-faint">Already withdrawn</dt>
+            <dt className="text-xs uppercase tracking-wide text-ink-faint">
+              {streaming ? "Already collected" : "Already withdrawn"}
+            </dt>
             <dd className="font-medium text-ink">{copy.withdrawn}</dd>
           </div>
           <div>
-            <dt className="text-xs uppercase tracking-wide text-ink-faint">Claimable now</dt>
+            <dt className="text-xs uppercase tracking-wide text-ink-faint">
+              {streaming ? "Available to collect" : "Claimable now"}
+            </dt>
             <dd className="font-medium text-ink">{copy.remaining}</dd>
           </div>
         </dl>
@@ -856,10 +887,17 @@ function ConfirmBody({
   }
   if (action === "releaseStreamAccrual") {
     return (
-      <p>
-        The program computes accrued release from on-chain time. The live number on this page is a
-        display estimate only and is not sent as an argument.
-      </p>
+      <div className="space-y-3 text-sm leading-6 text-ink-soft">
+        <p>
+          Record earned pay writes the program&apos;s accrued amount into released
+          accounting. It does not transfer tokens. The freelancer collects available
+          pay separately.
+        </p>
+        <p>
+          The live number on this page is a display estimate only and is not sent as
+          an argument. The program uses on-chain time.
+        </p>
+      </div>
     );
   }
   return <p>This action will be sent to your wallet for approval.</p>;
