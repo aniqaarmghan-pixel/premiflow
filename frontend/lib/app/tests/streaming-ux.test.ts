@@ -30,9 +30,9 @@ test("Streaming explainer and type blurb distinguish accrue, record, and collect
   assert.match(STREAMING_PAY_EXPLAINER, /accrues automatically with time/i);
   assert.match(STREAMING_PAY_EXPLAINER, /Recording earned pay does not transfer tokens/);
   assert.match(STREAMING_PAY_EXPLAINER, /collects available pay separately/);
-  assert.match(typeBlurb("Streaming"), /accrues automatically with time/i);
-  assert.match(typeBlurb("Fixed"), /One deliverable/);
-  assert.match(typeBlurb("Milestone"), /independently reviewed/);
+  assert.match(typeBlurb("Streaming"), /accrues proportionally while the stream is active/i);
+  assert.match(typeBlurb("Fixed"), /one main deliverable/i);
+  assert.match(typeBlurb("Milestone"), /stages with separate amounts/i);
 });
 
 test("trial-start explanation appears only after Streaming trial activation", () => {

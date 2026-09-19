@@ -19,6 +19,12 @@ import {
   paymentTokenLabel,
 } from "@/lib/app/premiflow";
 import {
+  CONTRACT_TYPE_DECISION_HEADING,
+  CONTRACT_TYPE_DECISION_HINTS,
+  CONTRACT_TYPE_GUIDES,
+  CONTRACT_TYPES,
+} from "@/lib/app/contract-type-guide";
+import {
   typeBlurb,
   presentType,
 } from "@/lib/app/view-model";
@@ -526,33 +532,110 @@ function TypeStep({
   value: ContractType;
   onChange: (type: ContractType) => void;
 }) {
-  const types: ContractType[] = ["Fixed", "Milestone", "Streaming"];
+  const selectedGuide = CONTRACT_TYPE_GUIDES[value];
   return (
-    <div className="grid gap-4 md:grid-cols-3">
-      {types.map((type) => {
-        const selected = type === value;
-        return (
-          <motion.button
-            key={type}
-            type="button"
-            onClick={() => onChange(type)}
-            whileHover={{ y: -6, scale: 1.02 }}
-            animate={selected ? { y: -6, scale: 1.03 } : { y: 0, scale: 1 }}
-            transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-            className={`group rounded-[28px] border p-5 text-left transition duration-300 ${
-              selected
-                ? "border-accent bg-card shadow-[0_18px_40px_-24px_rgba(18,194,184,.55)] ring-2 ring-accent/30"
-                : "border-line bg-paper-2/50 hover:border-accent/40"
-            }`}
-          >
-            <div className="rounded-2xl bg-white">
-              <TypeMotif type={type} active={selected} />
-            </div>
-            <p className="mt-3 font-display text-2xl">{type}</p>
-            <p className="mt-1 text-sm leading-6 text-ink-soft">{typeBlurb(type)}</p>
-          </motion.button>
-        );
-      })}
+    <div className="space-y-5">
+      <div>
+        <h2 className="font-display text-2xl">{CONTRACT_TYPE_DECISION_HEADING}</h2>
+        <ul className="mt-3 grid gap-2 sm:grid-cols-3">
+          {CONTRACT_TYPE_DECISION_HINTS.map((hint) => {
+            const active = hint.type === value;
+            return (
+              <li key={hint.type}>
+                <button
+                  type="button"
+                  onClick={() => onChange(hint.type)}
+                  className={`w-full rounded-2xl border px-3 py-2.5 text-left text-sm transition ${
+                    active
+                      ? "border-accent bg-accent-soft text-ink"
+                      : "border-line bg-paper-2/60 text-ink-soft hover:border-accent/40"
+                  }`}
+                >
+                  <span className="font-medium text-ink">{hint.match}</span>
+                  <span className="mt-0.5 block text-xs text-ink-faint">
+                    → {hint.type}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
+
+      <div className="grid gap-4 md:grid-cols-3">
+        {CONTRACT_TYPES.map((type) => {
+          const selected = type === value;
+          const guide = CONTRACT_TYPE_GUIDES[type];
+          return (
+            <motion.button
+              key={type}
+              type="button"
+              onClick={() => onChange(type)}
+              whileHover={{ y: -4, scale: 1.01 }}
+              animate={selected ? { y: -4, scale: 1.02 } : { y: 0, scale: 1 }}
+              transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
+              className={`group rounded-[28px] border p-4 text-left transition duration-300 sm:p-5 ${
+                selected
+                  ? "border-accent bg-card shadow-[0_18px_40px_-24px_rgba(18,194,184,.55)] ring-2 ring-accent/30"
+                  : "border-line bg-paper-2/50 hover:border-accent/40"
+              }`}
+            >
+              <div className={`rounded-2xl bg-white ${selected ? "" : "hidden sm:block"}`}>
+                <TypeMotif type={type} active={selected} />
+              </div>
+              <p className={`${selected ? "mt-3" : "sm:mt-3"} font-display text-2xl`}>
+                {guide.title}
+              </p>
+              <p className="text-sm font-semibold text-accent">{guide.tagline}</p>
+              <p className="mt-2 text-sm leading-6 text-ink-soft">{guide.explanation}</p>
+              <div className="mt-3 rounded-2xl bg-paper px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+                  {guide.exampleHeading}
+                </p>
+                {(selected ? guide.exampleLines : guide.compactExampleLines).map((line) => (
+                  <p key={line} className="mt-1 text-sm text-ink">
+                    {line}
+                  </p>
+                ))}
+              </div>
+              {selected ? (
+                <>
+                  <p className="mt-3 text-sm leading-6 text-ink-soft">{guide.bestFor}</p>
+                  {guide.collectNote ? (
+                    <p className="mt-2 text-sm leading-6 text-ink-soft">{guide.collectNote}</p>
+                  ) : null}
+                  <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
+                    Best for
+                  </p>
+                  <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                    {guide.goodFor.map((item) => (
+                      <li
+                        key={item}
+                        className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-ink-soft"
+                      >
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p className="mt-3 text-xs leading-5 text-ink-faint">
+                  Best for {guide.compactBestFor.toLowerCase()}
+                </p>
+              )}
+            </motion.button>
+          );
+        })}
+      </div>
+
+      <div className="rounded-[24px] border border-line bg-card px-4 py-3">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-faint">
+          {selectedGuide.title} selected
+        </p>
+        <p className="mt-1 text-sm leading-6 text-ink-soft">
+          {selectedGuide.selectedExplanation}
+        </p>
+      </div>
     </div>
   );
 }

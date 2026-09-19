@@ -1,5 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 
+import { CONTRACT_TYPE_GUIDES } from "@/lib/app/contract-type-guide";
 import {
   formatReviewPeriod,
   formatRevisionRemaining,
@@ -505,14 +506,7 @@ export function terminalMutationActions(
 }
 
 export function typeBlurb(type: ContractType): string {
-  switch (type) {
-    case "Fixed":
-      return "One deliverable. One principal payment path, released after review.";
-    case "Milestone":
-      return "Several independently reviewed pieces of work, each with its own amount.";
-    case "Streaming":
-      return "Pay accrues automatically with time while the contract is active. Recording earned pay does not transfer tokens.";
-  }
+  return CONTRACT_TYPE_GUIDES[type].selectedExplanation;
 }
 
 export type OfficialDeliverableCopy = {
