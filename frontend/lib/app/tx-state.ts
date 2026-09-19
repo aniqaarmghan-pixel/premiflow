@@ -4,6 +4,7 @@ export type TxPhase =
   | "submitting"
   | "confirming"
   | "success"
+  | "pending_confirmation"
   | "failed";
 
 export type TxState = {
@@ -18,6 +19,7 @@ export type TxEvent =
   | { type: "submit" }
   | { type: "confirm"; signature: string }
   | { type: "success"; signature: string }
+  | { type: "pending"; signature: string; message: string }
   | { type: "fail"; message: string }
   | { type: "reset" };
 
@@ -34,6 +36,12 @@ export function txReducer(state: TxState, event: TxEvent): TxState {
       return { phase: "confirming", signature: event.signature };
     case "success":
       return { phase: "success", signature: event.signature };
+    case "pending":
+      return {
+        phase: "pending_confirmation",
+        signature: event.signature,
+        message: event.message,
+      };
     case "fail":
       return {
         phase: "failed",
@@ -49,7 +57,8 @@ export function isTxBusy(phase: TxPhase): boolean {
   return (
     phase === "awaiting_wallet" ||
     phase === "submitting" ||
-    phase === "confirming"
+    phase === "confirming" ||
+    phase === "pending_confirmation"
   );
 }
 
@@ -65,6 +74,8 @@ export function txPhaseLabel(phase: TxPhase): string {
       return "Confirming";
     case "success":
       return "Success";
+    case "pending_confirmation":
+      return "Confirmation unknown";
     case "failed":
       return "Failed";
   }

@@ -1,11 +1,10 @@
 "use client";
 
-import { getMint } from "@solana/spl-token";
+import { getAccount } from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey } from "@solana/web3.js";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { TypeMotif } from "@/components/contracts/TypeMotif";
 import { SuccessMoment } from "@/components/contracts/SuccessMoment";
@@ -13,20 +12,29 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field, Input, Select, Textarea } from "@/components/ui/Field";
 import { TransactionStatus } from "@/components/ui/TransactionStatus";
-import { toDatetimeLocalValue } from "@/lib/app/datetime";
 import { localMetadataStore } from "@/lib/app/local-metadata";
 import { formatTokenAmount } from "@/lib/app/money";
+import {
+  defaultPaymentToken,
+  defaultResolver,
+  paymentTokenLabel,
+  resolverLabel,
+  SUPPORTED_PAYMENT_TOKENS,
+} from "@/lib/app/premiflow";
 import {
   typeBlurb,
   presentType,
 } from "@/lib/app/view-model";
 import {
+  defaultCreateDraft,
   parsePubkey,
   validateCreateDraft,
   validateMilestoneAllocation,
   type CreateWizardDraft,
   type MilestoneDraft,
 } from "@/lib/app/validation";
+import { Address } from "@/components/ui/Address";
+import { deriveEmployerSourceAta } from "@/lib/streampay-v2";
 import { useNow } from "@/lib/hooks/useNow";
 import { useStreamPayClient } from "@/lib/hooks/useStreamPayClient";
 import { useTx } from "@/lib/hooks/useTx";
@@ -45,36 +53,9 @@ const STEPS = [
   "Work",
   "Trial",
   "Schedule",
-  "Resolver",
+  "Dispute",
   "Review",
 ] as const;
-
-function defaultDraft(): CreateWizardDraft {
-  return {
-    paymentMode: "Fixed",
-    freelancer: "",
-    resolver: "",
-    mint: "",
-    decimals: 6,
-    totalAmountUi: "",
-    trialEnabled: false,
-    trialAmountUi: "",
-    startMode: "OnActivation",
-    scheduledStartLocal: "",
-    durationSeconds: 86_400,
-    checkpointInterval: 3_600,
-    reviewDuration: 3_600,
-    activationReviewDuration: 3_600,
-    maxRevisions: 2,
-    acceptanceDeadlineLocal: toDatetimeLocalValue(172_800),
-    title: "",
-    description: "",
-    deliverables: "",
-    milestones: [
-      { label: "Milestone 1", amountUi: "", dueOffsetSeconds: 43_200 },
-    ],
-  };
-}
 
 export function CreateWizard() {
   const router = useRouter();
@@ -84,8 +65,8 @@ export function CreateWizard() {
   const { now } = useNow(30_000);
   const tx = useTx();
   const [step, setStep] = useState(0);
-  const [draft, setDraft] = useState<CreateWizardDraft>(defaultDraft);
-  const [mintHint, setMintHint] = useState<string | null>(null);
+  const [draft, setDraft] = useState<CreateWizardDraft>(defaultCreateDraft);
+  const [tokenBalanceUi, setTokenBalanceUi] = useState<string | null>(null);
   const [successOpen, setSuccessOpen] = useState(false);
   const [createdAddress, setCreatedAddress] = useState<string | null>(null);
   const [progressNote, setProgressNote] = useState<string | null>(null);
@@ -115,20 +96,48 @@ export function CreateWizard() {
     setDraft((prev) => ({ ...prev, ...partial }));
   }
 
-  async function lookupMint() {
-    const mint = tryPk(draft.mint);
-    if (!mint) {
-      setMintHint("Enter a valid mint to load decimals.");
-      return;
+  useEffect(() => {
+    const token = defaultPaymentToken();
+    const resolver = defaultResolver();
+    setDraft((prev) => {
+      const next = { ...prev };
+      let changed = false;
+      if (!next.mint) {
+        next.mint = token.mint.toBase58();
+        next.decimals = token.decimals;
+        changed = true;
+      }
+      if (!next.resolver) {
+        next.resolver = resolver.address.toBase58();
+        changed = true;
+      }
+      return changed ? next : prev;
+    });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadBalance() {
+      if (!publicKey) {
+        setTokenBalanceUi(null);
+        return;
+      }
+      const token = defaultPaymentToken();
+      try {
+        const ata = deriveEmployerSourceAta(publicKey, token.mint);
+        const account = await getAccount(connection, ata);
+        if (!cancelled) {
+          setTokenBalanceUi(formatTokenAmount(account.amount, token.decimals));
+        }
+      } catch {
+        if (!cancelled) setTokenBalanceUi("0");
+      }
     }
-    try {
-      const info = await getMint(connection, mint);
-      patch({ decimals: info.decimals });
-      setMintHint(`Loaded ${info.decimals} decimals from mint.`);
-    } catch {
-      setMintHint("Could not fetch mint. Enter decimals manually.");
-    }
-  }
+    void loadBalance();
+    return () => {
+      cancelled = true;
+    };
+  }, [connection, publicKey]);
 
   async function submit() {
     if (!publicKey || !client) return;
@@ -262,27 +271,48 @@ export function CreateWizard() {
             ) : null}
             {step === 2 ? (
               <div className="space-y-4">
-                <Field label="Token mint" error={errors.mint} hint={mintHint ?? "Classic SPL token mint."}>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Input
-                      value={draft.mint}
-                      onChange={(e) => patch({ mint: e.target.value })}
-                      placeholder="Mint address"
-                    />
-                    <Button type="button" variant="secondary" onClick={() => void lookupMint()}>
-                      Load mint
-                    </Button>
+                <Field
+                  label="Payment token"
+                  error={errors.mint}
+                  hint="PREMIFLOW selects the supported Devnet test token. You do not need a mint address."
+                >
+                  <div className="space-y-2">
+                    {SUPPORTED_PAYMENT_TOKENS.map((token) => {
+                      const selected = draft.mint === token.mint.toBase58();
+                      return (
+                        <button
+                          key={token.id}
+                          type="button"
+                          onClick={() =>
+                            patch({ mint: token.mint.toBase58(), decimals: token.decimals })
+                          }
+                          className={`w-full rounded-2xl border px-4 py-3 text-left ${
+                            selected
+                              ? "border-accent bg-accent-soft"
+                              : "border-line bg-card"
+                          }`}
+                        >
+                          <p className="font-medium text-ink">{token.name}</p>
+                          <p className="mt-1 text-xs text-ink-faint">
+                            {token.symbol} · {token.cluster}
+                            {token.testToken ? " test token" : ""}
+                            {selected && tokenBalanceUi != null
+                              ? ` · wallet balance ${tokenBalanceUi}`
+                              : ""}
+                          </p>
+                        </button>
+                      );
+                    })}
                   </div>
                 </Field>
-                <Field label="Mint decimals" error={errors.decimals}>
-                  <Input
-                    type="number"
-                    min={0}
-                    max={18}
-                    value={draft.decimals}
-                    onChange={(e) => patch({ decimals: Number(e.target.value) })}
-                  />
-                </Field>
+                <details className="rounded-2xl border border-line bg-card px-4 py-3 text-sm">
+                  <summary className="cursor-pointer font-medium text-ink-soft">
+                    Advanced token details
+                  </summary>
+                  <div className="mt-3">
+                    <Address value={draft.mint} label="Mint" />
+                  </div>
+                </details>
                 <Field label="Total funded amount" error={errors.totalAmountUi} hint="Includes any paid trial.">
                   <Input
                     value={draft.totalAmountUi}
@@ -439,17 +469,32 @@ export function CreateWizard() {
               </div>
             ) : null}
             {step === 6 ? (
-              <Field
-                label="Resolver wallet"
-                error={errors.resolver}
-                hint="The named resolver can settle a dispute. Must differ from both parties."
-              >
-                <Input
-                  value={draft.resolver}
-                  onChange={(e) => patch({ resolver: e.target.value })}
-                  placeholder="Resolver public key"
-                />
-              </Field>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm font-medium text-ink">Dispute resolution</p>
+                  <p className="mt-1 text-sm text-ink-soft">
+                    PREMIFLOW Resolver is used only if a dispute needs an independent
+                    resolution. It is configured automatically.
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-accent bg-accent-soft px-4 py-3">
+                  <p className="font-medium text-ink">{resolverLabel(draft.resolver)}</p>
+                  <p className="mt-1 text-xs text-ink-faint">
+                    Selected automatically for this Devnet version.
+                  </p>
+                </div>
+                {errors.resolver ? (
+                  <p className="text-xs text-danger">{errors.resolver}</p>
+                ) : null}
+                <details className="rounded-2xl border border-line bg-card px-4 py-3 text-sm">
+                  <summary className="cursor-pointer font-medium text-ink-soft">
+                    Advanced details
+                  </summary>
+                  <div className="mt-3">
+                    <Address value={draft.resolver} label="Resolver" />
+                  </div>
+                </details>
+              </div>
             ) : null}
             {step === 7 ? (
               <ReviewPanel
@@ -681,12 +726,22 @@ function ReviewPanel({
         <li>Type: {presentType(draft.paymentMode)}</li>
         <li>Title: {draft.title || "—"}</li>
         <li>Freelancer: {draft.freelancer || "—"}</li>
-        <li>Resolver: {draft.resolver || "—"}</li>
+        <li>Payment token: {paymentTokenLabel(draft.mint)}</li>
+        <li>Resolver: {resolverLabel(draft.resolver)}</li>
         <li>Total: {draft.totalAmountUi || "—"}</li>
         <li>Main: {formatTokenAmount(mainAmount, draft.decimals)}</li>
         <li>Trial: {draft.trialEnabled ? formatTokenAmount(trialAmount, draft.decimals) : "None"}</li>
         <li>Start: {draft.startMode}</li>
       </ul>
+      <details className="mt-4 rounded-2xl border border-line bg-paper px-4 py-3 text-sm">
+        <summary className="cursor-pointer font-medium text-ink-soft">
+          Advanced addresses
+        </summary>
+        <div className="mt-3 space-y-2">
+          <Address value={draft.mint} label="Mint" />
+          <Address value={draft.resolver} label="Resolver" />
+        </div>
+      </details>
       {issueCount > 0 ? (
         <p className="mt-4 text-sm text-danger">
           {issueCount} field{issueCount === 1 ? "" : "s"} still need attention before create.
@@ -694,14 +749,6 @@ function ReviewPanel({
       ) : null}
     </Card>
   );
-}
-
-function tryPk(raw: string): PublicKey | null {
-  try {
-    return new PublicKey(raw.trim());
-  } catch {
-    return null;
-  }
 }
 
 function tryAmount(ui: string, decimals: number): bigint | null {

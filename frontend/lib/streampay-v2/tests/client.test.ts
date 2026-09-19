@@ -1,12 +1,19 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import {
+  TransactionConfirmationUnknownError,
+  TransactionFailedOnChainError,
+} from "../confirm";
 import { parseClientError } from "../errors";
 import { toCreateContractArgs } from "../instructions";
 import type { CreateContractRequest } from "../types";
 import { RESOLVER, makeContract } from "./fixtures";
 import { decodeContract } from "../accounts";
 import { BN } from "@coral-xyz/anchor";
+
+const SIG =
+  "xu1VLVJ6sQJKFpPhJHS6M6d91M1AgEHXqpAFPXFbC6fAPM3SPQZFNBKruZZtk3kELVW1pppPMyf1eAcM8hDZ6DT";
 
 test("create-contract request maps to current CreateContractArgs fields only", () => {
   const request: CreateContractRequest = {
@@ -66,6 +73,32 @@ test("error parser maps StreamPayV2Error codes and wallet rejection", () => {
     message: "failed to simulate: AccountNotInitialized",
   });
   assert.equal(missing.kind, "missing_ata");
+
+  const blockhash = parseClientError({
+    message: "Simulation failed. \nMessage: Transaction simulation failed: Blockhash not found. \nLogs: [].",
+    transactionMessage: "Transaction simulation failed: Blockhash not found",
+  });
+  assert.equal(blockhash.kind, "simulation");
+  assert.equal(
+    blockhash.uiMessage,
+    "Transaction simulation failed: Blockhash not found"
+  );
+
+  const pending = parseClientError(
+    new TransactionConfirmationUnknownError(SIG, "timeout")
+  );
+  assert.equal(pending.kind, "pending_confirmation");
+  assert.equal(pending.signature, SIG);
+  assert.match(pending.uiMessage, /may still have landed/i);
+
+  const onChain = parseClientError(
+    new TransactionFailedOnChainError(SIG, {
+      InstructionError: [0, { Custom: 6111 }],
+    })
+  );
+  assert.equal(onChain.kind, "streampay_v2");
+  assert.equal(onChain.code, 6111);
+  assert.equal(onChain.signature, SIG);
 });
 
 test("contract decode converts Anchor BN/enum representation", () => {

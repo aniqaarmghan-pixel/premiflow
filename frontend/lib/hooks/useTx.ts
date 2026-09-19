@@ -24,6 +24,14 @@ export function useTx() {
       return true;
     } catch (err) {
       const parsed = parseClientError(err);
+      if (parsed.kind === "pending_confirmation") {
+        dispatch({
+          type: "pending",
+          signature: parsed.signature ?? "",
+          message: parsed.uiMessage || `${label} confirmation is unknown.`,
+        });
+        return false;
+      }
       dispatch({ type: "fail", message: parsed.uiMessage || `${label} failed.` });
       return false;
     }

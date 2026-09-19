@@ -18,7 +18,8 @@ export function browserRpcEndpoint(): string {
 /**
  * HTTP-only proxy. If wsEndpoint is omitted, web3.js rewrites the HTTP URL
  * to wss://<origin>/api/rpc, which this route does not serve.
- * Confirmation for the first Fixed create uses HTTP getSignatureStatuses.
+ * V2 confirmation polls getSignatureStatuses over HTTP and does not use this
+ * dummy socket. It remains only so Connection does not rewrite the HTTP URL.
  */
 export const RPC_CONNECTION_CONFIG: ConnectionConfig = {
   commitment: "confirmed",

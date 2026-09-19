@@ -14,6 +14,7 @@ import { txResult, type TransactionResult } from "./results";
 import { TOKEN_PROGRAM_ID, deriveEmployerSourceAta, deriveFreelancerDestinationAta } from "./tokens";
 import { toHashArray } from "./bytes";
 import { requireU64 } from "./format";
+import { sendV2Method } from "./send";
 import {
   encodePaymentMode,
   encodeStartMode,
@@ -78,7 +79,7 @@ export class StreamPayV2Client {
     const fixedWorkUnit =
       params.request.paymentMode === "Fixed" ? pdas.fixedWorkUnit.address : null;
 
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .createContract(args)
       .accountsPartial({
         employer,
@@ -92,7 +93,7 @@ export class StreamPayV2Client {
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       })
-      .rpc();
+    );
 
     return txResult({
       signature,
@@ -122,7 +123,7 @@ export class StreamPayV2Client {
       contract.workUnitCount,
       this.program.programId
     ).address;
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .addMilestone(toBn(params.amount), toBn(params.dueOffsetSeconds))
       .accountsPartial({
         employer,
@@ -130,43 +131,43 @@ export class StreamPayV2Client {
         workUnit,
         systemProgram: SystemProgram.programId,
       })
-      .rpc();
+    );
     return txResult({ signature, contract: params.contract, workUnit });
   }
 
   async finalizeTerms(contract: PublicKey): Promise<TransactionResult> {
     const employer = connectedWallet(this.program);
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .finalizeTerms()
       .accountsPartial({ employer, contract })
-      .rpc();
+    );
     return txResult({ signature, contract });
   }
 
   async acceptContract(contract: PublicKey): Promise<TransactionResult> {
     const freelancer = connectedWallet(this.program);
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .acceptContract()
       .accountsPartial({ freelancer, contract })
-      .rpc();
+    );
     return txResult({ signature, contract });
   }
 
   async declineContract(contract: PublicKey): Promise<TransactionResult> {
     const freelancer = connectedWallet(this.program);
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .declineContract()
       .accountsPartial({ freelancer, contract })
-      .rpc();
+    );
     return txResult({ signature, contract });
   }
 
   async approveActivation(contract: PublicKey): Promise<TransactionResult> {
     const employer = connectedWallet(this.program);
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .approveActivation()
       .accountsPartial({ employer, contract })
-      .rpc();
+    );
     return txResult({ signature, contract });
   }
 
@@ -177,10 +178,10 @@ export class StreamPayV2Client {
       fetched.trialAmount > 0n
         ? deriveTrialWorkUnitPda(contract, this.program.programId).address
         : null;
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .rejectActivation()
       .accountsPartial({ employer, contract, trialWorkUnit })
-      .rpc();
+    );
     return txResult({
       signature,
       contract,
@@ -199,14 +200,14 @@ export class StreamPayV2Client {
       params.contract,
       this.program.programId
     ).address;
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .submitTrialWork(params.submissionUri, toHashArray(params.submissionHash))
       .accountsPartial({
         freelancer,
         contract: params.contract,
         trialWorkUnit,
       })
-      .rpc();
+    );
     return txResult({
       signature,
       contract: params.contract,
@@ -220,10 +221,10 @@ export class StreamPayV2Client {
       contract,
       this.program.programId
     ).address;
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .requestTrialRevision()
       .accountsPartial({ employer, contract, trialWorkUnit })
-      .rpc();
+    );
     return txResult({ signature, contract, trialWorkUnit });
   }
 
@@ -233,10 +234,10 @@ export class StreamPayV2Client {
       contract,
       this.program.programId
     ).address;
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .approveTrialAndActivate()
       .accountsPartial({ employer, contract, trialWorkUnit })
-      .rpc();
+    );
     return txResult({ signature, contract, trialWorkUnit });
   }
 
@@ -248,14 +249,14 @@ export class StreamPayV2Client {
   }): Promise<TransactionResult> {
     const freelancer = connectedWallet(this.program);
     assertMetadataUri(params.submissionUri);
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .submitWorkUnit(params.submissionUri, toHashArray(params.submissionHash))
       .accountsPartial({
         freelancer,
         contract: params.contract,
         workUnit: params.workUnit,
       })
-      .rpc();
+    );
     return txResult({
       signature,
       contract: params.contract,
@@ -268,14 +269,14 @@ export class StreamPayV2Client {
     workUnit: PublicKey;
   }): Promise<TransactionResult> {
     const employer = connectedWallet(this.program);
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .requestRevision()
       .accountsPartial({
         employer,
         contract: params.contract,
         workUnit: params.workUnit,
       })
-      .rpc();
+    );
     return txResult({
       signature,
       contract: params.contract,
@@ -288,14 +289,14 @@ export class StreamPayV2Client {
     workUnit: PublicKey;
   }): Promise<TransactionResult> {
     const employer = connectedWallet(this.program);
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .approveWorkUnit()
       .accountsPartial({
         employer,
         contract: params.contract,
         workUnit: params.workUnit,
       })
-      .rpc();
+    );
     return txResult({
       signature,
       contract: params.contract,
@@ -308,14 +309,14 @@ export class StreamPayV2Client {
     workUnit: PublicKey;
   }): Promise<TransactionResult> {
     const caller = connectedWallet(this.program);
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .finalizeReviewTimeout()
       .accountsPartial({
         caller,
         contract: params.contract,
         workUnit: params.workUnit,
       })
-      .rpc();
+    );
     return txResult({
       signature,
       contract: params.contract,
@@ -325,19 +326,19 @@ export class StreamPayV2Client {
 
   async releaseStreamAccrual(contract: PublicKey): Promise<TransactionResult> {
     const caller = connectedWallet(this.program);
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .releaseStreamAccrual()
       .accountsPartial({ caller, contract })
-      .rpc();
+    );
     return txResult({ signature, contract });
   }
 
   async cancelActiveContract(contract: PublicKey): Promise<TransactionResult> {
     const employer = connectedWallet(this.program);
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .cancelActiveContract()
       .accountsPartial({ employer, contract })
-      .rpc();
+    );
     return txResult({ signature, contract });
   }
 
@@ -354,7 +355,7 @@ export class StreamPayV2Client {
     const freelancerTokenAccount =
       params.freelancerTokenAccount ??
       deriveFreelancerDestinationAta(freelancer, contract.tokenMint);
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .withdrawFreelancer()
       .accountsPartial({
         freelancer,
@@ -363,7 +364,7 @@ export class StreamPayV2Client {
         contractEscrow: escrow,
         freelancerTokenAccount,
       })
-      .rpc();
+    );
     return txResult({
       signature,
       contract: params.contract,
@@ -385,7 +386,7 @@ export class StreamPayV2Client {
     const employerTokenAccount =
       params.employerTokenAccount ??
       deriveEmployerSourceAta(employer, contract.tokenMint);
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .claimEmployerRefund()
       .accountsPartial({
         employer,
@@ -394,7 +395,7 @@ export class StreamPayV2Client {
         contractEscrow: escrow,
         employerTokenAccount,
       })
-      .rpc();
+    );
     return txResult({
       signature,
       contract: params.contract,
@@ -405,10 +406,10 @@ export class StreamPayV2Client {
 
   async openDispute(contract: PublicKey): Promise<TransactionResult> {
     const party = connectedWallet(this.program);
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .openDispute()
       .accountsPartial({ party, contract })
-      .rpc();
+    );
     return txResult({ signature, contract });
   }
 
@@ -418,19 +419,19 @@ export class StreamPayV2Client {
   }): Promise<TransactionResult> {
     const resolver = connectedWallet(this.program);
     requireU64(params.freelancerContestedAward, "freelancerContestedAward");
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .resolveDispute(toBn(params.freelancerContestedAward))
       .accountsPartial({ resolver, contract: params.contract })
-      .rpc();
+    );
     return txResult({ signature, contract: params.contract });
   }
 
   async completeContract(contract: PublicKey): Promise<TransactionResult> {
     const caller = connectedWallet(this.program);
-    const signature = await this.program.methods
+    const signature = await sendV2Method(this.program, this.program.methods
       .completeContract()
       .accountsPartial({ caller, contract })
-      .rpc();
+    );
     return txResult({ signature, contract });
   }
 

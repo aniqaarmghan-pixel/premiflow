@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { CheckCircle2, Loader2, XCircle } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, XCircle } from "lucide-react";
 
 import { explorerTxUrl } from "@/lib/network";
 import { txPhaseLabel, type TxState } from "@/lib/app/tx-state";
@@ -26,6 +26,9 @@ export function TransactionStatus({ state }: { state: TxState }) {
           <motion.span initial={{ scale: 0.7, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}>
             <CheckCircle2 size={16} className="text-ok" />
           </motion.span>
+        ) : null}
+        {state.phase === "pending_confirmation" ? (
+          <AlertCircle size={16} className="text-[var(--warn)]" />
         ) : null}
         {state.phase === "failed" ? <XCircle size={16} className="text-danger" /> : null}
         {txPhaseLabel(state.phase)}

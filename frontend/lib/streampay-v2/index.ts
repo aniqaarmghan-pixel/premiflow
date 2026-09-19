@@ -23,6 +23,7 @@ export {
   getStreamPayV2Program,
   getStreamPayV2ProgramFromProvider,
   getStreamPayV2Provider,
+  bindHttpSendAndConfirm,
   streampayIdl,
   assertProgramId,
 } from "./program";
@@ -100,6 +101,25 @@ export type { UiAction, ActionAvailabilityInput } from "./actions";
 
 export { parseClientError, V2_ERROR_MESSAGES } from "./errors";
 export type { ParsedClientError } from "./errors";
+
+export {
+  confirmSignatureHttp,
+  confirmSignatureOnConnection,
+  HTTP_CONFIRM_TIMEOUT_MS,
+  HTTP_CONFIRM_INTERVAL_MS,
+  TransactionConfirmationUnknownError,
+  TransactionFailedOnChainError,
+} from "./confirm";
+export {
+  sendV2Transaction,
+  sendV2Method,
+  V2_SEND_COMMITMENT,
+} from "./send";
+export type {
+  ConfirmSignatureOutcome,
+  ConfirmSignatureOptions,
+  SignatureStatusFetcher,
+} from "./confirm";
 
 export {
   decodeContractStatus,

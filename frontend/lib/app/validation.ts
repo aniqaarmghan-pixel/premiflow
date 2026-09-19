@@ -1,5 +1,13 @@
 import { PublicKey } from "@solana/web3.js";
 
+import { toDatetimeLocalValue } from "@/lib/app/datetime";
+import {
+  assertResolverDistinct,
+  defaultPaymentToken,
+  defaultResolver,
+  findPaymentToken,
+  findResolver,
+} from "@/lib/app/premiflow";
 import {
   uiAmountToBaseUnits,
   type ContractType,
@@ -47,6 +55,35 @@ export type CreateWizardDraft = {
   milestones: MilestoneDraft[];
 };
 
+export function defaultCreateDraft(): CreateWizardDraft {
+  const token = defaultPaymentToken();
+  const resolver = defaultResolver();
+  return {
+    paymentMode: "Fixed",
+    freelancer: "",
+    resolver: resolver.address.toBase58(),
+    mint: token.mint.toBase58(),
+    decimals: token.decimals,
+    totalAmountUi: "",
+    trialEnabled: false,
+    trialAmountUi: "",
+    startMode: "OnActivation",
+    scheduledStartLocal: "",
+    durationSeconds: 86_400,
+    checkpointInterval: 3_600,
+    reviewDuration: 3_600,
+    activationReviewDuration: 3_600,
+    maxRevisions: 2,
+    acceptanceDeadlineLocal: toDatetimeLocalValue(172_800),
+    title: "",
+    description: "",
+    deliverables: "",
+    milestones: [
+      { label: "Milestone 1", amountUi: "", dueOffsetSeconds: 43_200 },
+    ],
+  };
+}
+
 export type FieldErrors = Record<string, string>;
 
 export function parsePubkey(raw: string, label: string): PublicKey {
@@ -79,13 +116,12 @@ export function validateParties(
   else if (freelancer.equals(employer)) {
     errors.freelancer = "Freelancer must be different from the connected wallet.";
   }
-  if (!resolver) errors.resolver = "Enter a valid resolver wallet.";
-  else if (resolver.equals(PublicKey.default)) {
-    errors.resolver = "Resolver cannot be the default public key.";
-  } else if (resolver.equals(employer)) {
-    errors.resolver = "Resolver must be different from the employer.";
-  } else if (freelancer && resolver.equals(freelancer)) {
-    errors.resolver = "Resolver must be different from the freelancer.";
+  if (!resolver) errors.resolver = "A PREMIFLOW resolver is not configured.";
+  else if (!findResolver(resolver)) {
+    errors.resolver = "Choose a supported PREMIFLOW resolver.";
+  } else {
+    const distinct = assertResolverDistinct(resolver, employer, freelancer);
+    if (distinct) errors.resolver = distinct;
   }
   return errors;
 }
@@ -193,8 +229,13 @@ export function validateCreateDraft(
   nowSeconds: number
 ): FieldErrors {
   const errors = validateParties(employer, draft.freelancer, draft.resolver);
-  if (!tryParsePubkey(draft.mint)) {
-    errors.mint = "Enter a valid token mint address.";
+  if (!tryParsePubkey(draft.mint) || !findPaymentToken(draft.mint)) {
+    errors.mint = "Select a supported PREMIFLOW payment token.";
+  } else {
+    const token = findPaymentToken(draft.mint);
+    if (token && draft.decimals !== token.decimals) {
+      errors.decimals = "Mint decimals must match the selected PREMIFLOW token.";
+    }
   }
   if (!Number.isInteger(draft.decimals) || draft.decimals < 0 || draft.decimals > 18) {
     errors.decimals = "Mint decimals must be between 0 and 18.";

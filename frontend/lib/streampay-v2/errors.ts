@@ -1,3 +1,8 @@
+import {
+  TransactionConfirmationUnknownError,
+  TransactionFailedOnChainError,
+} from "./confirm";
+
 export type ParsedClientError = {
   kind:
     | "anchor"
@@ -7,11 +12,13 @@ export type ParsedClientError = {
     | "insufficient_balance"
     | "missing_ata"
     | "simulation"
+    | "pending_confirmation"
     | "unknown";
   code?: number;
   name?: string;
   uiMessage: string;
   raw: string;
+  signature?: string;
 };
 
 const V2_ERROR_MESSAGES: Record<number, { name: string; message: string }> = {
@@ -193,6 +200,7 @@ function asError(err: unknown): {
   code?: number;
   logs?: string[];
   name?: string;
+  transactionMessage?: string;
   errorCode?: { code?: string; number?: number };
 } {
   if (typeof err === "string") return { message: err };
@@ -200,6 +208,7 @@ function asError(err: unknown): {
     const extra = err as Error & {
       code?: number;
       logs?: string[];
+      transactionMessage?: string;
       error?: { errorCode?: { code?: string; number?: number } };
     };
     return {
@@ -207,6 +216,7 @@ function asError(err: unknown): {
       code: extra.code,
       logs: extra.logs,
       name: err.name,
+      transactionMessage: extra.transactionMessage,
       errorCode: extra.error?.errorCode,
     };
   }
@@ -216,6 +226,7 @@ function asError(err: unknown): {
       code?: number;
       logs?: string[];
       name?: string;
+      transactionMessage?: string;
       error?: { errorCode?: { code?: string; number?: number } };
     };
     return {
@@ -223,6 +234,7 @@ function asError(err: unknown): {
       code: obj.code,
       logs: obj.logs,
       name: obj.name,
+      transactionMessage: obj.transactionMessage,
       errorCode: obj.error?.errorCode,
     };
   }
@@ -237,6 +249,8 @@ function extractNumericCode(text: string): number | undefined {
   }
   const named = text.match(/Error Code:\s*(\w+)\.\s*Error Number:\s*(\d+)/);
   if (named) return Number(named[2]);
+  const borshCustom = text.match(/"Custom"\s*:\s*(\d+)/);
+  if (borshCustom) return Number(borshCustom[1]);
   return undefined;
 }
 
@@ -244,6 +258,54 @@ export function parseClientError(err: unknown): ParsedClientError {
   const parsed = asError(err);
   const raw = [parsed.message, ...(parsed.logs ?? [])].join("\n");
   console.error("[streampay-v2]", err);
+
+  if (err instanceof TransactionConfirmationUnknownError) {
+    return {
+      kind: "pending_confirmation",
+      name: err.name,
+      signature: err.signature,
+      uiMessage:
+        "The transaction was sent, but confirmation timed out. It may still have landed. Check the signature before sending again.",
+      raw,
+    };
+  }
+
+  if (err instanceof TransactionFailedOnChainError) {
+    const failedRaw = `${raw}\n${JSON.stringify(err.err)}`;
+    const code = extractNumericCode(failedRaw);
+    if (code !== undefined && V2_ERROR_MESSAGES[code]) {
+      const mapped = V2_ERROR_MESSAGES[code];
+      return {
+        kind: "streampay_v2",
+        code,
+        name: mapped.name,
+        signature: err.signature,
+        uiMessage: mapped.message,
+        raw: failedRaw,
+      };
+    }
+    return {
+      kind: "unknown",
+      signature: err.signature,
+      uiMessage: "The transaction failed on-chain.",
+      raw: failedRaw,
+    };
+  }
+
+  if (
+    parsed.name === "TransactionExpiredTimeoutError" ||
+    /was not confirmed in .* seconds/i.test(raw)
+  ) {
+    const signature = raw.match(/Check signature\s+(\S+)/i)?.[1];
+    return {
+      kind: "pending_confirmation",
+      name: parsed.name,
+      signature,
+      uiMessage:
+        "The transaction was sent, but confirmation timed out. It may still have landed. Check the signature before sending again.",
+      raw,
+    };
+  }
 
   if (
     parsed.code === 4001 ||
@@ -292,10 +354,26 @@ export function parseClientError(err: unknown): ParsedClientError {
         raw,
       };
     }
+    const detail = parsed.transactionMessage?.trim();
+    const combined = `${raw}\n${detail ?? ""}`;
+    if (/blockhash not found/i.test(combined)) {
+      return {
+        kind: "simulation",
+        code,
+        uiMessage:
+          detail && /blockhash not found/i.test(detail)
+            ? detail
+            : "Transaction simulation failed: Blockhash not found",
+        raw,
+      };
+    }
     return {
       kind: "simulation",
       code,
-      uiMessage: "The transaction simulation failed. See logs for details.",
+      uiMessage:
+        detail && !/^simulation failed\.?$/i.test(detail)
+          ? detail
+          : "The transaction simulation failed. See logs for details.",
       raw,
     };
   }

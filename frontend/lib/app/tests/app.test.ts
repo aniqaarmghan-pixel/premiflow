@@ -24,6 +24,10 @@ import {
   type CreateWizardDraft,
 } from "../validation";
 import {
+  PREMIFLOW_RESOLVER,
+  PREMIFLOW_TEST_TOKEN,
+} from "../premiflow";
+import {
   RESOLVER,
   WALLET_A,
   WALLET_B,
@@ -32,7 +36,7 @@ import {
 } from "../../streampay-v2/tests/fixtures";
 import { estimateStreamAccrualDisplayMs } from "../stream-display";
 
-const MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+const MINT = PREMIFLOW_TEST_TOKEN.mint.toBase58();
 
 test("dashboard role grouping supports hiring and working at once", () => {
   const hiring = makeContract({
@@ -98,8 +102,20 @@ test("transaction-state reducer", () => {
   state = txReducer(state, { type: "success", signature: "sig" });
   assert.equal(state.phase, "success");
   assert.equal(txPhaseLabel("success"), "Success");
+  state = txReducer(state, { type: "submit" });
+  assert.equal(isTxBusy(state.phase), true);
   state = txReducer(state, { type: "reset" });
   assert.equal(state.phase, "ready");
+  assert.equal(isTxBusy(state.phase), false);
+  state = txReducer(state, {
+    type: "pending",
+    signature: "sig",
+    message: "Check the signature before sending again.",
+  });
+  assert.equal(state.phase, "pending_confirmation");
+  assert.equal(state.signature, "sig");
+  assert.equal(isTxBusy(state.phase), true);
+  assert.equal(txPhaseLabel("pending_confirmation"), "Confirmation unknown");
 });
 
 test("create-contract form validation", () => {
@@ -107,7 +123,7 @@ test("create-contract form validation", () => {
   const draft: CreateWizardDraft = {
     paymentMode: "Fixed",
     freelancer: WALLET_B.toBase58(),
-    resolver: RESOLVER.toBase58(),
+    resolver: PREMIFLOW_RESOLVER.address.toBase58(),
     mint: MINT,
     decimals: 6,
     totalAmountUi: "10",
