@@ -1,4 +1,4 @@
-import type { UiAction, WorkUnitStatus } from "@/lib/streampay-v2";
+import type { PaymentModeName, UiAction, WorkUnitStatus } from "@/lib/streampay-v2";
 
 /**
  * Small notice catalog for in-app toasts, later Activity rows, and optional sound.
@@ -27,7 +27,12 @@ export type NoticeKind =
   | "contract_cancelled"
   | "dispute_opened"
   | "dispute_resolved"
-  | "contract_completed";
+  | "contract_completed"
+  | "hourly_activated"
+  | "hourly_trial_activated"
+  | "hourly_session_started"
+  | "hourly_session_recorded"
+  | "hourly_contract_ended";
 
 export type NoticeCopy = {
   kind: NoticeKind;
@@ -37,6 +42,7 @@ export type NoticeCopy = {
 
 export type NoticeKindContext = {
   workUnitStatus?: WorkUnitStatus;
+  paymentMode?: PaymentModeName;
 };
 
 export const SOUND_PREF_KEY = "premiflow.soundEnabled";
@@ -152,6 +158,31 @@ export const NOTICE_CATALOG: Record<NoticeKind, NoticeCopy> = {
     title: "Contract completed",
     body: "Final settlement was recorded. This action did not itself transfer tokens.",
   },
+  hourly_activated: {
+    kind: "hourly_activated",
+    title: "Hourly contract activated",
+    body: "The hourly contract is active. Work time does not begin until the freelancer starts a session. No tokens moved.",
+  },
+  hourly_trial_activated: {
+    kind: "hourly_trial_activated",
+    title: "Trial approved and hourly contract activated",
+    body: "Trial approved. Hourly contract is active. Work time does not begin until the freelancer starts a session. The freelancer withdraws released trial funds separately.",
+  },
+  hourly_session_started: {
+    kind: "hourly_session_started",
+    title: "Work session started",
+    body: "The on-chain session start time is recorded. This did not transfer tokens or increase released pay.",
+  },
+  hourly_session_recorded: {
+    kind: "hourly_session_recorded",
+    title: "Work session recorded",
+    body: "Eligible working time was recorded in contract accounting. Tokens move only when Collect pay is sent.",
+  },
+  hourly_contract_ended: {
+    kind: "hourly_contract_ended",
+    title: "Hourly contract ended",
+    body: "Settlement of recorded earnings and unused budget was recorded. This action did not transfer tokens.",
+  },
 };
 
 export function noticeKindForAction(
@@ -164,7 +195,9 @@ export function noticeKindForAction(
     case "declineContract":
       return "contract_declined";
     case "approveActivation":
-      return "activation_approved";
+      return context?.paymentMode === "Hourly"
+        ? "hourly_activated"
+        : "activation_approved";
     case "rejectActivation":
       return context?.workUnitStatus === "Submitted" ||
         context?.workUnitStatus === "Revising"
@@ -179,7 +212,9 @@ export function noticeKindForAction(
     case "approveWorkUnit":
       return "work_approved";
     case "approveTrialAndActivate":
-      return "trial_approved_and_activated";
+      return context?.paymentMode === "Hourly"
+        ? "hourly_trial_activated"
+        : "trial_approved_and_activated";
     case "requestWorkRevision":
     case "requestTrialRevision":
       return "revision_requested";
@@ -200,6 +235,12 @@ export function noticeKindForAction(
       return "dispute_resolved";
     case "completeContract":
       return "contract_completed";
+    case "startHourlySession":
+      return "hourly_session_started";
+    case "stopHourlySession":
+      return "hourly_session_recorded";
+    case "endHourlyContract":
+      return "hourly_contract_ended";
     case "addMilestone":
     case "finalizeTerms":
       return null;

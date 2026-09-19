@@ -17,12 +17,13 @@ import {
 import { PREMIFLOW_RESOLVER, PREMIFLOW_TEST_TOKEN } from "../premiflow";
 import { WALLET_A, WALLET_B } from "../../streampay-v2/tests/fixtures";
 
-test("create type guide lists Fixed, Milestone, and Streaming only", () => {
-  assert.deepEqual([...CONTRACT_TYPES], ["Fixed", "Milestone", "Streaming"]);
+test("create type guide lists Fixed, Milestone, Streaming, and Hourly", () => {
+  assert.deepEqual([...CONTRACT_TYPES], ["Fixed", "Milestone", "Streaming", "Hourly"]);
   assert.equal(CONTRACT_TYPES.includes("Fixed"), true);
   assert.equal(CONTRACT_TYPES.includes("Milestone"), true);
   assert.equal(CONTRACT_TYPES.includes("Streaming"), true);
-  assert.equal("Hourly" in CONTRACT_TYPE_GUIDES, false);
+  assert.equal(CONTRACT_TYPES.includes("Hourly"), true);
+  assert.equal("Hourly" in CONTRACT_TYPE_GUIDES, true);
 });
 
 test("decision guide maps customer situations to existing payment modes", () => {
@@ -32,7 +33,8 @@ test("decision guide maps customer situations to existing payment modes", () => 
     [
       ["One specific deliverable", "Fixed"],
       ["Several project stages", "Milestone"],
-      ["Payment based on time", "Streaming"],
+      ["Continuous scheduled payment", "Streaming"],
+      ["Recorded working time", "Hourly"],
     ]
   );
 });
@@ -116,7 +118,7 @@ test("type cards still bind to the existing paymentMode values", () => {
   assert.equal(draft.paymentMode, "Streaming");
 });
 
-test("Create wizard still uses the three protocol types and the decision guide", () => {
+test("Create wizard uses the four protocol types and the decision guide", () => {
   const source = readFileSync(
     new URL("../../../components/create/CreateWizard.tsx", import.meta.url),
     "utf8"
@@ -126,7 +128,9 @@ test("Create wizard still uses the three protocol types and the decision guide",
   assert.match(source, /CONTRACT_TYPE_GUIDES/);
   assert.match(source, /compactExampleLines/);
   assert.match(source, /compactBestFor/);
-  assert.doesNotMatch(source, /Hourly/);
+  assert.match(source, /Hourly/);
+  assert.match(source, /createHourlyContract/);
+  assert.match(source, /createContract/);
   assert.doesNotMatch(source, /\["Fixed", "Milestone", "Streaming"\]/);
 });
 
@@ -148,6 +152,16 @@ function validDraft(overrides: Partial<CreateWizardDraft> = {}): CreateWizardDra
   draft.resolver = PREMIFLOW_RESOLVER.address.toBase58();
   return { ...draft, ...overrides };
 }
+
+test("decision guide distinguishes Hourly from Streaming", () => {
+  const streaming = CONTRACT_TYPE_GUIDES.Streaming;
+  const hourly = CONTRACT_TYPE_GUIDES.Hourly;
+  assert.match(streaming.explanation, /accrues proportionally with time/i);
+  assert.match(hourly.explanation, /explicitly starts and stops work sessions/i);
+  assert.match(hourly.collectNote ?? "", /Streaming accrues automatically/i);
+  assert.match(hourly.selectedExplanation, /Start work \/ Stop work/i);
+  assert.doesNotMatch(hourly.explanation, /accrues automatically as contract time/i);
+});
 
 test("existing Create validation still works for all three types", () => {
   const now = Math.floor(Date.now() / 1000);

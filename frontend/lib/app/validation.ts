@@ -6,9 +6,12 @@ import {
   findResolver,
   lockedCreatePayment,
 } from "@/lib/app/premiflow";
+import { canonicalHourlyEarned } from "@/lib/streampay-v2/hourly";
+import { parseAuthorizedTime, parseEngagementDuration } from "@/lib/app/hourly-ux";
 import {
   uiAmountToBaseUnits,
-  type ContractType,
+  type AuthorizedTimeUnit,
+  type PaymentModeName,
   type StartMode,
 } from "@/lib/streampay-v2";
 import {
@@ -31,12 +34,17 @@ export type MilestoneDraft = {
 };
 
 export type CreateWizardDraft = {
-  paymentMode: ContractType;
+  paymentMode: PaymentModeName;
   freelancer: string;
   resolver: string;
   mint: string;
   decimals: number;
   totalAmountUi: string;
+  hourlyRateUi: string;
+  authorizedTimeValue: string;
+  authorizedTimeUnit: AuthorizedTimeUnit;
+  engagementDurationValue: string;
+  engagementDurationUnit: AuthorizedTimeUnit;
   trialEnabled: boolean;
   trialAmountUi: string;
   startMode: StartMode;
@@ -69,7 +77,15 @@ export function applyCreateDraftPatch(
   partial: Partial<CreateWizardDraft>
 ): CreateWizardDraft {
   const { mint: _mint, resolver: _resolver, decimals: _decimals, ...unlocked } = partial;
-  return withLockedCreatePayment({ ...prev, ...unlocked });
+  const merged = { ...prev, ...unlocked };
+  if (merged.paymentMode === "Hourly") {
+    const engagement = parseEngagementDuration(
+      merged.engagementDurationValue,
+      merged.engagementDurationUnit
+    );
+    if (engagement.seconds) merged.durationSeconds = engagement.seconds;
+  }
+  return withLockedCreatePayment(merged);
 }
 
 export function defaultCreateDraft(): CreateWizardDraft {
@@ -80,6 +96,11 @@ export function defaultCreateDraft(): CreateWizardDraft {
     mint: "",
     decimals: 0,
     totalAmountUi: "",
+    hourlyRateUi: "",
+    authorizedTimeValue: "8",
+    authorizedTimeUnit: "hours",
+    engagementDurationValue: "1",
+    engagementDurationUnit: "days",
     trialEnabled: false,
     trialAmountUi: "",
     startMode: "OnActivation",
@@ -293,16 +314,42 @@ export function validateCreateDraft(
     errors.decimals = "Mint decimals must be between 0 and 18.";
   }
 
-  const total = validateAmountUi(draft.totalAmountUi, draft.decimals, "Amount");
-  if (total.error) errors.totalAmountUi = total.error;
+  let hourlyMain = 0n;
+  if (draft.paymentMode === "Hourly") {
+    const rate = validateAmountUi(draft.hourlyRateUi, draft.decimals, "Hourly rate");
+    if (rate.error) errors.hourlyRateUi = rate.error;
+    const authorized = parseAuthorizedTime(
+      draft.authorizedTimeValue,
+      draft.authorizedTimeUnit
+    );
+    if (authorized.error) errors.authorizedTimeValue = authorized.error;
+    if (rate.amount && authorized.seconds) {
+      try {
+        hourlyMain = canonicalHourlyEarned(rate.amount, BigInt(authorized.seconds));
+        if (hourlyMain === 0n) {
+          errors.hourlyRateUi =
+            "This rate and authorized time produce a zero work budget.";
+        }
+      } catch (err) {
+        errors.hourlyRateUi =
+          err instanceof Error ? err.message : "Hourly budget is invalid.";
+      }
+    }
+  } else {
+    const total = validateAmountUi(draft.totalAmountUi, draft.decimals, "Amount");
+    if (total.error) errors.totalAmountUi = total.error;
+  }
 
   let trial = 0n;
   if (draft.trialEnabled) {
     const parsed = validateAmountUi(draft.trialAmountUi, draft.decimals, "Trial amount");
     if (parsed.error) errors.trialAmountUi = parsed.error;
     else trial = parsed.amount ?? 0n;
-    if (total.amount && trial >= total.amount) {
-      errors.trialAmountUi = "Trial must be less than the total funded amount.";
+    if (draft.paymentMode !== "Hourly") {
+      const total = validateAmountUi(draft.totalAmountUi, draft.decimals, "Amount");
+      if (total.amount && trial >= total.amount) {
+        errors.trialAmountUi = "Trial must be less than the total funded amount.";
+      }
     }
   }
 
@@ -311,7 +358,21 @@ export function validateCreateDraft(
     errors.description = "Describe the work.";
   }
 
-  if (
+  if (draft.paymentMode === "Hourly") {
+    const engagement = parseEngagementDuration(
+      draft.engagementDurationValue,
+      draft.engagementDurationUnit
+    );
+    if (engagement.error) {
+      errors.engagementDurationValue = engagement.error;
+    } else if (
+      engagement.seconds != null &&
+      (engagement.seconds < MIN_DURATION_SECONDS ||
+        engagement.seconds > MAX_DURATION_SECONDS)
+    ) {
+      errors.engagementDurationValue = `Engagement window must be between ${MIN_DURATION_SECONDS}s and ${MAX_DURATION_SECONDS}s.`;
+    }
+  } else if (
     draft.durationSeconds < MIN_DURATION_SECONDS ||
     draft.durationSeconds > MAX_DURATION_SECONDS
   ) {
@@ -365,7 +426,11 @@ export function validateCreateDraft(
     }
   }
 
-  if (draft.paymentMode === "Milestone" && total.amount) {
+  if (draft.paymentMode === "Milestone") {
+    const total = validateAmountUi(draft.totalAmountUi, draft.decimals, "Amount");
+    if (!total.amount) {
+      return errors;
+    }
     const main = total.amount - trial;
     const alloc = validateMilestoneAllocation(
       draft.milestones,

@@ -24,6 +24,7 @@ export type ConfirmedNoticeInput = {
   signature?: string;
   action?: UiAction;
   workUnitStatus?: NoticeKindContext["workUnitStatus"];
+  paymentMode?: NoticeKindContext["paymentMode"];
   noticeKind?: NoticeKind;
   /** Create uses SuccessMoment instead of a toast/sound. */
   suppressNotice?: boolean;
@@ -42,6 +43,7 @@ export const SCHEDULED_ONLY_NOTICE_KINDS: readonly NoticeKind[] = [
 export function resolveNoticeKind(input: {
   action?: UiAction;
   workUnitStatus?: NoticeKindContext["workUnitStatus"];
+  paymentMode?: NoticeKindContext["paymentMode"];
   noticeKind?: NoticeKind;
 }): NoticeKind | null {
   if (input.noticeKind) {
@@ -51,6 +53,7 @@ export function resolveNoticeKind(input: {
   if (!input.action) return null;
   return noticeKindForAction(input.action, {
     workUnitStatus: input.workUnitStatus,
+    paymentMode: input.paymentMode,
   });
 }
 

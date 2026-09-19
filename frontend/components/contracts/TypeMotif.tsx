@@ -4,7 +4,7 @@ export function TypeMotif({
   type,
   active = false,
 }: {
-  type: "Fixed" | "Milestone" | "Streaming";
+  type: "Fixed" | "Milestone" | "Streaming" | "Hourly";
   active?: boolean;
 }) {
   const live = active ? "pf-motif-live" : "";
@@ -60,6 +60,31 @@ export function TypeMotif({
             ) : null}
           </g>
         ))}
+      </svg>
+    );
+  }
+
+  if (type === "Hourly") {
+    return (
+      <svg viewBox="0 0 180 100" className={`h-24 w-full ${live}`} aria-hidden="true">
+        <circle cx="90" cy="50" r="30" fill="#d7f6f3" />
+        <circle
+          cx="90"
+          cy="50"
+          r="26"
+          fill="none"
+          stroke="#12c2b8"
+          strokeWidth="3"
+        />
+        <path
+          d="M90 34 V50 L102 56"
+          fill="none"
+          stroke="#0c1b2e"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle cx="90" cy="50" r="3" fill="#0c1b2e" />
       </svg>
     );
   }

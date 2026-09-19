@@ -194,7 +194,7 @@ test("Streaming dispute context explains elapsed time, not worked hours", () => 
   assert.ok(context.notes.some((note) => /not freelancer work sessions/i.test(note)));
   assert.ok(context.notes.some((note) => /accrued pay is accounted/i.test(note)));
   const hours = DISPUTE_CATEGORIES.find((category) => category.id === "time_hours");
-  assert.match(hours?.hint ?? "", /not worked hours/i);
+  assert.match(hours?.hint ?? "", /Hourly tracks recorded/i);
 });
 
 test("trial context appears only when a trial is configured", () => {

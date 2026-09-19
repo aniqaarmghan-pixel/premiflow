@@ -116,6 +116,17 @@ export {
   workUnitStatusDetail,
 } from "./derived";
 
+export {
+  canonicalHourlyEarned,
+  authorizedTimeToSeconds,
+  engagementDurationToSeconds,
+  hasActiveHourlySession,
+  remainingAuthorizedSeconds,
+  displayHourlySessionCredit,
+  sessionIsOpen,
+} from "./hourly";
+export type { AuthorizedTimeUnit, EngagementDurationUnit } from "./hourly";
+
 export { availableActions, hasLifecycleMutation } from "./actions";
 export type { UiAction, ActionAvailabilityInput } from "./actions";
 

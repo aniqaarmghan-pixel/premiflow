@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { Flag, Layers, Waves } from "lucide-react";
+import { Flag, Layers, Timer, Waves } from "lucide-react";
 
 import { Card } from "@/components/ui/Card";
 import { Identicon } from "@/components/ui/Identicon";
@@ -42,7 +42,9 @@ export function ContractCard({
               ? "bg-cyan"
               : contract.paymentMode === "Milestone"
                 ? "bg-violet"
-                : "bg-accent-2"
+                : contract.paymentMode === "Hourly"
+                  ? "bg-gold"
+                  : "bg-accent-2"
           }`}
         />
         <div className="flex items-start justify-between gap-3">
@@ -64,6 +66,8 @@ export function ContractCard({
                 <Waves size={13} />
               ) : contract.paymentMode === "Milestone" ? (
                 <Layers size={13} />
+              ) : contract.paymentMode === "Hourly" ? (
+                <Timer size={13} />
               ) : (
                 <Flag size={13} />
               )}

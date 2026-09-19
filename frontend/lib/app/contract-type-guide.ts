@@ -1,24 +1,26 @@
-import type { ContractType } from "@/lib/streampay-v2";
+import type { PaymentModeName } from "@/lib/streampay-v2";
 
-export const CONTRACT_TYPES: readonly ContractType[] = [
+export const CONTRACT_TYPES: readonly PaymentModeName[] = [
   "Fixed",
   "Milestone",
   "Streaming",
+  "Hourly",
 ];
 
 export const CONTRACT_TYPE_DECISION_HEADING = "Which contract fits your work?";
 
 export const CONTRACT_TYPE_DECISION_HINTS: readonly {
   match: string;
-  type: ContractType;
+  type: PaymentModeName;
 }[] = [
   { match: "One specific deliverable", type: "Fixed" },
   { match: "Several project stages", type: "Milestone" },
-  { match: "Payment based on time", type: "Streaming" },
+  { match: "Continuous scheduled payment", type: "Streaming" },
+  { match: "Recorded working time", type: "Hourly" },
 ];
 
 export type ContractTypeGuide = {
-  type: ContractType;
+  type: PaymentModeName;
   title: string;
   tagline: string;
   bestFor: string;
@@ -32,7 +34,7 @@ export type ContractTypeGuide = {
   selectedExplanation: string;
 };
 
-export const CONTRACT_TYPE_GUIDES: Record<ContractType, ContractTypeGuide> = {
+export const CONTRACT_TYPE_GUIDES: Record<PaymentModeName, ContractTypeGuide> = {
   Fixed: {
     type: "Fixed",
     title: "Fixed",
@@ -101,5 +103,31 @@ export const CONTRACT_TYPE_GUIDES: Record<ContractType, ContractTypeGuide> = {
     ],
     selectedExplanation:
       "You'll fund a defined time period. Pay accrues proportionally while the stream is active.",
+  },
+  Hourly: {
+    type: "Hourly",
+    title: "Hourly",
+    tagline: "Pay for working time",
+    bestFor:
+      "Best for ongoing freelance work where the freelancer is paid at an agreed hourly rate.",
+    compactBestFor: "Logged freelance sessions",
+    exampleHeading: "Example",
+    exampleLines: [
+      "10 / hour × 8 authorized hours",
+      "Maximum work budget: 80",
+    ],
+    compactExampleLines: ["10 / hour × 8 authorized hours"],
+    explanation:
+      "The employer chooses an hourly rate and authorizes a maximum amount of working time. The maximum work budget is calculated automatically and the employer funds that budget into escrow. The freelancer explicitly starts and stops work sessions. Pay is calculated from recorded working time. Unused funded budget can be settled back to the employer when the contract ends.",
+    collectNote:
+      "Streaming accrues automatically as contract time passes. Hourly accrues only from explicit Start work / Stop work sessions. Tokens stay in escrow until collected.",
+    goodFor: [
+      "Ongoing freelance work",
+      "Logged consulting",
+      "Support retainers billed by session",
+      "Work that should not accrue while idle",
+    ],
+    selectedExplanation:
+      "You'll set an hourly rate and authorize working time. Pay accrues only from explicit Start work / Stop work sessions, not from the calendar clock.",
   },
 };

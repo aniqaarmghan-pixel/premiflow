@@ -9,6 +9,7 @@ import { withDisputeRaceMessage } from "@/lib/app/dispute-ux";
 import {
   parseClientError,
   withDeliverableRaceMessage,
+  type PaymentModeName,
   type UiAction,
   type WorkUnitStatus,
 } from "@/lib/streampay-v2";
@@ -22,6 +23,7 @@ import {
 export type TxRunContext = {
   action?: UiAction;
   workUnitStatus?: WorkUnitStatus;
+  paymentMode?: PaymentModeName;
   noticeKind?: NoticeKind;
   /** Skip toast/sound. Used by create, which already has SuccessMoment. */
   suppressNotice?: boolean;
@@ -51,6 +53,7 @@ export function useTx() {
           signature: result.signature,
           action: resolved.action,
           workUnitStatus: resolved.workUnitStatus,
+          paymentMode: resolved.paymentMode,
           noticeKind: resolved.noticeKind,
         });
       }

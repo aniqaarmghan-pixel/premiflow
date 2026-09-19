@@ -23,6 +23,7 @@ import {
   type ContractRole,
   type ContractStatus,
   type ContractType,
+  type PaymentModeName,
   type ContractView,
   type UiAction,
   type WorkUnitStatus,
@@ -199,7 +200,10 @@ export function contractActionVariant(
   if (action === "openDispute" || action === "cancelActiveContract") {
     return "danger";
   }
-  if (action === "completeContract") return "secondary";
+  if (action === "completeContract" || action === "endHourlyContract") {
+    return "secondary";
+  }
+  if (action === "stopHourlySession") return "danger";
   return "primary";
 }
 
@@ -418,12 +422,20 @@ export function actionLabel(
       return "Resolve dispute";
     case "completeContract":
       return "Mark contract finished";
+    case "startHourlySession":
+      return "Start work";
+    case "stopHourlySession":
+      return "Stop work";
+    case "endHourlyContract":
+      return "End hourly contract";
   }
 }
 
 export function confirmTitle(action: UiAction): string {
   if (action === "voidStaleRevision") return "End expired revision?";
   if (action === "openDispute") return "Open dispute?";
+  if (action === "stopHourlySession") return "Stop work?";
+  if (action === "endHourlyContract") return "End hourly contract?";
   return actionLabel(action);
 }
 
@@ -472,6 +484,12 @@ export function clientMethodForAction(action: UiAction): string {
       return "resolveDispute";
     case "completeContract":
       return "completeContract";
+    case "startHourlySession":
+      return "startHourlySession";
+    case "stopHourlySession":
+      return "stopHourlySession";
+    case "endHourlyContract":
+      return "endHourlyContract";
   }
 }
 
@@ -488,7 +506,9 @@ export function isEconomicAction(action: UiAction): boolean {
     action === "releaseStreamAccrual" ||
     action === "finalizeReviewTimeout" ||
     action === "declineContract" ||
-    action === "rejectActivation"
+    action === "rejectActivation" ||
+    action === "stopHourlySession" ||
+    action === "endHourlyContract"
   );
 }
 
@@ -514,7 +534,7 @@ export function terminalMutationActions(
   );
 }
 
-export function typeBlurb(type: ContractType): string {
+export function typeBlurb(type: PaymentModeName): string {
   return CONTRACT_TYPE_GUIDES[type].selectedExplanation;
 }
 

@@ -25,6 +25,14 @@ import {
   CONTRACT_TYPES,
 } from "@/lib/app/contract-type-guide";
 import {
+  HOURLY_COPY,
+  formatHourlyDuration,
+  hourlyCreateReviewLines,
+  hourlyFundingFromInputs,
+  parseAuthorizedTime,
+  parseEngagementDuration,
+} from "@/lib/app/hourly-ux";
+import {
   typeBlurb,
   presentType,
 } from "@/lib/app/view-model";
@@ -47,7 +55,8 @@ import {
   emptyMetadata,
   localDateTimeInputToUnixSeconds,
   uiAmountToBaseUnits,
-  type ContractType,
+  type AuthorizedTimeUnit,
+  type PaymentModeName,
 } from "@/lib/streampay-v2";
 
 const STEPS = [
@@ -79,12 +88,22 @@ export function CreateWizard() {
     [draft, now, publicKey]
   );
 
-  const totalParsed = tryAmount(draft.totalAmountUi, draft.decimals);
+  const hourlyPreview = draft.paymentMode === "Hourly"
+    ? previewHourlyFunding(draft)
+    : null;
+  const totalParsed =
+    draft.paymentMode === "Hourly"
+      ? hourlyPreview?.totalAmount ?? null
+      : tryAmount(draft.totalAmountUi, draft.decimals);
   const trialParsed = draft.trialEnabled
     ? tryAmount(draft.trialAmountUi, draft.decimals)
     : 0n;
   const mainAmount =
-    totalParsed != null && trialParsed != null ? totalParsed - trialParsed : 0n;
+    draft.paymentMode === "Hourly"
+      ? hourlyPreview?.mainAmount ?? 0n
+      : totalParsed != null && trialParsed != null
+        ? totalParsed - trialParsed
+        : 0n;
   const allocation =
     draft.paymentMode === "Milestone"
       ? validateMilestoneAllocation(
@@ -140,7 +159,6 @@ export function CreateWizard() {
       );
       return;
     }
-    const totalAmount = uiAmountToBaseUnits(draft.totalAmountUi, payment.decimals);
     const trialAmount = draft.trialEnabled
       ? uiAmountToBaseUnits(draft.trialAmountUi, payment.decimals)
       : 0n;
@@ -169,27 +187,56 @@ export function CreateWizard() {
       "Create contract",
       async () => {
       setProgressNote("Creating contract…");
-      const created = await client.createContract({
-        freelancer,
-        tokenMint: payment.mint,
-        request: {
-          contractId,
-          paymentMode: draft.paymentMode,
-          startMode: draft.startMode,
-          totalAmount,
-          acceptanceDeadline,
-          scheduledStartTime,
-          durationSeconds: draft.durationSeconds,
-          checkpointInterval,
-          reviewDuration: draft.reviewDuration,
-          activationReviewDuration: draft.activationReviewDuration,
-          maxRevisions: draft.maxRevisions,
-          trialAmount,
-          resolver: payment.resolver.address,
-          metadataUri: stored.uri,
-          metadataHash: stored.hash,
-        },
-      });
+      const created =
+        draft.paymentMode === "Hourly"
+          ? await client.createHourlyContract({
+              freelancer,
+              tokenMint: payment.mint,
+              request: {
+                contractId,
+                hourlyRate: uiAmountToBaseUnits(draft.hourlyRateUi, payment.decimals),
+                authorizedSeconds: BigInt(
+                  parseAuthorizedTime(
+                    draft.authorizedTimeValue,
+                    draft.authorizedTimeUnit
+                  ).seconds ?? 0
+                ),
+                acceptanceDeadline,
+                durationSeconds:
+                  parseEngagementDuration(
+                    draft.engagementDurationValue,
+                    draft.engagementDurationUnit
+                  ).seconds ?? 0,
+                reviewDuration: draft.reviewDuration,
+                activationReviewDuration: draft.activationReviewDuration,
+                maxRevisions: draft.maxRevisions,
+                trialAmount,
+                resolver: payment.resolver.address,
+                metadataUri: stored.uri,
+                metadataHash: stored.hash,
+              },
+            })
+          : await client.createContract({
+              freelancer,
+              tokenMint: payment.mint,
+              request: {
+                contractId,
+                paymentMode: draft.paymentMode,
+                startMode: draft.startMode,
+                totalAmount: uiAmountToBaseUnits(draft.totalAmountUi, payment.decimals),
+                acceptanceDeadline,
+                scheduledStartTime,
+                durationSeconds: draft.durationSeconds,
+                checkpointInterval,
+                reviewDuration: draft.reviewDuration,
+                activationReviewDuration: draft.activationReviewDuration,
+                maxRevisions: draft.maxRevisions,
+                trialAmount,
+                resolver: payment.resolver.address,
+                metadataUri: stored.uri,
+                metadataHash: stored.hash,
+              },
+            });
       if (draft.paymentMode === "Milestone" && created.contract) {
         for (const [i, milestone] of draft.milestones.entries()) {
           setProgressNote(`Adding milestone ${i + 1} of ${draft.milestones.length}…`);
@@ -247,7 +294,13 @@ export function CreateWizard() {
             {step === 0 ? (
               <TypeStep
                 value={draft.paymentMode}
-                onChange={(paymentMode) => patch({ paymentMode })}
+                onChange={(paymentMode) =>
+                  patch({
+                    paymentMode,
+                    startMode:
+                      paymentMode === "Hourly" ? "OnActivation" : draft.startMode,
+                  })
+                }
               />
             ) : null}
             {step === 1 ? (
@@ -281,13 +334,22 @@ export function CreateWizard() {
                   </p>
                   {errors.mint ? <p className="mt-2 text-xs text-danger">{errors.mint}</p> : null}
                 </div>
-                <Field label="Total funded amount" error={errors.totalAmountUi} hint="Includes any paid trial.">
-                  <Input
-                    value={draft.totalAmountUi}
-                    onChange={(e) => patch({ totalAmountUi: e.target.value })}
-                    placeholder="e.g. 1500"
+                {draft.paymentMode === "Hourly" ? (
+                  <HourlyPaymentFields
+                    draft={draft}
+                    errors={errors}
+                    preview={hourlyPreview}
+                    onPatch={patch}
                   />
-                </Field>
+                ) : (
+                  <Field label="Total funded amount" error={errors.totalAmountUi} hint="Includes any paid trial.">
+                    <Input
+                      value={draft.totalAmountUi}
+                      onChange={(e) => patch({ totalAmountUi: e.target.value })}
+                      placeholder="e.g. 1500"
+                    />
+                  </Field>
+                )}
               </div>
             ) : null}
             {step === 3 ? (
@@ -306,16 +368,23 @@ export function CreateWizard() {
                     placeholder="What will be delivered?"
                   />
                 </Field>
-                <Field
-                  label="Deliverables"
-                  hint="One item per line. Stored off-chain in this browser."
-                  error={errors.deliverables}
-                >
-                  <Textarea
-                    value={draft.deliverables}
-                    onChange={(e) => patch({ deliverables: e.target.value })}
-                  />
-                </Field>
+                {draft.paymentMode !== "Hourly" ? (
+                  <Field
+                    label="Deliverables"
+                    hint="One item per line. Stored off-chain in this browser."
+                    error={errors.deliverables}
+                  >
+                    <Textarea
+                      value={draft.deliverables}
+                      onChange={(e) => patch({ deliverables: e.target.value })}
+                    />
+                  </Field>
+                ) : (
+                  <p className="text-sm leading-6 text-ink-soft">
+                    Hourly contracts do not use a Fixed-style main deliverable. The freelancer
+                    records working time with Start work and Stop work after activation.
+                  </p>
+                )}
                 {draft.paymentMode === "Milestone" ? (
                   <MilestoneBuilder
                     draft={draft}
@@ -339,7 +408,10 @@ export function CreateWizard() {
                     <span className="font-medium text-ink">Optional paid trial</span>
                     <p className="mt-1 text-sm text-ink-soft">
                       The trial is protected separately. Accepting the contract does not start
-                      the main {draft.paymentMode.toLowerCase()} work until the trial is approved.
+                      {draft.paymentMode === "Hourly"
+                        ? " an Hourly work session"
+                        : ` the main ${draft.paymentMode.toLowerCase()} work`}{" "}
+                      until the trial is approved.
                     </p>
                   </span>
                 </label>
@@ -364,18 +436,25 @@ export function CreateWizard() {
             ) : null}
             {step === 5 ? (
               <div className="space-y-4">
-                <Field label="Start mode">
-                  <Select
-                    value={draft.startMode}
-                    onChange={(e) =>
-                      patch({ startMode: e.target.value as CreateWizardDraft["startMode"] })
-                    }
-                  >
-                    <option value="OnActivation">When the contract activates</option>
-                    <option value="Scheduled">At a scheduled start</option>
-                  </Select>
-                </Field>
-                {draft.startMode === "Scheduled" ? (
+                {draft.paymentMode === "Hourly" ? (
+                  <p className="text-sm leading-6 text-ink-soft">
+                    Hourly contracts activate after acceptance and any trial review. The work
+                    timer still does not start until the freelancer presses Start work.
+                  </p>
+                ) : (
+                  <Field label="Start mode">
+                    <Select
+                      value={draft.startMode}
+                      onChange={(e) =>
+                        patch({ startMode: e.target.value as CreateWizardDraft["startMode"] })
+                      }
+                    >
+                      <option value="OnActivation">When the contract activates</option>
+                      <option value="Scheduled">At a scheduled start</option>
+                    </Select>
+                  </Field>
+                )}
+                {draft.paymentMode !== "Hourly" && draft.startMode === "Scheduled" ? (
                   <Field label="Scheduled start" error={errors.scheduledStartLocal}>
                     <Input
                       type="datetime-local"
@@ -391,14 +470,51 @@ export function CreateWizard() {
                     onChange={(e) => patch({ acceptanceDeadlineLocal: e.target.value })}
                   />
                 </Field>
-                <Field label="Duration (seconds)" error={errors.durationSeconds}>
-                  <Input
-                    type="number"
-                    min={60}
-                    value={draft.durationSeconds}
-                    onChange={(e) => patch({ durationSeconds: Number(e.target.value) })}
-                  />
-                </Field>
+                {draft.paymentMode === "Hourly" ? (
+                  <div className="space-y-2">
+                    <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_140px]">
+                      <Field
+                        label="Engagement window"
+                        error={errors.engagementDurationValue}
+                        hint="Calendar period during which work sessions may happen. Converted to seconds before create."
+                      >
+                        <Input
+                          value={draft.engagementDurationValue}
+                          onChange={(e) =>
+                            patch({ engagementDurationValue: e.target.value })
+                          }
+                          placeholder="e.g. 14"
+                        />
+                      </Field>
+                      <Field label="Unit">
+                        <Select
+                          value={draft.engagementDurationUnit}
+                          onChange={(e) =>
+                            patch({
+                              engagementDurationUnit: e.target
+                                .value as AuthorizedTimeUnit,
+                            })
+                          }
+                        >
+                          <option value="hours">Hours</option>
+                          <option value="days">Days</option>
+                        </Select>
+                      </Field>
+                    </div>
+                    <p className="text-sm leading-6 text-ink-soft">
+                      {HOURLY_COPY.authorizedVsEngagement}
+                    </p>
+                  </div>
+                ) : (
+                  <Field label="Duration (seconds)" error={errors.durationSeconds}>
+                    <Input
+                      type="number"
+                      min={60}
+                      value={draft.durationSeconds}
+                      onChange={(e) => patch({ durationSeconds: Number(e.target.value) })}
+                    />
+                  </Field>
+                )}
                 {draft.paymentMode === "Streaming" ? (
                   <Field
                     label="Checkpoint interval (seconds)"
@@ -498,15 +614,27 @@ export function CreateWizard() {
           <dl className="mt-4 space-y-2 text-sm">
             <div className="flex justify-between gap-2">
               <dt className="text-white/45">Amount</dt>
-              <dd>{draft.totalAmountUi || "—"}</dd>
+              <dd>
+                {draft.paymentMode === "Hourly"
+                  ? hourlyPreview
+                    ? formatTokenAmount(hourlyPreview.mainAmount, draft.decimals)
+                    : "—"
+                  : draft.totalAmountUi || "—"}
+              </dd>
             </div>
             <div className="flex justify-between gap-2">
               <dt className="text-white/45">Trial</dt>
               <dd>{draft.trialEnabled ? draft.trialAmountUi || "—" : "None"}</dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-white/45">Duration</dt>
-              <dd>{draft.durationSeconds}s</dd>
+              <dt className="text-white/45">
+                {draft.paymentMode === "Hourly" ? "Engagement" : "Duration"}
+              </dt>
+              <dd>
+                {draft.paymentMode === "Hourly"
+                  ? `${draft.engagementDurationValue || "—"} ${draft.engagementDurationUnit}`
+                  : `${draft.durationSeconds}s`}
+              </dd>
             </div>
           </dl>
         </div>
@@ -515,7 +643,11 @@ export function CreateWizard() {
       <SuccessMoment
         open={successOpen}
         title="Contract created"
-        body="The funded contract is now waiting on the other party. Terms are on-chain; title and notes stay in this browser."
+        body={
+          draft.paymentMode === "Hourly"
+            ? "The hourly contract is funded for the maximum authorized budget. The freelancer earns only for recorded work sessions. Title and notes stay in this browser."
+            : "The funded contract is now waiting on the other party. Terms are on-chain; title and notes stay in this browser."
+        }
         onClose={() => {
           setSuccessOpen(false);
           if (createdAddress) router.push(`/contracts/${createdAddress}`);
@@ -529,15 +661,15 @@ function TypeStep({
   value,
   onChange,
 }: {
-  value: ContractType;
-  onChange: (type: ContractType) => void;
+  value: PaymentModeName;
+  onChange: (type: PaymentModeName) => void;
 }) {
   const selectedGuide = CONTRACT_TYPE_GUIDES[value];
   return (
     <div className="space-y-5">
       <div>
         <h2 className="font-display text-2xl">{CONTRACT_TYPE_DECISION_HEADING}</h2>
-        <ul className="mt-3 grid gap-2 sm:grid-cols-3">
+        <ul className="mt-3 grid gap-2 sm:grid-cols-2">
           {CONTRACT_TYPE_DECISION_HINTS.map((hint) => {
             const active = hint.type === value;
             return (
@@ -562,7 +694,7 @@ function TypeStep({
         </ul>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         {CONTRACT_TYPES.map((type) => {
           const selected = type === value;
           const guide = CONTRACT_TYPE_GUIDES[type];
@@ -739,26 +871,46 @@ function ReviewPanel({
         Creating funds the contract from your token account. Milestone contracts then add each
         milestone and lock terms in follow-up signatures.
       </p>
+      {draft.paymentMode === "Hourly" ? (
+        <p className="mt-3 text-sm leading-6 text-ink-soft">{HOURLY_COPY.fundExplain}</p>
+      ) : null}
       <ul className="mt-4 space-y-2 text-sm">
         <li>Worker: {draft.freelancer || "—"}</li>
         <li>Payment type: {presentType(draft.paymentMode)}</li>
         <li>Token: {paymentTokenLabel(draft.mint)}</li>
-        <li>Amount: {draft.totalAmountUi || "—"}</li>
-        <li>Main: {formatTokenAmount(mainAmount, draft.decimals)}</li>
-        <li>Trial: {draft.trialEnabled ? formatTokenAmount(trialAmount, draft.decimals) : "None"}</li>
+        {draft.paymentMode === "Hourly" ? (
+          <HourlyReviewLines draft={draft} mainAmount={mainAmount} trialAmount={trialAmount} />
+        ) : (
+          <>
+            <li>Amount: {draft.totalAmountUi || "—"}</li>
+            <li>Main: {formatTokenAmount(mainAmount, draft.decimals)}</li>
+            <li>Trial: {draft.trialEnabled ? formatTokenAmount(trialAmount, draft.decimals) : "None"}</li>
+          </>
+        )}
         <li>Title: {draft.title || "—"}</li>
-        <li>Start: {draft.startMode}</li>
-        <li>Duration: {draft.durationSeconds}s</li>
+        <li>
+          Start:{" "}
+          {draft.paymentMode === "Hourly"
+            ? "On activation, then freelancer Start work"
+            : draft.startMode}
+        </li>
+        {draft.paymentMode === "Hourly" ? null : (
+          <li>Duration: {draft.durationSeconds}s</li>
+        )}
         <li>Review window: {draft.reviewDuration}s</li>
         <li>Revisions: {draft.maxRevisions}</li>
-        <li>
-          Deliverables:{" "}
-          {draft.paymentMode === "Milestone"
-            ? `${draft.milestones.length} milestone${draft.milestones.length === 1 ? "" : "s"}`
-            : draft.deliverables.trim()
-              ? draft.deliverables.split("\n").filter((line) => line.trim()).length
-              : "—"}
-        </li>
+        {draft.paymentMode === "Hourly" ? (
+          <li>Deliverables: session-based — no Fixed main deliverable</li>
+        ) : (
+          <li>
+            Deliverables:{" "}
+            {draft.paymentMode === "Milestone"
+              ? `${draft.milestones.length} milestone${draft.milestones.length === 1 ? "" : "s"}`
+              : draft.deliverables.trim()
+                ? draft.deliverables.split("\n").filter((line) => line.trim()).length
+                : "—"}
+          </li>
+        )}
       </ul>
       <details className="mt-4 rounded-2xl border border-line bg-paper px-4 py-3 text-sm">
         <summary className="cursor-pointer font-medium text-ink-soft">
@@ -778,6 +930,141 @@ function ReviewPanel({
   );
 }
 
+function previewHourlyFunding(draft: CreateWizardDraft) {
+  const rate = tryAmount(draft.hourlyRateUi, draft.decimals);
+  const authorized = parseAuthorizedTime(
+    draft.authorizedTimeValue,
+    draft.authorizedTimeUnit
+  );
+  if (rate == null || !authorized.seconds) return null;
+  const trial = draft.trialEnabled
+    ? tryAmount(draft.trialAmountUi, draft.decimals)
+    : 0n;
+  if (trial == null) return null;
+  try {
+    return hourlyFundingFromInputs({
+      hourlyRate: rate,
+      authorizedSeconds: authorized.seconds,
+      trialAmount: trial,
+    });
+  } catch {
+    return null;
+  }
+}
+
+function HourlyPaymentFields({
+  draft,
+  errors,
+  preview,
+  onPatch,
+}: {
+  draft: CreateWizardDraft;
+  errors: Record<string, string>;
+  preview: ReturnType<typeof previewHourlyFunding>;
+  onPatch: (partial: Partial<CreateWizardDraft>) => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <Field
+        label="Hourly rate"
+        error={errors.hourlyRateUi}
+        hint={`Token units per hour in ${paymentTokenLabel(draft.mint)}.`}
+      >
+        <Input
+          value={draft.hourlyRateUi}
+          onChange={(e) => onPatch({ hourlyRateUi: e.target.value })}
+          placeholder="e.g. 10"
+        />
+      </Field>
+      <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_140px]">
+        <Field
+          label="Authorized working time"
+          error={errors.authorizedTimeValue}
+          hint="Converted to whole seconds before the transaction is built."
+        >
+          <Input
+            value={draft.authorizedTimeValue}
+            onChange={(e) => onPatch({ authorizedTimeValue: e.target.value })}
+            placeholder="e.g. 8"
+          />
+        </Field>
+        <Field label="Unit">
+          <Select
+            value={draft.authorizedTimeUnit}
+            onChange={(e) =>
+              onPatch({
+                authorizedTimeUnit: e.target.value as AuthorizedTimeUnit,
+              })
+            }
+          >
+            <option value="hours">Hours</option>
+            <option value="days">Days</option>
+          </Select>
+        </Field>
+      </div>
+      <div className="rounded-2xl border border-line bg-paper px-4 py-3 text-sm">
+        <p>
+          Hourly rate:{" "}
+          <span className="font-medium text-ink">
+            {draft.hourlyRateUi || "—"} / hour
+          </span>
+        </p>
+        <p className="mt-1">
+          Authorized time:{" "}
+          <span className="font-medium text-ink">
+            {preview
+              ? formatHourlyDuration(preview.authorizedSeconds)
+              : `${draft.authorizedTimeValue || "—"} ${draft.authorizedTimeUnit}`}
+          </span>
+        </p>
+        <p className="mt-1">
+          Maximum work budget:{" "}
+          <span className="font-medium text-ink">
+            {preview
+              ? formatTokenAmount(preview.mainAmount, draft.decimals)
+              : "—"}
+          </span>
+        </p>
+        <p className="mt-2 text-ink-soft">{HOURLY_COPY.fundExplain}</p>
+        <p className="mt-2 text-ink-soft">{HOURLY_COPY.authorizedVsEngagement}</p>
+      </div>
+    </div>
+  );
+}
+
+function HourlyReviewLines({
+  draft,
+  mainAmount,
+  trialAmount,
+}: {
+  draft: CreateWizardDraft;
+  mainAmount: bigint;
+  trialAmount: bigint;
+}) {
+  const preview = previewHourlyFunding(draft);
+  const lines = hourlyCreateReviewLines({
+    hourlyRateUi: draft.hourlyRateUi,
+    authorizedTimeValue: draft.authorizedTimeValue,
+    authorizedTimeUnit: draft.authorizedTimeUnit,
+    engagementDurationValue: draft.engagementDurationValue,
+    engagementDurationUnit: draft.engagementDurationUnit,
+    maxWorkBudgetLabel: formatTokenAmount(mainAmount, draft.decimals),
+    trialEnabled: draft.trialEnabled,
+    trialAmountLabel: formatTokenAmount(trialAmount, draft.decimals),
+    maxEscrowLabel: `${formatTokenAmount(mainAmount + trialAmount, draft.decimals)} (work budget${draft.trialEnabled ? " + trial" : ""})`,
+  });
+  return (
+    <>
+      {lines.map((line) => (
+        <li key={line}>{line}</li>
+      ))}
+      {preview ? (
+        <li className="text-ink-soft">{HOURLY_COPY.authorizedVsEngagement}</li>
+      ) : null}
+    </>
+  );
+}
+
 function tryAmount(ui: string, decimals: number): bigint | null {
   try {
     return uiAmountToBaseUnits(ui, decimals);
@@ -794,7 +1081,18 @@ function stepReady(
 ): boolean {
   if (step === 0) return true;
   if (step === 1) return !errors.freelancer;
-  if (step === 2) return !errors.mint && !errors.totalAmountUi && !errors.decimals;
+  if (step === 2) {
+    if (draft.paymentMode === "Hourly") {
+      return (
+        !errors.mint &&
+        !errors.decimals &&
+        !errors.hourlyRateUi &&
+        !errors.authorizedTimeValue &&
+        Boolean(draft.hourlyRateUi.trim())
+      );
+    }
+    return !errors.mint && !errors.totalAmountUi && !errors.decimals;
+  }
   if (step === 3) {
     if (errors.title || errors.description) return false;
     if (draft.paymentMode === "Milestone") return milestonesOk;
@@ -804,6 +1102,7 @@ function stepReady(
   if (step === 5) {
     return (
       !errors.durationSeconds &&
+      !errors.engagementDurationValue &&
       !errors.reviewDuration &&
       !errors.acceptanceDeadlineLocal &&
       !errors.scheduledStartLocal &&

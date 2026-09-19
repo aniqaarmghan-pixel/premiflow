@@ -24,7 +24,13 @@ import {
 import { supportTopicHref } from "@/lib/app/support";
 import { Card } from "@/components/ui/Card";
 import { Field, Select, Textarea } from "@/components/ui/Field";
-import type { ContractRole, ContractView, WorkUnitView } from "@/lib/streampay-v2";
+import type {
+  ContractRole,
+  ContractView,
+  HourlySessionView,
+  HourlyStateView,
+  WorkUnitView,
+} from "@/lib/streampay-v2";
 
 export function ResolutionCenter({
   contract,
@@ -37,12 +43,16 @@ export function ResolutionCenter({
   onCategoryChange,
   description,
   onDescriptionChange,
+  hourlyState,
+  hourlySession,
 }: {
   contract: ContractView;
   units: readonly WorkUnitView[];
   now: number;
   decimals?: number;
   role: ContractRole;
+  hourlyState?: HourlyStateView | null;
+  hourlySession?: HourlySessionView | null;
   showOpenGuidance: boolean;
   category: DisputeCategoryId | "";
   onCategoryChange: (value: DisputeCategoryId | "") => void;
@@ -50,8 +60,12 @@ export function ResolutionCenter({
   onDescriptionChange: (value: string) => void;
 }) {
   const resolver = presentResolver(contract.resolver);
-  const context = resolutionContext(contract, units, now, (amount) =>
-    formatTokenAmount(amount, decimals)
+  const context = resolutionContext(
+    contract,
+    units,
+    now,
+    (amount) => formatTokenAmount(amount, decimals),
+    { hourlyState, hourlySession }
   );
   const lifecycle = resolutionLifecycleState(contract.status);
   const disputed = contract.status === "Disputed";

@@ -1,12 +1,21 @@
 import { formatUnix } from "@/lib/app/datetime";
 import { presentResolver } from "@/lib/app/dispute-ux";
 import {
+  HOURLY_COPY,
+  displayHourlyWorkLog,
+  formatHourlyDuration,
+  hourlySessionIndexLabel,
+} from "@/lib/app/hourly-ux";
+import { remainingAuthorizedSeconds } from "@/lib/streampay-v2/hourly";
+import {
   estimatedStreamAccrualForContract,
   paymentModeLabel,
   projectedContestedRemainder,
   workUnitStatusLabel,
   type ContractType,
   type ContractView,
+  type HourlySessionView,
+  type HourlyStateView,
   type WorkUnitView,
 } from "@/lib/streampay-v2";
 
@@ -174,7 +183,7 @@ export const DISPUTE_CATEGORIES: readonly DisputeCategory[] = [
   {
     id: "time_hours",
     label: "Time or hours disagreement",
-    hint: "Future-safe wording. Current Streaming tracks elapsed contract time, not worked hours.",
+    hint: "Streaming tracks elapsed contract time. Hourly tracks recorded Start work / Stop work sessions.",
   },
   {
     id: "other",
@@ -245,11 +254,17 @@ export function resolutionLifecycleState(
   });
 }
 
+export type HourlyResolutionInput = {
+  hourlyState?: HourlyStateView | null;
+  hourlySession?: HourlySessionView | null;
+};
+
 export function resolutionContext(
   contract: ContractView,
   units: readonly WorkUnitView[],
   now: number,
-  formatAmount: (amount: bigint) => string = (amount) => amount.toString()
+  formatAmount: (amount: bigint) => string = (amount) => amount.toString(),
+  hourly?: HourlyResolutionInput
 ): ResolutionContext {
   const facts: EvidenceFact[] = [
     accountFact("Contract type", paymentModeLabel(contract.paymentMode)),
@@ -279,9 +294,9 @@ export function resolutionContext(
   const resolver = presentResolver(contract.resolver);
   facts.push(accountFact("Designated resolver", resolver.displayName));
 
-  const notes = contextNotes(contract);
+  const notes = contextNotes(contract, hourly);
   const trial = trialFacts(contract, units, formatAmount);
-  const typed = typeFacts(contract, units, now, formatAmount);
+  const typed = typeFacts(contract, units, now, formatAmount, hourly);
   return {
     paymentMode: contract.paymentMode,
     facts: [...facts, ...typed],
@@ -294,8 +309,16 @@ function accountFact(label: string, value: string): EvidenceFact {
   return { label, value, source: "account" };
 }
 
-function contextNotes(contract: ContractView): string[] {
+function contextNotes(contract: ContractView, hourly?: HourlyResolutionInput): string[] {
   const notes: string[] = [];
+  if (contract.paymentMode === "Hourly") {
+    notes.push(
+      "Hourly pay accrues only from recorded Start work / Stop work sessions, not from calendar time passing."
+    );
+    if (hourly?.hourlySession?.status === "Open") {
+      notes.push(HOURLY_COPY.disputeDuringSession);
+    }
+  }
   if (contract.paymentMode === "Streaming") {
     notes.push(
       "Streaming tracks elapsed contract time on the funded stream, not freelancer work sessions or hours."
@@ -323,7 +346,8 @@ function typeFacts(
   contract: ContractView,
   units: readonly WorkUnitView[],
   now: number,
-  formatAmount: (amount: bigint) => string
+  formatAmount: (amount: bigint) => string,
+  hourly?: HourlyResolutionInput
 ): EvidenceFact[] {
   const facts: EvidenceFact[] = [];
   const main = units.filter((unit) => unit.kind !== "Trial");
@@ -363,6 +387,29 @@ function typeFacts(
           `${workUnitStatusLabel(unit.status)} · ${formatAmount(unit.amount)}`
         )
       );
+    }
+  }
+
+  if (contract.paymentMode === "Hourly" && hourly?.hourlyState) {
+    const state = hourly.hourlyState;
+    const remaining = remainingAuthorizedSeconds(state);
+    facts.push(accountFact("Hourly rate", `${formatAmount(state.hourlyRate)} / hour`));
+    facts.push(
+      accountFact("Authorized time", formatHourlyDuration(Number(state.authorizedSeconds)))
+    );
+    facts.push(
+      accountFact("Recorded time", formatHourlyDuration(Number(state.approvedSeconds)))
+    );
+    facts.push(
+      accountFact("Remaining authorized time", formatHourlyDuration(Number(remaining)))
+    );
+    facts.push(accountFact("Active session", hourlySessionIndexLabel(state)));
+    if (hourly.hourlySession?.status === "Open") {
+      facts.push(accountFact("Session status", "Open"));
+    }
+    const workLog = displayHourlyWorkLog(hourly.hourlySession?.workLogUri);
+    if (workLog) {
+      facts.push(accountFact("Work log reference", workLog));
     }
   }
 

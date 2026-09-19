@@ -9,7 +9,9 @@ import {
   remainingFreelancerClaim,
   roleForContract,
 } from "./derived";
-import type { ContractView, WorkUnitView } from "./types";
+import type { ContractView, HourlyStateView, WorkUnitView } from "./types";
+import { hasActiveHourlySession, remainingAuthorizedSeconds } from "./hourly";
+import { MAX_HOURLY_SESSIONS } from "./constants";
 
 export type UiAction =
   | "addMilestone"
@@ -32,13 +34,17 @@ export type UiAction =
   | "claimEmployerRefund"
   | "openDispute"
   | "resolveDispute"
-  | "completeContract";
+  | "completeContract"
+  | "startHourlySession"
+  | "stopHourlySession"
+  | "endHourlyContract";
 
 export type ActionAvailabilityInput = {
   wallet: PublicKey;
   contract: ContractView;
   workUnit?: WorkUnitView | null;
   trialUnit?: WorkUnitView | null;
+  hourlyState?: HourlyStateView | null;
   now: number;
 };
 
@@ -123,7 +129,16 @@ export function availableActions(input: ActionAvailabilityInput): UiAction[] {
     }
     if (role === "employer") {
       if (contract.openReviewCount === 0) {
-        actions.add("cancelActiveContract");
+        if (contract.paymentMode === "Hourly") {
+          if (
+            input.hourlyState &&
+            !hasActiveHourlySession(input.hourlyState)
+          ) {
+            actions.add("endHourlyContract");
+          }
+        } else {
+          actions.add("cancelActiveContract");
+        }
       }
       if (unit?.status === "Submitted") {
         actions.add("approveWorkUnit");
@@ -141,11 +156,24 @@ export function availableActions(input: ActionAvailabilityInput): UiAction[] {
     if (role === "freelancer") {
       if (
         contract.paymentMode !== "Streaming" &&
+        contract.paymentMode !== "Hourly" &&
         unit &&
         (unit.status === "Defined" || unit.status === "Revising") &&
         (unit.kind === "Fixed" || unit.kind === "Milestone")
       ) {
         actions.add("submitWorkUnit");
+      }
+      if (contract.paymentMode === "Hourly" && input.hourlyState) {
+        if (
+          !hasActiveHourlySession(input.hourlyState) &&
+          remainingAuthorizedSeconds(input.hourlyState) > 0n &&
+          input.hourlyState.sessionCount < MAX_HOURLY_SESSIONS
+        ) {
+          actions.add("startHourlySession");
+        }
+        if (hasActiveHourlySession(input.hourlyState)) {
+          actions.add("stopHourlySession");
+        }
       }
       if (remainingFreelancerClaim(contract) > 0n) {
         actions.add("withdrawFreelancer");

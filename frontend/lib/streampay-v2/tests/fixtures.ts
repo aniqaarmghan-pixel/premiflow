@@ -1,6 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 
-import type { ContractView, WorkUnitView } from "../types";
+import { HOURLY_NO_ACTIVE_SESSION } from "../constants";
+import type { ContractView, HourlySessionView, HourlyStateView, WorkUnitView } from "../types";
 
 export const WALLET_A = new PublicKey("11111111111111111111111111111111");
 export const WALLET_B = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
@@ -87,6 +88,44 @@ export function makeWorkUnit(
     submissionHash: ZERO32,
     bump: 253,
     submissionUri: "",
+    ...overrides,
+  };
+}
+
+export function makeHourlyState(
+  overrides: Partial<HourlyStateView> = {}
+): HourlyStateView {
+  return {
+    address: WALLET_C,
+    version: 1,
+    contract: WALLET_C,
+    hourlyRate: 10_000_000n,
+    authorizedSeconds: 28_800n,
+    approvedSeconds: 0n,
+    sessionCount: 0,
+    activeSessionIndex: HOURLY_NO_ACTIVE_SESSION,
+    maxSessionSeconds: 28_800n,
+    minSessionSeconds: 60n,
+    bump: 250,
+    ...overrides,
+  };
+}
+
+export function makeHourlySession(
+  overrides: Partial<HourlySessionView> = {}
+): HourlySessionView {
+  return {
+    address: WALLET_C,
+    version: 1,
+    contract: WALLET_C,
+    index: 0,
+    startedAt: 1_700_000_100,
+    stoppedAt: 0,
+    durationSeconds: 0n,
+    status: "Open",
+    workLogHash: ZERO32,
+    bump: 249,
+    workLogUri: "",
     ...overrides,
   };
 }

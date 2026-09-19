@@ -9,6 +9,7 @@ import { Lifecycle } from "@/components/contracts/Lifecycle";
 import { PaymentProgress } from "@/components/contracts/PaymentProgress";
 import { ResolutionCenter } from "@/components/contracts/ResolutionCenter";
 import { StatusBadge } from "@/components/contracts/StatusBadge";
+import { HourlyShowcase } from "@/components/contracts/HourlyShowcase";
 import { StreamShowcase } from "@/components/contracts/StreamShowcase";
 import { ConnectPrompt } from "@/components/shell/ConnectPrompt";
 import { PageFade } from "@/components/shell/PageFade";
@@ -33,6 +34,12 @@ import {
   shouldOfferOpenDispute,
   shouldRefreshAfterDisputeFailure,
 } from "@/lib/app/dispute-ux";
+import {
+  HOURLY_COPY,
+  endHourlyCopy,
+  resolveHourlyWorkLogUri,
+  stopHourlyCopy,
+} from "@/lib/app/hourly-ux";
 import {
   CASE_PREPARATION_COPY,
   DISPUTE_CATEGORIES,
@@ -76,7 +83,11 @@ import { useTx } from "@/lib/hooks/useTx";
 import { useContracts } from "@/lib/hooks/ContractsProvider";
 import {
   availableActions,
+  deriveHourlySessionPda,
+  deriveHourlyStatePda,
   fetchContract,
+  fetchHourlySession,
+  fetchHourlyState,
   fetchWorkUnitsForContract,
   getStreamPayV2Program,
   hashBytes,
@@ -87,9 +98,12 @@ import {
   type ContractMetadata,
   type ContractRole,
   type ContractView,
+  type HourlySessionView,
+  type HourlyStateView,
   type UiAction,
   type WorkUnitView,
 } from "@/lib/streampay-v2";
+import { HOURLY_NO_ACTIVE_SESSION } from "@/lib/streampay-v2/constants";
 
 const UNIT_ACTIONS: UiAction[] = [
   "submitWorkUnit",
@@ -117,6 +131,8 @@ export function ContractDetail({ address }: { address: string }) {
   const [error, setError] = useState<string | null>(null);
   const [contract, setContract] = useState<ContractView | null>(null);
   const [units, setUnits] = useState<WorkUnitView[]>([]);
+  const [hourlyState, setHourlyState] = useState<HourlyStateView | null>(null);
+  const [hourlySession, setHourlySession] = useState<HourlySessionView | null>(null);
   const [decimals, setDecimals] = useState<number | undefined>();
   const [metadata, setMetadata] = useState<ContractMetadata | null>(null);
   const [confirm, setConfirm] = useState<{
@@ -141,6 +157,27 @@ export function ContractDetail({ address }: { address: string }) {
       const work = await fetchWorkUnitsForContract(program, pk);
       setContract(fetched);
       setUnits(work);
+      if (fetched.paymentMode === "Hourly") {
+        const statePda = deriveHourlyStatePda(pk, program.programId);
+        const state = await fetchHourlyState(program, statePda.address);
+        setHourlyState(state);
+        if (
+          state.activeSessionIndex !== HOURLY_NO_ACTIVE_SESSION &&
+          Number.isFinite(state.activeSessionIndex)
+        ) {
+          const sessionPda = deriveHourlySessionPda(
+            pk,
+            state.activeSessionIndex,
+            program.programId
+          );
+          setHourlySession(await fetchHourlySession(program, sessionPda.address));
+        } else {
+          setHourlySession(null);
+        }
+      } else {
+        setHourlyState(null);
+        setHourlySession(null);
+      }
       try {
         const mint = await getMint(connection, fetched.tokenMint);
         setDecimals(mint.decimals);
@@ -175,9 +212,10 @@ export function ContractDetail({ address }: { address: string }) {
       wallet: publicKey,
       contract,
       trialUnit,
+      hourlyState,
       now,
     });
-  }, [contract, now, publicKey, units]);
+  }, [contract, hourlyState, now, publicKey, units]);
 
   if (!connected) return <ConnectPrompt />;
   if (status === "loading" && !contract) {
@@ -314,6 +352,19 @@ export function ContractDetail({ address }: { address: string }) {
         }
         case "completeContract":
           return client.completeContract(contract.address);
+        case "startHourlySession":
+          return client.startHourlySession(contract.address);
+        case "stopHourlySession": {
+          const workLogUri = resolveHourlyWorkLogUri(uri);
+          const hash = await hashBytes(new TextEncoder().encode(workLogUri));
+          return client.stopHourlySession({
+            contract: contract.address,
+            workLogUri,
+            workLogHash: hash,
+          });
+        }
+        case "endHourlyContract":
+          return client.endHourlyContract(contract.address);
         case "addMilestone": {
           if (decimals == null) throw new Error("Mint decimals are required.");
           const parsed = validateAmountUi(milestoneAmountUi, decimals, "Milestone amount");
@@ -339,6 +390,7 @@ export function ContractDetail({ address }: { address: string }) {
         workUnitStatus:
           unit?.status ??
           (action === "rejectActivation" ? trial?.status : undefined),
+        paymentMode: contract.paymentMode,
       }
     );
     setConfirm(null);
@@ -361,8 +413,14 @@ export function ContractDetail({ address }: { address: string }) {
     void execute(action, unit);
   }
 
+  const hourlyPrimary: UiAction[] = [
+    "startHourlySession",
+    "stopHourlySession",
+    "endHourlyContract",
+  ];
   const contractButtons = actions
     .filter((a) => !UNIT_ACTIONS.includes(a) && !TRIAL_ACTIONS.includes(a))
+    .filter((a) => !hourlyPrimary.includes(a))
     .sort((a, b) => {
       if (a === "completeContract") return 1;
       if (b === "completeContract") return -1;
@@ -400,6 +458,8 @@ export function ContractDetail({ address }: { address: string }) {
             now={now}
             decimals={decimals}
             role={role}
+            hourlyState={hourlyState}
+            hourlySession={hourlySession}
             showOpenGuidance={openDisputeShown}
             category={disputeCategory}
             onCategoryChange={setDisputeCategory}
@@ -411,6 +471,26 @@ export function ContractDetail({ address }: { address: string }) {
         <Card className="p-5">
           <Lifecycle contract={contract} />
         </Card>
+
+        {contract.paymentMode === "Hourly" ? (
+          <HourlyShowcase
+            contract={contract}
+            hourlyState={hourlyState}
+            hourlySession={hourlySession}
+            now={now}
+            decimals={decimals}
+            role={role}
+            canStart={actions.includes("startHourlySession")}
+            canStop={actions.includes("stopHourlySession")}
+            canEnd={actions.includes("endHourlyContract")}
+            canCollect={actions.includes("withdrawFreelancer")}
+            busy={tx.busy}
+            onStart={() => requestAction("startHourlySession")}
+            onStop={() => requestAction("stopHourlySession")}
+            onEnd={() => requestAction("endHourlyContract")}
+            onCollect={() => requestAction("withdrawFreelancer")}
+          />
+        ) : null}
 
         {contract.paymentMode === "Streaming" ? (
           <>
@@ -499,7 +579,7 @@ export function ContractDetail({ address }: { address: string }) {
           </Card>
         ) : null}
 
-        {contract.paymentMode !== "Streaming" ? (
+        {contract.paymentMode !== "Streaming" && contract.paymentMode !== "Hourly" ? (
           <Card className="p-5">
             <h2 className="font-display text-2xl">
               {contract.paymentMode === "Milestone" ? "Milestones" : "Deliverable"}
@@ -682,6 +762,7 @@ export function ContractDetail({ address }: { address: string }) {
             awardUi={awardUi}
             setAwardUi={setAwardUi}
             disputeCategory={disputeCategory}
+            hourlySessionOpen={hourlySession?.status === "Open"}
           />
         ) : null}
       </Modal>
@@ -791,6 +872,7 @@ function ConfirmBody({
   awardUi,
   setAwardUi,
   disputeCategory,
+  hourlySessionOpen,
 }: {
   action: UiAction;
   contract: ContractView;
@@ -801,6 +883,7 @@ function ConfirmBody({
   awardUi: string;
   setAwardUi: (v: string) => void;
   disputeCategory: DisputeCategoryId | "";
+  hourlySessionOpen?: boolean;
 }) {
   if (action === "submitWorkUnit") {
     const copy = officialDeliverableCopy(contract);
@@ -854,6 +937,41 @@ function ConfirmBody({
       </Field>
     );
   }
+  if (action === "stopHourlySession") {
+    const copy = stopHourlyCopy();
+    return (
+      <div className="space-y-3 text-sm leading-6 text-ink-soft">
+        <p>{copy.intro}</p>
+        <ul className="list-disc space-y-1 pl-5">
+          {copy.points.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+        <p>{HOURLY_COPY.stopNotWithdraw}</p>
+        <p>{HOURLY_COPY.shortSession} {HOURLY_COPY.shortRemainder}</p>
+        <Field label="Work log reference (optional)" hint={copy.workLogHint}>
+          <Input
+            value={uri}
+            onChange={(e) => setUri(e.target.value)}
+            placeholder="https://… or a short note"
+          />
+        </Field>
+      </div>
+    );
+  }
+  if (action === "endHourlyContract") {
+    const copy = endHourlyCopy();
+    return (
+      <div className="space-y-3 text-sm leading-6 text-ink-soft">
+        <p>{copy.intro}</p>
+        <ul className="list-disc space-y-1 pl-5">
+          {copy.points.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
   if (action === "cancelActiveContract") {
     return (
       <p>
@@ -888,6 +1006,9 @@ function ConfirmBody({
           </span>
         </p>
         {presentation.streamingNote ? <p>{presentation.streamingNote}</p> : null}
+        {contract.paymentMode === "Hourly" && hourlySessionOpen ? (
+          <p>{HOURLY_COPY.disputeDuringSession}</p>
+        ) : null}
         {selected ? (
           <p>
             Optional page note: {selected.label}. {CASE_PREPARATION_COPY.notStored}
@@ -962,6 +1083,7 @@ function ConfirmBody({
             : copy.intro}
         </p>
         {streaming ? <p>{STREAMING_PAY_EXPLAINER}</p> : null}
+        {contract.paymentMode === "Hourly" ? <p>{HOURLY_COPY.collectExplain}</p> : null}
         <dl className="grid gap-2 sm:grid-cols-3">
           <div>
             <dt className="text-xs uppercase tracking-wide text-ink-faint">
