@@ -8,10 +8,11 @@
 use anchor_lang::prelude::*;
 
 use crate::v2::constants::CONTRACT_SEED;
-use crate::v2::enums::ContractStatus;
+use crate::v2::enums::{ContractStatus, PaymentMode};
 use crate::v2::errors::StreamPayV2Error;
 use crate::v2::events::ContractCancellationSettled;
-use crate::v2::state::Contract;
+use crate::v2::hourly::require_hourly_state_account;
+use crate::v2::state::{Contract, HourlyState};
 
 #[derive(Accounts)]
 pub struct CancelActiveContract<'info> {
@@ -29,6 +30,11 @@ pub struct CancelActiveContract<'info> {
         bump = contract.bump,
     )]
     pub contract: Account<'info, Contract>,
+
+    /// Required for Hourly so an Open session cannot be cancelled away.
+    /// Must be absent for Fixed / Milestone / Streaming.
+    #[account(mut)]
+    pub hourly_state: Option<Account<'info, HourlyState>>,
 }
 
 pub fn handle_cancel_active_contract(ctx: Context<CancelActiveContract>) -> Result<()> {
@@ -47,6 +53,29 @@ pub fn handle_cancel_active_contract(ctx: Context<CancelActiveContract>) -> Resu
         contract.open_review_count == 0,
         StreamPayV2Error::OpenReviewBlocksCancel
     );
+
+    if contract.payment_mode == PaymentMode::Hourly {
+        let state = ctx
+            .accounts
+            .hourly_state
+            .as_ref()
+            .ok_or(StreamPayV2Error::HourlyStateMissing)?;
+        require_hourly_state_account(
+            &contract.key(),
+            state,
+            &state.key(),
+            ctx.program_id,
+        )?;
+        require!(
+            !state.has_active_session(),
+            StreamPayV2Error::HourlyOpenSessionBlocksClose
+        );
+    } else {
+        require!(
+            ctx.accounts.hourly_state.is_none(),
+            StreamPayV2Error::InvalidPaymentMode
+        );
+    }
 
     let contract_key = contract.key();
     let employer = contract.employer;

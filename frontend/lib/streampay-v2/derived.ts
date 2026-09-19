@@ -249,6 +249,7 @@ export function mayAttemptCompletion(
   now: number
 ): boolean {
   if (contract.status !== "Active") return false;
+  if (contract.paymentMode === "Hourly") return false;
   if (contract.paymentMode === "Streaming") {
     return now >= contract.endTime && contract.endTime > 0;
   }
@@ -286,7 +287,7 @@ export function contractStatusLabel(status: ContractStatus): string {
   }
 }
 
-export function paymentModeLabel(mode: ContractType): string {
+export function paymentModeLabel(mode: ContractType | "Hourly"): string {
   switch (mode) {
     case "Streaming":
       return "Streaming";
@@ -294,6 +295,8 @@ export function paymentModeLabel(mode: ContractType): string {
       return "Milestone";
     case "Fixed":
       return "Fixed";
+    case "Hourly":
+      return "Hourly";
   }
 }
 

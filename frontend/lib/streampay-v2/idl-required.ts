@@ -21,6 +21,10 @@ export const REQUIRED_V2_INSTRUCTIONS = [
   "open_dispute",
   "resolve_dispute",
   "complete_contract",
+  "create_hourly_contract",
+  "start_hourly_session",
+  "stop_hourly_session",
+  "end_hourly_contract",
 ] as const;
 
 export type RequiredV2Instruction = (typeof REQUIRED_V2_INSTRUCTIONS)[number];

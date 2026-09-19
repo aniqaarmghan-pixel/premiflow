@@ -195,6 +195,49 @@ const V2_ERROR_MESSAGES: Record<number, { name: string; message: string }> = {
     message: "The contract is not ready for completion.",
   },
   6165: { name: "ContractAlreadyCompleted", message: "This contract is already completed." },
+  6166: { name: "InvalidHourlyRate", message: "Hourly rate must be greater than zero." },
+  6167: {
+    name: "InvalidAuthorizedSeconds",
+    message: "Authorized Hourly seconds must be greater than zero.",
+  },
+  6168: {
+    name: "HourlyMainAmountZero",
+    message: "Derived Hourly main amount is zero.",
+  },
+  6169: {
+    name: "HourlyStateMissing",
+    message: "HourlyState account is required for this Hourly operation.",
+  },
+  6170: {
+    name: "InvalidHourlyState",
+    message: "HourlyState does not belong to this contract.",
+  },
+  6171: { name: "HourlySessionAlreadyActive", message: "An Hourly session is already open." },
+  6172: { name: "NoActiveHourlySession", message: "There is no open Hourly session." },
+  6173: {
+    name: "HourlySessionLimitReached",
+    message: "This contract has reached the Hourly session limit.",
+  },
+  6174: {
+    name: "HourlyAuthorizedTimeExhausted",
+    message: "Authorized Hourly time is exhausted.",
+  },
+  6175: {
+    name: "HourlyEngagementExpired",
+    message: "The Hourly engagement window has closed.",
+  },
+  6176: {
+    name: "InvalidHourlySession",
+    message: "HourlySession does not belong to this contract.",
+  },
+  6177: {
+    name: "HourlySessionAlreadyRecorded",
+    message: "This Hourly session is already closed.",
+  },
+  6178: {
+    name: "HourlyOpenSessionBlocksClose",
+    message: "An open Hourly session blocks cancel or end.",
+  },
 };
 
 function asError(err: unknown): {

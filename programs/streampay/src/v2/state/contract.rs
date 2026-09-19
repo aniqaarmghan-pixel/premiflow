@@ -331,6 +331,39 @@ impl Contract {
         Ok(())
     }
 
+    /// Credit Hourly main-work earnings. Does not touch work-unit counters.
+    /// Trial already sitting in `released_amount` is not counted as Hourly
+    /// time: only the main remainder may grow, and never past `main_amount`.
+    pub fn credit_hourly_main_release(&mut self, amount: u64) -> Result<()> {
+        let new_released = self
+            .released_amount
+            .checked_add(amount)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        let released_plus_refunded = new_released
+            .checked_add(self.refunded_amount)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        require!(
+            released_plus_refunded <= self.total_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+
+        let trial_released = if self.has_trial() {
+            self.trial_amount
+        } else {
+            0
+        };
+        let main_released = new_released
+            .checked_sub(trial_released)
+            .ok_or(StreamPayV2Error::ReleaseAmountExceeded)?;
+        require!(
+            main_released <= self.main_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+
+        self.released_amount = new_released;
+        Ok(())
+    }
+
     /// Freeze a clean active-contract cancellation split.
     ///
     /// Streaming: `stream_accrued_at(now)` is materialized into
@@ -338,6 +371,11 @@ impl Contract {
     /// time is not lost. Fixed/Milestone: `released_amount` is left as-is —
     /// unreleased future work is never auto-paid, and unresolved review cannot
     /// reach this method (`open_review_count` must be 0).
+    ///
+    /// Hourly: same released / remainder split. Callers must already reject
+    /// an Open HourlySession (`HourlyOpenSessionBlocksClose`). Hourly `end`
+    /// also uses this Cancelled terminal as unused-budget settlement — not a
+    /// punitive cancellation.
     pub fn settle_active_cancellation(&mut self, now: i64) -> Result<(u64, u64)> {
         require!(
             self.status == ContractStatus::Active,
@@ -346,10 +384,6 @@ impl Contract {
         require!(
             self.open_review_count == 0,
             StreamPayV2Error::OpenReviewBlocksCancel
-        );
-        require!(
-            self.payment_mode != PaymentMode::Hourly,
-            StreamPayV2Error::InvalidPaymentMode
         );
 
         if self.payment_mode.uses_checkpoints() {
@@ -425,10 +459,6 @@ impl Contract {
             }
             _ => return Err(StreamPayV2Error::DisputeNotAllowed.into()),
         }
-        require!(
-            self.payment_mode != PaymentMode::Hourly,
-            StreamPayV2Error::InvalidPaymentMode
-        );
 
         if self.payment_mode.uses_checkpoints() && self.status == ContractStatus::Active {
             self.materialize_stream_at(now)?;

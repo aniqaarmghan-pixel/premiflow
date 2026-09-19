@@ -502,6 +502,15 @@ export type Streampay = {
               }
             ]
           }
+        },
+        {
+          "name": "hourlyState",
+          "writable": true,
+          "optional": true,
+          "docs": [
+            "Required for Hourly so an Open session cannot be cancelled away.",
+            "Must be absent for Fixed / Milestone / Streaming."
+          ]
         }
       ],
       "args": []
@@ -976,6 +985,179 @@ export type Streampay = {
       ]
     },
     {
+      "name": "createHourlyContract",
+      "docs": [
+        "Dedicated Hourly create. Derives and funds totalAmount. No session."
+      ],
+      "discriminator": [
+        125,
+        81,
+        39,
+        52,
+        149,
+        5,
+        211,
+        125
+      ],
+      "accounts": [
+        {
+          "name": "employer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "freelancer"
+        },
+        {
+          "name": "tokenMint"
+        },
+        {
+          "name": "employerTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "contract",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  116,
+                  114,
+                  97,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "employer"
+              },
+              {
+                "kind": "account",
+                "path": "freelancer"
+              },
+              {
+                "kind": "arg",
+                "path": "args.contractId"
+              }
+            ]
+          }
+        },
+        {
+          "name": "contractEscrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  116,
+                  114,
+                  97,
+                  99,
+                  116,
+                  95,
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "contract"
+              }
+            ]
+          }
+        },
+        {
+          "name": "hourlyState",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  114,
+                  108,
+                  121,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "contract"
+              }
+            ]
+          }
+        },
+        {
+          "name": "trialWorkUnit",
+          "writable": true,
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  114,
+                  105,
+                  97,
+                  108,
+                  95,
+                  117,
+                  110,
+                  105,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "contract"
+              }
+            ]
+          }
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "createHourlyContractArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "createStream",
       "discriminator": [
         71,
@@ -1138,6 +1320,99 @@ export type Streampay = {
                 "kind": "account",
                 "path": "contract.contractId",
                 "account": "contract"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "endHourlyContract",
+      "docs": [
+        "Employer unused-budget Hourly settlement. Rejects an Open session.",
+        "Uses Cancelled so existing claim instructions apply. No SPL transfer."
+      ],
+      "discriminator": [
+        26,
+        65,
+        53,
+        53,
+        54,
+        10,
+        222,
+        39
+      ],
+      "accounts": [
+        {
+          "name": "employer",
+          "signer": true,
+          "relations": [
+            "contract"
+          ]
+        },
+        {
+          "name": "contract",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  116,
+                  114,
+                  97,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "employer"
+              },
+              {
+                "kind": "account",
+                "path": "contract.freelancer",
+                "account": "contract"
+              },
+              {
+                "kind": "account",
+                "path": "contract.contractId",
+                "account": "contract"
+              }
+            ]
+          }
+        },
+        {
+          "name": "hourlyState",
+          "relations": [
+            "contract"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  114,
+                  108,
+                  121,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "contract"
               }
             ]
           }
@@ -1365,6 +1640,22 @@ export type Streampay = {
               }
             ]
           }
+        },
+        {
+          "name": "hourlyState",
+          "writable": true,
+          "optional": true,
+          "docs": [
+            "Required when paymentMode is Hourly. Absent otherwise."
+          ]
+        },
+        {
+          "name": "hourlySession",
+          "writable": true,
+          "optional": true,
+          "docs": [
+            "Required when Hourly and an Open session exists. Absent otherwise."
+          ]
         }
       ],
       "args": []
@@ -1776,6 +2067,286 @@ export type Streampay = {
         {
           "name": "freelancerContestedAward",
           "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "startHourlySession",
+      "docs": [
+        "Freelancer starts one Hourly session. No SPL transfer."
+      ],
+      "discriminator": [
+        105,
+        110,
+        200,
+        198,
+        143,
+        186,
+        166,
+        249
+      ],
+      "accounts": [
+        {
+          "name": "freelancer",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "contract"
+          ]
+        },
+        {
+          "name": "contract",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  116,
+                  114,
+                  97,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "contract.employer",
+                "account": "contract"
+              },
+              {
+                "kind": "account",
+                "path": "freelancer"
+              },
+              {
+                "kind": "account",
+                "path": "contract.contractId",
+                "account": "contract"
+              }
+            ]
+          }
+        },
+        {
+          "name": "hourlyState",
+          "writable": true,
+          "relations": [
+            "contract"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  114,
+                  108,
+                  121,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "contract"
+              }
+            ]
+          }
+        },
+        {
+          "name": "hourlySession",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  114,
+                  108,
+                  121,
+                  95,
+                  115,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "contract"
+              },
+              {
+                "kind": "account",
+                "path": "hourlyState.sessionCount",
+                "account": "hourlyState"
+              }
+            ]
+          }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "stopHourlySession",
+      "docs": [
+        "Freelancer stops the open Hourly session. No SPL transfer."
+      ],
+      "discriminator": [
+        17,
+        63,
+        118,
+        139,
+        152,
+        248,
+        159,
+        129
+      ],
+      "accounts": [
+        {
+          "name": "freelancer",
+          "signer": true,
+          "relations": [
+            "contract"
+          ]
+        },
+        {
+          "name": "contract",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  116,
+                  114,
+                  97,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "contract.employer",
+                "account": "contract"
+              },
+              {
+                "kind": "account",
+                "path": "freelancer"
+              },
+              {
+                "kind": "account",
+                "path": "contract.contractId",
+                "account": "contract"
+              }
+            ]
+          }
+        },
+        {
+          "name": "hourlyState",
+          "writable": true,
+          "relations": [
+            "contract"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  114,
+                  108,
+                  121,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "contract"
+              }
+            ]
+          }
+        },
+        {
+          "name": "hourlySession",
+          "writable": true,
+          "relations": [
+            "contract"
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  104,
+                  111,
+                  117,
+                  114,
+                  108,
+                  121,
+                  95,
+                  115,
+                  101,
+                  115,
+                  115,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "contract"
+              },
+              {
+                "kind": "account",
+                "path": "hourlyState.activeSessionIndex",
+                "account": "hourlyState"
+              }
+            ]
+          }
+        }
+      ],
+      "args": [
+        {
+          "name": "workLogUri",
+          "type": "string"
+        },
+        {
+          "name": "workLogHash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
         }
       ]
     },
@@ -2283,6 +2854,32 @@ export type Streampay = {
       ]
     },
     {
+      "name": "hourlySession",
+      "discriminator": [
+        19,
+        255,
+        160,
+        105,
+        76,
+        55,
+        185,
+        240
+      ]
+    },
+    {
+      "name": "hourlyState",
+      "discriminator": [
+        101,
+        103,
+        254,
+        84,
+        72,
+        77,
+        199,
+        115
+      ]
+    },
+    {
       "name": "stream",
       "discriminator": [
         166,
@@ -2451,6 +3048,58 @@ export type Streampay = {
         205,
         238,
         128
+      ]
+    },
+    {
+      "name": "hourlyContractCreated",
+      "discriminator": [
+        232,
+        8,
+        91,
+        174,
+        121,
+        142,
+        221,
+        140
+      ]
+    },
+    {
+      "name": "hourlyContractEnded",
+      "discriminator": [
+        93,
+        84,
+        91,
+        223,
+        113,
+        24,
+        178,
+        110
+      ]
+    },
+    {
+      "name": "hourlySessionRecorded",
+      "discriminator": [
+        12,
+        197,
+        4,
+        56,
+        143,
+        205,
+        184,
+        131
+      ]
+    },
+    {
+      "name": "hourlySessionStarted",
+      "discriminator": [
+        6,
+        63,
+        75,
+        36,
+        15,
+        180,
+        214,
+        115
       ]
     },
     {
@@ -2625,64 +3274,49 @@ export type Streampay = {
   ],
   "errors": [
     {
-      "code": 6100,
-      "name": "invalidAmount",
-      "msg": "Amount must be greater than zero."
+      "code": 6115,
+      "name": "acceptanceExpired",
+      "msg": "The acceptance deadline has passed."
     },
     {
-      "code": 6101,
-      "name": "invalidDuration",
-      "msg": "Duration is outside the permitted range."
+      "code": 6116,
+      "name": "acceptanceNotExpired",
+      "msg": "The acceptance deadline has not yet passed."
     },
     {
-      "code": 6102,
-      "name": "invalidCheckpointInterval",
-      "msg": "Checkpoint interval is invalid for this duration."
+      "code": 6149,
+      "name": "approvalWindowExpired",
+      "msg": "The employer activation window has closed."
     },
     {
-      "code": 6103,
-      "name": "invalidReviewDuration",
-      "msg": "Review duration is outside the permitted range or exceeds the checkpoint interval."
+      "code": 6144,
+      "name": "arithmeticOverflow",
+      "msg": "A math calculation overflowed."
     },
     {
-      "code": 6104,
-      "name": "tooManyCheckpoints",
-      "msg": "This configuration would create too many checkpoints."
+      "code": 6125,
+      "name": "badUnitIndex",
+      "msg": "Work unit index does not match the expected next index."
     },
     {
-      "code": 6105,
-      "name": "invalidMaxRevisions",
-      "msg": "Maximum revisions exceeds the permitted limit."
+      "code": 6162,
+      "name": "completionNotAllowed",
+      "msg": "Successful completion is not allowed in this contract state."
     },
     {
-      "code": 6106,
-      "name": "invalidAcceptanceDeadline",
-      "msg": "Acceptance deadline must be in the future."
+      "code": 6165,
+      "name": "contractAlreadyCompleted",
+      "msg": "This contract is already completed."
     },
     {
-      "code": 6107,
-      "name": "invalidScheduledStart",
-      "msg": "Scheduled start must not precede the acceptance deadline."
+      "code": 6160,
+      "name": "contractAlreadyDisputed",
+      "msg": "This contract is already disputed."
     },
     {
-      "code": 6108,
-      "name": "invalidMetadata",
-      "msg": "Metadata reference is missing or exceeds the maximum length."
-    },
-    {
-      "code": 6109,
-      "name": "selfContract",
-      "msg": "Employer and freelancer must be different wallets."
-    },
-    {
-      "code": 6110,
-      "name": "invalidPaymentMode",
-      "msg": "This operation is not valid for the contract's payment mode."
-    },
-    {
-      "code": 6111,
-      "name": "invalidState",
-      "msg": "The contract is not in the required state for this operation."
+      "code": 6164,
+      "name": "contractNotReadyForCompletion",
+      "msg": "The contract has not reached an objectively completable point."
     },
     {
       "code": 6112,
@@ -2695,29 +3329,184 @@ export type Streampay = {
       "msg": "The contract is in a terminal state."
     },
     {
-      "code": 6114,
-      "name": "termsNotFinalized",
-      "msg": "Contract terms have not been finalized."
+      "code": 6159,
+      "name": "disputeNotAllowed",
+      "msg": "A dispute cannot be opened in this contract state."
     },
     {
-      "code": 6115,
-      "name": "acceptanceExpired",
-      "msg": "The acceptance deadline has passed."
+      "code": 6137,
+      "name": "emptyCheckpoint",
+      "msg": "This checkpoint period has no earned amount."
     },
     {
-      "code": 6116,
-      "name": "acceptanceNotExpired",
-      "msg": "The acceptance deadline has not yet passed."
+      "code": 6145,
+      "name": "escrowFundingMismatch",
+      "msg": "Escrow did not receive the full contract amount."
     },
     {
-      "code": 6117,
-      "name": "obligationsOutstanding",
-      "msg": "Outstanding obligations remain on this contract."
+      "code": 6143,
+      "name": "escrowNotSettled",
+      "msg": "Escrow still holds funds owed to a party."
     },
     {
-      "code": 6118,
-      "name": "unauthorized",
-      "msg": "The signer is not authorized for this operation."
+      "code": 6122,
+      "name": "fixedNeedsOneUnit",
+      "msg": "A fixed contract requires exactly one work unit."
+    },
+    {
+      "code": 6138,
+      "name": "graceWindowClosed",
+      "msg": "The post-termination grace window has closed."
+    },
+    {
+      "code": 6174,
+      "name": "hourlyAuthorizedTimeExhausted",
+      "msg": "Authorized Hourly time is exhausted."
+    },
+    {
+      "code": 6175,
+      "name": "hourlyEngagementExpired",
+      "msg": "The Hourly engagement window has closed."
+    },
+    {
+      "code": 6168,
+      "name": "hourlyMainAmountZero",
+      "msg": "Derived Hourly main amount is zero; rate and authorized time are too small."
+    },
+    {
+      "code": 6178,
+      "name": "hourlyOpenSessionBlocksClose",
+      "msg": "An open Hourly session blocks cancel or end."
+    },
+    {
+      "code": 6171,
+      "name": "hourlySessionAlreadyActive",
+      "msg": "An Hourly session is already open."
+    },
+    {
+      "code": 6177,
+      "name": "hourlySessionAlreadyRecorded",
+      "msg": "This Hourly session is already closed."
+    },
+    {
+      "code": 6173,
+      "name": "hourlySessionLimitReached",
+      "msg": "This contract has reached the Hourly session limit."
+    },
+    {
+      "code": 6169,
+      "name": "hourlyStateMissing",
+      "msg": "HourlyState account is required for this Hourly operation."
+    },
+    {
+      "code": 6157,
+      "name": "insufficientEscrowBalance",
+      "msg": "Escrow holds fewer tokens than the entitlement being claimed."
+    },
+    {
+      "code": 6106,
+      "name": "invalidAcceptanceDeadline",
+      "msg": "Acceptance deadline must be in the future."
+    },
+    {
+      "code": 6148,
+      "name": "invalidActivationReview",
+      "msg": "Activation review duration is outside the permitted range."
+    },
+    {
+      "code": 6100,
+      "name": "invalidAmount",
+      "msg": "Amount must be greater than zero."
+    },
+    {
+      "code": 6167,
+      "name": "invalidAuthorizedSeconds",
+      "msg": "Authorized Hourly seconds must be greater than zero."
+    },
+    {
+      "code": 6102,
+      "name": "invalidCheckpointInterval",
+      "msg": "Checkpoint interval is invalid for this duration."
+    },
+    {
+      "code": 6161,
+      "name": "invalidDisputeAward",
+      "msg": "The dispute award exceeds the contested amount."
+    },
+    {
+      "code": 6147,
+      "name": "invalidDueDate",
+      "msg": "Milestone due offset is not a positive duration within the contract term, or is not later than the previous milestone."
+    },
+    {
+      "code": 6101,
+      "name": "invalidDuration",
+      "msg": "Duration is outside the permitted range."
+    },
+    {
+      "code": 6166,
+      "name": "invalidHourlyRate",
+      "msg": "Hourly rate must be greater than zero."
+    },
+    {
+      "code": 6176,
+      "name": "invalidHourlySession",
+      "msg": "HourlySession does not belong to this contract or is not valid."
+    },
+    {
+      "code": 6170,
+      "name": "invalidHourlyState",
+      "msg": "HourlyState does not belong to this contract or is not valid."
+    },
+    {
+      "code": 6105,
+      "name": "invalidMaxRevisions",
+      "msg": "Maximum revisions exceeds the permitted limit."
+    },
+    {
+      "code": 6108,
+      "name": "invalidMetadata",
+      "msg": "Metadata reference is missing or exceeds the maximum length."
+    },
+    {
+      "code": 6110,
+      "name": "invalidPaymentMode",
+      "msg": "This operation is not valid for the contract's payment mode."
+    },
+    {
+      "code": 6158,
+      "name": "invalidResolver",
+      "msg": "Resolver must be a distinct non-default public key."
+    },
+    {
+      "code": 6103,
+      "name": "invalidReviewDuration",
+      "msg": "Review duration is outside the permitted range or exceeds the checkpoint interval."
+    },
+    {
+      "code": 6107,
+      "name": "invalidScheduledStart",
+      "msg": "Scheduled start must not precede the acceptance deadline."
+    },
+    {
+      "code": 6111,
+      "name": "invalidState",
+      "msg": "The contract is not in the required state for this operation."
+    },
+    {
+      "code": 6151,
+      "name": "invalidTrialAmount",
+      "msg": "Trial amount is zero, equals or exceeds the funded total, or does not match the trial account."
+    },
+    {
+      "code": 6154,
+      "name": "invalidTrialState",
+      "msg": "The trial work unit is not in the required state for this operation."
+    },
+    {
+      "code": 6124,
+      "name": "invalidWorkUnit",
+      "msg": "The work unit is invalid or does not belong to this contract."
     },
     {
       "code": 6119,
@@ -2730,104 +3519,14 @@ export type Streampay = {
       "msg": "Milestone amounts do not sum to the funded total."
     },
     {
+      "code": 6172,
+      "name": "noActiveHourlySession",
+      "msg": "There is no open Hourly session."
+    },
+    {
       "code": 6121,
       "name": "noMilestones",
       "msg": "This payment mode requires at least one milestone."
-    },
-    {
-      "code": 6122,
-      "name": "fixedNeedsOneUnit",
-      "msg": "A fixed contract requires exactly one work unit."
-    },
-    {
-      "code": 6123,
-      "name": "streamingHasNoMilestones",
-      "msg": "A streaming contract cannot define milestones."
-    },
-    {
-      "code": 6124,
-      "name": "invalidWorkUnit",
-      "msg": "The work unit is invalid or does not belong to this contract."
-    },
-    {
-      "code": 6125,
-      "name": "badUnitIndex",
-      "msg": "Work unit index does not match the expected next index."
-    },
-    {
-      "code": 6126,
-      "name": "unitNotSubmittable",
-      "msg": "The work unit is not awaiting submission."
-    },
-    {
-      "code": 6127,
-      "name": "unitNotUnderReview",
-      "msg": "The work unit is not under review."
-    },
-    {
-      "code": 6128,
-      "name": "unitAlreadyReleased",
-      "msg": "The work unit has already been released."
-    },
-    {
-      "code": 6129,
-      "name": "unitVoided",
-      "msg": "The work unit has been voided."
-    },
-    {
-      "code": 6130,
-      "name": "unitNotStale",
-      "msg": "The work unit is not stale and cannot be voided."
-    },
-    {
-      "code": 6131,
-      "name": "reviewAlreadyOpen",
-      "msg": "Another work unit is still awaiting review."
-    },
-    {
-      "code": 6132,
-      "name": "reviewWindowOpen",
-      "msg": "The review window is still open."
-    },
-    {
-      "code": 6133,
-      "name": "reviewWindowClosed",
-      "msg": "The review window has already closed."
-    },
-    {
-      "code": 6134,
-      "name": "revisionLimitReached",
-      "msg": "The maximum number of revisions has been reached."
-    },
-    {
-      "code": 6135,
-      "name": "periodNotComplete",
-      "msg": "The checkpoint period is not yet complete."
-    },
-    {
-      "code": 6136,
-      "name": "streamFullyCheckpointed",
-      "msg": "All streaming periods have already been checkpointed."
-    },
-    {
-      "code": 6137,
-      "name": "emptyCheckpoint",
-      "msg": "This checkpoint period has no earned amount."
-    },
-    {
-      "code": 6138,
-      "name": "graceWindowClosed",
-      "msg": "The post-termination grace window has closed."
-    },
-    {
-      "code": 6139,
-      "name": "nothingToWithdraw",
-      "msg": "There is nothing available to withdraw."
-    },
-    {
-      "code": 6140,
-      "name": "nothingToRefund",
-      "msg": "There is nothing available to refund."
     },
     {
       "code": 6141,
@@ -2835,44 +3534,54 @@ export type Streampay = {
       "msg": "Nothing has been released on this contract."
     },
     {
+      "code": 6140,
+      "name": "nothingToRefund",
+      "msg": "There is nothing available to refund."
+    },
+    {
+      "code": 6139,
+      "name": "nothingToWithdraw",
+      "msg": "There is nothing available to withdraw."
+    },
+    {
+      "code": 6117,
+      "name": "obligationsOutstanding",
+      "msg": "Outstanding obligations remain on this contract."
+    },
+    {
       "code": 6142,
       "name": "openReviewBlocksCancel",
       "msg": "Cannot cancel while a work unit is under review."
     },
     {
-      "code": 6143,
-      "name": "escrowNotSettled",
-      "msg": "Escrow still holds funds owed to a party."
+      "code": 6135,
+      "name": "periodNotComplete",
+      "msg": "The checkpoint period is not yet complete."
     },
     {
-      "code": 6144,
-      "name": "arithmeticOverflow",
-      "msg": "A math calculation overflowed."
+      "code": 6156,
+      "name": "releaseAmountExceeded",
+      "msg": "This release would exceed the contract's main or total amount."
     },
     {
-      "code": 6145,
-      "name": "escrowFundingMismatch",
-      "msg": "Escrow did not receive the full contract amount."
+      "code": 6131,
+      "name": "reviewAlreadyOpen",
+      "msg": "Another work unit is still awaiting review."
     },
     {
-      "code": 6146,
-      "name": "tooManyMilestones",
-      "msg": "This contract already has the maximum number of milestones."
+      "code": 6133,
+      "name": "reviewWindowClosed",
+      "msg": "The review window has already closed."
     },
     {
-      "code": 6147,
-      "name": "invalidDueDate",
-      "msg": "Milestone due offset is not a positive duration within the contract term, or is not later than the previous milestone."
+      "code": 6132,
+      "name": "reviewWindowOpen",
+      "msg": "The review window is still open."
     },
     {
-      "code": 6148,
-      "name": "invalidActivationReview",
-      "msg": "Activation review duration is outside the permitted range."
-    },
-    {
-      "code": 6149,
-      "name": "approvalWindowExpired",
-      "msg": "The employer activation window has closed."
+      "code": 6134,
+      "name": "revisionLimitReached",
+      "msg": "The maximum number of revisions has been reached."
     },
     {
       "code": 6150,
@@ -2880,9 +3589,34 @@ export type Streampay = {
       "msg": "The scheduled start has already elapsed; activating now would create retroactive earnings."
     },
     {
-      "code": 6151,
-      "name": "invalidTrialAmount",
-      "msg": "Trial amount is zero, equals or exceeds the funded total, or does not match the trial account."
+      "code": 6109,
+      "name": "selfContract",
+      "msg": "Employer and freelancer must be different wallets."
+    },
+    {
+      "code": 6136,
+      "name": "streamFullyCheckpointed",
+      "msg": "All streaming periods have already been checkpointed."
+    },
+    {
+      "code": 6123,
+      "name": "streamingHasNoMilestones",
+      "msg": "A streaming contract cannot define milestones."
+    },
+    {
+      "code": 6114,
+      "name": "termsNotFinalized",
+      "msg": "Contract terms have not been finalized."
+    },
+    {
+      "code": 6104,
+      "name": "tooManyCheckpoints",
+      "msg": "This configuration would create too many checkpoints."
+    },
+    {
+      "code": 6146,
+      "name": "tooManyMilestones",
+      "msg": "This contract already has the maximum number of milestones."
     },
     {
       "code": 6152,
@@ -2895,49 +3629,34 @@ export type Streampay = {
       "msg": "A paid trial is configured; this instruction cannot bypass it."
     },
     {
-      "code": 6154,
-      "name": "invalidTrialState",
-      "msg": "The trial work unit is not in the required state for this operation."
+      "code": 6118,
+      "name": "unauthorized",
+      "msg": "The signer is not authorized for this operation."
     },
     {
-      "code": 6155,
-      "name": "unsupportedWorkUnitKind",
-      "msg": "This work unit kind cannot use the post-activation review instructions."
+      "code": 6128,
+      "name": "unitAlreadyReleased",
+      "msg": "The work unit has already been released."
     },
     {
-      "code": 6156,
-      "name": "releaseAmountExceeded",
-      "msg": "This release would exceed the contract's main or total amount."
+      "code": 6130,
+      "name": "unitNotStale",
+      "msg": "The work unit is not stale and cannot be voided."
     },
     {
-      "code": 6157,
-      "name": "insufficientEscrowBalance",
-      "msg": "Escrow holds fewer tokens than the entitlement being claimed."
+      "code": 6126,
+      "name": "unitNotSubmittable",
+      "msg": "The work unit is not awaiting submission."
     },
     {
-      "code": 6158,
-      "name": "invalidResolver",
-      "msg": "Resolver must be a distinct non-default public key."
+      "code": 6127,
+      "name": "unitNotUnderReview",
+      "msg": "The work unit is not under review."
     },
     {
-      "code": 6159,
-      "name": "disputeNotAllowed",
-      "msg": "A dispute cannot be opened in this contract state."
-    },
-    {
-      "code": 6160,
-      "name": "contractAlreadyDisputed",
-      "msg": "This contract is already disputed."
-    },
-    {
-      "code": 6161,
-      "name": "invalidDisputeAward",
-      "msg": "The dispute award exceeds the contested amount."
-    },
-    {
-      "code": 6162,
-      "name": "completionNotAllowed",
-      "msg": "Successful completion is not allowed in this contract state."
+      "code": 6129,
+      "name": "unitVoided",
+      "msg": "The work unit has been voided."
     },
     {
       "code": 6163,
@@ -2945,14 +3664,9 @@ export type Streampay = {
       "msg": "Required work is still unresolved, so the contract cannot complete."
     },
     {
-      "code": 6164,
-      "name": "contractNotReadyForCompletion",
-      "msg": "The contract has not reached an objectively completable point."
-    },
-    {
-      "code": 6165,
-      "name": "contractAlreadyCompleted",
-      "msg": "This contract is already completed."
+      "code": 6155,
+      "name": "unsupportedWorkUnitKind",
+      "msg": "This work unit kind cannot use the post-activation review instructions."
     }
   ],
   "types": [
@@ -3323,9 +4037,9 @@ export type Streampay = {
               "were taken from it.",
               "",
               "Phase 7 layout: two u64 settlement fields after `stream_released_amount`;",
-              "reserved 84 → 68. Phase 9 consumed 49 more bytes for `resolver` (32),",
+              "reserved 84 \u2192 68. Phase 9 consumed 49 more bytes for `resolver` (32),",
               "`contested_amount` (8), `disputed_at` (8) and `dispute_initiator` (1);",
-              "reserved 68 → 19. `INIT_SPACE` remains 621."
+              "reserved 68 \u2192 19. `INIT_SPACE` remains 621."
             ],
             "type": {
               "array": [
@@ -3601,21 +4315,21 @@ export type Streampay = {
       "docs": [
         "Authoritative contract lifecycle state.",
         "",
-        "Borsh unit-enum discriminants, old → new (V2 was never deployed):",
+        "Borsh unit-enum discriminants, old \u2192 new (V2 was never deployed):",
         "",
         "| variant                  | old | new |",
         "|--------------------------|-----|-----|",
         "| Draft                    | 0   | 0   |",
         "| PendingAcceptance        | 1   | 1   |",
-        "| PendingEmployerApproval  | —   | 2   |",
+        "| PendingEmployerApproval  | \u2014   | 2   |",
         "| Active                   | 2   | 3   |",
         "| Completed                | 3   | 4   |",
         "| Declined                 | 4   | 5   |",
         "| Expired                  | 5   | 6   |",
         "| Cancelled                | 6   | 7   |",
-        "| ActivationRejected       | —   | 8   |",
-        "| Disputed                 | —   | 9   |",
-        "| Resolved                 | —   | 10  |",
+        "| ActivationRejected       | \u2014   | 8   |",
+        "| Disputed                 | \u2014   | 9   |",
+        "| Resolved                 | \u2014   | 10  |",
         "",
         "`PendingEmployerApproval` is the employer-approval gate: the freelancer has",
         "accepted, the main stream has not started. `ActivationRejected` is the",
@@ -3788,6 +4502,67 @@ export type Streampay = {
             "docs": [
               "Hash of that record, making it tamper-evident."
             ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "createHourlyContractArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contractId",
+            "type": "u64"
+          },
+          {
+            "name": "hourlyRate",
+            "type": "u64"
+          },
+          {
+            "name": "authorizedSeconds",
+            "type": "u64"
+          },
+          {
+            "name": "acceptanceDeadline",
+            "type": "i64"
+          },
+          {
+            "name": "durationSeconds",
+            "type": "i64"
+          },
+          {
+            "name": "reviewDuration",
+            "type": "i64"
+          },
+          {
+            "name": "activationReviewDuration",
+            "type": "i64"
+          },
+          {
+            "name": "maxRevisions",
+            "type": "u8"
+          },
+          {
+            "name": "trialAmount",
+            "type": "u64"
+          },
+          {
+            "name": "resolver",
+            "type": "pubkey"
+          },
+          {
+            "name": "metadataUri",
+            "type": "string"
+          },
+          {
+            "name": "metadataHash",
             "type": {
               "array": [
                 "u8",
@@ -3991,6 +4766,314 @@ export type Streampay = {
       }
     },
     {
+      "name": "hourlyContractCreated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "contractId",
+            "type": "u64"
+          },
+          {
+            "name": "hourlyRate",
+            "type": "u64"
+          },
+          {
+            "name": "authorizedSeconds",
+            "type": "u64"
+          },
+          {
+            "name": "mainAmount",
+            "type": "u64"
+          },
+          {
+            "name": "trialAmount",
+            "type": "u64"
+          },
+          {
+            "name": "totalAmount",
+            "type": "u64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hourlyContractEnded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "endedAt",
+            "type": "i64"
+          },
+          {
+            "name": "freelancerSettlementAmount",
+            "type": "u64"
+          },
+          {
+            "name": "employerRefundableAmount",
+            "type": "u64"
+          },
+          {
+            "name": "releasedAmount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hourlySession",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "index",
+            "type": "u32"
+          },
+          {
+            "name": "startedAt",
+            "type": "i64"
+          },
+          {
+            "name": "stoppedAt",
+            "type": "i64"
+          },
+          {
+            "name": "durationSeconds",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "hourlySessionStatus"
+              }
+            }
+          },
+          {
+            "name": "workLogHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "workLogUri",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hourlySessionRecorded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "session",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "sessionIndex",
+            "type": "u32"
+          },
+          {
+            "name": "stoppedAt",
+            "type": "i64"
+          },
+          {
+            "name": "creditedDuration",
+            "type": "u64"
+          },
+          {
+            "name": "approvedSeconds",
+            "type": "u64"
+          },
+          {
+            "name": "releaseDelta",
+            "type": "u64"
+          },
+          {
+            "name": "releasedAmount",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "hourlySessionStatus"
+              }
+            }
+          },
+          {
+            "name": "materializedByDispute",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hourlySessionStarted",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "session",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "sessionIndex",
+            "type": "u32"
+          },
+          {
+            "name": "startedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hourlySessionStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "open"
+          },
+          {
+            "name": "recorded"
+          },
+          {
+            "name": "void"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hourlyState",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "hourlyRate",
+            "type": "u64"
+          },
+          {
+            "name": "authorizedSeconds",
+            "type": "u64"
+          },
+          {
+            "name": "approvedSeconds",
+            "type": "u64"
+          },
+          {
+            "name": "sessionCount",
+            "type": "u32"
+          },
+          {
+            "name": "activeSessionIndex",
+            "type": "u32"
+          },
+          {
+            "name": "maxSessionSeconds",
+            "type": "u64"
+          },
+          {
+            "name": "minSessionSeconds",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                64
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "milestoneAdded",
       "docs": [
         "One milestone was defined on a draft contract.",
@@ -4051,6 +5134,9 @@ export type Streampay = {
           },
           {
             "name": "fixed"
+          },
+          {
+            "name": "hourly"
           }
         ]
       }

@@ -21,17 +21,19 @@
 //!   or a review timeout can ever raise it.
 
 use anchor_lang::prelude::*;
-use anchor_spl::token::{transfer_checked, Mint, Token, TokenAccount, TransferChecked};
+use anchor_spl::token::{Mint, Token, TokenAccount};
 
 use crate::v2::constants::{
-    CONTRACT_ESCROW_SEED, CONTRACT_SEED, MAX_ACCEPTANCE_WINDOW, MAX_ACTIVATION_REVIEW,
-    MAX_CHECKPOINTS, MAX_DURATION_SECONDS, MAX_REVIEW_DURATION, MAX_REVISIONS_LIMIT, MAX_URI_LEN,
-    MIN_ACTIVATION_REVIEW, MIN_DURATION_SECONDS, MIN_REVIEW_DURATION, TRIAL_UNIT_SEED,
-    V2_LAYOUT_VERSION, WORK_UNIT_SEED,
+    CONTRACT_ESCROW_SEED, CONTRACT_SEED, MAX_CHECKPOINTS, TRIAL_UNIT_SEED, V2_LAYOUT_VERSION,
+    WORK_UNIT_SEED,
 };
 use crate::v2::enums::{ContractStatus, DisputeParty, PaymentMode, StartMode};
 use crate::v2::errors::StreamPayV2Error;
 use crate::v2::events::{ContractCreated, TrialConfigured};
+use crate::v2::instructions::create_shared::{
+    fund_contract_escrow, prove_on_activation_end_fits, validate_common_offer_terms,
+    validate_parties_and_resolver,
+};
 use crate::v2::state::{Contract, WorkUnit};
 
 /// Caller-supplied terms.
@@ -120,46 +122,15 @@ impl CreateContractArgs {
     fn resolve(&self, now: i64) -> Result<ResolvedTerms> {
         require!(self.total_amount > 0, StreamPayV2Error::InvalidAmount);
 
-        // A contract must be identifiable off-chain, and the reference must fit
-        // the space the account actually reserved.
-        require!(
-            !self.metadata_uri.is_empty() && self.metadata_uri.len() <= MAX_URI_LEN,
-            StreamPayV2Error::InvalidMetadata
-        );
-
-        // The offer must be live, and must not park escrowed funds indefinitely.
-        require!(
-            self.acceptance_deadline > now,
-            StreamPayV2Error::InvalidAcceptanceDeadline
-        );
-        let latest_deadline = now
-            .checked_add(MAX_ACCEPTANCE_WINDOW)
-            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
-        require!(
-            self.acceptance_deadline <= latest_deadline,
-            StreamPayV2Error::InvalidAcceptanceDeadline
-        );
-
-        require!(
-            (MIN_DURATION_SECONDS..=MAX_DURATION_SECONDS).contains(&self.duration_seconds),
-            StreamPayV2Error::InvalidDuration
-        );
-
-        require!(
-            (MIN_REVIEW_DURATION..=MAX_REVIEW_DURATION).contains(&self.review_duration),
-            StreamPayV2Error::InvalidReviewDuration
-        );
-
-        require!(
-            self.max_revisions <= MAX_REVISIONS_LIMIT,
-            StreamPayV2Error::InvalidMaxRevisions
-        );
-
-        require!(
-            (MIN_ACTIVATION_REVIEW..=MAX_ACTIVATION_REVIEW)
-                .contains(&self.activation_review_duration),
-            StreamPayV2Error::InvalidActivationReview
-        );
+        validate_common_offer_terms(
+            now,
+            &self.metadata_uri,
+            self.acceptance_deadline,
+            self.duration_seconds,
+            self.review_duration,
+            self.max_revisions,
+            self.activation_review_duration,
+        )?;
 
         let scheduled_start_time = self.resolve_start()?;
         let (status, checkpoint_interval) = self.resolve_payment_mode()?;
@@ -201,10 +172,11 @@ impl CreateContractArgs {
             StartMode::OnActivation => {
                 // Latest possible start is a last-second acceptance followed by
                 // a last-second activation. Bound that worst case.
-                self.acceptance_deadline
-                    .checked_add(self.activation_review_duration)
-                    .and_then(|t| t.checked_add(self.duration_seconds))
-                    .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+                prove_on_activation_end_fits(
+                    self.acceptance_deadline,
+                    self.activation_review_duration,
+                    self.duration_seconds,
+                )?;
 
                 Ok(0)
             }
@@ -383,23 +355,7 @@ pub fn handle_create_contract(
     let freelancer_key = ctx.accounts.freelancer.key();
     let token_mint_key = ctx.accounts.token_mint.key();
 
-    // A self-contract would let one wallet play both roles, making every
-    // two-party protection meaningless.
-    require_keys_neq!(employer_key, freelancer_key, StreamPayV2Error::SelfContract);
-    require!(
-        args.resolver != Pubkey::default(),
-        StreamPayV2Error::InvalidResolver
-    );
-    require_keys_neq!(
-        args.resolver,
-        employer_key,
-        StreamPayV2Error::InvalidResolver
-    );
-    require_keys_neq!(
-        args.resolver,
-        freelancer_key,
-        StreamPayV2Error::InvalidResolver
-    );
+    validate_parties_and_resolver(employer_key, freelancer_key, args.resolver)?;
 
     let terms = args.resolve(now)?;
 
@@ -523,33 +479,14 @@ pub fn handle_create_contract(
         );
     }
 
-    // Fund the escrow in full. `transfer_checked` rather than `transfer`: it
-    // re-verifies the mint and its decimals inside the token program, so a mint
-    // mismatch fails there too and not only at our account constraints.
-    transfer_checked(
-        CpiContext::new(
-            ctx.accounts.token_program.key(),
-            TransferChecked {
-                from: ctx.accounts.employer_token_account.to_account_info(),
-                mint: ctx.accounts.token_mint.to_account_info(),
-                to: ctx.accounts.contract_escrow.to_account_info(),
-                authority: ctx.accounts.employer.to_account_info(),
-            },
-        ),
+    fund_contract_escrow(
+        ctx.accounts.token_program.to_account_info(),
+        ctx.accounts.employer_token_account.to_account_info(),
+        &ctx.accounts.token_mint,
+        &mut ctx.accounts.contract_escrow,
+        ctx.accounts.employer.to_account_info(),
         total_amount,
-        ctx.accounts.token_mint.decimals,
     )?;
-
-    // Partial funding is not a supported state, so verify rather than assume.
-    // Classic SPL Token moves the exact amount, but asserting it here means the
-    // "fully funded at creation" guarantee is enforced by the program, and it
-    // would catch a fee-bearing mint if this ever moves to Token-2022.
-    ctx.accounts.contract_escrow.reload()?;
-    require_eq!(
-        ctx.accounts.contract_escrow.amount,
-        total_amount,
-        StreamPayV2Error::EscrowFundingMismatch
-    );
 
     emit!(ContractCreated {
         contract: contract_key,
@@ -592,10 +529,10 @@ mod hourly_h1_create {
     }
 
     #[test]
-    fn hourly_create_args_are_rejected_in_h1() {
+    fn hourly_create_args_are_rejected_on_create_contract() {
         assert!(
             valid_non_hourly(PaymentMode::Hourly).resolve(1_000).is_err(),
-            "Hourly create is H2"
+            "Hourly must use create_hourly_contract"
         );
     }
 

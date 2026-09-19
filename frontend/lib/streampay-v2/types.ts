@@ -2,6 +2,8 @@ import { BN } from "@coral-xyz/anchor";
 import { PublicKey } from "@solana/web3.js";
 
 export type ContractType = "Streaming" | "Milestone" | "Fixed";
+/** On-chain payment mode. Hourly is protocol-only in H2; Create UX stays 3 modes. */
+export type PaymentModeName = ContractType | "Hourly";
 export type StartMode = "OnActivation" | "Scheduled";
 export type ContractStatus =
   | "Draft"
@@ -56,7 +58,7 @@ export type ContractView = {
   freelancer: PublicKey;
   tokenMint: PublicKey;
   contractId: bigint;
-  paymentMode: ContractType;
+  paymentMode: PaymentModeName;
   status: ContractStatus;
   startMode: StartMode;
   totalAmount: bigint;
@@ -96,6 +98,36 @@ export type ContractView = {
   bump: number;
   escrowBump: number;
   metadataUri: string;
+};
+
+export type HourlySessionStatus = "Open" | "Recorded" | "Void";
+
+export type HourlyStateView = {
+  address: PublicKey;
+  version: number;
+  contract: PublicKey;
+  hourlyRate: bigint;
+  authorizedSeconds: bigint;
+  approvedSeconds: bigint;
+  sessionCount: number;
+  activeSessionIndex: number;
+  maxSessionSeconds: bigint;
+  minSessionSeconds: bigint;
+  bump: number;
+};
+
+export type HourlySessionView = {
+  address: PublicKey;
+  version: number;
+  contract: PublicKey;
+  index: number;
+  startedAt: number;
+  stoppedAt: number;
+  durationSeconds: bigint;
+  status: HourlySessionStatus;
+  workLogHash: Uint8Array;
+  bump: number;
+  workLogUri: string;
 };
 
 export type WorkUnitView = {
@@ -138,6 +170,21 @@ export type CreateContractRequest = {
   metadataHash: Uint8Array;
 };
 
+export type CreateHourlyContractRequest = {
+  contractId: bigint;
+  hourlyRate: bigint;
+  authorizedSeconds: bigint;
+  acceptanceDeadline: number;
+  durationSeconds: number;
+  reviewDuration: number;
+  activationReviewDuration: number;
+  maxRevisions: number;
+  trialAmount: bigint;
+  resolver: PublicKey;
+  metadataUri: string;
+  metadataHash: Uint8Array;
+};
+
 const CONTRACT_STATUSES: readonly ContractStatus[] = [
   "Draft",
   "PendingAcceptance",
@@ -152,10 +199,11 @@ const CONTRACT_STATUSES: readonly ContractStatus[] = [
   "Resolved",
 ] as const;
 
-const PAYMENT_MODES: readonly ContractType[] = [
+const PAYMENT_MODES: readonly PaymentModeName[] = [
   "Streaming",
   "Milestone",
   "Fixed",
+  "Hourly",
 ] as const;
 
 const START_MODES: readonly StartMode[] = ["OnActivation", "Scheduled"] as const;
@@ -226,7 +274,7 @@ export function decodeContractStatus(value: unknown): ContractStatus {
   return decodeAnchorEnum(value, CONTRACT_STATUSES, "ContractStatus");
 }
 
-export function decodePaymentMode(value: unknown): ContractType {
+export function decodePaymentMode(value: unknown): PaymentModeName {
   return decodeAnchorEnum(value, PAYMENT_MODES, "PaymentMode");
 }
 
@@ -252,7 +300,11 @@ export function decodeDisputeParty(value: unknown): DisputeParty {
 
 export function encodePaymentMode(
   mode: ContractType
-): { streaming: Record<string, never> } | { milestone: Record<string, never> } | { fixed: Record<string, never> } {
+):
+  | { streaming: Record<string, never> }
+  | { milestone: Record<string, never> }
+  | { fixed: Record<string, never> }
+  | { hourly: Record<string, never> } {
   switch (mode) {
     case "Streaming":
       return { streaming: {} };

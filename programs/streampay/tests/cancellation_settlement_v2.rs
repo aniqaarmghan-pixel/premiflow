@@ -417,7 +417,11 @@ impl Env {
     fn cancel_ix(&self, employer: Address, contract: Address) -> Instruction {
         Instruction {
             program_id: self.program_id,
-            accounts: streampay_program::accounts::CancelActiveContract { employer, contract }
+            accounts: streampay_program::accounts::CancelActiveContract {
+                employer,
+                contract,
+                hourly_state: None,
+            }
                 .to_account_metas(None),
             data: streampay_program::instruction::CancelActiveContract {}.data(),
         }

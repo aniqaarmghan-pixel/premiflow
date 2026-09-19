@@ -9,12 +9,16 @@ import {
   decodePaymentMode,
   decodeReleaseTrigger,
   decodeStartMode,
+  decodeAnchorEnum,
   decodeWorkUnitKind,
   decodeWorkUnitStatus,
   i64ToNumber,
   toBytes32,
   toPublicKey,
   type ContractView,
+  type HourlySessionStatus,
+  type HourlySessionView,
+  type HourlyStateView,
   type WorkUnitView,
 } from "./types";
 
@@ -159,6 +163,84 @@ export async function fetchWorkUnit(
 ): Promise<WorkUnitView> {
   const account = await program.account.workUnit.fetch(address);
   return decodeWorkUnit(address, account);
+}
+
+const HOURLY_SESSION_STATUSES: readonly HourlySessionStatus[] = [
+  "Open",
+  "Recorded",
+  "Void",
+];
+
+export function decodeHourlyState(
+  address: PublicKey,
+  rawAccount: unknown
+): HourlyStateView {
+  const raw = asRecord(rawAccount, "HourlyState");
+  return {
+    address,
+    version: Number(field(raw, "version")),
+    contract: toPublicKey(field(raw, "contract") as PublicKey | string),
+    hourlyRate: bnToBigInt(field(raw, "hourlyRate", "hourly_rate") as never),
+    authorizedSeconds: bnToBigInt(
+      field(raw, "authorizedSeconds", "authorized_seconds") as never
+    ),
+    approvedSeconds: bnToBigInt(
+      field(raw, "approvedSeconds", "approved_seconds") as never
+    ),
+    sessionCount: Number(field(raw, "sessionCount", "session_count")),
+    activeSessionIndex: Number(
+      field(raw, "activeSessionIndex", "active_session_index")
+    ),
+    maxSessionSeconds: bnToBigInt(
+      field(raw, "maxSessionSeconds", "max_session_seconds") as never
+    ),
+    minSessionSeconds: bnToBigInt(
+      field(raw, "minSessionSeconds", "min_session_seconds") as never
+    ),
+    bump: Number(field(raw, "bump")),
+  };
+}
+
+export function decodeHourlySession(
+  address: PublicKey,
+  rawAccount: unknown
+): HourlySessionView {
+  const raw = asRecord(rawAccount, "HourlySession");
+  return {
+    address,
+    version: Number(field(raw, "version")),
+    contract: toPublicKey(field(raw, "contract") as PublicKey | string),
+    index: Number(field(raw, "index")),
+    startedAt: i64ToNumber(field(raw, "startedAt", "started_at") as never),
+    stoppedAt: i64ToNumber(field(raw, "stoppedAt", "stopped_at") as never),
+    durationSeconds: bnToBigInt(
+      field(raw, "durationSeconds", "duration_seconds") as never
+    ),
+    status: decodeAnchorEnum(
+      field(raw, "status"),
+      HOURLY_SESSION_STATUSES,
+      "HourlySessionStatus"
+    ),
+    workLogHash: toBytes32(field(raw, "workLogHash", "work_log_hash") as never),
+    bump: Number(field(raw, "bump")),
+    workLogUri: String(field(raw, "workLogUri", "work_log_uri")),
+  };
+}
+
+export async function fetchHourlyState(
+  program: StreamPayV2Program,
+  address: PublicKey
+): Promise<HourlyStateView> {
+  const account = await program.account.hourlyState.fetch(address);
+  return decodeHourlyState(address, account);
+}
+
+export async function fetchHourlySession(
+  program: StreamPayV2Program,
+  address: PublicKey
+): Promise<HourlySessionView> {
+  const account = await program.account.hourlySession.fetch(address);
+  return decodeHourlySession(address, account);
 }
 
 /**

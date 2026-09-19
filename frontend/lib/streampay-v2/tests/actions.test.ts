@@ -23,6 +23,7 @@ test("Anchor enum conversion", () => {
   assert.equal(decodePaymentMode({ streaming: {} }), "Streaming");
   assert.equal(decodePaymentMode({ milestone: {} }), "Milestone");
   assert.equal(decodePaymentMode({ fixed: {} }), "Fixed");
+  assert.equal(decodePaymentMode({ hourly: {} }), "Hourly");
   assert.equal(decodeContractStatus({ pendingAcceptance: {} }), "PendingAcceptance");
   assert.equal(
     decodeContractStatus({ pendingEmployerApproval: {} }),

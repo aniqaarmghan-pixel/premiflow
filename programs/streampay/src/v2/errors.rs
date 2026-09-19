@@ -258,6 +258,48 @@ pub enum StreamPayV2Error {
 
     #[msg("This contract is already completed.")]
     ContractAlreadyCompleted,
+
+    // -----------------------------------------------------------------
+    // Appended in Phase H2 (Hourly protocol).
+    // -----------------------------------------------------------------
+    #[msg("Hourly rate must be greater than zero.")]
+    InvalidHourlyRate,
+
+    #[msg("Authorized Hourly seconds must be greater than zero.")]
+    InvalidAuthorizedSeconds,
+
+    #[msg("Derived Hourly main amount is zero; rate and authorized time are too small.")]
+    HourlyMainAmountZero,
+
+    #[msg("HourlyState account is required for this Hourly operation.")]
+    HourlyStateMissing,
+
+    #[msg("HourlyState does not belong to this contract or is not valid.")]
+    InvalidHourlyState,
+
+    #[msg("An Hourly session is already open.")]
+    HourlySessionAlreadyActive,
+
+    #[msg("There is no open Hourly session.")]
+    NoActiveHourlySession,
+
+    #[msg("This contract has reached the Hourly session limit.")]
+    HourlySessionLimitReached,
+
+    #[msg("Authorized Hourly time is exhausted.")]
+    HourlyAuthorizedTimeExhausted,
+
+    #[msg("The Hourly engagement window has closed.")]
+    HourlyEngagementExpired,
+
+    #[msg("HourlySession does not belong to this contract or is not valid.")]
+    InvalidHourlySession,
+
+    #[msg("This Hourly session is already closed.")]
+    HourlySessionAlreadyRecorded,
+
+    #[msg("An open Hourly session blocks cancel or end.")]
+    HourlyOpenSessionBlocksClose,
 }
 
 #[cfg(test)]
@@ -434,5 +476,24 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::InsufficientEscrowBalance), 6157);
         assert_eq!(u32::from(StreamPayV2Error::InvalidDisputeAward), 6161);
         assert_eq!(u32::from(StreamPayV2Error::ContractAlreadyCompleted), 6165);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidHourlyRate), 6166);
+        assert_eq!(u32::from(StreamPayV2Error::HourlyOpenSessionBlocksClose), 6178);
+    }
+
+    #[test]
+    fn v2_hourly_h2_error_codes_are_pinned() {
+        assert_eq!(u32::from(StreamPayV2Error::InvalidHourlyRate), 6166);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidAuthorizedSeconds), 6167);
+        assert_eq!(u32::from(StreamPayV2Error::HourlyMainAmountZero), 6168);
+        assert_eq!(u32::from(StreamPayV2Error::HourlyStateMissing), 6169);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidHourlyState), 6170);
+        assert_eq!(u32::from(StreamPayV2Error::HourlySessionAlreadyActive), 6171);
+        assert_eq!(u32::from(StreamPayV2Error::NoActiveHourlySession), 6172);
+        assert_eq!(u32::from(StreamPayV2Error::HourlySessionLimitReached), 6173);
+        assert_eq!(u32::from(StreamPayV2Error::HourlyAuthorizedTimeExhausted), 6174);
+        assert_eq!(u32::from(StreamPayV2Error::HourlyEngagementExpired), 6175);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidHourlySession), 6176);
+        assert_eq!(u32::from(StreamPayV2Error::HourlySessionAlreadyRecorded), 6177);
+        assert_eq!(u32::from(StreamPayV2Error::HourlyOpenSessionBlocksClose), 6178);
     }
 }

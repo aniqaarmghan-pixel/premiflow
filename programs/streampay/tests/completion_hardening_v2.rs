@@ -445,6 +445,7 @@ impl Env {
             accounts: streampay_program::accounts::CancelActiveContract {
                 employer: self.employer_pk,
                 contract: self.contract_pda(contract_id),
+                hourly_state: None,
             }
             .to_account_metas(None),
             data: streampay_program::instruction::CancelActiveContract {}.data(),
@@ -494,6 +495,8 @@ impl Env {
             accounts: streampay_program::accounts::OpenDispute {
                 party: self.employer_pk,
                 contract: self.contract_pda(contract_id),
+                hourly_state: None,
+                hourly_session: None,
             }
             .to_account_metas(None),
             data: streampay_program::instruction::OpenDispute {}.data(),

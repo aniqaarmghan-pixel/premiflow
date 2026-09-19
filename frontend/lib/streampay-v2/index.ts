@@ -40,11 +40,19 @@ export {
   fetchContractsForFreelancer,
   fetchWorkUnitsForContract,
   fetchWalletContractSets,
+  fetchHourlyState,
+  fetchHourlySession,
   decodeContract,
   decodeWorkUnit,
+  decodeHourlyState,
+  decodeHourlySession,
 } from "./accounts";
 
-export { StreamPayV2Client, toCreateContractArgs } from "./instructions";
+export {
+  StreamPayV2Client,
+  toCreateContractArgs,
+  toCreateHourlyContractArgs,
+} from "./instructions";
 export type { TransactionResult } from "./results";
 export { txResult } from "./results";
 
@@ -171,6 +179,11 @@ export type {
   ContractView,
   WorkUnitView,
   CreateContractRequest,
+  CreateHourlyContractRequest,
+  PaymentModeName,
+  HourlyStateView,
+  HourlySessionView,
+  HourlySessionStatus,
 } from "./types";
 
 export { REQUIRED_V2_INSTRUCTIONS } from "./idl-required";

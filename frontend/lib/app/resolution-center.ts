@@ -197,7 +197,7 @@ export type EvidenceFact = {
 };
 
 export type ResolutionContext = {
-  paymentMode: ContractType;
+  paymentMode: ContractType | "Hourly";
   facts: EvidenceFact[];
   notes: readonly string[];
   trial: EvidenceFact[] | null;

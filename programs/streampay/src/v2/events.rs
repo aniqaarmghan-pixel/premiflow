@@ -17,6 +17,8 @@
 //! - Phase 8: `FreelancerWithdrawal`, `EmployerRefundClaimed`
 //! - Phase 9: `DisputeOpened`, `DisputeResolved`
 //! - Phase 10: `ContractCompleted`
+//! - Phase H2: `HourlyContractCreated`, `HourlySessionStarted`,
+//!   `HourlySessionRecorded`, `HourlyContractEnded`
 //!
 //! Every event carries `contract` as its first field so a client can index a
 //! single contract's full history with one filter. Off-chain metadata URIs and
@@ -25,7 +27,7 @@
 
 use anchor_lang::prelude::*;
 
-use crate::v2::enums::{ContractStatus, DisputeParty, PaymentMode};
+use crate::v2::enums::{ContractStatus, DisputeParty, HourlySessionStatus, PaymentMode};
 
 /// A contract was created and fully funded into escrow.
 ///
@@ -307,4 +309,60 @@ pub struct ContractCompleted {
     pub released_amount: u64,
     pub withdrawn_amount: u64,
     pub refunded_amount: u64,
+}
+
+/// Dedicated Hourly create. Also accompanied by `ContractCreated`.
+#[event]
+pub struct HourlyContractCreated {
+    pub contract: Pubkey,
+    pub employer: Pubkey,
+    pub freelancer: Pubkey,
+    pub contract_id: u64,
+    pub hourly_rate: u64,
+    pub authorized_seconds: u64,
+    pub main_amount: u64,
+    pub trial_amount: u64,
+    pub total_amount: u64,
+    pub created_at: i64,
+}
+
+/// Freelancer opened an Hourly session. No SPL transfer.
+#[event]
+pub struct HourlySessionStarted {
+    pub contract: Pubkey,
+    pub session: Pubkey,
+    pub freelancer: Pubkey,
+    pub session_index: u32,
+    pub started_at: i64,
+}
+
+/// An Hourly session was closed (Stop or dispute materialization).
+/// `status` is Recorded or Void. No work-log URI. No SPL transfer.
+#[event]
+pub struct HourlySessionRecorded {
+    pub contract: Pubkey,
+    pub session: Pubkey,
+    pub freelancer: Pubkey,
+    pub session_index: u32,
+    pub stopped_at: i64,
+    pub credited_duration: u64,
+    pub approved_seconds: u64,
+    pub release_delta: u64,
+    pub released_amount: u64,
+    pub status: HourlySessionStatus,
+    pub materialized_by_dispute: bool,
+}
+
+/// Employer ended an Hourly contract. Unused-budget settlement uses the
+/// Cancelled terminal so existing claim instructions apply. Not punitive.
+/// No SPL transfer.
+#[event]
+pub struct HourlyContractEnded {
+    pub contract: Pubkey,
+    pub employer: Pubkey,
+    pub freelancer: Pubkey,
+    pub ended_at: i64,
+    pub freelancer_settlement_amount: u64,
+    pub employer_refundable_amount: u64,
+    pub released_amount: u64,
 }

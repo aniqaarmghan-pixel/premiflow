@@ -30,7 +30,6 @@ pub enum PaymentMode {
     Fixed,
     /// Pay for recorded work sessions at an agreed hourly rate.
     /// Discriminant 3; Streaming/Milestone/Fixed keep 0/1/2.
-    /// H1 architecture only — no live create/start/stop path yet.
     Hourly,
 }
 

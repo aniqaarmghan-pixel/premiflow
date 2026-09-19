@@ -388,6 +388,38 @@ Ok(())
     pub fn complete_contract(ctx: Context<CompleteContract>) -> Result<()> {
         v2::instructions::complete_contract::handle_complete_contract(ctx)
     }
+
+    /// Dedicated Hourly create. Derives and funds `total_amount`. No session.
+    pub fn create_hourly_contract(
+        ctx: Context<CreateHourlyContract>,
+        args: CreateHourlyContractArgs,
+    ) -> Result<()> {
+        v2::instructions::create_hourly_contract::handle_create_hourly_contract(ctx, args)
+    }
+
+    /// Freelancer starts one Hourly session. No SPL transfer.
+    pub fn start_hourly_session(ctx: Context<StartHourlySession>) -> Result<()> {
+        v2::instructions::start_hourly_session::handle_start_hourly_session(ctx)
+    }
+
+    /// Freelancer stops the open Hourly session. No SPL transfer.
+    pub fn stop_hourly_session(
+        ctx: Context<StopHourlySession>,
+        work_log_uri: String,
+        work_log_hash: [u8; 32],
+    ) -> Result<()> {
+        v2::instructions::stop_hourly_session::handle_stop_hourly_session(
+            ctx,
+            work_log_uri,
+            work_log_hash,
+        )
+    }
+
+    /// Employer unused-budget Hourly settlement. Rejects an Open session.
+    /// Uses Cancelled so existing claim instructions apply. No SPL transfer.
+    pub fn end_hourly_contract(ctx: Context<EndHourlyContract>) -> Result<()> {
+        v2::instructions::end_hourly_contract::handle_end_hourly_contract(ctx)
+    }
 }
 #[derive(Accounts)]
 pub struct Withdraw<'info> {

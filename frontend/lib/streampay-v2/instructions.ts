@@ -5,11 +5,13 @@ import { assertMetadataUri } from "./metadata";
 import {
   deriveContractAddresses,
   deriveContractEscrowPda,
+  deriveHourlySessionPda,
+  deriveHourlyStatePda,
   deriveTrialWorkUnitPda,
   deriveWorkUnitPda,
 } from "./pda";
 import type { StreamPayV2Program } from "./program";
-import { fetchContract, fetchWorkUnit } from "./accounts";
+import { fetchContract, fetchHourlyState, fetchWorkUnit } from "./accounts";
 import { txResult, type TransactionResult } from "./results";
 import { TOKEN_PROGRAM_ID, deriveEmployerSourceAta, deriveFreelancerDestinationAta } from "./tokens";
 import { toHashArray } from "./bytes";
@@ -20,7 +22,9 @@ import {
   encodeStartMode,
   toBn,
   type CreateContractRequest,
+  type CreateHourlyContractRequest,
 } from "./types";
+import { HOURLY_NO_ACTIVE_SESSION } from "./constants";
 
 function connectedWallet(program: StreamPayV2Program): PublicKey {
   const key = program.provider.publicKey;
@@ -44,6 +48,28 @@ export function toCreateContractArgs(request: CreateContractRequest) {
     scheduledStartTime: toBn(request.scheduledStartTime),
     durationSeconds: toBn(request.durationSeconds),
     checkpointInterval: toBn(request.checkpointInterval),
+    reviewDuration: toBn(request.reviewDuration),
+    activationReviewDuration: toBn(request.activationReviewDuration),
+    maxRevisions: request.maxRevisions,
+    trialAmount: toBn(request.trialAmount),
+    resolver: request.resolver,
+    metadataUri: request.metadataUri,
+    metadataHash: toHashArray(request.metadataHash),
+  };
+}
+
+export function toCreateHourlyContractArgs(request: CreateHourlyContractRequest) {
+  assertMetadataUri(request.metadataUri);
+  requireU64(request.hourlyRate, "hourlyRate");
+  requireU64(request.authorizedSeconds, "authorizedSeconds");
+  requireU64(request.trialAmount, "trialAmount");
+  requireU64(request.contractId, "contractId");
+  return {
+    contractId: toBn(request.contractId),
+    hourlyRate: toBn(request.hourlyRate),
+    authorizedSeconds: toBn(request.authorizedSeconds),
+    acceptanceDeadline: toBn(request.acceptanceDeadline),
+    durationSeconds: toBn(request.durationSeconds),
     reviewDuration: toBn(request.reviewDuration),
     activationReviewDuration: toBn(request.activationReviewDuration),
     maxRevisions: request.maxRevisions,
@@ -108,6 +134,136 @@ export class StreamPayV2Client {
         employerTokenAccount,
       },
     });
+  }
+
+  async createHourlyContract(params: {
+    request: CreateHourlyContractRequest;
+    freelancer: PublicKey;
+    tokenMint: PublicKey;
+    employerTokenAccount?: PublicKey;
+  }): Promise<TransactionResult> {
+    const employer = connectedWallet(this.program);
+    const args = toCreateHourlyContractArgs(params.request);
+    const pdas = deriveContractAddresses(
+      employer,
+      params.freelancer,
+      params.request.contractId,
+      this.program.programId
+    );
+    const hourlyState = deriveHourlyStatePda(
+      pdas.contract.address,
+      this.program.programId
+    ).address;
+    const employerTokenAccount =
+      params.employerTokenAccount ??
+      deriveEmployerSourceAta(employer, params.tokenMint);
+    const trialWorkUnit =
+      params.request.trialAmount > 0n ? pdas.trialWorkUnit.address : null;
+
+    const signature = await sendV2Method(this.program, this.program.methods
+      .createHourlyContract(args)
+      .accountsPartial({
+        employer,
+        freelancer: params.freelancer,
+        tokenMint: params.tokenMint,
+        employerTokenAccount,
+        contract: pdas.contract.address,
+        contractEscrow: pdas.escrow.address,
+        hourlyState,
+        trialWorkUnit,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+    );
+
+    return txResult({
+      signature,
+      contract: pdas.contract.address,
+      trialWorkUnit: trialWorkUnit ?? undefined,
+      escrow: pdas.escrow.address,
+      extra: {
+        employer,
+        freelancer: params.freelancer,
+        tokenMint: params.tokenMint,
+        employerTokenAccount,
+        hourlyState,
+      },
+    });
+  }
+
+  async startHourlySession(contract: PublicKey): Promise<TransactionResult> {
+    const freelancer = connectedWallet(this.program);
+    const hourlyState = deriveHourlyStatePda(
+      contract,
+      this.program.programId
+    ).address;
+    const state = await fetchHourlyState(this.program, hourlyState);
+    const hourlySession = deriveHourlySessionPda(
+      contract,
+      state.sessionCount,
+      this.program.programId
+    ).address;
+    const signature = await sendV2Method(this.program, this.program.methods
+      .startHourlySession()
+      .accountsPartial({
+        freelancer,
+        contract,
+        hourlyState,
+        hourlySession,
+        systemProgram: SystemProgram.programId,
+      })
+    );
+    return txResult({
+      signature,
+      contract,
+      extra: { hourlyState, hourlySession },
+    });
+  }
+
+  async stopHourlySession(params: {
+    contract: PublicKey;
+    workLogUri: string;
+    workLogHash: Uint8Array | number[];
+  }): Promise<TransactionResult> {
+    const freelancer = connectedWallet(this.program);
+    assertMetadataUri(params.workLogUri);
+    const hourlyState = deriveHourlyStatePda(
+      params.contract,
+      this.program.programId
+    ).address;
+    const state = await fetchHourlyState(this.program, hourlyState);
+    const hourlySession = deriveHourlySessionPda(
+      params.contract,
+      state.activeSessionIndex,
+      this.program.programId
+    ).address;
+    const signature = await sendV2Method(this.program, this.program.methods
+      .stopHourlySession(params.workLogUri, toHashArray(params.workLogHash))
+      .accountsPartial({
+        freelancer,
+        contract: params.contract,
+        hourlyState,
+        hourlySession,
+      })
+    );
+    return txResult({
+      signature,
+      contract: params.contract,
+      extra: { hourlyState, hourlySession },
+    });
+  }
+
+  async endHourlyContract(contract: PublicKey): Promise<TransactionResult> {
+    const employer = connectedWallet(this.program);
+    const hourlyState = deriveHourlyStatePda(
+      contract,
+      this.program.programId
+    ).address;
+    const signature = await sendV2Method(this.program, this.program.methods
+      .endHourlyContract()
+      .accountsPartial({ employer, contract, hourlyState })
+    );
+    return txResult({ signature, contract, extra: { hourlyState } });
   }
 
   async addMilestone(params: {
@@ -355,11 +511,26 @@ export class StreamPayV2Client {
 
   async cancelActiveContract(contract: PublicKey): Promise<TransactionResult> {
     const employer = connectedWallet(this.program);
+    const view = await fetchContract(this.program, contract);
+    const hourlyState =
+      view.paymentMode === "Hourly"
+        ? deriveHourlyStatePda(contract, this.program.programId).address
+        : null;
     const signature = await sendV2Method(this.program, this.program.methods
       .cancelActiveContract()
-      .accountsPartial({ employer, contract })
+      .accountsPartial({
+        employer,
+        contract,
+        ...(hourlyState ? { hourlyState } : {}),
+      })
     );
-    return txResult({ signature, contract });
+    return txResult({
+      signature,
+      contract,
+      extra: {
+        ...(hourlyState ? { hourlyState } : {}),
+      },
+    });
   }
 
   async withdrawFreelancer(params: {
@@ -426,11 +597,43 @@ export class StreamPayV2Client {
 
   async openDispute(contract: PublicKey): Promise<TransactionResult> {
     const party = connectedWallet(this.program);
+    const view = await fetchContract(this.program, contract);
+    let hourlyState: PublicKey | null = null;
+    let hourlySession: PublicKey | null = null;
+    if (view.paymentMode === "Hourly") {
+      hourlyState = deriveHourlyStatePda(
+        contract,
+        this.program.programId
+      ).address;
+      const state = await fetchHourlyState(this.program, hourlyState);
+      if (
+        state.activeSessionIndex !== HOURLY_NO_ACTIVE_SESSION &&
+        Number.isFinite(state.activeSessionIndex)
+      ) {
+        hourlySession = deriveHourlySessionPda(
+          contract,
+          state.activeSessionIndex,
+          this.program.programId
+        ).address;
+      }
+    }
     const signature = await sendV2Method(this.program, this.program.methods
       .openDispute()
-      .accountsPartial({ party, contract })
+      .accountsPartial({
+        party,
+        contract,
+        ...(hourlyState ? { hourlyState } : {}),
+        ...(hourlySession ? { hourlySession } : {}),
+      })
     );
-    return txResult({ signature, contract });
+    return txResult({
+      signature,
+      contract,
+      extra: {
+        ...(hourlyState ? { hourlyState } : {}),
+        ...(hourlySession ? { hourlySession } : {}),
+      },
+    });
   }
 
   async resolveDispute(params: {

@@ -81,7 +81,7 @@ export function presentStatus(status: ContractStatus): string {
   return contractStatusLabel(status);
 }
 
-export function presentType(type: ContractType): string {
+export function presentType(type: ContractType | "Hourly"): string {
   return paymentModeLabel(type);
 }
 
