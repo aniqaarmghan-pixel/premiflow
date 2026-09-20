@@ -197,8 +197,15 @@ export function streamingDashboard(
 export function contractActionVariant(
   action: UiAction
 ): "primary" | "secondary" | "danger" {
-  if (action === "openDispute" || action === "cancelActiveContract") {
+  if (
+    action === "openDispute" ||
+    action === "cancelActiveContract" ||
+    action === "rejectActivation"
+  ) {
     return "danger";
+  }
+  if (action === "settleTrialAndEnd" || action === "requestTrialRevision") {
+    return "secondary";
   }
   if (action === "completeContract" || action === "endHourlyContract") {
     return "secondary";
@@ -389,13 +396,18 @@ export function actionLabel(
     case "approveActivation":
       return "Activate";
     case "rejectActivation":
-      return "Do not activate";
+      return context?.workUnitStatus === "Submitted" ||
+        context?.workUnitStatus === "Revising"
+        ? "Dispute trial"
+        : "Do not activate";
     case "submitTrialWork":
       return "Submit trial";
     case "requestTrialRevision":
       return "Request trial revision";
     case "approveTrialAndActivate":
-      return "Approve trial & activate";
+      return "Approve trial & start contract";
+    case "settleTrialAndEnd":
+      return "Pay trial & don't continue";
     case "submitWorkUnit":
       return context?.workUnitStatus === "Revising"
         ? "Submit revised deliverable"
@@ -431,12 +443,17 @@ export function actionLabel(
   }
 }
 
-export function confirmTitle(action: UiAction): string {
+export function confirmTitle(
+  action: UiAction,
+  context?: { workUnitStatus?: WorkUnitStatus }
+): string {
   if (action === "voidStaleRevision") return "End expired revision?";
   if (action === "openDispute") return "Open dispute?";
   if (action === "stopHourlySession") return "Stop work?";
   if (action === "endHourlyContract") return "End hourly contract?";
-  return actionLabel(action);
+  if (action === "settleTrialAndEnd") return "Pay trial & don't continue?";
+  if (action === "rejectActivation") return `${actionLabel(action, context)}?`;
+  return actionLabel(action, context);
 }
 
 /** Client method on StreamPayV2Client used by the matching UI action. */
@@ -460,6 +477,8 @@ export function clientMethodForAction(action: UiAction): string {
       return "requestTrialRevision";
     case "approveTrialAndActivate":
       return "approveTrialAndActivate";
+    case "settleTrialAndEnd":
+      return "settleTrialAndEnd";
     case "submitWorkUnit":
       return "submitWorkUnit";
     case "requestWorkRevision":
@@ -503,6 +522,7 @@ export function isEconomicAction(action: UiAction): boolean {
     action === "completeContract" ||
     action === "approveWorkUnit" ||
     action === "approveTrialAndActivate" ||
+    action === "settleTrialAndEnd" ||
     action === "releaseStreamAccrual" ||
     action === "finalizeReviewTimeout" ||
     action === "declineContract" ||
@@ -517,6 +537,7 @@ export function needsConfirmation(action: UiAction): boolean {
     isEconomicAction(action) ||
     action === "submitWorkUnit" ||
     action === "submitTrialWork" ||
+    action === "requestTrialRevision" ||
     action === "voidStaleRevision"
   );
 }

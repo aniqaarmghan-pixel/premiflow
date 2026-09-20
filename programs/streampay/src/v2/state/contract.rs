@@ -423,6 +423,90 @@ impl Contract {
         Ok((freelancer, employer))
     }
 
+    /// Pay a submitted trial and end without activating the main engagement.
+    ///
+    /// No stream materialization. No activation timing. Status becomes
+    /// `Cancelled` so existing Collect pay / Claim refund paths apply.
+    pub fn settle_submitted_trial_without_activation(
+        &mut self,
+        now: i64,
+        trial_amount: u64,
+    ) -> Result<(u64, u64)> {
+        require!(
+            self.status == ContractStatus::PendingEmployerApproval,
+            StreamPayV2Error::InvalidState
+        );
+        require!(self.has_trial(), StreamPayV2Error::TrialNotConfigured);
+        require!(
+            trial_amount == self.trial_amount,
+            StreamPayV2Error::InvalidTrialAmount
+        );
+        require!(
+            self.released_amount == 0
+                && self.withdrawn_amount == 0
+                && self.refunded_amount == 0
+                && self.stream_released_amount == 0
+                && self.contested_amount == 0
+                && self.freelancer_settlement_amount == 0
+                && self.employer_refundable_amount == 0,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+        require!(
+            self.open_review_count > 0,
+            StreamPayV2Error::InvalidTrialState
+        );
+
+        let released = self
+            .released_amount
+            .checked_add(trial_amount)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        require!(
+            released <= self.total_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+        let released_unit_count = self
+            .released_unit_count
+            .checked_add(1)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        let open_review_count = self
+            .open_review_count
+            .checked_sub(1)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+
+        self.released_amount = released;
+        self.released_unit_count = released_unit_count;
+        self.open_review_count = open_review_count;
+
+        let freelancer = self.released_amount;
+        let employer = self
+            .total_amount
+            .checked_sub(freelancer)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        require!(
+            freelancer == self.trial_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+        require!(
+            employer == self.main_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+        let conserved = freelancer
+            .checked_add(employer)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        require!(
+            conserved == self.total_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+
+        self.freelancer_settlement_amount = freelancer;
+        self.employer_refundable_amount = employer;
+        self.contested_amount = 0;
+        self.status = ContractStatus::Cancelled;
+        self.terminated_at = now;
+        self.assert_terminal_settlement_invariants()?;
+        Ok((freelancer, employer))
+    }
+
     /// Materialize canonical stream accrual into released accounting.
     /// Used by Phase 7 cancel and Phase 9 dispute freeze. Status is unchanged.
     pub fn materialize_stream_at(&mut self, now: i64) -> Result<()> {

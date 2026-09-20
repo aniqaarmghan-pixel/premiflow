@@ -9,6 +9,7 @@ export const REQUIRED_V2_INSTRUCTIONS = [
   "submit_trial_work",
   "request_trial_revision",
   "approve_trial_and_activate",
+  "settle_trial_and_end",
   "submit_work_unit",
   "request_revision",
   "void_stale_revision",

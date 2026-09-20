@@ -63,6 +63,8 @@ test("both dispute-opening paths attempt case recovery after confirmed chain suc
   assert.equal(shouldRecoverAfterAction("rejectActivation", "Disputed"), true);
   assert.equal(shouldRecoverAfterAction("rejectActivation", "ActivationRejected"), false);
   assert.equal(shouldRecoverAfterAction("openDispute", "Active"), false);
+  assert.equal(shouldRecoverAfterAction("settleTrialAndEnd", "Cancelled"), false);
+  assert.equal(shouldRecoverAfterAction("settleTrialAndEnd", "Disputed"), false);
   assert.equal(shouldAttemptCaseRecover("Cancelled", "employer"), false);
   assert.equal(shouldAttemptCaseRecover("Disputed", "employer"), true);
   assert.equal(shouldAttemptCaseRecover("Resolved", "freelancer"), true);

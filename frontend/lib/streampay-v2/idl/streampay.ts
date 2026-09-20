@@ -31,45 +31,11 @@ export type Streampay = {
       "accounts": [
         {
           "name": "freelancer",
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract.employer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "freelancer"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": []
@@ -99,10 +65,7 @@ export type Streampay = {
             "contract's employer."
           ],
           "writable": true,
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
@@ -113,38 +76,7 @@ export type Streampay = {
             "address, so a cloned copy at some other key cannot be substituted.",
             "`has_one` proves the signer is this contract's employer."
           ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "employer"
-              },
-              {
-                "kind": "account",
-                "path": "contract.freelancer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "workUnit",
@@ -152,38 +84,10 @@ export type Streampay = {
             "The new milestone. Its address is derived from the parent contract and",
             "the parent's current unit count, so the caller has no say in either."
           ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  119,
-                  111,
-                  114,
-                  107,
-                  95,
-                  117,
-                  110,
-                  105,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.workUnitCount",
-                "account": "contract"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "systemProgram",
-          "address": "11111111111111111111111111111111"
+          "name": "systemProgram"
         }
       ],
       "args": [
@@ -215,45 +119,11 @@ export type Streampay = {
       "accounts": [
         {
           "name": "employer",
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "employer"
-              },
-              {
-                "kind": "account",
-                "path": "contract.freelancer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": []
@@ -276,75 +146,15 @@ export type Streampay = {
       "accounts": [
         {
           "name": "employer",
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "employer"
-              },
-              {
-                "kind": "account",
-                "path": "contract.freelancer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          },
-          "relations": [
-            "trialWorkUnit"
-          ]
+          "writable": true
         },
         {
           "name": "trialWorkUnit",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  114,
-                  105,
-                  97,
-                  108,
-                  95,
-                  117,
-                  110,
-                  105,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": []
@@ -367,79 +177,15 @@ export type Streampay = {
       "accounts": [
         {
           "name": "employer",
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "employer"
-              },
-              {
-                "kind": "account",
-                "path": "contract.freelancer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          },
-          "relations": [
-            "workUnit"
-          ]
+          "writable": true
         },
         {
           "name": "workUnit",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  119,
-                  111,
-                  114,
-                  107,
-                  95,
-                  117,
-                  110,
-                  105,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "workUnit.index",
-                "account": "workUnit"
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": []
@@ -463,54 +209,20 @@ export type Streampay = {
       "accounts": [
         {
           "name": "employer",
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "employer"
-              },
-              {
-                "kind": "account",
-                "path": "contract.freelancer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "hourlyState",
-          "writable": true,
-          "optional": true,
           "docs": [
             "Required for Hourly so an Open session cannot be cancelled away.",
             "Must be absent for Fixed / Milestone / Streaming."
-          ]
+          ],
+          "writable": true,
+          "optional": true
         }
       ],
       "args": []
@@ -534,25 +246,16 @@ export type Streampay = {
         },
         {
           "name": "employer",
-          "signer": true,
-          "relations": [
-            "stream"
-          ]
+          "signer": true
         },
         {
           "name": "worker",
           "docs": [
             "This must match the worker stored in the stream."
-          ],
-          "relations": [
-            "stream"
           ]
         },
         {
-          "name": "tokenMint",
-          "relations": [
-            "stream"
-          ]
+          "name": "tokenMint"
         },
         {
           "name": "employerTokenAccount",
@@ -564,30 +267,10 @@ export type Streampay = {
         },
         {
           "name": "escrowTokenAccount",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "stream"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "tokenProgram",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+          "name": "tokenProgram"
         }
       ],
       "args": []
@@ -610,83 +293,18 @@ export type Streampay = {
       "accounts": [
         {
           "name": "employer",
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "employer"
-              },
-              {
-                "kind": "account",
-                "path": "contract.freelancer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "tokenMint",
-          "relations": [
-            "contract"
-          ]
+          "name": "tokenMint"
         },
         {
           "name": "contractEscrow",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116,
-                  95,
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "employerTokenAccount",
@@ -697,8 +315,7 @@ export type Streampay = {
           "writable": true
         },
         {
-          "name": "tokenProgram",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+          "name": "tokenProgram"
         }
       ],
       "args": []
@@ -728,39 +345,7 @@ export type Streampay = {
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract.employer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.freelancer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": []
@@ -821,36 +406,7 @@ export type Streampay = {
             "contract account cannot be substituted and a duplicate triple is",
             "rejected by the runtime as an already-initialized account."
           ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "employer"
-              },
-              {
-                "kind": "account",
-                "path": "freelancer"
-              },
-              {
-                "kind": "arg",
-                "path": "args.contractId"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "contractEscrow",
@@ -861,35 +417,7 @@ export type Streampay = {
             "`token::authority` means only this program signing as the contract PDA",
             "can ever move the funds out."
           ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116,
-                  95,
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "trialWorkUnit",
@@ -898,30 +426,7 @@ export type Streampay = {
             "`trial_unit` PDA so it cannot collide with milestone indexes."
           ],
           "writable": true,
-          "optional": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  114,
-                  105,
-                  97,
-                  108,
-                  95,
-                  117,
-                  110,
-                  105,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              }
-            ]
-          }
+          "optional": true
         },
         {
           "name": "fixedWorkUnit",
@@ -931,46 +436,13 @@ export type Streampay = {
             "it before accepting. Seeds are independent of the trial PDA."
           ],
           "writable": true,
-          "optional": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  119,
-                  111,
-                  114,
-                  107,
-                  95,
-                  117,
-                  110,
-                  105,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              },
-              {
-                "kind": "const",
-                "value": [
-                  0,
-                  0,
-                  0,
-                  0
-                ]
-              }
-            ]
-          }
+          "optional": true
         },
         {
-          "name": "tokenProgram",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+          "name": "tokenProgram"
         },
         {
-          "name": "systemProgram",
-          "address": "11111111111111111111111111111111"
+          "name": "systemProgram"
         }
       ],
       "args": [
@@ -987,7 +459,7 @@ export type Streampay = {
     {
       "name": "createHourlyContract",
       "docs": [
-        "Dedicated Hourly create. Derives and funds totalAmount. No session."
+        "Dedicated Hourly create. Derives and funds `total_amount`. No session."
       ],
       "discriminator": [
         125,
@@ -1017,133 +489,26 @@ export type Streampay = {
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "employer"
-              },
-              {
-                "kind": "account",
-                "path": "freelancer"
-              },
-              {
-                "kind": "arg",
-                "path": "args.contractId"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "contractEscrow",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116,
-                  95,
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "hourlyState",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  104,
-                  111,
-                  117,
-                  114,
-                  108,
-                  121,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "trialWorkUnit",
           "writable": true,
-          "optional": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  114,
-                  105,
-                  97,
-                  108,
-                  95,
-                  117,
-                  110,
-                  105,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              }
-            ]
-          }
+          "optional": true
         },
         {
-          "name": "tokenProgram",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+          "name": "tokenProgram"
         },
         {
-          "name": "systemProgram",
-          "address": "11111111111111111111111111111111"
+          "name": "systemProgram"
         }
       ],
       "args": [
@@ -1172,34 +537,7 @@ export type Streampay = {
       "accounts": [
         {
           "name": "stream",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  115,
-                  116,
-                  114,
-                  101,
-                  97,
-                  109
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "employer"
-              },
-              {
-                "kind": "account",
-                "path": "worker"
-              },
-              {
-                "kind": "arg",
-                "path": "streamId"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "employer",
@@ -1221,34 +559,13 @@ export type Streampay = {
         },
         {
           "name": "escrowTokenAccount",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "stream"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "tokenProgram",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+          "name": "tokenProgram"
         },
         {
-          "name": "systemProgram",
-          "address": "11111111111111111111111111111111"
+          "name": "systemProgram"
         }
       ],
       "args": [
@@ -1284,45 +601,11 @@ export type Streampay = {
       "accounts": [
         {
           "name": "freelancer",
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract.employer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "freelancer"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": []
@@ -1346,76 +629,14 @@ export type Streampay = {
       "accounts": [
         {
           "name": "employer",
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "employer"
-              },
-              {
-                "kind": "account",
-                "path": "contract.freelancer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "hourlyState",
-          "relations": [
-            "contract"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  104,
-                  111,
-                  117,
-                  114,
-                  108,
-                  121,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              }
-            ]
-          }
+          "name": "hourlyState"
         }
       ],
       "args": []
@@ -1446,73 +667,11 @@ export type Streampay = {
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract.employer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.freelancer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          },
-          "relations": [
-            "workUnit"
-          ]
+          "writable": true
         },
         {
           "name": "workUnit",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  119,
-                  111,
-                  114,
-                  107,
-                  95,
-                  117,
-                  110,
-                  105,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "workUnit.index",
-                "account": "workUnit"
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": []
@@ -1535,10 +694,7 @@ export type Streampay = {
       "accounts": [
         {
           "name": "employer",
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
@@ -1546,38 +702,7 @@ export type Streampay = {
             "Same two checks as `add_milestone`: the account is a real contract at",
             "its canonical PDA, and the signer is its employer."
           ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "employer"
-              },
-              {
-                "kind": "account",
-                "path": "contract.freelancer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": []
@@ -1607,55 +732,23 @@ export type Streampay = {
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract.employer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.freelancer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "hourlyState",
-          "writable": true,
-          "optional": true,
           "docs": [
-            "Required when paymentMode is Hourly. Absent otherwise."
-          ]
+            "Required when `payment_mode == Hourly`. Absent otherwise."
+          ],
+          "writable": true,
+          "optional": true
         },
         {
           "name": "hourlySession",
-          "writable": true,
-          "optional": true,
           "docs": [
             "Required when Hourly and an Open session exists. Absent otherwise."
-          ]
+          ],
+          "writable": true,
+          "optional": true
         }
       ],
       "args": []
@@ -1678,78 +771,18 @@ export type Streampay = {
       "accounts": [
         {
           "name": "employer",
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "employer"
-              },
-              {
-                "kind": "account",
-                "path": "contract.freelancer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          },
-          "relations": [
-            "trialWorkUnit"
-          ]
+          "writable": true
         },
         {
           "name": "trialWorkUnit",
           "docs": [
             "Required when a trial is configured; omitted otherwise."
           ],
-          "optional": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  114,
-                  105,
-                  97,
-                  108,
-                  95,
-                  117,
-                  110,
-                  105,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              }
-            ]
-          }
+          "optional": true
         }
       ],
       "args": []
@@ -1780,39 +813,7 @@ export type Streampay = {
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract.employer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.freelancer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": []
@@ -1835,79 +836,15 @@ export type Streampay = {
       "accounts": [
         {
           "name": "employer",
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "employer"
-              },
-              {
-                "kind": "account",
-                "path": "contract.freelancer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          },
-          "relations": [
-            "workUnit"
-          ]
+          "writable": true
         },
         {
           "name": "workUnit",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  119,
-                  111,
-                  114,
-                  107,
-                  95,
-                  117,
-                  110,
-                  105,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "workUnit.index",
-                "account": "workUnit"
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": []
@@ -1930,75 +867,15 @@ export type Streampay = {
       "accounts": [
         {
           "name": "employer",
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "employer"
-              },
-              {
-                "kind": "account",
-                "path": "contract.freelancer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          },
-          "relations": [
-            "trialWorkUnit"
-          ]
+          "writable": true
         },
         {
           "name": "trialWorkUnit",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  114,
-                  105,
-                  97,
-                  108,
-                  95,
-                  117,
-                  110,
-                  105,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": []
@@ -2021,46 +898,11 @@ export type Streampay = {
       "accounts": [
         {
           "name": "resolver",
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract.employer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.freelancer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": [
@@ -2069,6 +911,37 @@ export type Streampay = {
           "type": "u64"
         }
       ]
+    },
+    {
+      "name": "settleTrialAndEnd",
+      "docs": [
+        "Employer pays a submitted trial and ends without activating the main engagement."
+      ],
+      "discriminator": [
+        220,
+        33,
+        3,
+        224,
+        191,
+        229,
+        244,
+        198
+      ],
+      "accounts": [
+        {
+          "name": "employer",
+          "signer": true
+        },
+        {
+          "name": "contract",
+          "writable": true
+        },
+        {
+          "name": "trialWorkUnit",
+          "writable": true
+        }
+      ],
+      "args": []
     },
     {
       "name": "startHourlySession",
@@ -2089,117 +962,22 @@ export type Streampay = {
         {
           "name": "freelancer",
           "writable": true,
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract.employer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "freelancer"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "hourlyState",
-          "writable": true,
-          "relations": [
-            "contract"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  104,
-                  111,
-                  117,
-                  114,
-                  108,
-                  121,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "hourlySession",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  104,
-                  111,
-                  117,
-                  114,
-                  108,
-                  121,
-                  95,
-                  115,
-                  101,
-                  115,
-                  115,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "hourlyState.sessionCount",
-                "account": "hourlyState"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "systemProgram",
-          "address": "11111111111111111111111111111111"
+          "name": "systemProgram"
         }
       ],
       "args": []
@@ -2222,116 +1000,19 @@ export type Streampay = {
       "accounts": [
         {
           "name": "freelancer",
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract.employer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "freelancer"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "hourlyState",
-          "writable": true,
-          "relations": [
-            "contract"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  104,
-                  111,
-                  117,
-                  114,
-                  108,
-                  121,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  101
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "hourlySession",
-          "writable": true,
-          "relations": [
-            "contract"
-          ],
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  104,
-                  111,
-                  117,
-                  114,
-                  108,
-                  121,
-                  95,
-                  115,
-                  101,
-                  115,
-                  115,
-                  105,
-                  111,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "hourlyState.activeSessionIndex",
-                "account": "hourlyState"
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": [
@@ -2368,75 +1049,15 @@ export type Streampay = {
       "accounts": [
         {
           "name": "freelancer",
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract.employer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "freelancer"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          },
-          "relations": [
-            "trialWorkUnit"
-          ]
+          "writable": true
         },
         {
           "name": "trialWorkUnit",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  114,
-                  105,
-                  97,
-                  108,
-                  95,
-                  117,
-                  110,
-                  105,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": [
@@ -2473,79 +1094,15 @@ export type Streampay = {
       "accounts": [
         {
           "name": "freelancer",
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract.employer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "freelancer"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          },
-          "relations": [
-            "workUnit"
-          ]
+          "writable": true
         },
         {
           "name": "workUnit",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  119,
-                  111,
-                  114,
-                  107,
-                  95,
-                  117,
-                  110,
-                  105,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "workUnit.index",
-                "account": "workUnit"
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": [
@@ -2582,79 +1139,15 @@ export type Streampay = {
       "accounts": [
         {
           "name": "employer",
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "employer"
-              },
-              {
-                "kind": "account",
-                "path": "contract.freelancer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          },
-          "relations": [
-            "workUnit"
-          ]
+          "writable": true
         },
         {
           "name": "workUnit",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  119,
-                  111,
-                  114,
-                  107,
-                  95,
-                  117,
-                  110,
-                  105,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "workUnit.index",
-                "account": "workUnit"
-              }
-            ]
-          }
+          "writable": true
         }
       ],
       "args": []
@@ -2678,16 +1171,10 @@ export type Streampay = {
         },
         {
           "name": "worker",
-          "signer": true,
-          "relations": [
-            "stream"
-          ]
+          "signer": true
         },
         {
-          "name": "tokenMint",
-          "relations": [
-            "stream"
-          ]
+          "name": "tokenMint"
         },
         {
           "name": "workerTokenAccount",
@@ -2695,30 +1182,10 @@ export type Streampay = {
         },
         {
           "name": "escrowTokenAccount",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "stream"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "tokenProgram",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+          "name": "tokenProgram"
         }
       ],
       "args": []
@@ -2741,51 +1208,14 @@ export type Streampay = {
       "accounts": [
         {
           "name": "freelancer",
-          "signer": true,
-          "relations": [
-            "contract"
-          ]
+          "signer": true
         },
         {
           "name": "contract",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract.employer",
-                "account": "contract"
-              },
-              {
-                "kind": "account",
-                "path": "freelancer"
-              },
-              {
-                "kind": "account",
-                "path": "contract.contractId",
-                "account": "contract"
-              }
-            ]
-          }
+          "writable": true
         },
         {
-          "name": "tokenMint",
-          "relations": [
-            "contract"
-          ]
+          "name": "tokenMint"
         },
         {
           "name": "contractEscrow",
@@ -2793,35 +1223,7 @@ export type Streampay = {
             "Canonical escrow for this Contract. Seeds bind it to `contract`; mint",
             "and authority bind it to the funded asset and the Contract PDA."
           ],
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  99,
-                  111,
-                  110,
-                  116,
-                  114,
-                  97,
-                  99,
-                  116,
-                  95,
-                  101,
-                  115,
-                  99,
-                  114,
-                  111,
-                  119
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "contract"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "freelancerTokenAccount",
@@ -2832,8 +1234,7 @@ export type Streampay = {
           "writable": true
         },
         {
-          "name": "tokenProgram",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+          "name": "tokenProgram"
         }
       ],
       "args": []
@@ -3194,6 +1595,19 @@ export type Streampay = {
       ]
     },
     {
+      "name": "trialSettledAndEnded",
+      "discriminator": [
+        6,
+        112,
+        35,
+        125,
+        73,
+        158,
+        24,
+        138
+      ]
+    },
+    {
       "name": "trialSubmitted",
       "discriminator": [
         57,
@@ -3274,49 +1688,64 @@ export type Streampay = {
   ],
   "errors": [
     {
-      "code": 6115,
-      "name": "acceptanceExpired",
-      "msg": "The acceptance deadline has passed."
+      "code": 6100,
+      "name": "invalidAmount",
+      "msg": "Amount must be greater than zero."
     },
     {
-      "code": 6116,
-      "name": "acceptanceNotExpired",
-      "msg": "The acceptance deadline has not yet passed."
+      "code": 6101,
+      "name": "invalidDuration",
+      "msg": "Duration is outside the permitted range."
     },
     {
-      "code": 6149,
-      "name": "approvalWindowExpired",
-      "msg": "The employer activation window has closed."
+      "code": 6102,
+      "name": "invalidCheckpointInterval",
+      "msg": "Checkpoint interval is invalid for this duration."
     },
     {
-      "code": 6144,
-      "name": "arithmeticOverflow",
-      "msg": "A math calculation overflowed."
+      "code": 6103,
+      "name": "invalidReviewDuration",
+      "msg": "Review duration is outside the permitted range or exceeds the checkpoint interval."
     },
     {
-      "code": 6125,
-      "name": "badUnitIndex",
-      "msg": "Work unit index does not match the expected next index."
+      "code": 6104,
+      "name": "tooManyCheckpoints",
+      "msg": "This configuration would create too many checkpoints."
     },
     {
-      "code": 6162,
-      "name": "completionNotAllowed",
-      "msg": "Successful completion is not allowed in this contract state."
+      "code": 6105,
+      "name": "invalidMaxRevisions",
+      "msg": "Maximum revisions exceeds the permitted limit."
     },
     {
-      "code": 6165,
-      "name": "contractAlreadyCompleted",
-      "msg": "This contract is already completed."
+      "code": 6106,
+      "name": "invalidAcceptanceDeadline",
+      "msg": "Acceptance deadline must be in the future."
     },
     {
-      "code": 6160,
-      "name": "contractAlreadyDisputed",
-      "msg": "This contract is already disputed."
+      "code": 6107,
+      "name": "invalidScheduledStart",
+      "msg": "Scheduled start must not precede the acceptance deadline."
     },
     {
-      "code": 6164,
-      "name": "contractNotReadyForCompletion",
-      "msg": "The contract has not reached an objectively completable point."
+      "code": 6108,
+      "name": "invalidMetadata",
+      "msg": "Metadata reference is missing or exceeds the maximum length."
+    },
+    {
+      "code": 6109,
+      "name": "selfContract",
+      "msg": "Employer and freelancer must be different wallets."
+    },
+    {
+      "code": 6110,
+      "name": "invalidPaymentMode",
+      "msg": "This operation is not valid for the contract's payment mode."
+    },
+    {
+      "code": 6111,
+      "name": "invalidState",
+      "msg": "The contract is not in the required state for this operation."
     },
     {
       "code": 6112,
@@ -3329,184 +1758,29 @@ export type Streampay = {
       "msg": "The contract is in a terminal state."
     },
     {
-      "code": 6159,
-      "name": "disputeNotAllowed",
-      "msg": "A dispute cannot be opened in this contract state."
+      "code": 6114,
+      "name": "termsNotFinalized",
+      "msg": "Contract terms have not been finalized."
     },
     {
-      "code": 6137,
-      "name": "emptyCheckpoint",
-      "msg": "This checkpoint period has no earned amount."
+      "code": 6115,
+      "name": "acceptanceExpired",
+      "msg": "The acceptance deadline has passed."
     },
     {
-      "code": 6145,
-      "name": "escrowFundingMismatch",
-      "msg": "Escrow did not receive the full contract amount."
+      "code": 6116,
+      "name": "acceptanceNotExpired",
+      "msg": "The acceptance deadline has not yet passed."
     },
     {
-      "code": 6143,
-      "name": "escrowNotSettled",
-      "msg": "Escrow still holds funds owed to a party."
+      "code": 6117,
+      "name": "obligationsOutstanding",
+      "msg": "Outstanding obligations remain on this contract."
     },
     {
-      "code": 6122,
-      "name": "fixedNeedsOneUnit",
-      "msg": "A fixed contract requires exactly one work unit."
-    },
-    {
-      "code": 6138,
-      "name": "graceWindowClosed",
-      "msg": "The post-termination grace window has closed."
-    },
-    {
-      "code": 6174,
-      "name": "hourlyAuthorizedTimeExhausted",
-      "msg": "Authorized Hourly time is exhausted."
-    },
-    {
-      "code": 6175,
-      "name": "hourlyEngagementExpired",
-      "msg": "The Hourly engagement window has closed."
-    },
-    {
-      "code": 6168,
-      "name": "hourlyMainAmountZero",
-      "msg": "Derived Hourly main amount is zero; rate and authorized time are too small."
-    },
-    {
-      "code": 6178,
-      "name": "hourlyOpenSessionBlocksClose",
-      "msg": "An open Hourly session blocks cancel or end."
-    },
-    {
-      "code": 6171,
-      "name": "hourlySessionAlreadyActive",
-      "msg": "An Hourly session is already open."
-    },
-    {
-      "code": 6177,
-      "name": "hourlySessionAlreadyRecorded",
-      "msg": "This Hourly session is already closed."
-    },
-    {
-      "code": 6173,
-      "name": "hourlySessionLimitReached",
-      "msg": "This contract has reached the Hourly session limit."
-    },
-    {
-      "code": 6169,
-      "name": "hourlyStateMissing",
-      "msg": "HourlyState account is required for this Hourly operation."
-    },
-    {
-      "code": 6157,
-      "name": "insufficientEscrowBalance",
-      "msg": "Escrow holds fewer tokens than the entitlement being claimed."
-    },
-    {
-      "code": 6106,
-      "name": "invalidAcceptanceDeadline",
-      "msg": "Acceptance deadline must be in the future."
-    },
-    {
-      "code": 6148,
-      "name": "invalidActivationReview",
-      "msg": "Activation review duration is outside the permitted range."
-    },
-    {
-      "code": 6100,
-      "name": "invalidAmount",
-      "msg": "Amount must be greater than zero."
-    },
-    {
-      "code": 6167,
-      "name": "invalidAuthorizedSeconds",
-      "msg": "Authorized Hourly seconds must be greater than zero."
-    },
-    {
-      "code": 6102,
-      "name": "invalidCheckpointInterval",
-      "msg": "Checkpoint interval is invalid for this duration."
-    },
-    {
-      "code": 6161,
-      "name": "invalidDisputeAward",
-      "msg": "The dispute award exceeds the contested amount."
-    },
-    {
-      "code": 6147,
-      "name": "invalidDueDate",
-      "msg": "Milestone due offset is not a positive duration within the contract term, or is not later than the previous milestone."
-    },
-    {
-      "code": 6101,
-      "name": "invalidDuration",
-      "msg": "Duration is outside the permitted range."
-    },
-    {
-      "code": 6166,
-      "name": "invalidHourlyRate",
-      "msg": "Hourly rate must be greater than zero."
-    },
-    {
-      "code": 6176,
-      "name": "invalidHourlySession",
-      "msg": "HourlySession does not belong to this contract or is not valid."
-    },
-    {
-      "code": 6170,
-      "name": "invalidHourlyState",
-      "msg": "HourlyState does not belong to this contract or is not valid."
-    },
-    {
-      "code": 6105,
-      "name": "invalidMaxRevisions",
-      "msg": "Maximum revisions exceeds the permitted limit."
-    },
-    {
-      "code": 6108,
-      "name": "invalidMetadata",
-      "msg": "Metadata reference is missing or exceeds the maximum length."
-    },
-    {
-      "code": 6110,
-      "name": "invalidPaymentMode",
-      "msg": "This operation is not valid for the contract's payment mode."
-    },
-    {
-      "code": 6158,
-      "name": "invalidResolver",
-      "msg": "Resolver must be a distinct non-default public key."
-    },
-    {
-      "code": 6103,
-      "name": "invalidReviewDuration",
-      "msg": "Review duration is outside the permitted range or exceeds the checkpoint interval."
-    },
-    {
-      "code": 6107,
-      "name": "invalidScheduledStart",
-      "msg": "Scheduled start must not precede the acceptance deadline."
-    },
-    {
-      "code": 6111,
-      "name": "invalidState",
-      "msg": "The contract is not in the required state for this operation."
-    },
-    {
-      "code": 6151,
-      "name": "invalidTrialAmount",
-      "msg": "Trial amount is zero, equals or exceeds the funded total, or does not match the trial account."
-    },
-    {
-      "code": 6154,
-      "name": "invalidTrialState",
-      "msg": "The trial work unit is not in the required state for this operation."
-    },
-    {
-      "code": 6124,
-      "name": "invalidWorkUnit",
-      "msg": "The work unit is invalid or does not belong to this contract."
+      "code": 6118,
+      "name": "unauthorized",
+      "msg": "The signer is not authorized for this operation."
     },
     {
       "code": 6119,
@@ -3519,84 +1793,14 @@ export type Streampay = {
       "msg": "Milestone amounts do not sum to the funded total."
     },
     {
-      "code": 6172,
-      "name": "noActiveHourlySession",
-      "msg": "There is no open Hourly session."
-    },
-    {
       "code": 6121,
       "name": "noMilestones",
       "msg": "This payment mode requires at least one milestone."
     },
     {
-      "code": 6141,
-      "name": "nothingReleasable",
-      "msg": "Nothing has been released on this contract."
-    },
-    {
-      "code": 6140,
-      "name": "nothingToRefund",
-      "msg": "There is nothing available to refund."
-    },
-    {
-      "code": 6139,
-      "name": "nothingToWithdraw",
-      "msg": "There is nothing available to withdraw."
-    },
-    {
-      "code": 6117,
-      "name": "obligationsOutstanding",
-      "msg": "Outstanding obligations remain on this contract."
-    },
-    {
-      "code": 6142,
-      "name": "openReviewBlocksCancel",
-      "msg": "Cannot cancel while a work unit is under review."
-    },
-    {
-      "code": 6135,
-      "name": "periodNotComplete",
-      "msg": "The checkpoint period is not yet complete."
-    },
-    {
-      "code": 6156,
-      "name": "releaseAmountExceeded",
-      "msg": "This release would exceed the contract's main or total amount."
-    },
-    {
-      "code": 6131,
-      "name": "reviewAlreadyOpen",
-      "msg": "Another work unit is still awaiting review."
-    },
-    {
-      "code": 6133,
-      "name": "reviewWindowClosed",
-      "msg": "The review window has already closed."
-    },
-    {
-      "code": 6132,
-      "name": "reviewWindowOpen",
-      "msg": "The review window is still open."
-    },
-    {
-      "code": 6134,
-      "name": "revisionLimitReached",
-      "msg": "The maximum number of revisions has been reached."
-    },
-    {
-      "code": 6150,
-      "name": "scheduledStartElapsed",
-      "msg": "The scheduled start has already elapsed; activating now would create retroactive earnings."
-    },
-    {
-      "code": 6109,
-      "name": "selfContract",
-      "msg": "Employer and freelancer must be different wallets."
-    },
-    {
-      "code": 6136,
-      "name": "streamFullyCheckpointed",
-      "msg": "All streaming periods have already been checkpointed."
+      "code": 6122,
+      "name": "fixedNeedsOneUnit",
+      "msg": "A fixed contract requires exactly one work unit."
     },
     {
       "code": 6123,
@@ -3604,44 +1808,14 @@ export type Streampay = {
       "msg": "A streaming contract cannot define milestones."
     },
     {
-      "code": 6114,
-      "name": "termsNotFinalized",
-      "msg": "Contract terms have not been finalized."
+      "code": 6124,
+      "name": "invalidWorkUnit",
+      "msg": "The work unit is invalid or does not belong to this contract."
     },
     {
-      "code": 6104,
-      "name": "tooManyCheckpoints",
-      "msg": "This configuration would create too many checkpoints."
-    },
-    {
-      "code": 6146,
-      "name": "tooManyMilestones",
-      "msg": "This contract already has the maximum number of milestones."
-    },
-    {
-      "code": 6152,
-      "name": "trialNotConfigured",
-      "msg": "This contract has no paid trial configured."
-    },
-    {
-      "code": 6153,
-      "name": "trialRequired",
-      "msg": "A paid trial is configured; this instruction cannot bypass it."
-    },
-    {
-      "code": 6118,
-      "name": "unauthorized",
-      "msg": "The signer is not authorized for this operation."
-    },
-    {
-      "code": 6128,
-      "name": "unitAlreadyReleased",
-      "msg": "The work unit has already been released."
-    },
-    {
-      "code": 6130,
-      "name": "unitNotStale",
-      "msg": "The work unit is not stale and cannot be voided."
+      "code": 6125,
+      "name": "badUnitIndex",
+      "msg": "Work unit index does not match the expected next index."
     },
     {
       "code": 6126,
@@ -3654,9 +1828,179 @@ export type Streampay = {
       "msg": "The work unit is not under review."
     },
     {
+      "code": 6128,
+      "name": "unitAlreadyReleased",
+      "msg": "The work unit has already been released."
+    },
+    {
       "code": 6129,
       "name": "unitVoided",
       "msg": "The work unit has been voided."
+    },
+    {
+      "code": 6130,
+      "name": "unitNotStale",
+      "msg": "The work unit is not stale and cannot be voided."
+    },
+    {
+      "code": 6131,
+      "name": "reviewAlreadyOpen",
+      "msg": "Another work unit is still awaiting review."
+    },
+    {
+      "code": 6132,
+      "name": "reviewWindowOpen",
+      "msg": "The review window is still open."
+    },
+    {
+      "code": 6133,
+      "name": "reviewWindowClosed",
+      "msg": "The review window has already closed."
+    },
+    {
+      "code": 6134,
+      "name": "revisionLimitReached",
+      "msg": "The maximum number of revisions has been reached."
+    },
+    {
+      "code": 6135,
+      "name": "periodNotComplete",
+      "msg": "The checkpoint period is not yet complete."
+    },
+    {
+      "code": 6136,
+      "name": "streamFullyCheckpointed",
+      "msg": "All streaming periods have already been checkpointed."
+    },
+    {
+      "code": 6137,
+      "name": "emptyCheckpoint",
+      "msg": "This checkpoint period has no earned amount."
+    },
+    {
+      "code": 6138,
+      "name": "graceWindowClosed",
+      "msg": "The post-termination grace window has closed."
+    },
+    {
+      "code": 6139,
+      "name": "nothingToWithdraw",
+      "msg": "There is nothing available to withdraw."
+    },
+    {
+      "code": 6140,
+      "name": "nothingToRefund",
+      "msg": "There is nothing available to refund."
+    },
+    {
+      "code": 6141,
+      "name": "nothingReleasable",
+      "msg": "Nothing has been released on this contract."
+    },
+    {
+      "code": 6142,
+      "name": "openReviewBlocksCancel",
+      "msg": "Cannot cancel while a work unit is under review."
+    },
+    {
+      "code": 6143,
+      "name": "escrowNotSettled",
+      "msg": "Escrow still holds funds owed to a party."
+    },
+    {
+      "code": 6144,
+      "name": "arithmeticOverflow",
+      "msg": "A math calculation overflowed."
+    },
+    {
+      "code": 6145,
+      "name": "escrowFundingMismatch",
+      "msg": "Escrow did not receive the full contract amount."
+    },
+    {
+      "code": 6146,
+      "name": "tooManyMilestones",
+      "msg": "This contract already has the maximum number of milestones."
+    },
+    {
+      "code": 6147,
+      "name": "invalidDueDate",
+      "msg": "Milestone due offset is not a positive duration within the contract term, or is not later than the previous milestone."
+    },
+    {
+      "code": 6148,
+      "name": "invalidActivationReview",
+      "msg": "Activation review duration is outside the permitted range."
+    },
+    {
+      "code": 6149,
+      "name": "approvalWindowExpired",
+      "msg": "The employer activation window has closed."
+    },
+    {
+      "code": 6150,
+      "name": "scheduledStartElapsed",
+      "msg": "The scheduled start has already elapsed; activating now would create retroactive earnings."
+    },
+    {
+      "code": 6151,
+      "name": "invalidTrialAmount",
+      "msg": "Trial amount is zero, equals or exceeds the funded total, or does not match the trial account."
+    },
+    {
+      "code": 6152,
+      "name": "trialNotConfigured",
+      "msg": "This contract has no paid trial configured."
+    },
+    {
+      "code": 6153,
+      "name": "trialRequired",
+      "msg": "A paid trial is configured; this instruction cannot bypass it."
+    },
+    {
+      "code": 6154,
+      "name": "invalidTrialState",
+      "msg": "The trial work unit is not in the required state for this operation."
+    },
+    {
+      "code": 6155,
+      "name": "unsupportedWorkUnitKind",
+      "msg": "This work unit kind cannot use the post-activation review instructions."
+    },
+    {
+      "code": 6156,
+      "name": "releaseAmountExceeded",
+      "msg": "This release would exceed the contract's main or total amount."
+    },
+    {
+      "code": 6157,
+      "name": "insufficientEscrowBalance",
+      "msg": "Escrow holds fewer tokens than the entitlement being claimed."
+    },
+    {
+      "code": 6158,
+      "name": "invalidResolver",
+      "msg": "Resolver must be a distinct non-default public key."
+    },
+    {
+      "code": 6159,
+      "name": "disputeNotAllowed",
+      "msg": "A dispute cannot be opened in this contract state."
+    },
+    {
+      "code": 6160,
+      "name": "contractAlreadyDisputed",
+      "msg": "This contract is already disputed."
+    },
+    {
+      "code": 6161,
+      "name": "invalidDisputeAward",
+      "msg": "The dispute award exceeds the contested amount."
+    },
+    {
+      "code": 6162,
+      "name": "completionNotAllowed",
+      "msg": "Successful completion is not allowed in this contract state."
     },
     {
       "code": 6163,
@@ -3664,35 +2008,556 @@ export type Streampay = {
       "msg": "Required work is still unresolved, so the contract cannot complete."
     },
     {
-      "code": 6155,
-      "name": "unsupportedWorkUnitKind",
-      "msg": "This work unit kind cannot use the post-activation review instructions."
+      "code": 6164,
+      "name": "contractNotReadyForCompletion",
+      "msg": "The contract has not reached an objectively completable point."
+    },
+    {
+      "code": 6165,
+      "name": "contractAlreadyCompleted",
+      "msg": "This contract is already completed."
+    },
+    {
+      "code": 6166,
+      "name": "invalidHourlyRate",
+      "msg": "Hourly rate must be greater than zero."
+    },
+    {
+      "code": 6167,
+      "name": "invalidAuthorizedSeconds",
+      "msg": "Authorized Hourly seconds must be greater than zero."
+    },
+    {
+      "code": 6168,
+      "name": "hourlyMainAmountZero",
+      "msg": "Derived Hourly main amount is zero; rate and authorized time are too small."
+    },
+    {
+      "code": 6169,
+      "name": "hourlyStateMissing",
+      "msg": "HourlyState account is required for this Hourly operation."
+    },
+    {
+      "code": 6170,
+      "name": "invalidHourlyState",
+      "msg": "HourlyState does not belong to this contract or is not valid."
+    },
+    {
+      "code": 6171,
+      "name": "hourlySessionAlreadyActive",
+      "msg": "An Hourly session is already open."
+    },
+    {
+      "code": 6172,
+      "name": "noActiveHourlySession",
+      "msg": "There is no open Hourly session."
+    },
+    {
+      "code": 6173,
+      "name": "hourlySessionLimitReached",
+      "msg": "This contract has reached the Hourly session limit."
+    },
+    {
+      "code": 6174,
+      "name": "hourlyAuthorizedTimeExhausted",
+      "msg": "Authorized Hourly time is exhausted."
+    },
+    {
+      "code": 6175,
+      "name": "hourlyEngagementExpired",
+      "msg": "The Hourly engagement window has closed."
+    },
+    {
+      "code": 6176,
+      "name": "invalidHourlySession",
+      "msg": "HourlySession does not belong to this contract or is not valid."
+    },
+    {
+      "code": 6177,
+      "name": "hourlySessionAlreadyRecorded",
+      "msg": "This Hourly session is already closed."
+    },
+    {
+      "code": 6178,
+      "name": "hourlyOpenSessionBlocksClose",
+      "msg": "An open Hourly session blocks cancel or end."
     }
   ],
   "types": [
     {
-      "name": "activationRejected",
-      "docs": [
-        "The employer reviewed the trial stage and declined to activate."
-      ],
+      "name": "stream",
       "type": {
         "kind": "struct",
         "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
           {
             "name": "employer",
             "type": "pubkey"
           },
           {
-            "name": "freelancer",
+            "name": "worker",
             "type": "pubkey"
           },
           {
-            "name": "rejectedAt",
+            "name": "tokenMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "streamId",
+            "type": "u64"
+          },
+          {
+            "name": "totalAmount",
+            "type": "u64"
+          },
+          {
+            "name": "withdrawnAmount",
+            "type": "u64"
+          },
+          {
+            "name": "isCancelled",
+            "type": "bool"
+          },
+          {
+            "name": "startTime",
             "type": "i64"
+          },
+          {
+            "name": "endTime",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "contractStatus",
+      "docs": [
+        "Authoritative contract lifecycle state.",
+        "",
+        "Borsh unit-enum discriminants, old → new (V2 was never deployed):",
+        "",
+        "| variant                  | old | new |",
+        "|--------------------------|-----|-----|",
+        "| Draft                    | 0   | 0   |",
+        "| PendingAcceptance        | 1   | 1   |",
+        "| PendingEmployerApproval  | —   | 2   |",
+        "| Active                   | 2   | 3   |",
+        "| Completed                | 3   | 4   |",
+        "| Declined                 | 4   | 5   |",
+        "| Expired                  | 5   | 6   |",
+        "| Cancelled                | 6   | 7   |",
+        "| ActivationRejected       | —   | 8   |",
+        "| Disputed                 | —   | 9   |",
+        "| Resolved                 | —   | 10  |",
+        "",
+        "`PendingEmployerApproval` is the employer-approval gate: the freelancer has",
+        "accepted, the main stream has not started. `ActivationRejected` is the",
+        "employer's \"no\" at that gate, distinct from `Declined` (the freelancer",
+        "refused the offer). Events distinguish the two paths for indexers; status",
+        "distinguishes them for on-chain logic."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "draft"
+          },
+          {
+            "name": "pendingAcceptance"
+          },
+          {
+            "name": "pendingEmployerApproval"
+          },
+          {
+            "name": "active"
+          },
+          {
+            "name": "completed"
+          },
+          {
+            "name": "declined"
+          },
+          {
+            "name": "expired"
+          },
+          {
+            "name": "cancelled"
+          },
+          {
+            "name": "activationRejected"
+          },
+          {
+            "name": "disputed"
+          },
+          {
+            "name": "resolved"
+          }
+        ]
+      }
+    },
+    {
+      "name": "disputeParty",
+      "docs": [
+        "Who opened an on-chain dispute. `None` until `open_dispute` / trial reject."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "none"
+          },
+          {
+            "name": "employer"
+          },
+          {
+            "name": "freelancer"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hourlySessionStatus",
+      "docs": [
+        "Lifecycle of one Hourly work session. H1 defines the states only;",
+        "Start/Stop instructions that transition them belong to H2."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "open"
+          },
+          {
+            "name": "recorded"
+          },
+          {
+            "name": "void"
+          }
+        ]
+      }
+    },
+    {
+      "name": "paymentMode",
+      "docs": [
+        "How compensation is structured and released.",
+        "",
+        "Existing modes are mutually exclusive: a streaming contract never has",
+        "milestones, and a milestone/fixed contract never has checkpoints. Hourly",
+        "is appended as discriminant 3 and uses its own `HourlyState` /",
+        "`HourlySession` PDAs, not WorkUnits. H1 does not implement Hourly",
+        "instructions; existing handlers must reject it explicitly."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "streaming"
+          },
+          {
+            "name": "milestone"
+          },
+          {
+            "name": "fixed"
+          },
+          {
+            "name": "hourly"
+          }
+        ]
+      }
+    },
+    {
+      "name": "releaseTrigger",
+      "docs": [
+        "Why a work unit's amount became released.",
+        "",
+        "A typed \"not yet\" variant rather than a sentinel value; only meaningful",
+        "once `WorkUnitStatus::Released`."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "notReleased"
+          },
+          {
+            "name": "employerApproval"
+          },
+          {
+            "name": "reviewTimeout"
+          }
+        ]
+      }
+    },
+    {
+      "name": "startMode",
+      "docs": [
+        "When the main earning clock starts.",
+        "",
+        "Discriminants are stable: `OnActivation` is 0, `Scheduled` is 1. This was",
+        "previously named `OnAcceptance`; it was renamed before V2 deployment because",
+        "freelancer acceptance no longer starts the stream."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "onActivation"
+          },
+          {
+            "name": "scheduled"
+          }
+        ]
+      }
+    },
+    {
+      "name": "workUnitKind",
+      "docs": [
+        "Which flavour of work unit this account represents.",
+        "",
+        "Checkpoints are created by the freelancer at submission time with an amount",
+        "derived from the agreed vesting formula. Milestones are created by the",
+        "employer before acceptance with a negotiated amount."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "checkpoint"
+          },
+          {
+            "name": "milestone"
+          },
+          {
+            "name": "fixed"
+          },
+          {
+            "name": "trial"
+          }
+        ]
+      }
+    },
+    {
+      "name": "workUnitStatus",
+      "docs": [
+        "Authoritative work unit lifecycle state."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "defined"
+          },
+          {
+            "name": "submitted"
+          },
+          {
+            "name": "revising"
+          },
+          {
+            "name": "released"
+          },
+          {
+            "name": "void"
+          }
+        ]
+      }
+    },
+    {
+      "name": "createContractArgs",
+      "docs": [
+        "Caller-supplied terms.",
+        "",
+        "Grouped into a struct rather than a dozen positional parameters so that",
+        "adding a term in a later phase cannot silently shift an existing argument's",
+        "meaning at the call site.",
+        "",
+        "Every field here is a *term*. No lifecycle or accounting field is accepted",
+        "from the caller: `status`, all five money counters, all unit counters, every",
+        "lifecycle timestamp and both bumps are derived by the handler below."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contractId",
+            "docs": [
+              "Employer-scoped identifier. Part of the PDA seeds, so reusing one for",
+              "the same freelancer is rejected by the runtime, not by a check here."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "paymentMode",
+            "type": {
+              "defined": {
+                "name": "paymentMode"
+              }
+            }
+          },
+          {
+            "name": "startMode",
+            "type": {
+              "defined": {
+                "name": "startMode"
+              }
+            }
+          },
+          {
+            "name": "totalAmount",
+            "docs": [
+              "Funded in full during this instruction."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "acceptanceDeadline",
+            "docs": [
+              "Latest instant the freelancer may accept."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "scheduledStartTime",
+            "docs": [
+              "Only meaningful when `start_mode == Scheduled`; normalized away",
+              "otherwise. See `resolve`."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "durationSeconds",
+            "docs": [
+              "Length of the contract term, in seconds."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "checkpointInterval",
+            "docs": [
+              "Only meaningful when `payment_mode == Streaming`; normalized away",
+              "otherwise. See `resolve`."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "reviewDuration",
+            "docs": [
+              "Employer review window, and equally the freelancer's resubmission",
+              "window."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "activationReviewDuration",
+            "docs": [
+              "How long the employer has after freelancer acceptance to approve",
+              "activation. Does not start the stream by itself."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "maxRevisions",
+            "type": "u8"
+          },
+          {
+            "name": "trialAmount",
+            "docs": [
+              "Paid pre-activation trial reservation, included in `total_amount`.",
+              "Zero means no trial. Must be strictly less than `total_amount` so the",
+              "main contract retains a positive economic base."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "resolver",
+            "docs": [
+              "Per-contract dispute resolver. Must differ from employer, freelancer,",
+              "and the default pubkey. Frozen at creation."
+            ],
+            "type": "pubkey"
+          },
+          {
+            "name": "metadataUri",
+            "docs": [
+              "Bounded reference to the off-chain contract record."
+            ],
+            "type": "string"
+          },
+          {
+            "name": "metadataHash",
+            "docs": [
+              "Hash of that record, making it tamper-evident."
+            ],
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "createHourlyContractArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contractId",
+            "type": "u64"
+          },
+          {
+            "name": "hourlyRate",
+            "type": "u64"
+          },
+          {
+            "name": "authorizedSeconds",
+            "type": "u64"
+          },
+          {
+            "name": "acceptanceDeadline",
+            "type": "i64"
+          },
+          {
+            "name": "durationSeconds",
+            "type": "i64"
+          },
+          {
+            "name": "reviewDuration",
+            "type": "i64"
+          },
+          {
+            "name": "activationReviewDuration",
+            "type": "i64"
+          },
+          {
+            "name": "maxRevisions",
+            "type": "u8"
+          },
+          {
+            "name": "trialAmount",
+            "type": "u64"
+          },
+          {
+            "name": "resolver",
+            "type": "pubkey"
+          },
+          {
+            "name": "metadataUri",
+            "type": "string"
+          },
+          {
+            "name": "metadataHash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
           }
         ]
       }
@@ -4037,9 +2902,9 @@ export type Streampay = {
               "were taken from it.",
               "",
               "Phase 7 layout: two u64 settlement fields after `stream_released_amount`;",
-              "reserved 84 \u2192 68. Phase 9 consumed 49 more bytes for `resolver` (32),",
+              "reserved 84 → 68. Phase 9 consumed 49 more bytes for `resolver` (32),",
               "`contested_amount` (8), `disputed_at` (8) and `dispute_initiator` (1);",
-              "reserved 68 \u2192 19. `INIT_SPACE` remains 621."
+              "reserved 68 → 19. `INIT_SPACE` remains 621."
             ],
             "type": {
               "array": [
@@ -4059,797 +2924,6 @@ export type Streampay = {
       }
     },
     {
-      "name": "contractAccepted",
-      "docs": [
-        "The freelancer accepted a funded offer. The main stream has not started."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "acceptedAt",
-            "type": "i64"
-          },
-          {
-            "name": "activationDeadline",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "contractActivated",
-      "docs": [
-        "The employer approved activation. Main-contract timing is now established."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "activatedAt",
-            "type": "i64"
-          },
-          {
-            "name": "startTime",
-            "type": "i64"
-          },
-          {
-            "name": "endTime",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "contractCancellationSettled",
-      "docs": [
-        "An Active contract was cancelled and its economic split was frozen.",
-        "No SPL transfer."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "paymentMode",
-            "type": {
-              "defined": {
-                "name": "paymentMode"
-              }
-            }
-          },
-          {
-            "name": "settledAt",
-            "type": "i64"
-          },
-          {
-            "name": "freelancerEntitlement",
-            "type": "u64"
-          },
-          {
-            "name": "employerRefundable",
-            "type": "u64"
-          },
-          {
-            "name": "releasedAmount",
-            "type": "u64"
-          },
-          {
-            "name": "streamReleasedAmount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "contractCompleted",
-      "docs": [
-        "Successful completion froze the agreed economic end. No SPL transfer."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "completedAt",
-            "type": "i64"
-          },
-          {
-            "name": "finalFreelancerEntitlement",
-            "type": "u64"
-          },
-          {
-            "name": "finalEmployerEntitlement",
-            "type": "u64"
-          },
-          {
-            "name": "releasedAmount",
-            "type": "u64"
-          },
-          {
-            "name": "withdrawnAmount",
-            "type": "u64"
-          },
-          {
-            "name": "refundedAmount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "contractCreated",
-      "docs": [
-        "A contract was created and fully funded into escrow.",
-        "",
-        "`status` is included because it is the one field an indexer cannot infer:",
-        "it distinguishes a contract that is immediately offerable",
-        "(`PendingAcceptance`) from a milestone contract still awaiting its",
-        "allocation (`Draft`)."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "tokenMint",
-            "type": "pubkey"
-          },
-          {
-            "name": "contractId",
-            "type": "u64"
-          },
-          {
-            "name": "paymentMode",
-            "type": {
-              "defined": {
-                "name": "paymentMode"
-              }
-            }
-          },
-          {
-            "name": "status",
-            "type": {
-              "defined": {
-                "name": "contractStatus"
-              }
-            }
-          },
-          {
-            "name": "totalAmount",
-            "type": "u64"
-          },
-          {
-            "name": "createdAt",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "contractDeclined",
-      "docs": [
-        "The freelancer refused a funded offer."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "declinedAt",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "contractStatus",
-      "docs": [
-        "Authoritative contract lifecycle state.",
-        "",
-        "Borsh unit-enum discriminants, old \u2192 new (V2 was never deployed):",
-        "",
-        "| variant                  | old | new |",
-        "|--------------------------|-----|-----|",
-        "| Draft                    | 0   | 0   |",
-        "| PendingAcceptance        | 1   | 1   |",
-        "| PendingEmployerApproval  | \u2014   | 2   |",
-        "| Active                   | 2   | 3   |",
-        "| Completed                | 3   | 4   |",
-        "| Declined                 | 4   | 5   |",
-        "| Expired                  | 5   | 6   |",
-        "| Cancelled                | 6   | 7   |",
-        "| ActivationRejected       | \u2014   | 8   |",
-        "| Disputed                 | \u2014   | 9   |",
-        "| Resolved                 | \u2014   | 10  |",
-        "",
-        "`PendingEmployerApproval` is the employer-approval gate: the freelancer has",
-        "accepted, the main stream has not started. `ActivationRejected` is the",
-        "employer's \"no\" at that gate, distinct from `Declined` (the freelancer",
-        "refused the offer). Events distinguish the two paths for indexers; status",
-        "distinguishes them for on-chain logic."
-      ],
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "draft"
-          },
-          {
-            "name": "pendingAcceptance"
-          },
-          {
-            "name": "pendingEmployerApproval"
-          },
-          {
-            "name": "active"
-          },
-          {
-            "name": "completed"
-          },
-          {
-            "name": "declined"
-          },
-          {
-            "name": "expired"
-          },
-          {
-            "name": "cancelled"
-          },
-          {
-            "name": "activationRejected"
-          },
-          {
-            "name": "disputed"
-          },
-          {
-            "name": "resolved"
-          }
-        ]
-      }
-    },
-    {
-      "name": "createContractArgs",
-      "docs": [
-        "Caller-supplied terms.",
-        "",
-        "Grouped into a struct rather than a dozen positional parameters so that",
-        "adding a term in a later phase cannot silently shift an existing argument's",
-        "meaning at the call site.",
-        "",
-        "Every field here is a *term*. No lifecycle or accounting field is accepted",
-        "from the caller: `status`, all five money counters, all unit counters, every",
-        "lifecycle timestamp and both bumps are derived by the handler below."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contractId",
-            "docs": [
-              "Employer-scoped identifier. Part of the PDA seeds, so reusing one for",
-              "the same freelancer is rejected by the runtime, not by a check here."
-            ],
-            "type": "u64"
-          },
-          {
-            "name": "paymentMode",
-            "type": {
-              "defined": {
-                "name": "paymentMode"
-              }
-            }
-          },
-          {
-            "name": "startMode",
-            "type": {
-              "defined": {
-                "name": "startMode"
-              }
-            }
-          },
-          {
-            "name": "totalAmount",
-            "docs": [
-              "Funded in full during this instruction."
-            ],
-            "type": "u64"
-          },
-          {
-            "name": "acceptanceDeadline",
-            "docs": [
-              "Latest instant the freelancer may accept."
-            ],
-            "type": "i64"
-          },
-          {
-            "name": "scheduledStartTime",
-            "docs": [
-              "Only meaningful when `start_mode == Scheduled`; normalized away",
-              "otherwise. See `resolve`."
-            ],
-            "type": "i64"
-          },
-          {
-            "name": "durationSeconds",
-            "docs": [
-              "Length of the contract term, in seconds."
-            ],
-            "type": "i64"
-          },
-          {
-            "name": "checkpointInterval",
-            "docs": [
-              "Only meaningful when `payment_mode == Streaming`; normalized away",
-              "otherwise. See `resolve`."
-            ],
-            "type": "i64"
-          },
-          {
-            "name": "reviewDuration",
-            "docs": [
-              "Employer review window, and equally the freelancer's resubmission",
-              "window."
-            ],
-            "type": "i64"
-          },
-          {
-            "name": "activationReviewDuration",
-            "docs": [
-              "How long the employer has after freelancer acceptance to approve",
-              "activation. Does not start the stream by itself."
-            ],
-            "type": "i64"
-          },
-          {
-            "name": "maxRevisions",
-            "type": "u8"
-          },
-          {
-            "name": "trialAmount",
-            "docs": [
-              "Paid pre-activation trial reservation, included in `total_amount`.",
-              "Zero means no trial. Must be strictly less than `total_amount` so the",
-              "main contract retains a positive economic base."
-            ],
-            "type": "u64"
-          },
-          {
-            "name": "resolver",
-            "docs": [
-              "Per-contract dispute resolver. Must differ from employer, freelancer,",
-              "and the default pubkey. Frozen at creation."
-            ],
-            "type": "pubkey"
-          },
-          {
-            "name": "metadataUri",
-            "docs": [
-              "Bounded reference to the off-chain contract record."
-            ],
-            "type": "string"
-          },
-          {
-            "name": "metadataHash",
-            "docs": [
-              "Hash of that record, making it tamper-evident."
-            ],
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "createHourlyContractArgs",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contractId",
-            "type": "u64"
-          },
-          {
-            "name": "hourlyRate",
-            "type": "u64"
-          },
-          {
-            "name": "authorizedSeconds",
-            "type": "u64"
-          },
-          {
-            "name": "acceptanceDeadline",
-            "type": "i64"
-          },
-          {
-            "name": "durationSeconds",
-            "type": "i64"
-          },
-          {
-            "name": "reviewDuration",
-            "type": "i64"
-          },
-          {
-            "name": "activationReviewDuration",
-            "type": "i64"
-          },
-          {
-            "name": "maxRevisions",
-            "type": "u8"
-          },
-          {
-            "name": "trialAmount",
-            "type": "u64"
-          },
-          {
-            "name": "resolver",
-            "type": "pubkey"
-          },
-          {
-            "name": "metadataUri",
-            "type": "string"
-          },
-          {
-            "name": "metadataHash",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
-          }
-        ]
-      }
-    },
-    {
-      "name": "disputeOpened",
-      "docs": [
-        "A party froze the contract into Disputed. No SPL transfer."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "initiator",
-            "type": {
-              "defined": {
-                "name": "disputeParty"
-              }
-            }
-          },
-          {
-            "name": "resolver",
-            "type": "pubkey"
-          },
-          {
-            "name": "disputedAt",
-            "type": "i64"
-          },
-          {
-            "name": "contestedAmount",
-            "type": "u64"
-          },
-          {
-            "name": "releasedAmount",
-            "type": "u64"
-          },
-          {
-            "name": "streamReleasedAmount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "disputeParty",
-      "docs": [
-        "Who opened an on-chain dispute. `None` until `open_dispute` / trial reject."
-      ],
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "none"
-          },
-          {
-            "name": "employer"
-          },
-          {
-            "name": "freelancer"
-          }
-        ]
-      }
-    },
-    {
-      "name": "disputeResolved",
-      "docs": [
-        "The contract resolver allocated the contested remainder. No SPL transfer."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "resolver",
-            "type": "pubkey"
-          },
-          {
-            "name": "resolvedAt",
-            "type": "i64"
-          },
-          {
-            "name": "contestedAmount",
-            "type": "u64"
-          },
-          {
-            "name": "freelancerContestedAward",
-            "type": "u64"
-          },
-          {
-            "name": "employerContestedAward",
-            "type": "u64"
-          },
-          {
-            "name": "finalFreelancerEntitlement",
-            "type": "u64"
-          },
-          {
-            "name": "finalEmployerEntitlement",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "employerRefundClaimed",
-      "docs": [
-        "SPL tokens left escrow back to the employer. Real token movement."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "mint",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "refundedAmount",
-            "type": "u64"
-          },
-          {
-            "name": "remainingRefundable",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "freelancerWithdrawal",
-      "docs": [
-        "SPL tokens left escrow for the freelancer. Real token movement."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "mint",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "withdrawnAmount",
-            "type": "u64"
-          },
-          {
-            "name": "remainingEntitlement",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "hourlyContractCreated",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "contractId",
-            "type": "u64"
-          },
-          {
-            "name": "hourlyRate",
-            "type": "u64"
-          },
-          {
-            "name": "authorizedSeconds",
-            "type": "u64"
-          },
-          {
-            "name": "mainAmount",
-            "type": "u64"
-          },
-          {
-            "name": "trialAmount",
-            "type": "u64"
-          },
-          {
-            "name": "totalAmount",
-            "type": "u64"
-          },
-          {
-            "name": "createdAt",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "hourlyContractEnded",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "endedAt",
-            "type": "i64"
-          },
-          {
-            "name": "freelancerSettlementAmount",
-            "type": "u64"
-          },
-          {
-            "name": "employerRefundableAmount",
-            "type": "u64"
-          },
-          {
-            "name": "releasedAmount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
       "name": "hourlySession",
       "type": {
         "kind": "struct",
@@ -4864,18 +2938,30 @@ export type Streampay = {
           },
           {
             "name": "index",
+            "docs": [
+              "Zero-based session index and PDA seed (`u32` little-endian)."
+            ],
             "type": "u32"
           },
           {
             "name": "startedAt",
+            "docs": [
+              "Solana Clock at Start. Zero until opened."
+            ],
             "type": "i64"
           },
           {
             "name": "stoppedAt",
+            "docs": [
+              "Solana Clock at Stop. Zero while `Open`."
+            ],
             "type": "i64"
           },
           {
             "name": "durationSeconds",
+            "docs": [
+              "`stopped_at - started_at` once recorded, after H2 caps."
+            ],
             "type": "u64"
           },
           {
@@ -4888,6 +2974,9 @@ export type Streampay = {
           },
           {
             "name": "workLogHash",
+            "docs": [
+              "Hash of the optional off-chain work log."
+            ],
             "type": {
               "array": [
                 "u8",
@@ -4910,108 +2999,10 @@ export type Streampay = {
           },
           {
             "name": "workLogUri",
+            "docs": [
+              "Bounded pointer to the off-chain work log. Not required in V1."
+            ],
             "type": "string"
-          }
-        ]
-      }
-    },
-    {
-      "name": "hourlySessionRecorded",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "session",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "sessionIndex",
-            "type": "u32"
-          },
-          {
-            "name": "stoppedAt",
-            "type": "i64"
-          },
-          {
-            "name": "creditedDuration",
-            "type": "u64"
-          },
-          {
-            "name": "approvedSeconds",
-            "type": "u64"
-          },
-          {
-            "name": "releaseDelta",
-            "type": "u64"
-          },
-          {
-            "name": "releasedAmount",
-            "type": "u64"
-          },
-          {
-            "name": "status",
-            "type": {
-              "defined": {
-                "name": "hourlySessionStatus"
-              }
-            }
-          },
-          {
-            "name": "materializedByDispute",
-            "type": "bool"
-          }
-        ]
-      }
-    },
-    {
-      "name": "hourlySessionStarted",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "session",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "sessionIndex",
-            "type": "u32"
-          },
-          {
-            "name": "startedAt",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "hourlySessionStatus",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "open"
-          },
-          {
-            "name": "recorded"
-          },
-          {
-            "name": "void"
           }
         ]
       }
@@ -5023,38 +3014,68 @@ export type Streampay = {
         "fields": [
           {
             "name": "version",
+            "docs": [
+              "Same layout version family as `Contract` / `WorkUnit`."
+            ],
             "type": "u8"
           },
           {
             "name": "contract",
+            "docs": [
+              "Parent contract. Stored in addition to the PDA seed."
+            ],
             "type": "pubkey"
           },
           {
             "name": "hourlyRate",
+            "docs": [
+              "Token base units paid for one hour of approved work."
+            ],
             "type": "u64"
           },
           {
             "name": "authorizedSeconds",
+            "docs": [
+              "Maximum funded work seconds. `main_amount` must match",
+              "`canonical_hourly_earned(hourly_rate, authorized_seconds)` when H2",
+              "creates the contract."
+            ],
             "type": "u64"
           },
           {
             "name": "approvedSeconds",
+            "docs": [
+              "Cumulative settled work seconds. Earnings are computed from this",
+              "total, never from isolated session floors."
+            ],
             "type": "u64"
           },
           {
             "name": "sessionCount",
+            "docs": [
+              "Number of session PDAs allocated (next index to use)."
+            ],
             "type": "u32"
           },
           {
             "name": "activeSessionIndex",
+            "docs": [
+              "Index of the open session, or `HOURLY_NO_ACTIVE_SESSION` (`u32::MAX`)."
+            ],
             "type": "u32"
           },
           {
             "name": "maxSessionSeconds",
+            "docs": [
+              "Per-session ceiling. Architecture default: 8 hours."
+            ],
             "type": "u64"
           },
           {
             "name": "minSessionSeconds",
+            "docs": [
+              "Per-session floor. Architecture default: 60 seconds."
+            ],
             "type": "u64"
           },
           {
@@ -5063,399 +3084,15 @@ export type Streampay = {
           },
           {
             "name": "reserved",
+            "docs": [
+              "Headroom so later Hourly fields do not realloc this account."
+            ],
             "type": {
               "array": [
                 "u8",
                 64
               ]
             }
-          }
-        ]
-      }
-    },
-    {
-      "name": "milestoneAdded",
-      "docs": [
-        "One milestone was defined on a draft contract.",
-        "",
-        "`allocated_amount` is the running total after this milestone, so an indexer",
-        "can tell how much of the escrow is still unallocated without re-reading the",
-        "contract. Titles and specifications are not here: they live in the",
-        "contract's off-chain record."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "workUnit",
-            "type": "pubkey"
-          },
-          {
-            "name": "index",
-            "type": "u32"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "dueOffsetSeconds",
-            "type": "i64"
-          },
-          {
-            "name": "allocatedAmount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "paymentMode",
-      "docs": [
-        "How compensation is structured and released.",
-        "",
-        "The three modes are mutually exclusive: a streaming contract never has",
-        "milestones, and a milestone/fixed contract never has checkpoints. That",
-        "exclusivity is what lets a single `WorkUnit` type and a single index space",
-        "serve all three."
-      ],
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "streaming"
-          },
-          {
-            "name": "milestone"
-          },
-          {
-            "name": "fixed"
-          },
-          {
-            "name": "hourly"
-          }
-        ]
-      }
-    },
-    {
-      "name": "releaseTrigger",
-      "docs": [
-        "Why a work unit's amount became released.",
-        "",
-        "A typed \"not yet\" variant rather than a sentinel value; only meaningful",
-        "once `WorkUnitStatus::Released`."
-      ],
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "notReleased"
-          },
-          {
-            "name": "employerApproval"
-          },
-          {
-            "name": "reviewTimeout"
-          }
-        ]
-      }
-    },
-    {
-      "name": "startMode",
-      "docs": [
-        "When the main earning clock starts.",
-        "",
-        "Discriminants are stable: `OnActivation` is 0, `Scheduled` is 1. This was",
-        "previously named `OnAcceptance`; it was renamed before V2 deployment because",
-        "freelancer acceptance no longer starts the stream."
-      ],
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "onActivation"
-          },
-          {
-            "name": "scheduled"
-          }
-        ]
-      }
-    },
-    {
-      "name": "stream",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "worker",
-            "type": "pubkey"
-          },
-          {
-            "name": "tokenMint",
-            "type": "pubkey"
-          },
-          {
-            "name": "streamId",
-            "type": "u64"
-          },
-          {
-            "name": "totalAmount",
-            "type": "u64"
-          },
-          {
-            "name": "withdrawnAmount",
-            "type": "u64"
-          },
-          {
-            "name": "isCancelled",
-            "type": "bool"
-          },
-          {
-            "name": "startTime",
-            "type": "i64"
-          },
-          {
-            "name": "endTime",
-            "type": "i64"
-          },
-          {
-            "name": "bump",
-            "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "streamAccrualReleased",
-      "docs": [
-        "Time-based streaming earnings were materialized into released accounting.",
-        "No SPL transfer."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "newlyReleased",
-            "type": "u64"
-          },
-          {
-            "name": "cumulativeStreamReleased",
-            "type": "u64"
-          },
-          {
-            "name": "totalReleased",
-            "type": "u64"
-          },
-          {
-            "name": "accrualTime",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "termsFinalized",
-      "docs": [
-        "A milestone contract's terms became immutable and the contract is now",
-        "offered to the freelancer."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "workUnitCount",
-            "type": "u32"
-          },
-          {
-            "name": "totalAmount",
-            "type": "u64"
-          },
-          {
-            "name": "finalizedAt",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "trialApproved",
-      "docs": [
-        "The employer approved the trial. Compensation is released, not withdrawn."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "trialWorkUnit",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "approvedAt",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "trialConfigured",
-      "docs": [
-        "A paid trial was configured at contract creation."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "trialWorkUnit",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "trialRejected",
-      "docs": [
-        "The employer rejected submitted trial work. No tokens moved."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "trialWorkUnit",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "rejectedAt",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "trialRevisionRequested",
-      "docs": [
-        "The employer requested a trial revision."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "trialWorkUnit",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "revisionCount",
-            "type": "u8"
-          },
-          {
-            "name": "actionDeadline",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "trialSubmitted",
-      "docs": [
-        "The freelancer submitted (or resubmitted) trial work."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "trialWorkUnit",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "submittedAt",
-            "type": "i64"
-          },
-          {
-            "name": "actionDeadline",
-            "type": "i64"
-          },
-          {
-            "name": "revisionCount",
-            "type": "u8"
           }
         ]
       }
@@ -5631,9 +3268,684 @@ export type Streampay = {
       }
     },
     {
-      "name": "workUnitApproved",
+      "name": "contractCancellationSettled",
       "docs": [
-        "The employer approved a submitted work unit. Compensation is released, not withdrawn."
+        "An Active contract was cancelled and its economic split was frozen.",
+        "No SPL transfer."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "paymentMode",
+            "type": {
+              "defined": {
+                "name": "paymentMode"
+              }
+            }
+          },
+          {
+            "name": "settledAt",
+            "type": "i64"
+          },
+          {
+            "name": "freelancerEntitlement",
+            "type": "u64"
+          },
+          {
+            "name": "employerRefundable",
+            "type": "u64"
+          },
+          {
+            "name": "releasedAmount",
+            "type": "u64"
+          },
+          {
+            "name": "streamReleasedAmount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "activationRejected",
+      "docs": [
+        "The employer reviewed the trial stage and declined to activate."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "rejectedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "contractActivated",
+      "docs": [
+        "The employer approved activation. Main-contract timing is now established."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "activatedAt",
+            "type": "i64"
+          },
+          {
+            "name": "startTime",
+            "type": "i64"
+          },
+          {
+            "name": "endTime",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "freelancerWithdrawal",
+      "docs": [
+        "SPL tokens left escrow for the freelancer. Real token movement."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "withdrawnAmount",
+            "type": "u64"
+          },
+          {
+            "name": "remainingEntitlement",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "disputeResolved",
+      "docs": [
+        "The contract resolver allocated the contested remainder. No SPL transfer."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "resolver",
+            "type": "pubkey"
+          },
+          {
+            "name": "resolvedAt",
+            "type": "i64"
+          },
+          {
+            "name": "contestedAmount",
+            "type": "u64"
+          },
+          {
+            "name": "freelancerContestedAward",
+            "type": "u64"
+          },
+          {
+            "name": "employerContestedAward",
+            "type": "u64"
+          },
+          {
+            "name": "finalFreelancerEntitlement",
+            "type": "u64"
+          },
+          {
+            "name": "finalEmployerEntitlement",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "employerRefundClaimed",
+      "docs": [
+        "SPL tokens left escrow back to the employer. Real token movement."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "refundedAmount",
+            "type": "u64"
+          },
+          {
+            "name": "remainingRefundable",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "disputeOpened",
+      "docs": [
+        "A party froze the contract into Disputed. No SPL transfer."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "initiator",
+            "type": {
+              "defined": {
+                "name": "disputeParty"
+              }
+            }
+          },
+          {
+            "name": "resolver",
+            "type": "pubkey"
+          },
+          {
+            "name": "disputedAt",
+            "type": "i64"
+          },
+          {
+            "name": "contestedAmount",
+            "type": "u64"
+          },
+          {
+            "name": "releasedAmount",
+            "type": "u64"
+          },
+          {
+            "name": "streamReleasedAmount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "contractDeclined",
+      "docs": [
+        "The freelancer refused a funded offer."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "declinedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "contractCreated",
+      "docs": [
+        "A contract was created and fully funded into escrow.",
+        "",
+        "`status` is included because it is the one field an indexer cannot infer:",
+        "it distinguishes a contract that is immediately offerable",
+        "(`PendingAcceptance`) from a milestone contract still awaiting its",
+        "allocation (`Draft`)."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "tokenMint",
+            "type": "pubkey"
+          },
+          {
+            "name": "contractId",
+            "type": "u64"
+          },
+          {
+            "name": "paymentMode",
+            "type": {
+              "defined": {
+                "name": "paymentMode"
+              }
+            }
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "contractStatus"
+              }
+            }
+          },
+          {
+            "name": "totalAmount",
+            "type": "u64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "contractAccepted",
+      "docs": [
+        "The freelancer accepted a funded offer. The main stream has not started."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "acceptedAt",
+            "type": "i64"
+          },
+          {
+            "name": "activationDeadline",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "contractCompleted",
+      "docs": [
+        "Successful completion froze the agreed economic end. No SPL transfer."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "completedAt",
+            "type": "i64"
+          },
+          {
+            "name": "finalFreelancerEntitlement",
+            "type": "u64"
+          },
+          {
+            "name": "finalEmployerEntitlement",
+            "type": "u64"
+          },
+          {
+            "name": "releasedAmount",
+            "type": "u64"
+          },
+          {
+            "name": "withdrawnAmount",
+            "type": "u64"
+          },
+          {
+            "name": "refundedAmount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hourlySessionStarted",
+      "docs": [
+        "Freelancer opened an Hourly session. No SPL transfer."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "session",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "sessionIndex",
+            "type": "u32"
+          },
+          {
+            "name": "startedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hourlySessionRecorded",
+      "docs": [
+        "An Hourly session was closed (Stop or dispute materialization).",
+        "`status` is Recorded or Void. No work-log URI. No SPL transfer."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "session",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "sessionIndex",
+            "type": "u32"
+          },
+          {
+            "name": "stoppedAt",
+            "type": "i64"
+          },
+          {
+            "name": "creditedDuration",
+            "type": "u64"
+          },
+          {
+            "name": "approvedSeconds",
+            "type": "u64"
+          },
+          {
+            "name": "releaseDelta",
+            "type": "u64"
+          },
+          {
+            "name": "releasedAmount",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "hourlySessionStatus"
+              }
+            }
+          },
+          {
+            "name": "materializedByDispute",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hourlyContractCreated",
+      "docs": [
+        "Dedicated Hourly create. Also accompanied by `ContractCreated`."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "contractId",
+            "type": "u64"
+          },
+          {
+            "name": "hourlyRate",
+            "type": "u64"
+          },
+          {
+            "name": "authorizedSeconds",
+            "type": "u64"
+          },
+          {
+            "name": "mainAmount",
+            "type": "u64"
+          },
+          {
+            "name": "trialAmount",
+            "type": "u64"
+          },
+          {
+            "name": "totalAmount",
+            "type": "u64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "hourlyContractEnded",
+      "docs": [
+        "Employer ended an Hourly contract. Unused-budget settlement uses the",
+        "Cancelled terminal so existing claim instructions apply. Not punitive.",
+        "No SPL transfer."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "endedAt",
+            "type": "i64"
+          },
+          {
+            "name": "freelancerSettlementAmount",
+            "type": "u64"
+          },
+          {
+            "name": "employerRefundableAmount",
+            "type": "u64"
+          },
+          {
+            "name": "releasedAmount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "streamAccrualReleased",
+      "docs": [
+        "Time-based streaming earnings were materialized into released accounting.",
+        "No SPL transfer."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "newlyReleased",
+            "type": "u64"
+          },
+          {
+            "name": "cumulativeStreamReleased",
+            "type": "u64"
+          },
+          {
+            "name": "totalReleased",
+            "type": "u64"
+          },
+          {
+            "name": "accrualTime",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "milestoneAdded",
+      "docs": [
+        "One milestone was defined on a draft contract.",
+        "",
+        "`allocated_amount` is the running total after this milestone, so an indexer",
+        "can tell how much of the escrow is still unallocated without re-reading the",
+        "contract. Titles and specifications are not here: they live in the",
+        "contract's off-chain record."
       ],
       "type": {
         "kind": "struct",
@@ -5647,12 +3959,106 @@ export type Streampay = {
             "type": "pubkey"
           },
           {
+            "name": "index",
+            "type": "u32"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "dueOffsetSeconds",
+            "type": "i64"
+          },
+          {
+            "name": "allocatedAmount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "trialConfigured",
+      "docs": [
+        "A paid trial was configured at contract creation."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "trialWorkUnit",
+            "type": "pubkey"
+          },
+          {
             "name": "employer",
             "type": "pubkey"
           },
           {
-            "name": "workUnitIndex",
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "termsFinalized",
+      "docs": [
+        "A milestone contract's terms became immutable and the contract is now",
+        "offered to the freelancer."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "workUnitCount",
             "type": "u32"
+          },
+          {
+            "name": "totalAmount",
+            "type": "u64"
+          },
+          {
+            "name": "finalizedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "trialApproved",
+      "docs": [
+        "The employer approved the trial. Compensation is released, not withdrawn."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "trialWorkUnit",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
           },
           {
             "name": "amount",
@@ -5666,36 +4072,9 @@ export type Streampay = {
       }
     },
     {
-      "name": "workUnitKind",
+      "name": "trialRevisionRequested",
       "docs": [
-        "Which flavour of work unit this account represents.",
-        "",
-        "Checkpoints are created by the freelancer at submission time with an amount",
-        "derived from the agreed vesting formula. Milestones are created by the",
-        "employer before acceptance with a negotiated amount."
-      ],
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "checkpoint"
-          },
-          {
-            "name": "milestone"
-          },
-          {
-            "name": "fixed"
-          },
-          {
-            "name": "trial"
-          }
-        ]
-      }
-    },
-    {
-      "name": "workUnitReviewTimedOut",
-      "docs": [
-        "Review timed out and the submitted unit was auto-released. No SPL transfer."
+        "The employer requested a trial revision."
       ],
       "type": {
         "kind": "struct",
@@ -5705,47 +4084,12 @@ export type Streampay = {
             "type": "pubkey"
           },
           {
-            "name": "workUnit",
-            "type": "pubkey"
-          },
-          {
-            "name": "workUnitIndex",
-            "type": "u32"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "releasedAt",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "workUnitRevisionRequested",
-      "docs": [
-        "The employer requested a bounded resubmission of post-activation work."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "workUnit",
+            "name": "trialWorkUnit",
             "type": "pubkey"
           },
           {
             "name": "employer",
             "type": "pubkey"
-          },
-          {
-            "name": "workUnitIndex",
-            "type": "u32"
           },
           {
             "name": "revisionCount",
@@ -5754,6 +4098,50 @@ export type Streampay = {
           {
             "name": "actionDeadline",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "trialSettledAndEnded",
+      "docs": [
+        "The employer paid the submitted trial and ended without activating.",
+        "No SPL transfer. Not a dispute."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "trialWorkUnit",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "settledAt",
+            "type": "i64"
+          },
+          {
+            "name": "trialAmount",
+            "type": "u64"
+          },
+          {
+            "name": "freelancerSettlement",
+            "type": "u64"
+          },
+          {
+            "name": "employerRefundable",
+            "type": "u64"
           }
         ]
       }
@@ -5785,32 +4173,6 @@ export type Streampay = {
           {
             "name": "voidedAt",
             "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "workUnitStatus",
-      "docs": [
-        "Authoritative work unit lifecycle state."
-      ],
-      "type": {
-        "kind": "enum",
-        "variants": [
-          {
-            "name": "defined"
-          },
-          {
-            "name": "submitted"
-          },
-          {
-            "name": "revising"
-          },
-          {
-            "name": "released"
-          },
-          {
-            "name": "void"
           }
         ]
       }
@@ -5850,6 +4212,173 @@ export type Streampay = {
           {
             "name": "revisionCount",
             "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "trialSubmitted",
+      "docs": [
+        "The freelancer submitted (or resubmitted) trial work."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "trialWorkUnit",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "submittedAt",
+            "type": "i64"
+          },
+          {
+            "name": "actionDeadline",
+            "type": "i64"
+          },
+          {
+            "name": "revisionCount",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "workUnitReviewTimedOut",
+      "docs": [
+        "Review timed out and the submitted unit was auto-released. No SPL transfer."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "workUnit",
+            "type": "pubkey"
+          },
+          {
+            "name": "workUnitIndex",
+            "type": "u32"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "releasedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "trialRejected",
+      "docs": [
+        "The employer rejected submitted trial work. No tokens moved."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "trialWorkUnit",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "rejectedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "workUnitApproved",
+      "docs": [
+        "The employer approved a submitted work unit. Compensation is released, not withdrawn."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "workUnit",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "workUnitIndex",
+            "type": "u32"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "approvedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "workUnitRevisionRequested",
+      "docs": [
+        "The employer requested a bounded resubmission of post-activation work."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "workUnit",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "workUnitIndex",
+            "type": "u32"
+          },
+          {
+            "name": "revisionCount",
+            "type": "u8"
+          },
+          {
+            "name": "actionDeadline",
+            "type": "i64"
           }
         ]
       }

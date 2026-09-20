@@ -14,6 +14,7 @@ export type NoticeKind =
   | "activation_rejected_disputed"
   | "trial_submitted"
   | "trial_approved_and_activated"
+  | "trial_settled_and_ended"
   | "work_submitted"
   | "work_approved"
   | "revision_requested"
@@ -87,6 +88,11 @@ export const NOTICE_CATALOG: Record<NoticeKind, NoticeCopy> = {
     kind: "trial_approved_and_activated",
     title: "Trial approved and contract activated",
     body: "The trial amount was released in contract accounting and the contract is now active. The freelancer withdraws released funds separately.",
+  },
+  trial_settled_and_ended: {
+    kind: "trial_settled_and_ended",
+    title: "Trial paid and contract ended",
+    body: "The trial amount was released in contract accounting and the main engagement did not start. No dispute was opened. Tokens move only when Collect pay or Claim refund is used later.",
   },
   work_submitted: {
     kind: "work_submitted",
@@ -215,6 +221,8 @@ export function noticeKindForAction(
       return context?.paymentMode === "Hourly"
         ? "hourly_trial_activated"
         : "trial_approved_and_activated";
+    case "settleTrialAndEnd":
+      return "trial_settled_and_ended";
     case "requestWorkRevision":
     case "requestTrialRevision":
       return "revision_requested";

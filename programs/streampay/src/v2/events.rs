@@ -9,7 +9,7 @@
 //! - Phase 3: `ContractAccepted`, `ContractDeclined`, `ContractActivated`,
 //!   `ActivationRejected`
 //! - Phase 4: `TrialConfigured`, `TrialSubmitted`, `TrialRevisionRequested`,
-//!   `TrialApproved`, `TrialRejected`
+//!   `TrialApproved`, `TrialRejected`, `TrialSettledAndEnded`
 //! - Phase 5: `WorkUnitSubmitted`, `WorkUnitApproved`,
 //!   `WorkUnitRevisionRequested`, `WorkUnitReviewTimedOut`
 //! - Phase 6: `StreamAccrualReleased`
@@ -153,6 +153,20 @@ pub struct TrialApproved {
     pub employer: Pubkey,
     pub amount: u64,
     pub approved_at: i64,
+}
+
+/// The employer paid the submitted trial and ended without activating.
+/// No SPL transfer. Not a dispute.
+#[event]
+pub struct TrialSettledAndEnded {
+    pub contract: Pubkey,
+    pub trial_work_unit: Pubkey,
+    pub employer: Pubkey,
+    pub freelancer: Pubkey,
+    pub settled_at: i64,
+    pub trial_amount: u64,
+    pub freelancer_settlement: u64,
+    pub employer_refundable: u64,
 }
 
 /// The employer rejected submitted trial work. No tokens moved.

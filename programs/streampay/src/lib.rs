@@ -316,6 +316,11 @@ Ok(())
         v2::instructions::approve_trial_and_activate::handle_approve_trial_and_activate(ctx)
     }
 
+    /// Employer pays a submitted trial and ends without activating the main engagement.
+    pub fn settle_trial_and_end(ctx: Context<SettleTrialAndEnd>) -> Result<()> {
+        v2::instructions::settle_trial_and_end::handle_settle_trial_and_end(ctx)
+    }
+
     /// Freelancer submits post-activation Milestone or Fixed work.
     pub fn submit_work_unit(
         ctx: Context<SubmitWorkUnit>,

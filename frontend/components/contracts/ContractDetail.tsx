@@ -48,6 +48,11 @@ import {
   type DisputeCategoryId,
 } from "@/lib/app/resolution-center";
 import { shouldRecoverAfterAction } from "@/lib/app/resolution-case";
+import {
+  TRIAL_EXIT_COPY,
+  settleTrialAndEndConfirmation,
+  trialEmployerDecisions,
+} from "@/lib/app/trial-exit";
 import { supportTopicHref } from "@/lib/app/support";
 import { formatUnix } from "@/lib/app/datetime";
 import { localMetadataStore } from "@/lib/app/local-metadata";
@@ -119,6 +124,7 @@ const TRIAL_ACTIONS: UiAction[] = [
   "submitTrialWork",
   "requestTrialRevision",
   "approveTrialAndActivate",
+  "settleTrialAndEnd",
 ];
 
 export function ContractDetail({ address }: { address: string }) {
@@ -294,6 +300,8 @@ export function ContractDetail({ address }: { address: string }) {
           return client.requestTrialRevision(contract.address);
         case "approveTrialAndActivate":
           return client.approveTrialAndActivate(contract.address);
+        case "settleTrialAndEnd":
+          return client.settleTrialAndEnd(contract.address);
         case "submitWorkUnit": {
           if (!unit) throw new Error("Choose a work unit.");
           const hash = await hashBytes(new TextEncoder().encode(uri));
@@ -395,7 +403,9 @@ export function ContractDetail({ address }: { address: string }) {
         action,
         workUnitStatus:
           unit?.status ??
-          (action === "rejectActivation" ? trial?.status : undefined),
+          (action === "rejectActivation" || action === "settleTrialAndEnd"
+            ? trial?.status
+            : undefined),
         paymentMode: contract.paymentMode,
       }
     );
@@ -433,6 +443,15 @@ export function ContractDetail({ address }: { address: string }) {
   const contractButtons = actions
     .filter((a) => !UNIT_ACTIONS.includes(a) && !TRIAL_ACTIONS.includes(a))
     .filter((a) => !hourlyPrimary.includes(a))
+    .filter((a) => {
+      if (
+        a === "rejectActivation" &&
+        (trial?.status === "Submitted" || trial?.status === "Revising")
+      ) {
+        return false;
+      }
+      return true;
+    })
     .sort((a, b) => {
       if (a === "completeContract") return 1;
       if (b === "completeContract") return -1;
@@ -590,7 +609,12 @@ export function ContractDetail({ address }: { address: string }) {
                   contract,
                   trialUnit: trial,
                   now,
-                }).filter((a) => TRIAL_ACTIONS.includes(a))}
+                }).filter(
+                  (a) =>
+                    TRIAL_ACTIONS.includes(a) ||
+                    (a === "rejectActivation" &&
+                      (trial.status === "Submitted" || trial.status === "Revising"))
+                )}
                 busy={tx.busy}
                 onAction={(action) => requestAction(action, trial)}
               />
@@ -706,7 +730,7 @@ export function ContractDetail({ address }: { address: string }) {
                   disabled={tx.busy}
                   onClick={() => requestAction(action)}
                 >
-                  {actionLabel(action)}
+                  {actionLabel(action, { workUnitStatus: trial?.status })}
                 </Button>
               ))
             )}
@@ -747,7 +771,13 @@ export function ContractDetail({ address }: { address: string }) {
 
       <Modal
         open={confirm != null}
-        title={confirm ? confirmTitle(confirm.action) : ""}
+        title={
+          confirm
+            ? confirmTitle(confirm.action, {
+                workUnitStatus: confirm.unit?.status ?? trial?.status,
+              })
+            : ""
+        }
         onClose={() => setConfirm(null)}
         footer={
           <>
@@ -759,9 +789,11 @@ export function ContractDetail({ address }: { address: string }) {
               variant={
                 confirm?.action === "openDispute" ||
                 confirm?.action === "cancelActiveContract" ||
-                confirm?.action === "voidStaleRevision"
+                confirm?.action === "voidStaleRevision" ||
+                confirm?.action === "rejectActivation"
                   ? "danger"
-                  : confirm?.action === "completeContract"
+                  : confirm?.action === "completeContract" ||
+                      confirm?.action === "settleTrialAndEnd"
                     ? "secondary"
                     : "primary"
               }
@@ -784,6 +816,7 @@ export function ContractDetail({ address }: { address: string }) {
             setAwardUi={setAwardUi}
             disputeCategory={disputeCategory}
             hourlySessionOpen={hourlySession?.status === "Open"}
+            workUnitStatus={confirm.unit?.status ?? trial?.status}
           />
         ) : null}
       </Modal>
@@ -866,18 +899,59 @@ function WorkUnitPanel({
         <Row label="Submission URI" value={unit.submissionUri || "None"} />
       </dl>
       {actions.length > 0 ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {actions.map((action) => (
-            <Button
-              key={action}
-              disabled={busy}
-              variant={action === "voidStaleRevision" ? "danger" : "secondary"}
-              onClick={() => onAction(action)}
-            >
-              {actionLabel(action, { workUnitStatus: unit.status })}
-            </Button>
-          ))}
-        </div>
+        unit.kind === "Trial" &&
+        unit.status === "Submitted" &&
+        trialEmployerDecisions({ actions }).length > 0 ? (
+          <div className="mt-4 space-y-3">
+            {trialEmployerDecisions({ actions }).map((decision) => (
+              <div
+                key={decision.action}
+                className="rounded-xl border border-line p-3"
+              >
+                <p className="text-sm font-medium text-ink">{decision.title}</p>
+                <p className="mt-1 text-sm leading-6 text-ink-soft">{decision.body}</p>
+                {decision.action === "settleTrialAndEnd" &&
+                contract.paymentMode === "Streaming" ? (
+                  <p className="mt-1 text-sm leading-6 text-ink-soft">
+                    {TRIAL_EXIT_COPY.streamingDoesNotStart}
+                  </p>
+                ) : null}
+                {decision.action === "settleTrialAndEnd" &&
+                contract.paymentMode === "Hourly" ? (
+                  <p className="mt-1 text-sm leading-6 text-ink-soft">
+                    {TRIAL_EXIT_COPY.hourlyDoesNotActivate}
+                  </p>
+                ) : null}
+                <div className="mt-3">
+                  <Button
+                    disabled={busy}
+                    variant={contractActionVariant(decision.action)}
+                    onClick={() => onAction(decision.action)}
+                  >
+                    {decision.title}
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-3 flex flex-wrap gap-2">
+            {actions.map((action) => (
+              <Button
+                key={action}
+                disabled={busy}
+                variant={
+                  action === "voidStaleRevision" || action === "rejectActivation"
+                    ? "danger"
+                    : "secondary"
+                }
+                onClick={() => onAction(action)}
+              >
+                {actionLabel(action, { workUnitStatus: unit.status })}
+              </Button>
+            ))}
+          </div>
+        )
       ) : null}
     </div>
   );
@@ -894,6 +968,7 @@ function ConfirmBody({
   setAwardUi,
   disputeCategory,
   hourlySessionOpen,
+  workUnitStatus,
 }: {
   action: UiAction;
   contract: ContractView;
@@ -905,6 +980,7 @@ function ConfirmBody({
   setAwardUi: (v: string) => void;
   disputeCategory: DisputeCategoryId | "";
   hourlySessionOpen?: boolean;
+  workUnitStatus?: WorkUnitView["status"];
 }) {
   if (action === "submitWorkUnit") {
     const copy = officialDeliverableCopy(contract);
@@ -957,6 +1033,35 @@ function ConfirmBody({
         <Input value={uri} onChange={(e) => setUri(e.target.value)} placeholder="https://…" />
       </Field>
     );
+  }
+  if (action === "settleTrialAndEnd") {
+    const copy = settleTrialAndEndConfirmation({ contract, decimals });
+    return (
+      <div className="space-y-3 text-sm leading-6 text-ink-soft">
+        <p>{TRIAL_EXIT_COPY.payEndBody}</p>
+        <ul className="list-disc space-y-1 pl-5">
+          {copy.points.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+  if (action === "requestTrialRevision") {
+    return (
+      <div className="space-y-3 text-sm leading-6 text-ink-soft">
+        <p>{TRIAL_EXIT_COPY.revisionBody}</p>
+      </div>
+    );
+  }
+  if (action === "rejectActivation") {
+    if (workUnitStatus === "Submitted" || workUnitStatus === "Revising") {
+      return (
+        <div className="space-y-3 text-sm leading-6 text-ink-soft">
+          <p>{TRIAL_EXIT_COPY.disputeBody}</p>
+        </div>
+      );
+    }
   }
   if (action === "stopHourlySession") {
     const copy = stopHourlyCopy();
