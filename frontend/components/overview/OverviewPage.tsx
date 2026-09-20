@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 
 import { ContractCard } from "@/components/contracts/ContractCard";
+import { WhyPremiflowTeaser } from "@/components/about/AboutPage";
 import { ConnectPrompt } from "@/components/shell/ConnectPrompt";
 import { PageFade } from "@/components/shell/PageFade";
 import { Button } from "@/components/ui/Button";
@@ -42,6 +43,7 @@ export function OverviewPage() {
     return (
       <PageFade>
         <Hero />
+        <WhyPremiflowTeaser />
         <div className="mt-8">
           <ConnectPrompt />
         </div>
@@ -88,6 +90,7 @@ export function OverviewPage() {
   return (
     <PageFade>
       <Hero />
+      <WhyPremiflowTeaser />
       <div className="mt-8 grid gap-4 lg:grid-cols-12">
         <Card className="relative overflow-hidden p-6 lg:col-span-8">
           <div className="pointer-events-none absolute -right-8 -top-10 h-40 w-40 rounded-full bg-accent/15 blur-3xl" />

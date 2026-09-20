@@ -6,6 +6,7 @@ import {
   Activity,
   CircleHelp,
   FilePlus2,
+  Info,
   LayoutDashboard,
   Menu,
   ScrollText,
@@ -25,6 +26,7 @@ const NAV = [
   { href: "/contracts", label: "Contracts", icon: ScrollText },
   { href: "/create", label: "Create contract", icon: FilePlus2 },
   { href: "/activity", label: "Activity", icon: Activity },
+  { href: "/about", label: "About", icon: Info },
   { href: "/support", label: "Help & Support", icon: CircleHelp },
 ];
 
