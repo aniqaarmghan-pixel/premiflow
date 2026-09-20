@@ -1,28 +1,29 @@
-//! `decline_contract`: the freelancer refuses a funded offer.
+//! `expire_acceptance`: close a lapsed funded offer before work starts.
 //!
-//! The contract becomes `Declined` and records `terminated_at`. Settlement is
-//! frozen with a full employer refund entitlement. Escrow stays funded until
-//! the employer later uses Claim refund. No tokens move here.
+//! Permissionless: the outcome is determined by `Clock` vs
+//! `acceptance_deadline` and by unstarted accounting, not by who pays the fee.
+//! Applies to `PendingAcceptance` and to funded Milestone `Draft` after the
+//! deadline. No SPL transfer. No dispute. Employer Claim refund is later.
 
 use anchor_lang::prelude::*;
 
 use crate::v2::constants::CONTRACT_SEED;
 use crate::v2::enums::ContractStatus;
 use crate::v2::errors::StreamPayV2Error;
-use crate::v2::events::ContractDeclined;
+use crate::v2::events::ContractExpired;
 use crate::v2::state::Contract;
 
 #[derive(Accounts)]
-pub struct DeclineContract<'info> {
-    pub freelancer: Signer<'info>,
+pub struct ExpireAcceptance<'info> {
+    /// Permissionless: the result is determined by clock and contract state.
+    pub caller: Signer<'info>,
 
     #[account(
         mut,
-        has_one = freelancer @ StreamPayV2Error::Unauthorized,
         seeds = [
             CONTRACT_SEED,
             contract.employer.as_ref(),
-            freelancer.key().as_ref(),
+            contract.freelancer.as_ref(),
             &contract.contract_id.to_le_bytes(),
         ],
         bump = contract.bump,
@@ -30,13 +31,13 @@ pub struct DeclineContract<'info> {
     pub contract: Account<'info, Contract>,
 }
 
-pub fn handle_decline_contract(ctx: Context<DeclineContract>) -> Result<()> {
+pub fn handle_expire_acceptance(ctx: Context<ExpireAcceptance>) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
     let contract = &ctx.accounts.contract;
 
     require!(
-        contract.status == ContractStatus::PendingAcceptance,
-        StreamPayV2Error::InvalidState
+        now >= contract.acceptance_deadline,
+        StreamPayV2Error::AcceptanceNotExpired
     );
 
     let contract_key = contract.key();
@@ -47,10 +48,10 @@ pub fn handle_decline_contract(ctx: Context<DeclineContract>) -> Result<()> {
 
     let contract = &mut ctx.accounts.contract;
     let (freelancer_settlement, employer_refundable) =
-        contract.settle_unaccepted_offer(now, ContractStatus::Declined)?;
+        contract.settle_unaccepted_offer(now, ContractStatus::Expired)?;
 
     require!(
-        contract.status == ContractStatus::Declined,
+        contract.status == ContractStatus::Expired,
         StreamPayV2Error::InvalidState
     );
     require!(
@@ -58,15 +59,20 @@ pub fn handle_decline_contract(ctx: Context<DeclineContract>) -> Result<()> {
         StreamPayV2Error::InvalidState
     );
     require!(
+        contract.start_time == 0 && contract.end_time == 0,
+        StreamPayV2Error::InvalidState
+    );
+    require!(
         freelancer_settlement == 0 && employer_refundable == contract.total_amount,
         StreamPayV2Error::ReleaseAmountExceeded
     );
 
-    emit!(ContractDeclined {
+    emit!(ContractExpired {
         contract: contract_key,
         employer,
         freelancer,
-        declined_at: now,
+        expired_at: now,
+        employer_refundable,
     });
 
     Ok(())

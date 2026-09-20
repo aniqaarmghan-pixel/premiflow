@@ -559,6 +559,75 @@ impl Contract {
         Ok((freelancer, employer))
     }
 
+    /// Peaceful pre-acceptance exit. Nothing is earned.
+    ///
+    /// Used by freelancer `decline_contract` (`Declined`) and permissionless
+    /// `expire_acceptance` (`Expired`, including funded Milestone `Draft`).
+    /// No stream materialization. No activation timing. Trial, if present,
+    /// stays Defined.
+    pub fn settle_unaccepted_offer(
+        &mut self,
+        now: i64,
+        terminal: ContractStatus,
+    ) -> Result<(u64, u64)> {
+        require!(
+            terminal == ContractStatus::Declined || terminal == ContractStatus::Expired,
+            StreamPayV2Error::InvalidState
+        );
+        match self.status {
+            ContractStatus::PendingAcceptance => {}
+            ContractStatus::Draft => {
+                require!(
+                    terminal == ContractStatus::Expired,
+                    StreamPayV2Error::InvalidState
+                );
+                require!(
+                    self.payment_mode == PaymentMode::Milestone,
+                    StreamPayV2Error::InvalidPaymentMode
+                );
+            }
+            _ => return Err(StreamPayV2Error::InvalidState.into()),
+        }
+        require!(self.accepted_at == 0, StreamPayV2Error::InvalidState);
+        require!(
+            self.released_amount == 0
+                && self.withdrawn_amount == 0
+                && self.refunded_amount == 0
+                && self.stream_released_amount == 0
+                && self.contested_amount == 0
+                && self.freelancer_settlement_amount == 0
+                && self.employer_refundable_amount == 0
+                && self.released_unit_count == 0,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+        require!(
+            self.open_review_count == 0,
+            StreamPayV2Error::InvalidTrialState
+        );
+        require!(
+            self.start_time == 0 && self.end_time == 0,
+            StreamPayV2Error::InvalidState
+        );
+
+        let freelancer = 0u64;
+        let employer = self.total_amount;
+        let conserved = freelancer
+            .checked_add(employer)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+        require!(
+            conserved == self.total_amount,
+            StreamPayV2Error::ReleaseAmountExceeded
+        );
+
+        self.freelancer_settlement_amount = freelancer;
+        self.employer_refundable_amount = employer;
+        self.contested_amount = 0;
+        self.status = terminal;
+        self.terminated_at = now;
+        self.assert_terminal_settlement_invariants()?;
+        Ok((freelancer, employer))
+    }
+
     /// Materialize canonical stream accrual into released accounting.
     /// Used by Phase 7 cancel and Phase 9 dispute freeze. Status is unchanged.
     pub fn materialize_stream_at(&mut self, now: i64) -> Result<()> {
@@ -790,8 +859,8 @@ impl Contract {
         Ok(())
     }
 
-    /// Frozen settlement after Cancelled, Resolved, Completed, or
-    /// ActivationRejected.
+    /// Frozen settlement after Cancelled, Resolved, Completed,
+    /// ActivationRejected, Declined, or Expired.
     pub fn assert_terminal_settlement_invariants(&self) -> Result<()> {
         self.assert_live_invariants()?;
         require!(

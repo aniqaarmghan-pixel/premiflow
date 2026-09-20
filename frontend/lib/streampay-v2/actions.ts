@@ -18,6 +18,7 @@ export type UiAction =
   | "finalizeTerms"
   | "acceptContract"
   | "declineContract"
+  | "expireAcceptance"
   | "approveActivation"
   | "rejectActivation"
   | "submitTrialWork"
@@ -54,6 +55,7 @@ const LIFECYCLE_ACTIONS: readonly UiAction[] = [
   "finalizeTerms",
   "acceptContract",
   "declineContract",
+  "expireAcceptance",
   "approveActivation",
   "rejectActivation",
   "submitTrialWork",
@@ -85,7 +87,7 @@ export function availableActions(input: ActionAvailabilityInput): UiAction[] {
   }
 
   if (contract.status === "Draft" && role === "employer") {
-    if (contract.paymentMode === "Milestone") {
+    if (contract.paymentMode === "Milestone" && now < contract.acceptanceDeadline) {
       actions.add("addMilestone");
       actions.add("finalizeTerms");
     }
@@ -96,6 +98,14 @@ export function availableActions(input: ActionAvailabilityInput): UiAction[] {
       actions.add("acceptContract");
     }
     actions.add("declineContract");
+  }
+
+  if (
+    (contract.status === "PendingAcceptance" || contract.status === "Draft") &&
+    now >= contract.acceptanceDeadline &&
+    role === "employer"
+  ) {
+    actions.add("expireAcceptance");
   }
 
   if (contract.status === "PendingEmployerApproval") {

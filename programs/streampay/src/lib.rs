@@ -278,9 +278,14 @@ Ok(())
         v2::instructions::accept_contract::handle_accept_contract(ctx)
     }
 
-    /// Freelancer refuses a funded offer. Escrow is left in place.
+    /// Freelancer refuses a funded offer. Settlement freezes a full employer refund.
     pub fn decline_contract(ctx: Context<DeclineContract>) -> Result<()> {
         v2::instructions::decline_contract::handle_decline_contract(ctx)
+    }
+
+    /// Permissionless close of a lapsed funded offer. No SPL transfer.
+    pub fn expire_acceptance(ctx: Context<ExpireAcceptance>) -> Result<()> {
+        v2::instructions::expire_acceptance::handle_expire_acceptance(ctx)
     }
 
     /// Employer approves activation and establishes main-contract timing.

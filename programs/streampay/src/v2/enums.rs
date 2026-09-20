@@ -163,10 +163,11 @@ impl ContractStatus {
     }
 
     /// Whether Phase 8 may pay frozen settlement (cancel, resolved dispute,
-    /// successful completion, or pre-submission activation rejection).
+    /// successful completion, pre-submission activation rejection, freelancer
+    /// decline, or lapsed offer expiry).
     ///
-    /// `Declined` and `Expired` stay excluded. `Disputed` stays frozen until
-    /// resolve. `ActivationRejected` is the unpaid pre-submission exit.
+    /// `Disputed` stays frozen until resolve. `Declined` and `Expired` are
+    /// unpaid pre-acceptance exits with a full employer refund entitlement.
     pub fn allows_settlement_claims(&self) -> bool {
         matches!(
             self,
@@ -174,6 +175,8 @@ impl ContractStatus {
                 | Self::Resolved
                 | Self::Completed
                 | Self::ActivationRejected
+                | Self::Declined
+                | Self::Expired
         )
     }
 }
@@ -339,16 +342,18 @@ mod tests {
     }
 
     #[test]
-    fn settlement_claims_include_activation_rejected_not_declined_or_disputed() {
+    fn settlement_claims_include_declined_and_expired_not_disputed() {
         assert!(ContractStatus::Cancelled.allows_settlement_claims());
         assert!(ContractStatus::Resolved.allows_settlement_claims());
         assert!(ContractStatus::Completed.allows_settlement_claims());
         assert!(ContractStatus::ActivationRejected.allows_settlement_claims());
-        assert!(!ContractStatus::Declined.allows_settlement_claims());
-        assert!(!ContractStatus::Expired.allows_settlement_claims());
+        assert!(ContractStatus::Declined.allows_settlement_claims());
+        assert!(ContractStatus::Expired.allows_settlement_claims());
         assert!(!ContractStatus::Disputed.allows_settlement_claims());
         assert!(!ContractStatus::Active.allows_settlement_claims());
         assert!(!ContractStatus::PendingEmployerApproval.allows_settlement_claims());
+        assert!(!ContractStatus::Draft.allows_settlement_claims());
+        assert!(!ContractStatus::PendingAcceptance.allows_settlement_claims());
     }
 
     #[test]

@@ -318,6 +318,15 @@ export class StreamPayV2Client {
     return txResult({ signature, contract });
   }
 
+  async expireAcceptance(contract: PublicKey): Promise<TransactionResult> {
+    const caller = connectedWallet(this.program);
+    const signature = await sendV2Method(this.program, this.program.methods
+      .expireAcceptance()
+      .accountsPartial({ caller, contract })
+    );
+    return txResult({ signature, contract });
+  }
+
   async approveActivation(contract: PublicKey): Promise<TransactionResult> {
     const employer = connectedWallet(this.program);
     const signature = await sendV2Method(this.program, this.program.methods

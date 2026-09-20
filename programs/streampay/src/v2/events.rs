@@ -7,7 +7,7 @@
 //! - Phase 1: `ContractCreated`
 //! - Phase 2: `MilestoneAdded`, `TermsFinalized`
 //! - Phase 3: `ContractAccepted`, `ContractDeclined`, `ContractActivated`,
-//!   `ActivationRejected`
+//!   `ActivationRejected`, `ContractExpired`
 //! - Phase 4: `TrialConfigured`, `TrialSubmitted`, `TrialRevisionRequested`,
 //!   `TrialApproved`, `TrialRejected`, `TrialSettledAndEnded`
 //! - Phase 5: `WorkUnitSubmitted`, `WorkUnitApproved`,
@@ -92,6 +92,16 @@ pub struct ContractDeclined {
     pub employer: Pubkey,
     pub freelancer: Pubkey,
     pub declined_at: i64,
+}
+
+/// A funded offer lapsed without acceptance. No SPL transfer. Not a dispute.
+#[event]
+pub struct ContractExpired {
+    pub contract: Pubkey,
+    pub employer: Pubkey,
+    pub freelancer: Pubkey,
+    pub expired_at: i64,
+    pub employer_refundable: u64,
 }
 
 /// The employer approved activation. Main-contract timing is now established.

@@ -580,7 +580,7 @@
     {
       "name": "decline_contract",
       "docs": [
-        "Freelancer refuses a funded offer. Escrow is left in place."
+        "Freelancer refuses a funded offer. Settlement freezes a full employer refund."
       ],
       "discriminator": [
         229,
@@ -631,6 +631,36 @@
         },
         {
           "name": "hourly_state"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "expire_acceptance",
+      "docs": [
+        "Permissionless close of a lapsed funded offer. No SPL transfer."
+      ],
+      "discriminator": [
+        128,
+        65,
+        149,
+        153,
+        4,
+        231,
+        159,
+        16
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "docs": [
+            "Permissionless: the result is determined by clock and contract state."
+          ],
+          "signer": true
+        },
+        {
+          "name": "contract",
+          "writable": true
         }
       ],
       "args": []
@@ -1299,782 +1329,6 @@
         159,
         169
       ]
-    }
-  ],
-  "events": [
-    {
-      "name": "ActivationRejected",
-      "discriminator": [
-        170,
-        33,
-        164,
-        118,
-        168,
-        17,
-        62,
-        160
-      ]
-    },
-    {
-      "name": "ContractAccepted",
-      "discriminator": [
-        44,
-        209,
-        126,
-        23,
-        190,
-        99,
-        31,
-        196
-      ]
-    },
-    {
-      "name": "ContractActivated",
-      "discriminator": [
-        4,
-        154,
-        226,
-        21,
-        37,
-        131,
-        12,
-        219
-      ]
-    },
-    {
-      "name": "ContractCancellationSettled",
-      "discriminator": [
-        64,
-        179,
-        183,
-        177,
-        79,
-        20,
-        124,
-        43
-      ]
-    },
-    {
-      "name": "ContractCompleted",
-      "discriminator": [
-        99,
-        32,
-        99,
-        27,
-        103,
-        45,
-        188,
-        151
-      ]
-    },
-    {
-      "name": "ContractCreated",
-      "discriminator": [
-        80,
-        69,
-        164,
-        109,
-        77,
-        15,
-        47,
-        164
-      ]
-    },
-    {
-      "name": "ContractDeclined",
-      "discriminator": [
-        9,
-        118,
-        156,
-        41,
-        196,
-        21,
-        1,
-        226
-      ]
-    },
-    {
-      "name": "DisputeOpened",
-      "discriminator": [
-        239,
-        222,
-        102,
-        235,
-        193,
-        85,
-        1,
-        214
-      ]
-    },
-    {
-      "name": "DisputeResolved",
-      "discriminator": [
-        121,
-        64,
-        249,
-        153,
-        139,
-        128,
-        236,
-        187
-      ]
-    },
-    {
-      "name": "EmployerRefundClaimed",
-      "discriminator": [
-        251,
-        43,
-        237,
-        49,
-        23,
-        113,
-        22,
-        39
-      ]
-    },
-    {
-      "name": "FreelancerWithdrawal",
-      "discriminator": [
-        97,
-        134,
-        235,
-        236,
-        166,
-        205,
-        238,
-        128
-      ]
-    },
-    {
-      "name": "HourlyContractCreated",
-      "discriminator": [
-        232,
-        8,
-        91,
-        174,
-        121,
-        142,
-        221,
-        140
-      ]
-    },
-    {
-      "name": "HourlyContractEnded",
-      "discriminator": [
-        93,
-        84,
-        91,
-        223,
-        113,
-        24,
-        178,
-        110
-      ]
-    },
-    {
-      "name": "HourlySessionRecorded",
-      "discriminator": [
-        12,
-        197,
-        4,
-        56,
-        143,
-        205,
-        184,
-        131
-      ]
-    },
-    {
-      "name": "HourlySessionStarted",
-      "discriminator": [
-        6,
-        63,
-        75,
-        36,
-        15,
-        180,
-        214,
-        115
-      ]
-    },
-    {
-      "name": "MilestoneAdded",
-      "discriminator": [
-        25,
-        65,
-        182,
-        178,
-        253,
-        180,
-        118,
-        77
-      ]
-    },
-    {
-      "name": "StreamAccrualReleased",
-      "discriminator": [
-        39,
-        213,
-        135,
-        163,
-        146,
-        157,
-        240,
-        50
-      ]
-    },
-    {
-      "name": "TermsFinalized",
-      "discriminator": [
-        10,
-        116,
-        161,
-        152,
-        181,
-        100,
-        209,
-        44
-      ]
-    },
-    {
-      "name": "TrialApproved",
-      "discriminator": [
-        2,
-        110,
-        94,
-        43,
-        143,
-        111,
-        86,
-        155
-      ]
-    },
-    {
-      "name": "TrialConfigured",
-      "discriminator": [
-        53,
-        13,
-        124,
-        182,
-        69,
-        42,
-        253,
-        43
-      ]
-    },
-    {
-      "name": "TrialRejected",
-      "discriminator": [
-        91,
-        90,
-        223,
-        84,
-        43,
-        232,
-        217,
-        50
-      ]
-    },
-    {
-      "name": "TrialRevisionRequested",
-      "discriminator": [
-        156,
-        184,
-        33,
-        45,
-        115,
-        90,
-        83,
-        15
-      ]
-    },
-    {
-      "name": "TrialSettledAndEnded",
-      "discriminator": [
-        6,
-        112,
-        35,
-        125,
-        73,
-        158,
-        24,
-        138
-      ]
-    },
-    {
-      "name": "TrialSubmitted",
-      "discriminator": [
-        57,
-        24,
-        217,
-        63,
-        28,
-        150,
-        24,
-        76
-      ]
-    },
-    {
-      "name": "WorkUnitApproved",
-      "discriminator": [
-        192,
-        198,
-        6,
-        177,
-        1,
-        202,
-        157,
-        191
-      ]
-    },
-    {
-      "name": "WorkUnitReviewTimedOut",
-      "discriminator": [
-        231,
-        232,
-        242,
-        197,
-        164,
-        101,
-        41,
-        5
-      ]
-    },
-    {
-      "name": "WorkUnitRevisionRequested",
-      "discriminator": [
-        33,
-        63,
-        179,
-        196,
-        105,
-        181,
-        185,
-        45
-      ]
-    },
-    {
-      "name": "WorkUnitStaleRevisionVoided",
-      "discriminator": [
-        127,
-        55,
-        118,
-        220,
-        159,
-        214,
-        133,
-        1
-      ]
-    },
-    {
-      "name": "WorkUnitSubmitted",
-      "discriminator": [
-        212,
-        210,
-        177,
-        58,
-        32,
-        129,
-        94,
-        213
-      ]
-    }
-  ],
-  "errors": [
-    {
-      "code": 6100,
-      "name": "InvalidAmount",
-      "msg": "Amount must be greater than zero."
-    },
-    {
-      "code": 6101,
-      "name": "InvalidDuration",
-      "msg": "Duration is outside the permitted range."
-    },
-    {
-      "code": 6102,
-      "name": "InvalidCheckpointInterval",
-      "msg": "Checkpoint interval is invalid for this duration."
-    },
-    {
-      "code": 6103,
-      "name": "InvalidReviewDuration",
-      "msg": "Review duration is outside the permitted range or exceeds the checkpoint interval."
-    },
-    {
-      "code": 6104,
-      "name": "TooManyCheckpoints",
-      "msg": "This configuration would create too many checkpoints."
-    },
-    {
-      "code": 6105,
-      "name": "InvalidMaxRevisions",
-      "msg": "Maximum revisions exceeds the permitted limit."
-    },
-    {
-      "code": 6106,
-      "name": "InvalidAcceptanceDeadline",
-      "msg": "Acceptance deadline must be in the future."
-    },
-    {
-      "code": 6107,
-      "name": "InvalidScheduledStart",
-      "msg": "Scheduled start must not precede the acceptance deadline."
-    },
-    {
-      "code": 6108,
-      "name": "InvalidMetadata",
-      "msg": "Metadata reference is missing or exceeds the maximum length."
-    },
-    {
-      "code": 6109,
-      "name": "SelfContract",
-      "msg": "Employer and freelancer must be different wallets."
-    },
-    {
-      "code": 6110,
-      "name": "InvalidPaymentMode",
-      "msg": "This operation is not valid for the contract's payment mode."
-    },
-    {
-      "code": 6111,
-      "name": "InvalidState",
-      "msg": "The contract is not in the required state for this operation."
-    },
-    {
-      "code": 6112,
-      "name": "ContractNotStarted",
-      "msg": "The contract has not started; terms are not yet accepted."
-    },
-    {
-      "code": 6113,
-      "name": "ContractTerminal",
-      "msg": "The contract is in a terminal state."
-    },
-    {
-      "code": 6114,
-      "name": "TermsNotFinalized",
-      "msg": "Contract terms have not been finalized."
-    },
-    {
-      "code": 6115,
-      "name": "AcceptanceExpired",
-      "msg": "The acceptance deadline has passed."
-    },
-    {
-      "code": 6116,
-      "name": "AcceptanceNotExpired",
-      "msg": "The acceptance deadline has not yet passed."
-    },
-    {
-      "code": 6117,
-      "name": "ObligationsOutstanding",
-      "msg": "Outstanding obligations remain on this contract."
-    },
-    {
-      "code": 6118,
-      "name": "Unauthorized",
-      "msg": "The signer is not authorized for this operation."
-    },
-    {
-      "code": 6119,
-      "name": "MilestoneAllocationExceeded",
-      "msg": "Milestone amounts exceed the funded total."
-    },
-    {
-      "code": 6120,
-      "name": "MilestoneAllocationIncomplete",
-      "msg": "Milestone amounts do not sum to the funded total."
-    },
-    {
-      "code": 6121,
-      "name": "NoMilestones",
-      "msg": "This payment mode requires at least one milestone."
-    },
-    {
-      "code": 6122,
-      "name": "FixedNeedsOneUnit",
-      "msg": "A fixed contract requires exactly one work unit."
-    },
-    {
-      "code": 6123,
-      "name": "StreamingHasNoMilestones",
-      "msg": "A streaming contract cannot define milestones."
-    },
-    {
-      "code": 6124,
-      "name": "InvalidWorkUnit",
-      "msg": "The work unit is invalid or does not belong to this contract."
-    },
-    {
-      "code": 6125,
-      "name": "BadUnitIndex",
-      "msg": "Work unit index does not match the expected next index."
-    },
-    {
-      "code": 6126,
-      "name": "UnitNotSubmittable",
-      "msg": "The work unit is not awaiting submission."
-    },
-    {
-      "code": 6127,
-      "name": "UnitNotUnderReview",
-      "msg": "The work unit is not under review."
-    },
-    {
-      "code": 6128,
-      "name": "UnitAlreadyReleased",
-      "msg": "The work unit has already been released."
-    },
-    {
-      "code": 6129,
-      "name": "UnitVoided",
-      "msg": "The work unit has been voided."
-    },
-    {
-      "code": 6130,
-      "name": "UnitNotStale",
-      "msg": "The work unit is not stale and cannot be voided."
-    },
-    {
-      "code": 6131,
-      "name": "ReviewAlreadyOpen",
-      "msg": "Another work unit is still awaiting review."
-    },
-    {
-      "code": 6132,
-      "name": "ReviewWindowOpen",
-      "msg": "The review window is still open."
-    },
-    {
-      "code": 6133,
-      "name": "ReviewWindowClosed",
-      "msg": "The review window has already closed."
-    },
-    {
-      "code": 6134,
-      "name": "RevisionLimitReached",
-      "msg": "The maximum number of revisions has been reached."
-    },
-    {
-      "code": 6135,
-      "name": "PeriodNotComplete",
-      "msg": "The checkpoint period is not yet complete."
-    },
-    {
-      "code": 6136,
-      "name": "StreamFullyCheckpointed",
-      "msg": "All streaming periods have already been checkpointed."
-    },
-    {
-      "code": 6137,
-      "name": "EmptyCheckpoint",
-      "msg": "This checkpoint period has no earned amount."
-    },
-    {
-      "code": 6138,
-      "name": "GraceWindowClosed",
-      "msg": "The post-termination grace window has closed."
-    },
-    {
-      "code": 6139,
-      "name": "NothingToWithdraw",
-      "msg": "There is nothing available to withdraw."
-    },
-    {
-      "code": 6140,
-      "name": "NothingToRefund",
-      "msg": "There is nothing available to refund."
-    },
-    {
-      "code": 6141,
-      "name": "NothingReleasable",
-      "msg": "Nothing has been released on this contract."
-    },
-    {
-      "code": 6142,
-      "name": "OpenReviewBlocksCancel",
-      "msg": "Cannot cancel while a work unit is under review."
-    },
-    {
-      "code": 6143,
-      "name": "EscrowNotSettled",
-      "msg": "Escrow still holds funds owed to a party."
-    },
-    {
-      "code": 6144,
-      "name": "ArithmeticOverflow",
-      "msg": "A math calculation overflowed."
-    },
-    {
-      "code": 6145,
-      "name": "EscrowFundingMismatch",
-      "msg": "Escrow did not receive the full contract amount."
-    },
-    {
-      "code": 6146,
-      "name": "TooManyMilestones",
-      "msg": "This contract already has the maximum number of milestones."
-    },
-    {
-      "code": 6147,
-      "name": "InvalidDueDate",
-      "msg": "Milestone due offset is not a positive duration within the contract term, or is not later than the previous milestone."
-    },
-    {
-      "code": 6148,
-      "name": "InvalidActivationReview",
-      "msg": "Activation review duration is outside the permitted range."
-    },
-    {
-      "code": 6149,
-      "name": "ApprovalWindowExpired",
-      "msg": "The employer activation window has closed."
-    },
-    {
-      "code": 6150,
-      "name": "ScheduledStartElapsed",
-      "msg": "The scheduled start has already elapsed; activating now would create retroactive earnings."
-    },
-    {
-      "code": 6151,
-      "name": "InvalidTrialAmount",
-      "msg": "Trial amount is zero, equals or exceeds the funded total, or does not match the trial account."
-    },
-    {
-      "code": 6152,
-      "name": "TrialNotConfigured",
-      "msg": "This contract has no paid trial configured."
-    },
-    {
-      "code": 6153,
-      "name": "TrialRequired",
-      "msg": "A paid trial is configured; this instruction cannot bypass it."
-    },
-    {
-      "code": 6154,
-      "name": "InvalidTrialState",
-      "msg": "The trial work unit is not in the required state for this operation."
-    },
-    {
-      "code": 6155,
-      "name": "UnsupportedWorkUnitKind",
-      "msg": "This work unit kind cannot use the post-activation review instructions."
-    },
-    {
-      "code": 6156,
-      "name": "ReleaseAmountExceeded",
-      "msg": "This release would exceed the contract's main or total amount."
-    },
-    {
-      "code": 6157,
-      "name": "InsufficientEscrowBalance",
-      "msg": "Escrow holds fewer tokens than the entitlement being claimed."
-    },
-    {
-      "code": 6158,
-      "name": "InvalidResolver",
-      "msg": "Resolver must be a distinct non-default public key."
-    },
-    {
-      "code": 6159,
-      "name": "DisputeNotAllowed",
-      "msg": "A dispute cannot be opened in this contract state."
-    },
-    {
-      "code": 6160,
-      "name": "ContractAlreadyDisputed",
-      "msg": "This contract is already disputed."
-    },
-    {
-      "code": 6161,
-      "name": "InvalidDisputeAward",
-      "msg": "The dispute award exceeds the contested amount."
-    },
-    {
-      "code": 6162,
-      "name": "CompletionNotAllowed",
-      "msg": "Successful completion is not allowed in this contract state."
-    },
-    {
-      "code": 6163,
-      "name": "UnresolvedWorkRemaining",
-      "msg": "Required work is still unresolved, so the contract cannot complete."
-    },
-    {
-      "code": 6164,
-      "name": "ContractNotReadyForCompletion",
-      "msg": "The contract has not reached an objectively completable point."
-    },
-    {
-      "code": 6165,
-      "name": "ContractAlreadyCompleted",
-      "msg": "This contract is already completed."
-    },
-    {
-      "code": 6166,
-      "name": "InvalidHourlyRate",
-      "msg": "Hourly rate must be greater than zero."
-    },
-    {
-      "code": 6167,
-      "name": "InvalidAuthorizedSeconds",
-      "msg": "Authorized Hourly seconds must be greater than zero."
-    },
-    {
-      "code": 6168,
-      "name": "HourlyMainAmountZero",
-      "msg": "Derived Hourly main amount is zero; rate and authorized time are too small."
-    },
-    {
-      "code": 6169,
-      "name": "HourlyStateMissing",
-      "msg": "HourlyState account is required for this Hourly operation."
-    },
-    {
-      "code": 6170,
-      "name": "InvalidHourlyState",
-      "msg": "HourlyState does not belong to this contract or is not valid."
-    },
-    {
-      "code": 6171,
-      "name": "HourlySessionAlreadyActive",
-      "msg": "An Hourly session is already open."
-    },
-    {
-      "code": 6172,
-      "name": "NoActiveHourlySession",
-      "msg": "There is no open Hourly session."
-    },
-    {
-      "code": 6173,
-      "name": "HourlySessionLimitReached",
-      "msg": "This contract has reached the Hourly session limit."
-    },
-    {
-      "code": 6174,
-      "name": "HourlyAuthorizedTimeExhausted",
-      "msg": "Authorized Hourly time is exhausted."
-    },
-    {
-      "code": 6175,
-      "name": "HourlyEngagementExpired",
-      "msg": "The Hourly engagement window has closed."
-    },
-    {
-      "code": 6176,
-      "name": "InvalidHourlySession",
-      "msg": "HourlySession does not belong to this contract or is not valid."
-    },
-    {
-      "code": 6177,
-      "name": "HourlySessionAlreadyRecorded",
-      "msg": "This Hourly session is already closed."
-    },
-    {
-      "code": 6178,
-      "name": "HourlyOpenSessionBlocksClose",
-      "msg": "An open Hourly session blocks cancel or end."
     }
   ],
   "types": [
@@ -3263,6 +2517,146 @@
     },
     {
       "docs": [
+        "The employer reviewed the trial stage and declined to activate."
+      ],
+      "name": "ActivationRejected",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "rejected_at",
+            "type": "i64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
+        "The freelancer accepted a funded offer. The main stream has not started."
+      ],
+      "name": "ContractAccepted",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "accepted_at",
+            "type": "i64"
+          },
+          {
+            "name": "activation_deadline",
+            "type": "i64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
+        "The employer approved activation. Main-contract timing is now established."
+      ],
+      "name": "ContractActivated",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "activated_at",
+            "type": "i64"
+          },
+          {
+            "name": "start_time",
+            "type": "i64"
+          },
+          {
+            "name": "end_time",
+            "type": "i64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
+        "Successful completion froze the agreed economic end. No SPL transfer."
+      ],
+      "name": "ContractCompleted",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "completed_at",
+            "type": "i64"
+          },
+          {
+            "name": "final_freelancer_entitlement",
+            "type": "u64"
+          },
+          {
+            "name": "final_employer_entitlement",
+            "type": "u64"
+          },
+          {
+            "name": "released_amount",
+            "type": "u64"
+          },
+          {
+            "name": "withdrawn_amount",
+            "type": "u64"
+          },
+          {
+            "name": "refunded_amount",
+            "type": "u64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
         "An Active contract was cancelled and its economic split was frozen.",
         "No SPL transfer."
       ],
@@ -3315,9 +2709,9 @@
     },
     {
       "docs": [
-        "The employer reviewed the trial stage and declined to activate."
+        "The freelancer refused a funded offer."
       ],
-      "name": "ActivationRejected",
+      "name": "ContractDeclined",
       "type": {
         "fields": [
           {
@@ -3333,7 +2727,7 @@
             "type": "pubkey"
           },
           {
-            "name": "rejected_at",
+            "name": "declined_at",
             "type": "i64"
           }
         ],
@@ -3342,9 +2736,9 @@
     },
     {
       "docs": [
-        "The employer approved activation. Main-contract timing is now established."
+        "A funded offer lapsed without acceptance. No SPL transfer. Not a dispute."
       ],
-      "name": "ContractActivated",
+      "name": "ContractExpired",
       "type": {
         "fields": [
           {
@@ -3360,50 +2754,11 @@
             "type": "pubkey"
           },
           {
-            "name": "activated_at",
+            "name": "expired_at",
             "type": "i64"
           },
           {
-            "name": "start_time",
-            "type": "i64"
-          },
-          {
-            "name": "end_time",
-            "type": "i64"
-          }
-        ],
-        "kind": "struct"
-      }
-    },
-    {
-      "docs": [
-        "SPL tokens left escrow for the freelancer. Real token movement."
-      ],
-      "name": "FreelancerWithdrawal",
-      "type": {
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "mint",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "withdrawn_amount",
-            "type": "u64"
-          },
-          {
-            "name": "remaining_entitlement",
+            "name": "employer_refundable",
             "type": "u64"
           }
         ],
@@ -3456,119 +2811,6 @@
           {
             "name": "final_employer_entitlement",
             "type": "u64"
-          }
-        ],
-        "kind": "struct"
-      }
-    },
-    {
-      "docs": [
-        "SPL tokens left escrow back to the employer. Real token movement."
-      ],
-      "name": "EmployerRefundClaimed",
-      "type": {
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "mint",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "refunded_amount",
-            "type": "u64"
-          },
-          {
-            "name": "remaining_refundable",
-            "type": "u64"
-          }
-        ],
-        "kind": "struct"
-      }
-    },
-    {
-      "docs": [
-        "A party froze the contract into Disputed. No SPL transfer."
-      ],
-      "name": "DisputeOpened",
-      "type": {
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "initiator",
-            "type": {
-              "defined": {
-                "name": "DisputeParty"
-              }
-            }
-          },
-          {
-            "name": "resolver",
-            "type": "pubkey"
-          },
-          {
-            "name": "disputed_at",
-            "type": "i64"
-          },
-          {
-            "name": "contested_amount",
-            "type": "u64"
-          },
-          {
-            "name": "released_amount",
-            "type": "u64"
-          },
-          {
-            "name": "stream_released_amount",
-            "type": "u64"
-          }
-        ],
-        "kind": "struct"
-      }
-    },
-    {
-      "docs": [
-        "The freelancer refused a funded offer."
-      ],
-      "name": "ContractDeclined",
-      "type": {
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "declined_at",
-            "type": "i64"
           }
         ],
         "kind": "struct"
@@ -3636,9 +2878,9 @@
     },
     {
       "docs": [
-        "The freelancer accepted a funded offer. The main stream has not started."
+        "SPL tokens left escrow back to the employer. Real token movement."
       ],
-      "name": "ContractAccepted",
+      "name": "EmployerRefundClaimed",
       "type": {
         "fields": [
           {
@@ -3650,16 +2892,20 @@
             "type": "pubkey"
           },
           {
-            "name": "freelancer",
+            "name": "mint",
             "type": "pubkey"
           },
           {
-            "name": "accepted_at",
-            "type": "i64"
+            "name": "amount",
+            "type": "u64"
           },
           {
-            "name": "activation_deadline",
-            "type": "i64"
+            "name": "refunded_amount",
+            "type": "u64"
+          },
+          {
+            "name": "remaining_refundable",
+            "type": "u64"
           }
         ],
         "kind": "struct"
@@ -3667,9 +2913,9 @@
     },
     {
       "docs": [
-        "Successful completion froze the agreed economic end. No SPL transfer."
+        "SPL tokens left escrow for the freelancer. Real token movement."
       ],
-      "name": "ContractCompleted",
+      "name": "FreelancerWithdrawal",
       "type": {
         "fields": [
           {
@@ -3677,27 +2923,15 @@
             "type": "pubkey"
           },
           {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
             "name": "freelancer",
             "type": "pubkey"
           },
           {
-            "name": "completed_at",
-            "type": "i64"
+            "name": "mint",
+            "type": "pubkey"
           },
           {
-            "name": "final_freelancer_entitlement",
-            "type": "u64"
-          },
-          {
-            "name": "final_employer_entitlement",
-            "type": "u64"
-          },
-          {
-            "name": "released_amount",
+            "name": "amount",
             "type": "u64"
           },
           {
@@ -3705,7 +2939,7 @@
             "type": "u64"
           },
           {
-            "name": "refunded_amount",
+            "name": "remaining_entitlement",
             "type": "u64"
           }
         ],
@@ -3714,9 +2948,9 @@
     },
     {
       "docs": [
-        "Freelancer opened an Hourly session. No SPL transfer."
+        "A party froze the contract into Disputed. No SPL transfer."
       ],
-      "name": "HourlySessionStarted",
+      "name": "DisputeOpened",
       "type": {
         "fields": [
           {
@@ -3724,7 +2958,7 @@
             "type": "pubkey"
           },
           {
-            "name": "session",
+            "name": "employer",
             "type": "pubkey"
           },
           {
@@ -3732,12 +2966,200 @@
             "type": "pubkey"
           },
           {
-            "name": "session_index",
+            "name": "initiator",
+            "type": {
+              "defined": {
+                "name": "DisputeParty"
+              }
+            }
+          },
+          {
+            "name": "resolver",
+            "type": "pubkey"
+          },
+          {
+            "name": "disputed_at",
+            "type": "i64"
+          },
+          {
+            "name": "contested_amount",
+            "type": "u64"
+          },
+          {
+            "name": "released_amount",
+            "type": "u64"
+          },
+          {
+            "name": "stream_released_amount",
+            "type": "u64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
+        "Dedicated Hourly create. Also accompanied by `ContractCreated`."
+      ],
+      "name": "HourlyContractCreated",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "contract_id",
+            "type": "u64"
+          },
+          {
+            "name": "hourly_rate",
+            "type": "u64"
+          },
+          {
+            "name": "authorized_seconds",
+            "type": "u64"
+          },
+          {
+            "name": "main_amount",
+            "type": "u64"
+          },
+          {
+            "name": "trial_amount",
+            "type": "u64"
+          },
+          {
+            "name": "total_amount",
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
+        "Time-based streaming earnings were materialized into released accounting.",
+        "No SPL transfer."
+      ],
+      "name": "StreamAccrualReleased",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "newly_released",
+            "type": "u64"
+          },
+          {
+            "name": "cumulative_stream_released",
+            "type": "u64"
+          },
+          {
+            "name": "total_released",
+            "type": "u64"
+          },
+          {
+            "name": "accrual_time",
+            "type": "i64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
+        "Employer ended an Hourly contract. Unused-budget settlement uses the",
+        "Cancelled terminal so existing claim instructions apply. Not punitive.",
+        "No SPL transfer."
+      ],
+      "name": "HourlyContractEnded",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "ended_at",
+            "type": "i64"
+          },
+          {
+            "name": "freelancer_settlement_amount",
+            "type": "u64"
+          },
+          {
+            "name": "employer_refundable_amount",
+            "type": "u64"
+          },
+          {
+            "name": "released_amount",
+            "type": "u64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
+        "One milestone was defined on a draft contract.",
+        "",
+        "`allocated_amount` is the running total after this milestone, so an indexer",
+        "can tell how much of the escrow is still unallocated without re-reading the",
+        "contract. Titles and specifications are not here: they live in the",
+        "contract's off-chain record."
+      ],
+      "name": "MilestoneAdded",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "work_unit",
+            "type": "pubkey"
+          },
+          {
+            "name": "index",
             "type": "u32"
           },
           {
-            "name": "started_at",
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "due_offset_seconds",
             "type": "i64"
+          },
+          {
+            "name": "allocated_amount",
+            "type": "u64"
           }
         ],
         "kind": "struct"
@@ -3805,9 +3227,9 @@
     },
     {
       "docs": [
-        "Dedicated Hourly create. Also accompanied by `ContractCreated`."
+        "Freelancer opened an Hourly session. No SPL transfer."
       ],
-      "name": "HourlyContractCreated",
+      "name": "HourlySessionStarted",
       "type": {
         "fields": [
           {
@@ -3815,7 +3237,7 @@
             "type": "pubkey"
           },
           {
-            "name": "employer",
+            "name": "session",
             "type": "pubkey"
           },
           {
@@ -3823,149 +3245,12 @@
             "type": "pubkey"
           },
           {
-            "name": "contract_id",
-            "type": "u64"
-          },
-          {
-            "name": "hourly_rate",
-            "type": "u64"
-          },
-          {
-            "name": "authorized_seconds",
-            "type": "u64"
-          },
-          {
-            "name": "main_amount",
-            "type": "u64"
-          },
-          {
-            "name": "trial_amount",
-            "type": "u64"
-          },
-          {
-            "name": "total_amount",
-            "type": "u64"
-          },
-          {
-            "name": "created_at",
-            "type": "i64"
-          }
-        ],
-        "kind": "struct"
-      }
-    },
-    {
-      "docs": [
-        "Employer ended an Hourly contract. Unused-budget settlement uses the",
-        "Cancelled terminal so existing claim instructions apply. Not punitive.",
-        "No SPL transfer."
-      ],
-      "name": "HourlyContractEnded",
-      "type": {
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "ended_at",
-            "type": "i64"
-          },
-          {
-            "name": "freelancer_settlement_amount",
-            "type": "u64"
-          },
-          {
-            "name": "employer_refundable_amount",
-            "type": "u64"
-          },
-          {
-            "name": "released_amount",
-            "type": "u64"
-          }
-        ],
-        "kind": "struct"
-      }
-    },
-    {
-      "docs": [
-        "Time-based streaming earnings were materialized into released accounting.",
-        "No SPL transfer."
-      ],
-      "name": "StreamAccrualReleased",
-      "type": {
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "newly_released",
-            "type": "u64"
-          },
-          {
-            "name": "cumulative_stream_released",
-            "type": "u64"
-          },
-          {
-            "name": "total_released",
-            "type": "u64"
-          },
-          {
-            "name": "accrual_time",
-            "type": "i64"
-          }
-        ],
-        "kind": "struct"
-      }
-    },
-    {
-      "docs": [
-        "One milestone was defined on a draft contract.",
-        "",
-        "`allocated_amount` is the running total after this milestone, so an indexer",
-        "can tell how much of the escrow is still unallocated without re-reading the",
-        "contract. Titles and specifications are not here: they live in the",
-        "contract's off-chain record."
-      ],
-      "name": "MilestoneAdded",
-      "type": {
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "work_unit",
-            "type": "pubkey"
-          },
-          {
-            "name": "index",
+            "name": "session_index",
             "type": "u32"
           },
           {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "due_offset_seconds",
+            "name": "started_at",
             "type": "i64"
-          },
-          {
-            "name": "allocated_amount",
-            "type": "u64"
           }
         ],
         "kind": "struct"
@@ -3973,9 +3258,9 @@
     },
     {
       "docs": [
-        "A paid trial was configured at contract creation."
+        "The employer approved the trial. Compensation is released, not withdrawn."
       ],
-      "name": "TrialConfigured",
+      "name": "TrialApproved",
       "type": {
         "fields": [
           {
@@ -3991,12 +3276,12 @@
             "type": "pubkey"
           },
           {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
             "name": "amount",
             "type": "u64"
+          },
+          {
+            "name": "approved_at",
+            "type": "i64"
           }
         ],
         "kind": "struct"
@@ -4036,9 +3321,9 @@
     },
     {
       "docs": [
-        "The employer approved the trial. Compensation is released, not withdrawn."
+        "A paid trial was configured at contract creation."
       ],
-      "name": "TrialApproved",
+      "name": "TrialConfigured",
       "type": {
         "fields": [
           {
@@ -4052,6 +3337,116 @@
           {
             "name": "employer",
             "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
+        "The employer rejected submitted trial work. No tokens moved."
+      ],
+      "name": "TrialRejected",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "trial_work_unit",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "rejected_at",
+            "type": "i64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
+        "The employer paid the submitted trial and ended without activating.",
+        "No SPL transfer. Not a dispute."
+      ],
+      "name": "TrialSettledAndEnded",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "trial_work_unit",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "settled_at",
+            "type": "i64"
+          },
+          {
+            "name": "trial_amount",
+            "type": "u64"
+          },
+          {
+            "name": "freelancer_settlement",
+            "type": "u64"
+          },
+          {
+            "name": "employer_refundable",
+            "type": "u64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
+        "The employer approved a submitted work unit. Compensation is released, not withdrawn."
+      ],
+      "name": "WorkUnitApproved",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "work_unit",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "work_unit_index",
+            "type": "u32"
           },
           {
             "name": "amount",
@@ -4098,10 +3493,40 @@
     },
     {
       "docs": [
-        "The employer paid the submitted trial and ended without activating.",
-        "No SPL transfer. Not a dispute."
+        "Review timed out and the submitted unit was auto-released. No SPL transfer."
       ],
-      "name": "TrialSettledAndEnded",
+      "name": "WorkUnitReviewTimedOut",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "work_unit",
+            "type": "pubkey"
+          },
+          {
+            "name": "work_unit_index",
+            "type": "u32"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "released_at",
+            "type": "i64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
+        "The freelancer submitted (or resubmitted) trial work."
+      ],
+      "name": "TrialSubmitted",
       "type": {
         "fields": [
           {
@@ -4113,28 +3538,55 @@
             "type": "pubkey"
           },
           {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
             "name": "freelancer",
             "type": "pubkey"
           },
           {
-            "name": "settled_at",
+            "name": "submitted_at",
             "type": "i64"
           },
           {
-            "name": "trial_amount",
-            "type": "u64"
+            "name": "action_deadline",
+            "type": "i64"
           },
           {
-            "name": "freelancer_settlement",
-            "type": "u64"
+            "name": "revision_count",
+            "type": "u8"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
+        "The employer requested a bounded resubmission of post-activation work."
+      ],
+      "name": "WorkUnitRevisionRequested",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
           },
           {
-            "name": "employer_refundable",
-            "type": "u64"
+            "name": "work_unit",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "work_unit_index",
+            "type": "u32"
+          },
+          {
+            "name": "revision_count",
+            "type": "u8"
+          },
+          {
+            "name": "action_deadline",
+            "type": "i64"
           }
         ],
         "kind": "struct"
@@ -4209,173 +3661,795 @@
         ],
         "kind": "struct"
       }
+    }
+  ],
+  "events": [
+    {
+      "name": "ActivationRejected",
+      "discriminator": [
+        170,
+        33,
+        164,
+        118,
+        168,
+        17,
+        62,
+        160
+      ]
     },
     {
-      "docs": [
-        "The freelancer submitted (or resubmitted) trial work."
-      ],
-      "name": "TrialSubmitted",
-      "type": {
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "trial_work_unit",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "submitted_at",
-            "type": "i64"
-          },
-          {
-            "name": "action_deadline",
-            "type": "i64"
-          },
-          {
-            "name": "revision_count",
-            "type": "u8"
-          }
-        ],
-        "kind": "struct"
-      }
+      "name": "ContractAccepted",
+      "discriminator": [
+        44,
+        209,
+        126,
+        23,
+        190,
+        99,
+        31,
+        196
+      ]
     },
     {
-      "docs": [
-        "Review timed out and the submitted unit was auto-released. No SPL transfer."
-      ],
-      "name": "WorkUnitReviewTimedOut",
-      "type": {
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "work_unit",
-            "type": "pubkey"
-          },
-          {
-            "name": "work_unit_index",
-            "type": "u32"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "released_at",
-            "type": "i64"
-          }
-        ],
-        "kind": "struct"
-      }
+      "name": "ContractActivated",
+      "discriminator": [
+        4,
+        154,
+        226,
+        21,
+        37,
+        131,
+        12,
+        219
+      ]
     },
     {
-      "docs": [
-        "The employer rejected submitted trial work. No tokens moved."
-      ],
+      "name": "ContractCancellationSettled",
+      "discriminator": [
+        64,
+        179,
+        183,
+        177,
+        79,
+        20,
+        124,
+        43
+      ]
+    },
+    {
+      "name": "ContractCompleted",
+      "discriminator": [
+        99,
+        32,
+        99,
+        27,
+        103,
+        45,
+        188,
+        151
+      ]
+    },
+    {
+      "name": "ContractCreated",
+      "discriminator": [
+        80,
+        69,
+        164,
+        109,
+        77,
+        15,
+        47,
+        164
+      ]
+    },
+    {
+      "name": "ContractDeclined",
+      "discriminator": [
+        9,
+        118,
+        156,
+        41,
+        196,
+        21,
+        1,
+        226
+      ]
+    },
+    {
+      "name": "ContractExpired",
+      "discriminator": [
+        125,
+        156,
+        235,
+        96,
+        23,
+        67,
+        193,
+        191
+      ]
+    },
+    {
+      "name": "DisputeOpened",
+      "discriminator": [
+        239,
+        222,
+        102,
+        235,
+        193,
+        85,
+        1,
+        214
+      ]
+    },
+    {
+      "name": "DisputeResolved",
+      "discriminator": [
+        121,
+        64,
+        249,
+        153,
+        139,
+        128,
+        236,
+        187
+      ]
+    },
+    {
+      "name": "EmployerRefundClaimed",
+      "discriminator": [
+        251,
+        43,
+        237,
+        49,
+        23,
+        113,
+        22,
+        39
+      ]
+    },
+    {
+      "name": "FreelancerWithdrawal",
+      "discriminator": [
+        97,
+        134,
+        235,
+        236,
+        166,
+        205,
+        238,
+        128
+      ]
+    },
+    {
+      "name": "HourlyContractCreated",
+      "discriminator": [
+        232,
+        8,
+        91,
+        174,
+        121,
+        142,
+        221,
+        140
+      ]
+    },
+    {
+      "name": "HourlyContractEnded",
+      "discriminator": [
+        93,
+        84,
+        91,
+        223,
+        113,
+        24,
+        178,
+        110
+      ]
+    },
+    {
+      "name": "HourlySessionRecorded",
+      "discriminator": [
+        12,
+        197,
+        4,
+        56,
+        143,
+        205,
+        184,
+        131
+      ]
+    },
+    {
+      "name": "HourlySessionStarted",
+      "discriminator": [
+        6,
+        63,
+        75,
+        36,
+        15,
+        180,
+        214,
+        115
+      ]
+    },
+    {
+      "name": "MilestoneAdded",
+      "discriminator": [
+        25,
+        65,
+        182,
+        178,
+        253,
+        180,
+        118,
+        77
+      ]
+    },
+    {
+      "name": "StreamAccrualReleased",
+      "discriminator": [
+        39,
+        213,
+        135,
+        163,
+        146,
+        157,
+        240,
+        50
+      ]
+    },
+    {
+      "name": "TermsFinalized",
+      "discriminator": [
+        10,
+        116,
+        161,
+        152,
+        181,
+        100,
+        209,
+        44
+      ]
+    },
+    {
+      "name": "TrialApproved",
+      "discriminator": [
+        2,
+        110,
+        94,
+        43,
+        143,
+        111,
+        86,
+        155
+      ]
+    },
+    {
+      "name": "TrialConfigured",
+      "discriminator": [
+        53,
+        13,
+        124,
+        182,
+        69,
+        42,
+        253,
+        43
+      ]
+    },
+    {
       "name": "TrialRejected",
-      "type": {
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "trial_work_unit",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "rejected_at",
-            "type": "i64"
-          }
-        ],
-        "kind": "struct"
-      }
+      "discriminator": [
+        91,
+        90,
+        223,
+        84,
+        43,
+        232,
+        217,
+        50
+      ]
     },
     {
-      "docs": [
-        "The employer approved a submitted work unit. Compensation is released, not withdrawn."
-      ],
+      "name": "TrialRevisionRequested",
+      "discriminator": [
+        156,
+        184,
+        33,
+        45,
+        115,
+        90,
+        83,
+        15
+      ]
+    },
+    {
+      "name": "TrialSettledAndEnded",
+      "discriminator": [
+        6,
+        112,
+        35,
+        125,
+        73,
+        158,
+        24,
+        138
+      ]
+    },
+    {
+      "name": "TrialSubmitted",
+      "discriminator": [
+        57,
+        24,
+        217,
+        63,
+        28,
+        150,
+        24,
+        76
+      ]
+    },
+    {
       "name": "WorkUnitApproved",
-      "type": {
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "work_unit",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "work_unit_index",
-            "type": "u32"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "approved_at",
-            "type": "i64"
-          }
-        ],
-        "kind": "struct"
-      }
+      "discriminator": [
+        192,
+        198,
+        6,
+        177,
+        1,
+        202,
+        157,
+        191
+      ]
     },
     {
-      "docs": [
-        "The employer requested a bounded resubmission of post-activation work."
-      ],
+      "name": "WorkUnitReviewTimedOut",
+      "discriminator": [
+        231,
+        232,
+        242,
+        197,
+        164,
+        101,
+        41,
+        5
+      ]
+    },
+    {
       "name": "WorkUnitRevisionRequested",
-      "type": {
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "work_unit",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "work_unit_index",
-            "type": "u32"
-          },
-          {
-            "name": "revision_count",
-            "type": "u8"
-          },
-          {
-            "name": "action_deadline",
-            "type": "i64"
-          }
-        ],
-        "kind": "struct"
-      }
+      "discriminator": [
+        33,
+        63,
+        179,
+        196,
+        105,
+        181,
+        185,
+        45
+      ]
+    },
+    {
+      "name": "WorkUnitStaleRevisionVoided",
+      "discriminator": [
+        127,
+        55,
+        118,
+        220,
+        159,
+        214,
+        133,
+        1
+      ]
+    },
+    {
+      "name": "WorkUnitSubmitted",
+      "discriminator": [
+        212,
+        210,
+        177,
+        58,
+        32,
+        129,
+        94,
+        213
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6100,
+      "name": "InvalidAmount",
+      "msg": "Amount must be greater than zero."
+    },
+    {
+      "code": 6101,
+      "name": "InvalidDuration",
+      "msg": "Duration is outside the permitted range."
+    },
+    {
+      "code": 6102,
+      "name": "InvalidCheckpointInterval",
+      "msg": "Checkpoint interval is invalid for this duration."
+    },
+    {
+      "code": 6103,
+      "name": "InvalidReviewDuration",
+      "msg": "Review duration is outside the permitted range or exceeds the checkpoint interval."
+    },
+    {
+      "code": 6104,
+      "name": "TooManyCheckpoints",
+      "msg": "This configuration would create too many checkpoints."
+    },
+    {
+      "code": 6105,
+      "name": "InvalidMaxRevisions",
+      "msg": "Maximum revisions exceeds the permitted limit."
+    },
+    {
+      "code": 6106,
+      "name": "InvalidAcceptanceDeadline",
+      "msg": "Acceptance deadline must be in the future."
+    },
+    {
+      "code": 6107,
+      "name": "InvalidScheduledStart",
+      "msg": "Scheduled start must not precede the acceptance deadline."
+    },
+    {
+      "code": 6108,
+      "name": "InvalidMetadata",
+      "msg": "Metadata reference is missing or exceeds the maximum length."
+    },
+    {
+      "code": 6109,
+      "name": "SelfContract",
+      "msg": "Employer and freelancer must be different wallets."
+    },
+    {
+      "code": 6110,
+      "name": "InvalidPaymentMode",
+      "msg": "This operation is not valid for the contract's payment mode."
+    },
+    {
+      "code": 6111,
+      "name": "InvalidState",
+      "msg": "The contract is not in the required state for this operation."
+    },
+    {
+      "code": 6112,
+      "name": "ContractNotStarted",
+      "msg": "The contract has not started; terms are not yet accepted."
+    },
+    {
+      "code": 6113,
+      "name": "ContractTerminal",
+      "msg": "The contract is in a terminal state."
+    },
+    {
+      "code": 6114,
+      "name": "TermsNotFinalized",
+      "msg": "Contract terms have not been finalized."
+    },
+    {
+      "code": 6115,
+      "name": "AcceptanceExpired",
+      "msg": "The acceptance deadline has passed."
+    },
+    {
+      "code": 6116,
+      "name": "AcceptanceNotExpired",
+      "msg": "The acceptance deadline has not yet passed."
+    },
+    {
+      "code": 6117,
+      "name": "ObligationsOutstanding",
+      "msg": "Outstanding obligations remain on this contract."
+    },
+    {
+      "code": 6118,
+      "name": "Unauthorized",
+      "msg": "The signer is not authorized for this operation."
+    },
+    {
+      "code": 6119,
+      "name": "MilestoneAllocationExceeded",
+      "msg": "Milestone amounts exceed the funded total."
+    },
+    {
+      "code": 6120,
+      "name": "MilestoneAllocationIncomplete",
+      "msg": "Milestone amounts do not sum to the funded total."
+    },
+    {
+      "code": 6121,
+      "name": "NoMilestones",
+      "msg": "This payment mode requires at least one milestone."
+    },
+    {
+      "code": 6122,
+      "name": "FixedNeedsOneUnit",
+      "msg": "A fixed contract requires exactly one work unit."
+    },
+    {
+      "code": 6123,
+      "name": "StreamingHasNoMilestones",
+      "msg": "A streaming contract cannot define milestones."
+    },
+    {
+      "code": 6124,
+      "name": "InvalidWorkUnit",
+      "msg": "The work unit is invalid or does not belong to this contract."
+    },
+    {
+      "code": 6125,
+      "name": "BadUnitIndex",
+      "msg": "Work unit index does not match the expected next index."
+    },
+    {
+      "code": 6126,
+      "name": "UnitNotSubmittable",
+      "msg": "The work unit is not awaiting submission."
+    },
+    {
+      "code": 6127,
+      "name": "UnitNotUnderReview",
+      "msg": "The work unit is not under review."
+    },
+    {
+      "code": 6128,
+      "name": "UnitAlreadyReleased",
+      "msg": "The work unit has already been released."
+    },
+    {
+      "code": 6129,
+      "name": "UnitVoided",
+      "msg": "The work unit has been voided."
+    },
+    {
+      "code": 6130,
+      "name": "UnitNotStale",
+      "msg": "The work unit is not stale and cannot be voided."
+    },
+    {
+      "code": 6131,
+      "name": "ReviewAlreadyOpen",
+      "msg": "Another work unit is still awaiting review."
+    },
+    {
+      "code": 6132,
+      "name": "ReviewWindowOpen",
+      "msg": "The review window is still open."
+    },
+    {
+      "code": 6133,
+      "name": "ReviewWindowClosed",
+      "msg": "The review window has already closed."
+    },
+    {
+      "code": 6134,
+      "name": "RevisionLimitReached",
+      "msg": "The maximum number of revisions has been reached."
+    },
+    {
+      "code": 6135,
+      "name": "PeriodNotComplete",
+      "msg": "The checkpoint period is not yet complete."
+    },
+    {
+      "code": 6136,
+      "name": "StreamFullyCheckpointed",
+      "msg": "All streaming periods have already been checkpointed."
+    },
+    {
+      "code": 6137,
+      "name": "EmptyCheckpoint",
+      "msg": "This checkpoint period has no earned amount."
+    },
+    {
+      "code": 6138,
+      "name": "GraceWindowClosed",
+      "msg": "The post-termination grace window has closed."
+    },
+    {
+      "code": 6139,
+      "name": "NothingToWithdraw",
+      "msg": "There is nothing available to withdraw."
+    },
+    {
+      "code": 6140,
+      "name": "NothingToRefund",
+      "msg": "There is nothing available to refund."
+    },
+    {
+      "code": 6141,
+      "name": "NothingReleasable",
+      "msg": "Nothing has been released on this contract."
+    },
+    {
+      "code": 6142,
+      "name": "OpenReviewBlocksCancel",
+      "msg": "Cannot cancel while a work unit is under review."
+    },
+    {
+      "code": 6143,
+      "name": "EscrowNotSettled",
+      "msg": "Escrow still holds funds owed to a party."
+    },
+    {
+      "code": 6144,
+      "name": "ArithmeticOverflow",
+      "msg": "A math calculation overflowed."
+    },
+    {
+      "code": 6145,
+      "name": "EscrowFundingMismatch",
+      "msg": "Escrow did not receive the full contract amount."
+    },
+    {
+      "code": 6146,
+      "name": "TooManyMilestones",
+      "msg": "This contract already has the maximum number of milestones."
+    },
+    {
+      "code": 6147,
+      "name": "InvalidDueDate",
+      "msg": "Milestone due offset is not a positive duration within the contract term, or is not later than the previous milestone."
+    },
+    {
+      "code": 6148,
+      "name": "InvalidActivationReview",
+      "msg": "Activation review duration is outside the permitted range."
+    },
+    {
+      "code": 6149,
+      "name": "ApprovalWindowExpired",
+      "msg": "The employer activation window has closed."
+    },
+    {
+      "code": 6150,
+      "name": "ScheduledStartElapsed",
+      "msg": "The scheduled start has already elapsed; activating now would create retroactive earnings."
+    },
+    {
+      "code": 6151,
+      "name": "InvalidTrialAmount",
+      "msg": "Trial amount is zero, equals or exceeds the funded total, or does not match the trial account."
+    },
+    {
+      "code": 6152,
+      "name": "TrialNotConfigured",
+      "msg": "This contract has no paid trial configured."
+    },
+    {
+      "code": 6153,
+      "name": "TrialRequired",
+      "msg": "A paid trial is configured; this instruction cannot bypass it."
+    },
+    {
+      "code": 6154,
+      "name": "InvalidTrialState",
+      "msg": "The trial work unit is not in the required state for this operation."
+    },
+    {
+      "code": 6155,
+      "name": "UnsupportedWorkUnitKind",
+      "msg": "This work unit kind cannot use the post-activation review instructions."
+    },
+    {
+      "code": 6156,
+      "name": "ReleaseAmountExceeded",
+      "msg": "This release would exceed the contract's main or total amount."
+    },
+    {
+      "code": 6157,
+      "name": "InsufficientEscrowBalance",
+      "msg": "Escrow holds fewer tokens than the entitlement being claimed."
+    },
+    {
+      "code": 6158,
+      "name": "InvalidResolver",
+      "msg": "Resolver must be a distinct non-default public key."
+    },
+    {
+      "code": 6159,
+      "name": "DisputeNotAllowed",
+      "msg": "A dispute cannot be opened in this contract state."
+    },
+    {
+      "code": 6160,
+      "name": "ContractAlreadyDisputed",
+      "msg": "This contract is already disputed."
+    },
+    {
+      "code": 6161,
+      "name": "InvalidDisputeAward",
+      "msg": "The dispute award exceeds the contested amount."
+    },
+    {
+      "code": 6162,
+      "name": "CompletionNotAllowed",
+      "msg": "Successful completion is not allowed in this contract state."
+    },
+    {
+      "code": 6163,
+      "name": "UnresolvedWorkRemaining",
+      "msg": "Required work is still unresolved, so the contract cannot complete."
+    },
+    {
+      "code": 6164,
+      "name": "ContractNotReadyForCompletion",
+      "msg": "The contract has not reached an objectively completable point."
+    },
+    {
+      "code": 6165,
+      "name": "ContractAlreadyCompleted",
+      "msg": "This contract is already completed."
+    },
+    {
+      "code": 6166,
+      "name": "InvalidHourlyRate",
+      "msg": "Hourly rate must be greater than zero."
+    },
+    {
+      "code": 6167,
+      "name": "InvalidAuthorizedSeconds",
+      "msg": "Authorized Hourly seconds must be greater than zero."
+    },
+    {
+      "code": 6168,
+      "name": "HourlyMainAmountZero",
+      "msg": "Derived Hourly main amount is zero; rate and authorized time are too small."
+    },
+    {
+      "code": 6169,
+      "name": "HourlyStateMissing",
+      "msg": "HourlyState account is required for this Hourly operation."
+    },
+    {
+      "code": 6170,
+      "name": "InvalidHourlyState",
+      "msg": "HourlyState does not belong to this contract or is not valid."
+    },
+    {
+      "code": 6171,
+      "name": "HourlySessionAlreadyActive",
+      "msg": "An Hourly session is already open."
+    },
+    {
+      "code": 6172,
+      "name": "NoActiveHourlySession",
+      "msg": "There is no open Hourly session."
+    },
+    {
+      "code": 6173,
+      "name": "HourlySessionLimitReached",
+      "msg": "This contract has reached the Hourly session limit."
+    },
+    {
+      "code": 6174,
+      "name": "HourlyAuthorizedTimeExhausted",
+      "msg": "Authorized Hourly time is exhausted."
+    },
+    {
+      "code": 6175,
+      "name": "HourlyEngagementExpired",
+      "msg": "The Hourly engagement window has closed."
+    },
+    {
+      "code": 6176,
+      "name": "InvalidHourlySession",
+      "msg": "HourlySession does not belong to this contract or is not valid."
+    },
+    {
+      "code": 6177,
+      "name": "HourlySessionAlreadyRecorded",
+      "msg": "This Hourly session is already closed."
+    },
+    {
+      "code": 6178,
+      "name": "HourlyOpenSessionBlocksClose",
+      "msg": "An open Hourly session blocks cancel or end."
     }
   ]
 }

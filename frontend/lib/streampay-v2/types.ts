@@ -400,7 +400,9 @@ export function allowsSettlementClaims(status: ContractStatus): boolean {
     status === "Cancelled" ||
     status === "Resolved" ||
     status === "Completed" ||
-    status === "ActivationRejected"
+    status === "ActivationRejected" ||
+    status === "Declined" ||
+    status === "Expired"
   );
 }
 

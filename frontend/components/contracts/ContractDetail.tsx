@@ -54,6 +54,7 @@ import {
   settleTrialAndEndConfirmation,
   trialEmployerDecisions,
 } from "@/lib/app/trial-exit";
+import { OFFER_EXIT_COPY, expireOfferConfirmation } from "@/lib/app/offer-exit";
 import { supportTopicHref } from "@/lib/app/support";
 import { formatUnix } from "@/lib/app/datetime";
 import { localMetadataStore } from "@/lib/app/local-metadata";
@@ -285,6 +286,8 @@ export function ContractDetail({ address }: { address: string }) {
           return client.acceptContract(contract.address);
         case "declineContract":
           return client.declineContract(contract.address);
+        case "expireAcceptance":
+          return client.expireAcceptance(contract.address);
         case "approveActivation":
           return client.approveActivation(contract.address);
         case "rejectActivation":
@@ -662,7 +665,7 @@ export function ContractDetail({ address }: { address: string }) {
           </Card>
         ) : null}
 
-        {["Cancelled", "Completed", "Resolved", "ActivationRejected"].includes(
+        {["Cancelled", "Completed", "Resolved", "ActivationRejected", "Declined", "Expired"].includes(
           contract.status
         ) ? (
           <Card className="p-5">
@@ -672,6 +675,10 @@ export function ContractDetail({ address }: { address: string }) {
                 ? "The resolver recorded settlement accounting. Tokens move only when Collect pay or Claim refund is sent."
                 : contract.status === "ActivationRejected"
                   ? "The contract ended before trial work. Tokens move only when Claim refund is sent. The freelancer has no earned amount to collect."
+                  : contract.status === "Declined"
+                    ? `${OFFER_EXIT_COPY.declinedTitle} ${OFFER_EXIT_COPY.declinedBody} ${OFFER_EXIT_COPY.laterRefund}`
+                    : contract.status === "Expired"
+                      ? "The offer expired before work started. Tokens move only when Claim refund is sent. The freelancer has no earned amount to collect."
                 : "Completion records entitlements. Tokens move only when withdraw or refund is sent."}
             </p>
             {contract.status === "Resolved" && role === "freelancer" ? (
@@ -798,7 +805,8 @@ export function ContractDetail({ address }: { address: string }) {
                 confirm?.action === "rejectActivation"
                   ? "danger"
                   : confirm?.action === "completeContract" ||
-                      confirm?.action === "settleTrialAndEnd"
+                      confirm?.action === "settleTrialAndEnd" ||
+                      confirm?.action === "expireAcceptance"
                     ? "secondary"
                     : "primary"
               }
@@ -1037,6 +1045,28 @@ function ConfirmBody({
       >
         <Input value={uri} onChange={(e) => setUri(e.target.value)} placeholder="https://…" />
       </Field>
+    );
+  }
+  if (action === "expireAcceptance") {
+    const copy = expireOfferConfirmation({ contract, decimals });
+    return (
+      <div className="space-y-3 text-sm leading-6 text-ink-soft">
+        <p>{OFFER_EXIT_COPY.expireBody}</p>
+        <ul className="list-disc space-y-1 pl-5">
+          {copy.points.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+  if (action === "declineContract") {
+    return (
+      <div className="space-y-3 text-sm leading-6 text-ink-soft">
+        <p>{OFFER_EXIT_COPY.declinedTitle}</p>
+        <p>{OFFER_EXIT_COPY.declinedBody}</p>
+        <p>{OFFER_EXIT_COPY.noImmediateTransfer}</p>
+      </div>
     );
   }
   if (action === "settleTrialAndEnd") {

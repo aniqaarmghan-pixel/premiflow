@@ -620,6 +620,9 @@ fn freelancer_declines_offer() {
     assert!(!after.status.is_accepted());
     assert!(!after.status.is_started());
     assert_eq!(after.start_time, 0);
+    assert_eq!(after.freelancer_settlement_amount, 0);
+    assert_eq!(after.employer_refundable_amount, TOTAL_AMOUNT);
+    assert_eq!(after.contested_amount, 0);
     assert_financials_frozen(&before, &after);
     assert_eq!(env.escrow_amount(id), escrow_before);
 }

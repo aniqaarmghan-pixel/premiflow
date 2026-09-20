@@ -49,6 +49,38 @@ test("action availability for representative states", () => {
       "acceptContract"
     )
   );
+  assert.ok(
+    !availableActions({ wallet: WALLET_A, contract: pending, now: 1_000 }).includes(
+      "expireAcceptance"
+    )
+  );
+  const lapsed = makeContract({
+    status: "PendingAcceptance",
+    acceptanceDeadline: 500,
+  });
+  assert.ok(
+    availableActions({ wallet: WALLET_A, contract: lapsed, now: 1_000 }).includes(
+      "expireAcceptance"
+    )
+  );
+  assert.ok(
+    !availableActions({ wallet: WALLET_B, contract: lapsed, now: 1_000 }).includes(
+      "acceptContract"
+    )
+  );
+  const draftLapsed = makeContract({
+    status: "Draft",
+    paymentMode: "Milestone",
+    acceptanceDeadline: 500,
+  });
+  const draftActions = availableActions({
+    wallet: WALLET_A,
+    contract: draftLapsed,
+    now: 1_000,
+  });
+  assert.ok(draftActions.includes("expireAcceptance"));
+  assert.ok(!draftActions.includes("finalizeTerms"));
+  assert.ok(!draftActions.includes("addMilestone"));
 
   const submitted = makeWorkUnit({ status: "Submitted", actionDeadline: 2_000 });
   const active = makeContract({ status: "Active", paymentMode: "Fixed" });
@@ -234,14 +266,30 @@ test("terminal states expose no mutation actions except legitimate claims", () =
   assert.equal(hasLifecycleMutation(freelancer), false);
   assert.equal(hasLifecycleMutation(employer), false);
 
-  const declined = makeContract({ status: "Declined" });
+  const declined = makeContract({
+    status: "Declined",
+    totalAmount: 100n,
+    freelancerSettlementAmount: 0n,
+    employerRefundableAmount: 100n,
+  });
   assert.deepEqual(
     availableActions({ wallet: WALLET_A, contract: declined, now: 1_000 }),
-    []
+    ["claimEmployerRefund"]
   );
   assert.deepEqual(
     availableActions({ wallet: WALLET_B, contract: declined, now: 1_000 }),
     []
+  );
+
+  const expired = makeContract({
+    status: "Expired",
+    totalAmount: 100n,
+    freelancerSettlementAmount: 0n,
+    employerRefundableAmount: 100n,
+  });
+  assert.deepEqual(
+    availableActions({ wallet: WALLET_A, contract: expired, now: 1_000 }),
+    ["claimEmployerRefund"]
   );
 });
 
