@@ -65,3 +65,41 @@ test("program ID agrees across declare_id, Anchor.toml, IDL, and client", () => 
   );
   assert.ok(frontendV1.includes(CANONICAL_PROGRAM_ID));
 });
+
+type IdlAccount = { name: string; optional?: boolean };
+type IdlInstruction = { name: string; accounts: IdlAccount[] };
+
+function instructionAccounts(name: string): IdlAccount[] {
+  const ix = (idl as { instructions: IdlInstruction[] }).instructions.find(
+    (item) => item.name === name
+  );
+  assert.ok(ix, `IDL missing instruction ${name}`);
+  return ix.accounts;
+}
+
+test("withdraw_freelancer and claim_employer_refund require token_program", () => {
+  for (const name of ["withdraw_freelancer", "claim_employer_refund"] as const) {
+    const tokenProgram = instructionAccounts(name).find(
+      (account) => account.name === "token_program"
+    );
+    assert.ok(tokenProgram, `${name} missing token_program`);
+    assert.notEqual(tokenProgram.optional, true);
+  }
+});
+
+test("open_dispute Hourly accounts are optional in the IDL", () => {
+  const accounts = instructionAccounts("open_dispute");
+  const hourlyState = accounts.find((account) => account.name === "hourly_state");
+  const hourlySession = accounts.find(
+    (account) => account.name === "hourly_session"
+  );
+  assert.equal(hourlyState?.optional, true);
+  assert.equal(hourlySession?.optional, true);
+});
+
+test("cancel_active_contract Hourly state is optional in the IDL", () => {
+  const hourlyState = instructionAccounts("cancel_active_contract").find(
+    (account) => account.name === "hourly_state"
+  );
+  assert.equal(hourlyState?.optional, true);
+});

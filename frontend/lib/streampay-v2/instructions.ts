@@ -16,6 +16,7 @@ import { txResult, type TransactionResult } from "./results";
 import { TOKEN_PROGRAM_ID, deriveEmployerSourceAta, deriveFreelancerDestinationAta } from "./tokens";
 import { toHashArray } from "./bytes";
 import { requireU64 } from "./format";
+import { HOURLY_NO_ACTIVE_SESSION } from "./constants";
 import { sendV2Method } from "./send";
 import {
   encodePaymentMode,
@@ -23,8 +24,9 @@ import {
   toBn,
   type CreateContractRequest,
   type CreateHourlyContractRequest,
+  type PaymentModeName,
 } from "./types";
-import { HOURLY_NO_ACTIVE_SESSION } from "./constants";
+import { hasActiveHourlySession } from "./hourly";
 
 function connectedWallet(program: StreamPayV2Program): PublicKey {
   const key = program.provider.publicKey;
@@ -56,6 +58,91 @@ export function toCreateContractArgs(request: CreateContractRequest) {
     metadataUri: request.metadataUri,
     metadataHash: toHashArray(request.metadataHash),
   };
+}
+
+export function withdrawFreelancerAccounts(params: {
+  freelancer: PublicKey;
+  contract: PublicKey;
+  tokenMint: PublicKey;
+  contractEscrow: PublicKey;
+  freelancerTokenAccount: PublicKey;
+}) {
+  return {
+    freelancer: params.freelancer,
+    contract: params.contract,
+    tokenMint: params.tokenMint,
+    contractEscrow: params.contractEscrow,
+    freelancerTokenAccount: params.freelancerTokenAccount,
+    tokenProgram: TOKEN_PROGRAM_ID,
+  };
+}
+
+export function claimEmployerRefundAccounts(params: {
+  employer: PublicKey;
+  contract: PublicKey;
+  tokenMint: PublicKey;
+  contractEscrow: PublicKey;
+  employerTokenAccount: PublicKey;
+}) {
+  return {
+    employer: params.employer,
+    contract: params.contract,
+    tokenMint: params.tokenMint,
+    contractEscrow: params.contractEscrow,
+    employerTokenAccount: params.employerTokenAccount,
+    tokenProgram: TOKEN_PROGRAM_ID,
+  };
+}
+
+export function openDisputeAccounts(params: {
+  party: PublicKey;
+  contract: PublicKey;
+  hourlyState: PublicKey | null;
+  hourlySession: PublicKey | null;
+}) {
+  return {
+    party: params.party,
+    contract: params.contract,
+    hourlyState: params.hourlyState,
+    hourlySession: params.hourlySession,
+  };
+}
+
+export function cancelActiveContractAccounts(params: {
+  employer: PublicKey;
+  contract: PublicKey;
+  hourlyState: PublicKey | null;
+}) {
+  return {
+    employer: params.employer,
+    contract: params.contract,
+    hourlyState: params.hourlyState,
+  };
+}
+
+export function resolveOpenDisputeHourlyOptionals(params: {
+  paymentMode: PaymentModeName;
+  contract: PublicKey;
+  programId: PublicKey;
+  activeSessionIndex?: number;
+}): { hourlyState: PublicKey | null; hourlySession: PublicKey | null } {
+  if (params.paymentMode !== "Hourly") {
+    return { hourlyState: null, hourlySession: null };
+  }
+  const hourlyState = deriveHourlyStatePda(
+    params.contract,
+    params.programId
+  ).address;
+  const hourlySession = hasActiveHourlySession({
+    activeSessionIndex: params.activeSessionIndex ?? HOURLY_NO_ACTIVE_SESSION,
+  })
+    ? deriveHourlySessionPda(
+        params.contract,
+        params.activeSessionIndex as number,
+        params.programId
+      ).address
+    : null;
+  return { hourlyState, hourlySession };
 }
 
 export function toCreateHourlyContractArgs(request: CreateHourlyContractRequest) {
@@ -558,18 +645,14 @@ export class StreamPayV2Client {
         : null;
     const signature = await sendV2Method(this.program, this.program.methods
       .cancelActiveContract()
-      .accountsPartial({
-        employer,
-        contract,
-        ...(hourlyState ? { hourlyState } : {}),
-      })
+      .accountsPartial(
+        cancelActiveContractAccounts({ employer, contract, hourlyState })
+      )
     );
     return txResult({
       signature,
       contract,
-      extra: {
-        ...(hourlyState ? { hourlyState } : {}),
-      },
+      extra: hourlyState ? { hourlyState } : {},
     });
   }
 
@@ -588,13 +671,15 @@ export class StreamPayV2Client {
       deriveFreelancerDestinationAta(freelancer, contract.tokenMint);
     const signature = await sendV2Method(this.program, this.program.methods
       .withdrawFreelancer()
-      .accountsPartial({
-        freelancer,
-        contract: params.contract,
-        tokenMint: contract.tokenMint,
-        contractEscrow: escrow,
-        freelancerTokenAccount,
-      })
+      .accountsPartial(
+        withdrawFreelancerAccounts({
+          freelancer,
+          contract: params.contract,
+          tokenMint: contract.tokenMint,
+          contractEscrow: escrow,
+          freelancerTokenAccount,
+        })
+      )
     );
     return txResult({
       signature,
@@ -619,13 +704,15 @@ export class StreamPayV2Client {
       deriveEmployerSourceAta(employer, contract.tokenMint);
     const signature = await sendV2Method(this.program, this.program.methods
       .claimEmployerRefund()
-      .accountsPartial({
-        employer,
-        contract: params.contract,
-        tokenMint: contract.tokenMint,
-        contractEscrow: escrow,
-        employerTokenAccount,
-      })
+      .accountsPartial(
+        claimEmployerRefundAccounts({
+          employer,
+          contract: params.contract,
+          tokenMint: contract.tokenMint,
+          contractEscrow: escrow,
+          employerTokenAccount,
+        })
+      )
     );
     return txResult({
       signature,
@@ -638,33 +725,31 @@ export class StreamPayV2Client {
   async openDispute(contract: PublicKey): Promise<TransactionResult> {
     const party = connectedWallet(this.program);
     const view = await fetchContract(this.program, contract);
-    let hourlyState: PublicKey | null = null;
-    let hourlySession: PublicKey | null = null;
+    let activeSessionIndex: number | undefined;
     if (view.paymentMode === "Hourly") {
-      hourlyState = deriveHourlyStatePda(
+      const hourlyStatePda = deriveHourlyStatePda(
         contract,
         this.program.programId
       ).address;
-      const state = await fetchHourlyState(this.program, hourlyState);
-      if (
-        state.activeSessionIndex !== HOURLY_NO_ACTIVE_SESSION &&
-        Number.isFinite(state.activeSessionIndex)
-      ) {
-        hourlySession = deriveHourlySessionPda(
-          contract,
-          state.activeSessionIndex,
-          this.program.programId
-        ).address;
-      }
+      const state = await fetchHourlyState(this.program, hourlyStatePda);
+      activeSessionIndex = state.activeSessionIndex;
     }
+    const { hourlyState, hourlySession } = resolveOpenDisputeHourlyOptionals({
+      paymentMode: view.paymentMode,
+      contract,
+      programId: this.program.programId,
+      activeSessionIndex,
+    });
     const signature = await sendV2Method(this.program, this.program.methods
       .openDispute()
-      .accountsPartial({
-        party,
-        contract,
-        ...(hourlyState ? { hourlyState } : {}),
-        ...(hourlySession ? { hourlySession } : {}),
-      })
+      .accountsPartial(
+        openDisputeAccounts({
+          party,
+          contract,
+          hourlyState,
+          hourlySession,
+        })
+      )
     );
     return txResult({
       signature,
