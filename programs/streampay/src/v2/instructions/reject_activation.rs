@@ -1,8 +1,10 @@
 //! `reject_activation`: the employer declines to start the main contract.
 //!
-//! If a paid trial was submitted, the contract becomes `Disputed` rather than
-//! `ActivationRejected`, so later settlement can see that real work exists.
-//! No tokens move.
+//! If a paid trial was submitted or is being revised, the contract becomes
+//! `Disputed` rather than `ActivationRejected`, so later settlement can see
+//! that real work exists. Defined / no-trial rejection is a peaceful
+//! pre-submission exit: freelancer entitlement stays 0 and the employer may
+//! Claim refund of the full funded amount. No tokens move here.
 
 use anchor_lang::prelude::*;
 
@@ -99,8 +101,18 @@ pub fn handle_reject_activation(ctx: Context<RejectActivation>) -> Result<()> {
             stream_released_amount: contract.stream_released_amount,
         });
     } else {
-        contract.status = new_status;
-        contract.terminated_at = now;
+        if let Some(trial) = ctx.accounts.trial_work_unit.as_ref() {
+            require!(
+                trial.status == WorkUnitStatus::Defined,
+                StreamPayV2Error::InvalidTrialState
+            );
+            require!(
+                trial.release_trigger
+                    == crate::v2::enums::ReleaseTrigger::NotReleased,
+                StreamPayV2Error::InvalidTrialState
+            );
+        }
+        contract.settle_unsubmitted_activation_rejection(now)?;
         emit!(ActivationRejected {
             contract: contract_key,
             employer,

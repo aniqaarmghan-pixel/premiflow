@@ -71,6 +71,25 @@ test("remaining claim calculation exact", () => {
   assert.equal(remainingFreelancerClaim(disputed), 0n);
 });
 
+test("ActivationRejected settlement claims: employer refundable, freelancer zero", () => {
+  const rejected = makeContract({
+    status: "ActivationRejected",
+    totalAmount: 1_000n,
+    releasedAmount: 0n,
+    withdrawnAmount: 0n,
+    refundedAmount: 0n,
+    freelancerSettlementAmount: 0n,
+    employerRefundableAmount: 1_000n,
+  });
+  assert.equal(remainingFreelancerClaim(rejected), 0n);
+  assert.equal(remainingEmployerRefund(rejected), 1_000n);
+  const afterRefund = makeContract({
+    ...rejected,
+    refundedAmount: 1_000n,
+  });
+  assert.equal(remainingEmployerRefund(afterRefund), 0n);
+});
+
 test("remaining refund calculation exact", () => {
   const cancelled = makeContract({
     status: "Cancelled",

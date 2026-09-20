@@ -248,8 +248,10 @@ test("rejectActivation notice matches ActivationRejected or Disputed from source
     "activation_declined"
   );
   const declined = NOTICE_CATALOG.activation_declined;
-  assert.match(declined.body, /did not activate/i);
-  assert.doesNotMatch(declined.body, /\bpaid\b|\btransferred\b|\breceived in wallet\b|\brefunded\b|\breturned\b/i);
+  assert.match(declined.body, /before trial work/i);
+  assert.match(declined.body, /Claim refund/i);
+  assert.match(declined.body, /No dispute was opened/);
+  assert.doesNotMatch(declined.body, /\bpaid\b|\btransferred\b|\breceived in wallet\b/i);
 
   assert.equal(
     noticeKindForAction("rejectActivation", { workUnitStatus: "Submitted" }),

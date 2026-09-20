@@ -397,7 +397,10 @@ export function isTerminalStatus(status: ContractStatus): boolean {
 
 export function allowsSettlementClaims(status: ContractStatus): boolean {
   return (
-    status === "Cancelled" || status === "Resolved" || status === "Completed"
+    status === "Cancelled" ||
+    status === "Resolved" ||
+    status === "Completed" ||
+    status === "ActivationRejected"
   );
 }
 

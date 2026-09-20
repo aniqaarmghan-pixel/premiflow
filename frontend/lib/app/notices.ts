@@ -72,7 +72,7 @@ export const NOTICE_CATALOG: Record<NoticeKind, NoticeCopy> = {
   activation_declined: {
     kind: "activation_declined",
     title: "Activation declined",
-    body: "The employer did not activate this contract. No tokens moved.",
+    body: "The employer ended the contract before trial work. No dispute was opened. Tokens move only when Claim refund is used later.",
   },
   activation_rejected_disputed: {
     kind: "activation_rejected_disputed",

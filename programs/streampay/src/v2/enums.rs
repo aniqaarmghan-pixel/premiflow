@@ -162,10 +162,19 @@ impl ContractStatus {
         matches!(self, Self::Draft)
     }
 
-    /// Whether Phase 8 may pay frozen settlement (cancel, resolved dispute, or
-    /// successful completion).
+    /// Whether Phase 8 may pay frozen settlement (cancel, resolved dispute,
+    /// successful completion, or pre-submission activation rejection).
+    ///
+    /// `Declined` and `Expired` stay excluded. `Disputed` stays frozen until
+    /// resolve. `ActivationRejected` is the unpaid pre-submission exit.
     pub fn allows_settlement_claims(&self) -> bool {
-        matches!(self, Self::Cancelled | Self::Resolved | Self::Completed)
+        matches!(
+            self,
+            Self::Cancelled
+                | Self::Resolved
+                | Self::Completed
+                | Self::ActivationRejected
+        )
     }
 }
 
@@ -327,6 +336,19 @@ mod tests {
         assert_eq!(disc(DisputeParty::None), 0);
         assert_eq!(disc(DisputeParty::Employer), 1);
         assert_eq!(disc(DisputeParty::Freelancer), 2);
+    }
+
+    #[test]
+    fn settlement_claims_include_activation_rejected_not_declined_or_disputed() {
+        assert!(ContractStatus::Cancelled.allows_settlement_claims());
+        assert!(ContractStatus::Resolved.allows_settlement_claims());
+        assert!(ContractStatus::Completed.allows_settlement_claims());
+        assert!(ContractStatus::ActivationRejected.allows_settlement_claims());
+        assert!(!ContractStatus::Declined.allows_settlement_claims());
+        assert!(!ContractStatus::Expired.allows_settlement_claims());
+        assert!(!ContractStatus::Disputed.allows_settlement_claims());
+        assert!(!ContractStatus::Active.allows_settlement_claims());
+        assert!(!ContractStatus::PendingEmployerApproval.allows_settlement_claims());
     }
 
     #[test]

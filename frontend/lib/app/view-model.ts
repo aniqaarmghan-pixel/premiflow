@@ -399,7 +399,9 @@ export function actionLabel(
       return context?.workUnitStatus === "Submitted" ||
         context?.workUnitStatus === "Revising"
         ? "Dispute trial"
-        : "Do not activate";
+        : context?.workUnitStatus === "Defined"
+          ? "End before trial work"
+          : "Do not start contract";
     case "submitTrialWork":
       return "Submit trial";
     case "requestTrialRevision":

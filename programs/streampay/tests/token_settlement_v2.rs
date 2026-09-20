@@ -1100,7 +1100,7 @@ fn pre_active_and_disputed_withdrawals_rejected() {
         env.read_contract(&env.contract_pda(2)).status,
         ContractStatus::ActivationRejected
     );
-    assert_rejected(env.withdraw(2), E_CONTRACT_TERMINAL, "activation rejected");
+    assert_rejected(env.withdraw(2), E_NOTHING_TO_WITHDRAW, "activation rejected");
 
     let mut args = streaming_args(3, TOTAL_AMOUNT, env.now());
     args.trial_amount = TRIAL_AMOUNT;

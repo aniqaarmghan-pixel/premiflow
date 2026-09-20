@@ -934,3 +934,204 @@ fn request_revision_behavior_unchanged() {
         ContractStatus::Cancelled
     );
 }
+
+fn assert_t2_freeze(env: &Env, id: u64, expected_total: u64) {
+    let contract = env.contract_pda(id);
+    let c = env.read_contract(&contract);
+    assert_eq!(c.status, ContractStatus::ActivationRejected);
+    assert!(c.status.allows_settlement_claims());
+    assert!(!c.status.is_started());
+    assert_eq!(c.terminated_at, env.now());
+    assert_eq!(c.start_time, 0);
+    assert_eq!(c.end_time, 0);
+    assert_eq!(c.released_amount, 0);
+    assert_eq!(c.stream_released_amount, 0);
+    assert_eq!(c.withdrawn_amount, 0);
+    assert_eq!(c.refunded_amount, 0);
+    assert_eq!(c.freelancer_settlement_amount, 0);
+    assert_eq!(c.employer_refundable_amount, expected_total);
+    assert_eq!(c.contested_amount, 0);
+    assert_eq!(c.released_unit_count, 0);
+    assert_eq!(c.open_review_count, 0);
+    assert_eq!(
+        c.freelancer_settlement_amount + c.employer_refundable_amount,
+        expected_total
+    );
+    assert_eq!(env.escrow_amount(id), expected_total);
+}
+
+fn t2_refund_and_conserve(env: &mut Env, id: u64, expected_total: u64) {
+    assert_rejected(
+        env.withdraw(id),
+        E_NOTHING_TO_WITHDRAW,
+        "T2 freelancer collect",
+    );
+    env.refund(id).unwrap();
+    let c = env.read_contract(&env.contract_pda(id));
+    assert_eq!(c.refunded_amount, expected_total);
+    assert_eq!(c.withdrawn_amount, 0);
+    assert_eq!(env.escrow_amount(id), 0);
+    assert_eq!(env.token_balance(&env.freelancer_token_account), 0);
+    assert_eq!(
+        c.withdrawn_amount + c.refunded_amount + env.escrow_amount(id),
+        expected_total
+    );
+    env.svm.expire_blockhash();
+    assert_rejected(env.refund(id), E_NOTHING_TO_REFUND, "T2 duplicate refund");
+}
+
+#[test]
+fn t2_fixed_pre_submission_exit_refunds_full_escrow() {
+    let mut env = setup(TOTAL_AMOUNT);
+    env.create(&fixed_args(1, env.now())).unwrap();
+    env.accept(1).unwrap();
+    env.reject(1).unwrap();
+    assert_t2_freeze(&env, 1, TOTAL_AMOUNT);
+    let trial = env.read_work_unit(&env.trial_pda(&env.contract_pda(1)));
+    assert_eq!(trial.status, WorkUnitStatus::Defined);
+    assert_eq!(trial.release_trigger, ReleaseTrigger::NotReleased);
+    let main = env.read_work_unit(&env.work_unit_pda(&env.contract_pda(1), 0));
+    assert_eq!(main.status, WorkUnitStatus::Defined);
+    assert_rejected(
+        env.submit_work(1, 0),
+        E_INVALID_STATE,
+        "Fixed submit after T2",
+    );
+    t2_refund_and_conserve(&mut env, 1, TOTAL_AMOUNT);
+}
+
+#[test]
+fn t2_milestone_pre_submission_exit_leaves_stages_defined() {
+    let mut env = setup(TOTAL_AMOUNT);
+    env.create(&milestone_args(1, env.now())).unwrap();
+    env.add_milestone(1, MAIN_AMOUNT, OFFSET).unwrap();
+    env.finalize_terms(1).unwrap();
+    env.accept(1).unwrap();
+    env.reject(1).unwrap();
+    assert_t2_freeze(&env, 1, TOTAL_AMOUNT);
+    let stage = env.read_work_unit(&env.work_unit_pda(&env.contract_pda(1), 0));
+    assert_eq!(stage.kind, WorkUnitKind::Milestone);
+    assert_eq!(stage.status, WorkUnitStatus::Defined);
+    assert_rejected(
+        env.submit_work(1, 0),
+        E_INVALID_STATE,
+        "milestone submit after T2",
+    );
+    t2_refund_and_conserve(&mut env, 1, TOTAL_AMOUNT);
+}
+
+#[test]
+fn t2_streaming_pre_submission_exit_does_not_accrue() {
+    let mut env = setup(TOTAL_AMOUNT);
+    env.create(&streaming_args(1, env.now())).unwrap();
+    env.accept(1).unwrap();
+    env.reject(1).unwrap();
+    assert_t2_freeze(&env, 1, TOTAL_AMOUNT);
+    assert_rejected(
+        env.release_stream(1),
+        E_INVALID_STATE,
+        "stream accrual after T2",
+    );
+    t2_refund_and_conserve(&mut env, 1, TOTAL_AMOUNT);
+}
+
+#[test]
+fn t2_hourly_pre_submission_exit_does_not_start_session() {
+    let funded = hourly_main() + TRIAL_AMOUNT;
+    let mut env = setup(funded);
+    env.create_hourly(&hourly_args(1, env.now())).unwrap();
+    env.accept(1).unwrap();
+    env.reject(1).unwrap();
+    assert_t2_freeze(&env, 1, funded);
+    let state = env.read_hourly_state(&env.contract_pda(1));
+    assert!(!state.has_active_session());
+    assert_eq!(state.session_count, 0);
+    assert_eq!(state.active_session_index, HOURLY_NO_ACTIVE_SESSION);
+    assert_rejected(
+        env.start_hourly(1),
+        E_INVALID_STATE,
+        "Start work after T2",
+    );
+    t2_refund_and_conserve(&mut env, 1, funded);
+}
+
+#[test]
+fn t2_no_trial_activation_rejected_refunds_full_amount() {
+    let mut env = setup(TOTAL_AMOUNT);
+    let mut args = streaming_args(1, env.now());
+    args.trial_amount = 0;
+    env.create(&args).unwrap();
+    env.accept(1).unwrap();
+    env.reject_no_trial(1).unwrap();
+    assert_t2_freeze(&env, 1, TOTAL_AMOUNT);
+    t2_refund_and_conserve(&mut env, 1, TOTAL_AMOUNT);
+}
+
+#[test]
+fn t2_reject_guards_signer_duplicate_submitted_revising_and_terminals() {
+    let mut env = setup(TOTAL_AMOUNT * 4);
+    env.create(&streaming_args(1, env.now())).unwrap();
+    env.accept(1).unwrap();
+    let contract = env.contract_pda(1);
+    let trial = env.trial_pda(&contract);
+    let freelancer = clone_kp(&env.freelancer);
+    assert_rejected(
+        env.reject_as(&freelancer, env.freelancer_pk, contract, Some(trial)),
+        E_CONSTRAINT_SEEDS,
+        "freelancer T2 reject",
+    );
+    env.reject(1).unwrap();
+    env.svm.expire_blockhash();
+    assert_rejected(env.reject(1), E_INVALID_STATE, "duplicate T2 reject");
+
+    accepted_submitted_streaming(&mut env, 2);
+    env.reject(2).unwrap();
+    assert_eq!(
+        env.read_contract(&env.contract_pda(2)).status,
+        ContractStatus::Disputed
+    );
+    assert_eq!(
+        env.read_contract(&env.contract_pda(2)).contested_amount,
+        TOTAL_AMOUNT
+    );
+    assert_rejected(env.refund(2), E_CONTRACT_TERMINAL, "Disputed T2 refund");
+    env.svm.expire_blockhash();
+    assert_rejected(env.reject(2), E_INVALID_STATE, "Disputed re-reject");
+
+    env.create(&streaming_args(3, env.now())).unwrap();
+    env.accept(3).unwrap();
+    env.submit(3).unwrap();
+    env.request_revision(3).unwrap();
+    env.reject(3).unwrap();
+    assert_eq!(
+        env.read_contract(&env.contract_pda(3)).status,
+        ContractStatus::Disputed
+    );
+
+    env.create(&streaming_args(4, env.now())).unwrap();
+    env.accept(4).unwrap();
+    env.set_trial_status(4, 3);
+    assert_rejected(env.reject(4), E_INVALID_TRIAL_STATE, "Released T2");
+    env.svm.expire_blockhash();
+    env.set_trial_status(4, 4);
+    assert_rejected(env.reject(4), E_INVALID_TRIAL_STATE, "Void T2");
+}
+
+#[test]
+fn t2_active_cannot_enter_peaceful_rejection() {
+    let mut env = setup(TOTAL_AMOUNT);
+    let mut args = streaming_args(1, env.now());
+    args.trial_amount = 0;
+    env.create(&args).unwrap();
+    env.accept(1).unwrap();
+    env.approve_activation(1).unwrap();
+    assert_eq!(
+        env.read_contract(&env.contract_pda(1)).status,
+        ContractStatus::Active
+    );
+    assert_rejected(
+        env.reject_no_trial(1),
+        E_INVALID_STATE,
+        "Active T2 reject",
+    );
+}

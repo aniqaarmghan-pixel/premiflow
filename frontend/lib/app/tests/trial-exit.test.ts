@@ -7,6 +7,7 @@ import { makeContract, makeWorkUnit, WALLET_A, WALLET_B } from "../../streampay-
 import { NOTICE_CATALOG, noticeKindForAction } from "../notices";
 import {
   TRIAL_EXIT_COPY,
+  endBeforeTrialWorkConfirmation,
   settleTrialAndEndConfirmation,
   trialEmployerDecisions,
 } from "../trial-exit";
@@ -186,4 +187,61 @@ test("pay/end confirmation states trial entitlement, remainder, and no immediate
     now: 1_000,
   });
   assert.ok(!freelancer.includes("settleTrialAndEnd"));
+});
+
+test("end before trial work is distinct from dispute trial and T1 pay/end", () => {
+  const contract = pendingTrialContract();
+  const defined = makeWorkUnit({ kind: "Trial", status: "Defined", amount: 50n });
+  const actions = availableActions({
+    wallet: WALLET_A,
+    contract,
+    trialUnit: defined,
+    now: 1_000,
+  });
+  assert.ok(actions.includes("rejectActivation"));
+  assert.ok(!actions.includes("settleTrialAndEnd"));
+  assert.ok(!actions.includes("approveTrialAndActivate"));
+  assert.equal(
+    actionLabel("rejectActivation", { workUnitStatus: "Defined" }),
+    "End before trial work"
+  );
+  assert.equal(actionLabel("rejectActivation"), "Do not start contract");
+  assert.notEqual(
+    actionLabel("rejectActivation", { workUnitStatus: "Defined" }),
+    actionLabel("rejectActivation", { workUnitStatus: "Submitted" })
+  );
+  const decisions = trialEmployerDecisions({ actions });
+  assert.ok(!decisions.some((d) => d.title === TRIAL_EXIT_COPY.endBeforeTitle));
+  assert.equal(confirmTitle("rejectActivation", { workUnitStatus: "Defined" }), "End before trial work?");
+  assert.equal(confirmTitle("rejectActivation"), "Do not start contract?");
+  assert.match(TRIAL_EXIT_COPY.endBeforeBody, /has not submitted the trial/i);
+  assert.match(TRIAL_EXIT_COPY.endBeforeBody, /will not start/i);
+  assert.match(TRIAL_EXIT_COPY.endBeforeBody, /becomes refundable/i);
+  assert.match(TRIAL_EXIT_COPY.endBeforeBody, /does not open a dispute/i);
+  assert.match(TRIAL_EXIT_COPY.laterFullRefund, /Claim refund/i);
+  assert.doesNotMatch(TRIAL_EXIT_COPY.endBeforeBody, /Dispute trial/);
+  assert.match(detail, /endBeforeTrialWorkConfirmation/);
+  assert.match(detail, /End before trial work|endBeforeBody/);
+  assert.equal(shouldRecoverAfterAction("rejectActivation", "ActivationRejected"), false);
+  assert.equal(shouldAttemptCaseRecover("ActivationRejected", "employer"), false);
+
+  const copy = endBeforeTrialWorkConfirmation({ contract, decimals: 0 });
+  assert.equal(copy.fundedAmountLabel, "1000");
+  assert.ok(copy.points.some((line) => /has not submitted the trial/.test(line)));
+  assert.ok(copy.points.includes(TRIAL_EXIT_COPY.laterFullRefund));
+  assert.ok(copy.points.includes(TRIAL_EXIT_COPY.noImmediateTransfer));
+
+  const rejected = makeContract({
+    status: "ActivationRejected",
+    employer: WALLET_A,
+    freelancer: WALLET_B,
+    totalAmount: 1_000n,
+    trialAmount: 50n,
+    freelancerSettlementAmount: 0n,
+    employerRefundableAmount: 1_000n,
+  });
+  const after = availableActions({ wallet: WALLET_A, contract: rejected, now: 1_000 });
+  assert.ok(after.includes("claimEmployerRefund"));
+  const freelancer = availableActions({ wallet: WALLET_B, contract: rejected, now: 1_000 });
+  assert.ok(!freelancer.includes("withdrawFreelancer"));
 });

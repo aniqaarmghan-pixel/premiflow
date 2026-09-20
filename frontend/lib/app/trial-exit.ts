@@ -1,5 +1,5 @@
 import { formatTokenAmount } from "@/lib/app/money";
-import type { ContractView, UiAction } from "@/lib/streampay-v2";
+import type { ContractView, UiAction, WorkUnitStatus } from "@/lib/streampay-v2";
 
 export const TRIAL_EXIT_COPY = {
   approveTitle: "Approve trial & start contract",
@@ -14,6 +14,14 @@ export const TRIAL_EXIT_COPY = {
   disputeTitle: "Dispute trial",
   disputeBody:
     "Use this when you disagree that the submitted trial should be paid as-is. The contract enters dispute and the configured resolver reviews the contested amount.",
+  endBeforeTitle: "End before trial work",
+  endBeforeBody:
+    "The freelancer has not submitted the trial. The main contract will not start. Your funded amount becomes refundable. This does not open a dispute. The resolver is not involved.",
+  doNotStartTitle: "Do not start contract",
+  doNotStartBody:
+    "The main contract will not start. Your funded amount becomes refundable. This does not open a dispute. The resolver is not involved.",
+  laterFullRefund:
+    "After confirmation, use Claim refund to return the funded tokens to your wallet.",
   noImmediateTransfer:
     "This is an on-chain transaction. Tokens do not move during this action.",
   laterCollect: "The freelancer must Collect pay later to receive the trial amount.",
@@ -94,4 +102,35 @@ export function settleTrialAndEndConfirmation(input: {
     points.push(TRIAL_EXIT_COPY.hourlyDoesNotActivate);
   }
   return { trialAmountLabel, employerRefundableLabel, points };
+}
+
+export function endBeforeTrialWorkConfirmation(input: {
+  contract: Pick<ContractView, "totalAmount" | "trialAmount" | "paymentMode">;
+  decimals?: number;
+}): {
+  fundedAmountLabel: string;
+  points: string[];
+} {
+  const fundedAmountLabel = formatTokenAmount(input.contract.totalAmount, input.decimals);
+  const points = [
+    input.contract.trialAmount > 0n
+      ? "The freelancer has not submitted the trial."
+      : "No trial work is waiting for review.",
+    TRIAL_EXIT_COPY.mainWillNotStart,
+    `Your funded amount becomes refundable: ${fundedAmountLabel}.`,
+    TRIAL_EXIT_COPY.noDispute,
+    TRIAL_EXIT_COPY.noImmediateTransfer,
+    TRIAL_EXIT_COPY.laterFullRefund,
+  ];
+  if (input.contract.paymentMode === "Streaming") {
+    points.push(TRIAL_EXIT_COPY.streamingDoesNotStart);
+  }
+  if (input.contract.paymentMode === "Hourly") {
+    points.push(TRIAL_EXIT_COPY.hourlyDoesNotActivate);
+  }
+  return { fundedAmountLabel, points };
+}
+
+export function isSubmittedTrialDisputeLabel(status?: WorkUnitStatus): boolean {
+  return status === "Submitted" || status === "Revising";
 }

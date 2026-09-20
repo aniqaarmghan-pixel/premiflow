@@ -50,6 +50,7 @@ import {
 import { shouldRecoverAfterAction } from "@/lib/app/resolution-case";
 import {
   TRIAL_EXIT_COPY,
+  endBeforeTrialWorkConfirmation,
   settleTrialAndEndConfirmation,
   trialEmployerDecisions,
 } from "@/lib/app/trial-exit";
@@ -661,12 +662,16 @@ export function ContractDetail({ address }: { address: string }) {
           </Card>
         ) : null}
 
-        {["Cancelled", "Completed", "Resolved"].includes(contract.status) ? (
+        {["Cancelled", "Completed", "Resolved", "ActivationRejected"].includes(
+          contract.status
+        ) ? (
           <Card className="p-5">
             <h2 className="font-display text-2xl">Settlement</h2>
             <p className="mt-1 text-sm text-ink-soft">
               {contract.status === "Resolved"
                 ? "The resolver recorded settlement accounting. Tokens move only when Collect pay or Claim refund is sent."
+                : contract.status === "ActivationRejected"
+                  ? "The contract ended before trial work. Tokens move only when Claim refund is sent. The freelancer has no earned amount to collect."
                 : "Completion records entitlements. Tokens move only when withdraw or refund is sent."}
             </p>
             {contract.status === "Resolved" && role === "freelancer" ? (
@@ -1062,6 +1067,21 @@ function ConfirmBody({
         </div>
       );
     }
+    const copy = endBeforeTrialWorkConfirmation({ contract, decimals });
+    return (
+      <div className="space-y-3 text-sm leading-6 text-ink-soft">
+        <p>
+          {contract.trialAmount > 0n
+            ? TRIAL_EXIT_COPY.endBeforeBody
+            : TRIAL_EXIT_COPY.doNotStartBody}
+        </p>
+        <ul className="list-disc space-y-1 pl-5">
+          {copy.points.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </div>
+    );
   }
   if (action === "stopHourlySession") {
     const copy = stopHourlyCopy();
