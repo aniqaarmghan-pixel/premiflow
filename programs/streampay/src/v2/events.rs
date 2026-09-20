@@ -9,7 +9,8 @@
 //! - Phase 3: `ContractAccepted`, `ContractDeclined`, `ContractActivated`,
 //!   `ActivationRejected`, `ContractExpired`, `ActivationWindowExpired`
 //! - Phase 4: `TrialConfigured`, `TrialSubmitted`, `TrialRevisionRequested`,
-//!   `TrialApproved`, `TrialRejected`, `TrialSettledAndEnded`
+//!   `TrialApproved`, `TrialRejected`, `TrialSettledAndEnded`,
+//!   `TrialReviewTimedOut`
 //! - Phase 5: `WorkUnitSubmitted`, `WorkUnitApproved`,
 //!   `WorkUnitRevisionRequested`, `WorkUnitReviewTimedOut`
 //! - Phase 6: `StreamAccrualReleased`
@@ -185,6 +186,20 @@ pub struct TrialSettledAndEnded {
     pub employer: Pubkey,
     pub freelancer: Pubkey,
     pub settled_at: i64,
+    pub trial_amount: u64,
+    pub freelancer_settlement: u64,
+    pub employer_refundable: u64,
+}
+
+/// Permissionless close of a Submitted trial after the review window.
+/// Same freeze as T1. No SPL transfer. Not a dispute.
+#[event]
+pub struct TrialReviewTimedOut {
+    pub contract: Pubkey,
+    pub trial_work_unit: Pubkey,
+    pub employer: Pubkey,
+    pub freelancer: Pubkey,
+    pub timed_out_at: i64,
     pub trial_amount: u64,
     pub freelancer_settlement: u64,
     pub employer_refundable: u64,

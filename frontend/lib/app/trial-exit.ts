@@ -30,6 +30,9 @@ export const TRIAL_EXIT_COPY = {
   mainWillNotStart: "The main contract will not start.",
   streamingDoesNotStart: "Ending after the trial does not start the payment stream.",
   hourlyDoesNotActivate: "Ending after the trial does not activate Hourly work sessions.",
+  timeoutTitle: "Finalize expired trial review",
+  timeoutBody:
+    "The employer review period expired. The trial amount becomes payable to the freelancer. The main contract does not start. The remaining funded amount becomes refundable to the employer. This is not a dispute. The resolver is not involved.",
 } as const;
 
 export type TrialEmployerDecision = {
@@ -54,6 +57,13 @@ export function trialEmployerDecisions(input: {
       action: "settleTrialAndEnd",
       title: TRIAL_EXIT_COPY.payEndTitle,
       body: TRIAL_EXIT_COPY.payEndBody,
+    });
+  }
+  if (input.actions.includes("finalizeTrialReviewTimeout")) {
+    decisions.push({
+      action: "finalizeTrialReviewTimeout",
+      title: TRIAL_EXIT_COPY.timeoutTitle,
+      body: TRIAL_EXIT_COPY.timeoutBody,
     });
   }
   if (input.actions.includes("requestTrialRevision")) {
@@ -92,6 +102,40 @@ export function settleTrialAndEndConfirmation(input: {
     TRIAL_EXIT_COPY.mainWillNotStart,
     TRIAL_EXIT_COPY.noDispute,
     TRIAL_EXIT_COPY.noImmediateTransfer,
+    TRIAL_EXIT_COPY.laterCollect,
+    TRIAL_EXIT_COPY.laterRefund,
+  ];
+  if (input.contract.paymentMode === "Streaming") {
+    points.push(TRIAL_EXIT_COPY.streamingDoesNotStart);
+  }
+  if (input.contract.paymentMode === "Hourly") {
+    points.push(TRIAL_EXIT_COPY.hourlyDoesNotActivate);
+  }
+  return { trialAmountLabel, employerRefundableLabel, points };
+}
+
+export function finalizeTrialReviewTimeoutConfirmation(input: {
+  contract: Pick<ContractView, "trialAmount" | "mainAmount" | "paymentMode">;
+  decimals?: number;
+}): {
+  trialAmountLabel: string;
+  employerRefundableLabel: string;
+  points: string[];
+} {
+  const trialAmountLabel = formatTokenAmount(input.contract.trialAmount, input.decimals);
+  const employerRefundableLabel = formatTokenAmount(
+    input.contract.mainAmount,
+    input.decimals
+  );
+  const points = [
+    "The employer review period expired.",
+    `The trial amount becomes payable to the freelancer: ${trialAmountLabel}.`,
+    TRIAL_EXIT_COPY.mainWillNotStart,
+    `The remaining funded amount becomes refundable to the employer: ${employerRefundableLabel}.`,
+    "This is not a dispute.",
+    "The resolver is not involved.",
+    TRIAL_EXIT_COPY.noImmediateTransfer,
+    "This instruction itself does not transfer tokens.",
     TRIAL_EXIT_COPY.laterCollect,
     TRIAL_EXIT_COPY.laterRefund,
   ];

@@ -66,7 +66,7 @@ test("program ID agrees across declare_id, Anchor.toml, IDL, and client", () => 
   assert.ok(frontendV1.includes(CANONICAL_PROGRAM_ID));
 });
 
-type IdlAccount = { name: string; optional?: boolean };
+type IdlAccount = { name: string; optional?: boolean; signer?: boolean };
 type IdlInstruction = { name: string; accounts: IdlAccount[] };
 
 function instructionAccounts(name: string): IdlAccount[] {
@@ -102,4 +102,19 @@ test("cancel_active_contract Hourly state is optional in the IDL", () => {
     (account) => account.name === "hourly_state"
   );
   assert.equal(hourlyState?.optional, true);
+});
+
+test("finalize_trial_review_timeout is permissionless and has no token accounts", () => {
+  const accounts = instructionAccounts("finalize_trial_review_timeout");
+  assert.deepEqual(
+    accounts.map((account) => account.name),
+    ["caller", "contract", "trial_work_unit"]
+  );
+  assert.equal(accounts[0]?.signer, true);
+  assert.ok(!accounts.some((account) => account.name.includes("token")));
+  const names = new Set(
+    (idl as { instructions: Array<{ name: string }> }).instructions.map((ix) => ix.name)
+  );
+  assert.ok(names.has("settle_trial_and_end"));
+  assert.ok(names.has("finalize_review_timeout"));
 });

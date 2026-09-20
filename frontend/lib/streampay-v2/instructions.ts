@@ -524,6 +524,19 @@ export class StreamPayV2Client {
     return txResult({ signature, contract, trialWorkUnit });
   }
 
+  async finalizeTrialReviewTimeout(contract: PublicKey): Promise<TransactionResult> {
+    const caller = connectedWallet(this.program);
+    const trialWorkUnit = deriveTrialWorkUnitPda(
+      contract,
+      this.program.programId
+    ).address;
+    const signature = await sendV2Method(this.program, this.program.methods
+      .finalizeTrialReviewTimeout()
+      .accountsPartial({ caller, contract, trialWorkUnit })
+    );
+    return txResult({ signature, contract, trialWorkUnit });
+  }
+
   async submitWorkUnit(params: {
     contract: PublicKey;
     workUnit: PublicKey;

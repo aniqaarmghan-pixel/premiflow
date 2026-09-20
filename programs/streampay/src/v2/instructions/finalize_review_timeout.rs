@@ -2,7 +2,7 @@
 //!
 //! Any signer may invoke this. The outcome does not depend on caller identity.
 //! Applies only to post-activation Milestone/Fixed units currently `Submitted`.
-//! Trial timeout remains a separate product-policy problem.
+//! Submitted trial timeout is `finalize_trial_review_timeout`.
 
 use anchor_lang::prelude::*;
 

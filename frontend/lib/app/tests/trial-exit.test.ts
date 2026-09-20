@@ -3,11 +3,12 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import { availableActions } from "../../streampay-v2/actions";
-import { makeContract, makeWorkUnit, WALLET_A, WALLET_B } from "../../streampay-v2/tests/fixtures";
+import { makeContract, makeWorkUnit, WALLET_A, WALLET_B, WALLET_C } from "../../streampay-v2/tests/fixtures";
 import { NOTICE_CATALOG, noticeKindForAction } from "../notices";
 import {
   TRIAL_EXIT_COPY,
   endBeforeTrialWorkConfirmation,
+  finalizeTrialReviewTimeoutConfirmation,
   settleTrialAndEndConfirmation,
   trialEmployerDecisions,
 } from "../trial-exit";
@@ -244,4 +245,158 @@ test("end before trial work is distinct from dispute trial and T1 pay/end", () =
   assert.ok(after.includes("claimEmployerRefund"));
   const freelancer = availableActions({ wallet: WALLET_B, contract: rejected, now: 1_000 });
   assert.ok(!freelancer.includes("withdrawFreelancer"));
+});
+
+test("T6 timeout action is hidden before the trial review deadline", () => {
+  const contract = pendingTrialContract();
+  const trial = submittedTrial({ actionDeadline: 2_000 });
+  const employer = availableActions({
+    wallet: WALLET_A,
+    contract,
+    trialUnit: trial,
+    now: 1_999,
+  });
+  const freelancer = availableActions({
+    wallet: WALLET_B,
+    contract,
+    trialUnit: trial,
+    now: 1_999,
+  });
+  assert.ok(!employer.includes("finalizeTrialReviewTimeout"));
+  assert.ok(!freelancer.includes("finalizeTrialReviewTimeout"));
+  assert.ok(employer.includes("settleTrialAndEnd"));
+  assert.ok(employer.includes("approveTrialAndActivate"));
+  assert.ok(employer.includes("requestTrialRevision"));
+  assert.ok(!freelancer.includes("settleTrialAndEnd"));
+});
+
+test("T6 timeout action appears after the review deadline for Submitted only", () => {
+  const contract = pendingTrialContract();
+  const atDeadline = availableActions({
+    wallet: WALLET_A,
+    contract,
+    trialUnit: submittedTrial({ actionDeadline: 2_000 }),
+    now: 2_000,
+  });
+  const afterDeadline = availableActions({
+    wallet: WALLET_B,
+    contract,
+    trialUnit: submittedTrial({ actionDeadline: 2_000 }),
+    now: 2_001,
+  });
+  assert.ok(atDeadline.includes("finalizeTrialReviewTimeout"));
+  assert.ok(afterDeadline.includes("finalizeTrialReviewTimeout"));
+  assert.ok(atDeadline.includes("settleTrialAndEnd"));
+  assert.ok(!afterDeadline.includes("settleTrialAndEnd"));
+
+  const defined = availableActions({
+    wallet: WALLET_A,
+    contract,
+    trialUnit: makeWorkUnit({ kind: "Trial", status: "Defined", actionDeadline: 1_000 }),
+    now: 2_000,
+  });
+  const revising = availableActions({
+    wallet: WALLET_A,
+    contract,
+    trialUnit: makeWorkUnit({ kind: "Trial", status: "Revising", actionDeadline: 1_000 }),
+    now: 2_000,
+  });
+  assert.ok(!defined.includes("finalizeTrialReviewTimeout"));
+  assert.ok(!revising.includes("finalizeTrialReviewTimeout"));
+
+  const stranger = availableActions({
+    wallet: WALLET_C,
+    contract,
+    trialUnit: submittedTrial({ actionDeadline: 2_000 }),
+    now: 2_001,
+  });
+  assert.ok(!stranger.includes("finalizeTrialReviewTimeout"));
+});
+
+test("T6 timeout confirmation copy, client method, and no R2 recovery", () => {
+  assert.equal(actionLabel("finalizeTrialReviewTimeout"), "Finalize expired trial review");
+  assert.equal(confirmTitle("finalizeTrialReviewTimeout"), "Finalize expired trial review?");
+  assert.equal(clientMethodForAction("finalizeTrialReviewTimeout"), "finalizeTrialReviewTimeout");
+  assert.notEqual(actionLabel("finalizeTrialReviewTimeout"), actionLabel("finalizeReviewTimeout"));
+  assert.notEqual(actionLabel("finalizeTrialReviewTimeout"), actionLabel("settleTrialAndEnd"));
+  assert.notEqual(actionLabel("finalizeTrialReviewTimeout"), actionLabel("expireActivation"));
+  assert.equal(needsConfirmation("finalizeTrialReviewTimeout"), true);
+  assert.match(client, /async finalizeTrialReviewTimeout\(/);
+  assert.match(client, /\.finalizeTrialReviewTimeout\(\)/);
+  assert.match(client, /accountsPartial\(\{ caller, contract, trialWorkUnit \}\)/);
+  assert.match(detail, /case "finalizeTrialReviewTimeout":/);
+  assert.match(detail, /client\.finalizeTrialReviewTimeout\(contract\.address\)/);
+  assert.match(detail, /finalizeTrialReviewTimeoutConfirmation/);
+  assert.doesNotMatch(
+    detail.split('case "finalizeTrialReviewTimeout":')[1].split("case ")[0],
+    /finalizeReviewTimeout|recoverResolutionCase|openDispute/
+  );
+
+  const copy = finalizeTrialReviewTimeoutConfirmation({
+    contract: pendingTrialContract("Streaming"),
+    decimals: 0,
+  });
+  assert.equal(copy.trialAmountLabel, "50");
+  assert.equal(copy.employerRefundableLabel, "950");
+  assert.ok(copy.points.some((line) => /employer review period expired/i.test(line)));
+  assert.ok(copy.points.some((line) => /payable to the freelancer: 50/.test(line)));
+  assert.ok(copy.points.includes(TRIAL_EXIT_COPY.mainWillNotStart));
+  assert.ok(copy.points.some((line) => /refundable to the employer: 950/.test(line)));
+  assert.ok(copy.points.some((line) => /not a dispute/i.test(line)));
+  assert.ok(copy.points.some((line) => /resolver is not involved/i.test(line)));
+  assert.ok(copy.points.includes(TRIAL_EXIT_COPY.noImmediateTransfer));
+  assert.ok(copy.points.some((line) => /does not transfer tokens/i.test(line)));
+  assert.ok(copy.points.includes(TRIAL_EXIT_COPY.laterCollect));
+  assert.ok(copy.points.includes(TRIAL_EXIT_COPY.laterRefund));
+  assert.ok(copy.points.includes(TRIAL_EXIT_COPY.streamingDoesNotStart));
+  assert.match(TRIAL_EXIT_COPY.timeoutBody, /review period expired/i);
+  assert.match(TRIAL_EXIT_COPY.timeoutBody, /not a dispute/i);
+  assert.match(TRIAL_EXIT_COPY.timeoutBody, /resolver is not involved/i);
+
+  const hourly = finalizeTrialReviewTimeoutConfirmation({
+    contract: pendingTrialContract("Hourly"),
+    decimals: 0,
+  });
+  assert.ok(hourly.points.includes(TRIAL_EXIT_COPY.hourlyDoesNotActivate));
+
+  const notice = NOTICE_CATALOG.trial_review_timed_out;
+  assert.equal(noticeKindForAction("finalizeTrialReviewTimeout"), "trial_review_timed_out");
+  assert.notEqual(
+    noticeKindForAction("finalizeTrialReviewTimeout"),
+    noticeKindForAction("finalizeReviewTimeout")
+  );
+  assert.match(notice.body, /review period expired/i);
+  assert.match(notice.body, /did not start/i);
+  assert.match(notice.body, /No dispute was opened/);
+  assert.match(notice.body, /resolver is not involved/i);
+  assert.match(notice.body, /Collect pay|Claim refund/);
+  assert.doesNotMatch(notice.body, /transferred to your wallet|immediate payment/i);
+
+  assert.equal(shouldRecoverAfterAction("finalizeTrialReviewTimeout", "Cancelled"), false);
+  assert.equal(shouldRecoverAfterAction("finalizeTrialReviewTimeout", "Disputed"), false);
+  assert.equal(shouldAttemptCaseRecover("Cancelled", "employer"), false);
+  assert.equal(shouldAttemptCaseRecover("Cancelled", "freelancer"), false);
+
+  const decisions = trialEmployerDecisions({
+    actions: ["finalizeTrialReviewTimeout", "settleTrialAndEnd"],
+  });
+  assert.deepEqual(
+    decisions.map((d) => d.action),
+    ["settleTrialAndEnd", "finalizeTrialReviewTimeout"]
+  );
+});
+
+test("requestTrialRevision is hidden after the activation window even if trial review is open", () => {
+  const contract = pendingTrialContract();
+  const activationClosed = contract.acceptedAt + contract.activationReviewDuration;
+  const trial = submittedTrial({ actionDeadline: activationClosed + 10_000 });
+  const actions = availableActions({
+    wallet: WALLET_A,
+    contract,
+    trialUnit: trial,
+    now: activationClosed,
+  });
+  assert.ok(!actions.includes("requestTrialRevision"));
+  assert.ok(actions.includes("settleTrialAndEnd"));
+  assert.ok(!actions.includes("approveTrialAndActivate"));
 });

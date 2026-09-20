@@ -27,6 +27,7 @@ export type UiAction =
   | "requestTrialRevision"
   | "approveTrialAndActivate"
   | "settleTrialAndEnd"
+  | "finalizeTrialReviewTimeout"
   | "submitWorkUnit"
   | "requestWorkRevision"
   | "approveWorkUnit"
@@ -65,6 +66,7 @@ const LIFECYCLE_ACTIONS: readonly UiAction[] = [
   "requestTrialRevision",
   "approveTrialAndActivate",
   "settleTrialAndEnd",
+  "finalizeTrialReviewTimeout",
   "submitWorkUnit",
   "requestWorkRevision",
   "approveWorkUnit",
@@ -132,13 +134,14 @@ export function availableActions(input: ActionAvailabilityInput): UiAction[] {
         }
       } else if (trial?.status === "Submitted") {
         actions.add("settleTrialAndEnd");
-        if (
-          now < trial.actionDeadline &&
-          trial.revisionCount < contract.maxRevisions
-        ) {
-          actions.add("requestTrialRevision");
-        }
       }
+    }
+    if (
+      (role === "employer" || role === "freelancer") &&
+      trial?.status === "Submitted" &&
+      now >= trial.actionDeadline
+    ) {
+      actions.add("finalizeTrialReviewTimeout");
     }
     if (role === "freelancer" && trialConfigured && windowOpen) {
       if (!trial || trial.status === "Defined" || trial.status === "Revising") {

@@ -769,6 +769,32 @@
       "args": []
     },
     {
+      "name": "finalize_trial_review_timeout",
+      "docs": [
+        "Permissionless close of a Submitted trial after the review window.",
+        "Reuses T1 settlement. No SPL transfer. No dispute. No activation."
+      ],
+      "discriminator": [73, 37, 7, 43, 236, 153, 157, 194],
+      "accounts": [
+        {
+          "name": "caller",
+          "docs": [
+            "Permissionless: the result is determined by clock and trial state."
+          ],
+          "signer": true
+        },
+        {
+          "name": "contract",
+          "writable": true
+        },
+        {
+          "name": "trial_work_unit",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "open_dispute",
       "docs": [
         "Employer or freelancer freezes contested economics. No SPL transfer."
@@ -3452,6 +3478,50 @@
     },
     {
       "docs": [
+        "Permissionless close of a Submitted trial after the review window.",
+        "Same freeze as T1. No SPL transfer. Not a dispute."
+      ],
+      "name": "TrialReviewTimedOut",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "trial_work_unit",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "timed_out_at",
+            "type": "i64"
+          },
+          {
+            "name": "trial_amount",
+            "type": "u64"
+          },
+          {
+            "name": "freelancer_settlement",
+            "type": "u64"
+          },
+          {
+            "name": "employer_refundable",
+            "type": "u64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
         "The employer requested a trial revision."
       ],
       "name": "TrialRevisionRequested",
@@ -4031,6 +4101,10 @@
         217,
         50
       ]
+    },
+    {
+      "name": "TrialReviewTimedOut",
+      "discriminator": [156, 35, 4, 198, 44, 204, 80, 245]
     },
     {
       "name": "TrialRevisionRequested",

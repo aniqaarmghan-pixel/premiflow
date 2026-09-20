@@ -331,6 +331,16 @@ Ok(())
         v2::instructions::settle_trial_and_end::handle_settle_trial_and_end(ctx)
     }
 
+    /// Permissionless close of a Submitted trial after the review window.
+    /// Reuses T1 settlement. No SPL transfer. No dispute. No activation.
+    pub fn finalize_trial_review_timeout(
+        ctx: Context<FinalizeTrialReviewTimeout>,
+    ) -> Result<()> {
+        v2::instructions::finalize_trial_review_timeout::handle_finalize_trial_review_timeout(
+            ctx,
+        )
+    }
+
     /// Freelancer submits post-activation Milestone or Fixed work.
     pub fn submit_work_unit(
         ctx: Context<SubmitWorkUnit>,

@@ -17,6 +17,7 @@ export type NoticeKind =
   | "trial_submitted"
   | "trial_approved_and_activated"
   | "trial_settled_and_ended"
+  | "trial_review_timed_out"
   | "work_submitted"
   | "work_approved"
   | "revision_requested"
@@ -105,6 +106,11 @@ export const NOTICE_CATALOG: Record<NoticeKind, NoticeCopy> = {
     kind: "trial_settled_and_ended",
     title: "Trial paid and contract ended",
     body: "The trial amount was released in contract accounting and the main engagement did not start. No dispute was opened. Tokens move only when Collect pay or Claim refund is used later.",
+  },
+  trial_review_timed_out: {
+    kind: "trial_review_timed_out",
+    title: "Expired trial review finalized",
+    body: "The employer review period expired. The trial amount is payable to the freelancer and the main contract did not start. No dispute was opened. The resolver is not involved. Tokens move only when Collect pay or Claim refund is used later.",
   },
   work_submitted: {
     kind: "work_submitted",
@@ -239,6 +245,8 @@ export function noticeKindForAction(
         : "trial_approved_and_activated";
     case "settleTrialAndEnd":
       return "trial_settled_and_ended";
+    case "finalizeTrialReviewTimeout":
+      return "trial_review_timed_out";
     case "requestWorkRevision":
     case "requestTrialRevision":
       return "revision_requested";

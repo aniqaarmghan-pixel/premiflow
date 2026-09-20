@@ -775,6 +775,32 @@ export type Streampay = {
       "args": []
     },
     {
+      "name": "finalizeTrialReviewTimeout",
+      "docs": [
+        "Permissionless close of a Submitted trial after the review window.",
+        "Reuses T1 settlement. No SPL transfer. No dispute. No activation."
+      ],
+      "discriminator": [73, 37, 7, 43, 236, 153, 157, 194],
+      "accounts": [
+        {
+          "name": "caller",
+          "docs": [
+            "Permissionless: the result is determined by clock and trial state."
+          ],
+          "signer": true
+        },
+        {
+          "name": "contract",
+          "writable": true
+        },
+        {
+          "name": "trialWorkUnit",
+          "writable": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "openDispute",
       "docs": [
         "Employer or freelancer freezes contested economics. No SPL transfer."
@@ -1673,6 +1699,10 @@ export type Streampay = {
         217,
         50
       ]
+    },
+    {
+      "name": "trialReviewTimedOut",
+      "discriminator": [156, 35, 4, 198, 44, 204, 80, 245]
     },
     {
       "name": "trialRevisionRequested",
@@ -4259,6 +4289,50 @@ export type Streampay = {
           {
             "name": "rejectedAt",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "trialReviewTimedOut",
+      "docs": [
+        "Permissionless close of a Submitted trial after the review window.",
+        "Same freeze as T1. No SPL transfer. Not a dispute."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "trialWorkUnit",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "timedOutAt",
+            "type": "i64"
+          },
+          {
+            "name": "trialAmount",
+            "type": "u64"
+          },
+          {
+            "name": "freelancerSettlement",
+            "type": "u64"
+          },
+          {
+            "name": "employerRefundable",
+            "type": "u64"
           }
         ]
       }

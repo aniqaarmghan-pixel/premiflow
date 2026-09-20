@@ -1,5 +1,7 @@
 //! `request_trial_revision`: the employer asks for a bounded trial resubmission.
 //!
+//! Requires both the trial review window and the activation window to still
+//! be open, so a lapsed activation cannot trap the freelancer in Revising.
 //! Does not transfer tokens and does not activate the main contract.
 
 use anchor_lang::prelude::*;
@@ -50,6 +52,10 @@ pub fn handle_request_trial_revision(ctx: Context<RequestTrialRevision>) -> Resu
     require!(
         trial.status == WorkUnitStatus::Submitted,
         StreamPayV2Error::InvalidTrialState
+    );
+    require!(
+        now < contract.activation_deadline()?,
+        StreamPayV2Error::ApprovalWindowExpired
     );
     require!(
         now < trial.action_deadline,

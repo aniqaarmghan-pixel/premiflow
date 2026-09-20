@@ -12,6 +12,7 @@ export const REQUIRED_V2_INSTRUCTIONS = [
   "request_trial_revision",
   "approve_trial_and_activate",
   "settle_trial_and_end",
+  "finalize_trial_review_timeout",
   "submit_work_unit",
   "request_revision",
   "void_stale_revision",

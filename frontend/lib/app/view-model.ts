@@ -204,7 +204,11 @@ export function contractActionVariant(
   ) {
     return "danger";
   }
-  if (action === "settleTrialAndEnd" || action === "requestTrialRevision") {
+  if (
+    action === "settleTrialAndEnd" ||
+    action === "requestTrialRevision" ||
+    action === "finalizeTrialReviewTimeout"
+  ) {
     return "secondary";
   }
   if (
@@ -419,6 +423,8 @@ export function actionLabel(
       return "Approve trial & start contract";
     case "settleTrialAndEnd":
       return "Pay trial & don't continue";
+    case "finalizeTrialReviewTimeout":
+      return "Finalize expired trial review";
     case "submitWorkUnit":
       return context?.workUnitStatus === "Revising"
         ? "Submit revised deliverable"
@@ -463,6 +469,7 @@ export function confirmTitle(
   if (action === "stopHourlySession") return "Stop work?";
   if (action === "endHourlyContract") return "End hourly contract?";
   if (action === "settleTrialAndEnd") return "Pay trial & don't continue?";
+  if (action === "finalizeTrialReviewTimeout") return "Finalize expired trial review?";
   if (action === "expireAcceptance") return "Expire offer?";
   if (action === "expireActivation") return "End expired activation?";
   if (action === "declineContract") return "Decline offer?";
@@ -497,6 +504,8 @@ export function clientMethodForAction(action: UiAction): string {
       return "approveTrialAndActivate";
     case "settleTrialAndEnd":
       return "settleTrialAndEnd";
+    case "finalizeTrialReviewTimeout":
+      return "finalizeTrialReviewTimeout";
     case "submitWorkUnit":
       return "submitWorkUnit";
     case "requestWorkRevision":
@@ -541,6 +550,7 @@ export function isEconomicAction(action: UiAction): boolean {
     action === "approveWorkUnit" ||
     action === "approveTrialAndActivate" ||
     action === "settleTrialAndEnd" ||
+    action === "finalizeTrialReviewTimeout" ||
     action === "releaseStreamAccrual" ||
     action === "finalizeReviewTimeout" ||
     action === "declineContract" ||

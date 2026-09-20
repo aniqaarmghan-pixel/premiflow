@@ -327,6 +327,9 @@ test("notice catalog covers the planned lifecycle events", () => {
     noticeKindForAction("submitWorkUnit", { workUnitStatus: "Revising" }),
     "revised_deliverable_submitted"
   );
+  assert.equal(noticeKindForAction("settleTrialAndEnd"), "trial_settled_and_ended");
+  assert.equal(noticeKindForAction("finalizeTrialReviewTimeout"), "trial_review_timed_out");
+  assert.match(NOTICE_CATALOG.trial_review_timed_out.body, /resolver is not involved/i);
 });
 
 test("official deliverable label appears for a submittable Fixed unit", () => {

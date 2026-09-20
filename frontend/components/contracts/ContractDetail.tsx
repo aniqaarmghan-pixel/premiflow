@@ -51,6 +51,7 @@ import { shouldRecoverAfterAction } from "@/lib/app/resolution-case";
 import {
   TRIAL_EXIT_COPY,
   endBeforeTrialWorkConfirmation,
+  finalizeTrialReviewTimeoutConfirmation,
   settleTrialAndEndConfirmation,
   trialEmployerDecisions,
 } from "@/lib/app/trial-exit";
@@ -131,6 +132,7 @@ const TRIAL_ACTIONS: UiAction[] = [
   "requestTrialRevision",
   "approveTrialAndActivate",
   "settleTrialAndEnd",
+  "finalizeTrialReviewTimeout",
 ];
 
 export function ContractDetail({ address }: { address: string }) {
@@ -312,6 +314,8 @@ export function ContractDetail({ address }: { address: string }) {
           return client.approveTrialAndActivate(contract.address);
         case "settleTrialAndEnd":
           return client.settleTrialAndEnd(contract.address);
+        case "finalizeTrialReviewTimeout":
+          return client.finalizeTrialReviewTimeout(contract.address);
         case "submitWorkUnit": {
           if (!unit) throw new Error("Choose a work unit.");
           const hash = await hashBytes(new TextEncoder().encode(uri));
@@ -413,7 +417,9 @@ export function ContractDetail({ address }: { address: string }) {
         action,
         workUnitStatus:
           unit?.status ??
-          (action === "rejectActivation" || action === "settleTrialAndEnd"
+          (action === "rejectActivation" ||
+          action === "settleTrialAndEnd" ||
+          action === "finalizeTrialReviewTimeout"
             ? trial?.status
             : undefined),
         paymentMode: contract.paymentMode,
@@ -812,6 +818,7 @@ export function ContractDetail({ address }: { address: string }) {
                   ? "danger"
                   :                       confirm?.action === "completeContract" ||
                       confirm?.action === "settleTrialAndEnd" ||
+                      confirm?.action === "finalizeTrialReviewTimeout" ||
                       confirm?.action === "expireAcceptance" ||
                       confirm?.action === "expireActivation"
                     ? "secondary"
@@ -930,13 +937,15 @@ function WorkUnitPanel({
               >
                 <p className="text-sm font-medium text-ink">{decision.title}</p>
                 <p className="mt-1 text-sm leading-6 text-ink-soft">{decision.body}</p>
-                {decision.action === "settleTrialAndEnd" &&
+                {(decision.action === "settleTrialAndEnd" ||
+                  decision.action === "finalizeTrialReviewTimeout") &&
                 contract.paymentMode === "Streaming" ? (
                   <p className="mt-1 text-sm leading-6 text-ink-soft">
                     {TRIAL_EXIT_COPY.streamingDoesNotStart}
                   </p>
                 ) : null}
-                {decision.action === "settleTrialAndEnd" &&
+                {(decision.action === "settleTrialAndEnd" ||
+                  decision.action === "finalizeTrialReviewTimeout") &&
                 contract.paymentMode === "Hourly" ? (
                   <p className="mt-1 text-sm leading-6 text-ink-soft">
                     {TRIAL_EXIT_COPY.hourlyDoesNotActivate}
@@ -1094,6 +1103,19 @@ function ConfirmBody({
     return (
       <div className="space-y-3 text-sm leading-6 text-ink-soft">
         <p>{TRIAL_EXIT_COPY.payEndBody}</p>
+        <ul className="list-disc space-y-1 pl-5">
+          {copy.points.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+  if (action === "finalizeTrialReviewTimeout") {
+    const copy = finalizeTrialReviewTimeoutConfirmation({ contract, decimals });
+    return (
+      <div className="space-y-3 text-sm leading-6 text-ink-soft">
+        <p>{TRIAL_EXIT_COPY.timeoutBody}</p>
         <ul className="list-disc space-y-1 pl-5">
           {copy.points.map((line) => (
             <li key={line}>{line}</li>

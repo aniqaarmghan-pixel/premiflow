@@ -192,6 +192,17 @@ test("Milestone and Streaming disputes use the same explicit-null Hourly keys", 
   }
 });
 
+test("finalizeTrialReviewTimeout account map is caller, contract, and trial PDA", () => {
+  const source = methodSource("finalizeTrialReviewTimeout");
+  assert.match(source, /\.finalizeTrialReviewTimeout\(\)/);
+  assert.match(source, /accountsPartial\(\{\s*caller,\s*contract,\s*trialWorkUnit\s*\}\)/);
+  assert.doesNotMatch(source, /tokenProgram/);
+  assert.doesNotMatch(source, /finalizeReviewTimeout\(/);
+  const settle = methodSource("settleTrialAndEnd");
+  assert.match(settle, /\.settleTrialAndEnd\(\)/);
+  assert.match(settle, /accountsPartial\(\{\s*employer,\s*contract,\s*trialWorkUnit\s*\}\)/);
+});
+
 function methodSource(name: string): string {
   const start = instructionsSrc.indexOf(`async ${name}(`);
   assert.notEqual(start, -1, `${name} not found`);
