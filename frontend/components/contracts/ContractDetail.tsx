@@ -47,6 +47,7 @@ import {
   SUPPORT_VS_DISPUTE_COPY,
   type DisputeCategoryId,
 } from "@/lib/app/resolution-center";
+import { shouldRecoverAfterAction } from "@/lib/app/resolution-case";
 import { supportTopicHref } from "@/lib/app/support";
 import { formatUnix } from "@/lib/app/datetime";
 import { localMetadataStore } from "@/lib/app/local-metadata";
@@ -146,6 +147,8 @@ export function ContractDetail({ address }: { address: string }) {
   const [milestoneDue, setMilestoneDue] = useState("3600");
   const [disputeCategory, setDisputeCategory] = useState<DisputeCategoryId | "">("");
   const [disputeDescription, setDisputeDescription] = useState("");
+  const [caseRecoverGeneration, setCaseRecoverGeneration] = useState(0);
+  const [caseOpenSignature, setCaseOpenSignature] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!wallet) return;
@@ -191,9 +194,11 @@ export function ContractDetail({ address }: { address: string }) {
         setMetadata(null);
       }
       setStatus("ready");
+      return fetched;
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : "Could not load this contract.");
+      return null;
     }
   }, [address, connection, wallet]);
 
@@ -259,16 +264,13 @@ export function ContractDetail({ address }: { address: string }) {
         ? decimals == null || Boolean(resolveParsed.error) || !resolvePreview.valid
         : false;
 
-  async function afterSuccess() {
-    await load();
-    await refreshList();
-  }
-
   async function execute(action: UiAction, unit?: WorkUnitView) {
     if (!client || !contract) return;
+    let signature: string | undefined;
     const ok = await tx.run(
       actionLabel(action, { workUnitStatus: unit?.status }),
       async () => {
+      const result = await (async () => {
       switch (action) {
         case "finalizeTerms":
           return client.finalizeTerms(contract.address);
@@ -385,6 +387,9 @@ export function ContractDetail({ address }: { address: string }) {
         default:
           throw new Error("Unsupported action");
       }
+      })();
+      signature = result.signature;
+      return result;
       },
       {
         action,
@@ -395,8 +400,14 @@ export function ContractDetail({ address }: { address: string }) {
       }
     );
     setConfirm(null);
-    if (ok) await afterSuccess();
-    else if (
+    if (ok) {
+      const latest = await load();
+      await refreshList();
+      if (latest && shouldRecoverAfterAction(action, latest.status)) {
+        setCaseOpenSignature(signature ?? null);
+        setCaseRecoverGeneration((n) => n + 1);
+      }
+    } else if (
       action === "voidStaleRevision" ||
       action === "submitWorkUnit" ||
       shouldRefreshAfterDisputeFailure(action)
@@ -466,6 +477,8 @@ export function ContractDetail({ address }: { address: string }) {
             onCategoryChange={setDisputeCategory}
             description={disputeDescription}
             onDescriptionChange={setDisputeDescription}
+            recoverGeneration={caseRecoverGeneration}
+            openSignature={caseOpenSignature}
           />
         ) : null}
 
@@ -1019,7 +1032,7 @@ function ConfirmBody({
         ) : null}
         {selected ? (
           <p>
-            Optional page note: {selected.label}. {CASE_PREPARATION_COPY.notStored}
+            Optional case note: {selected.label}. {CASE_PREPARATION_COPY.notStored}
           </p>
         ) : (
           <p>{CASE_PREPARATION_COPY.notStored}</p>

@@ -52,25 +52,26 @@ export const SUPPORT_VS_DISPUTE_COPY = {
 export const CASE_PREPARATION_COPY = {
   heading: "Prepare case notes",
   notStored:
-    "These notes are not recorded on-chain and are not sent with Open dispute. PREMIFLOW does not yet have a Resolution Case backend.",
+    "These notes are not recorded on-chain. After the dispute is confirmed, PREMIFLOW saves them to the Resolution Case.",
   pageOnly:
-    "Anything you type here stays on this page until you leave. It is not submitted as evidence.",
+    "Until the dispute is confirmed on-chain, anything you type here stays on this page. It is not submitted as evidence.",
   categoryLabel: "What is the disagreement about?",
-  categoryHint: "Optional. Helps you think through the case. It does not choose a settlement split.",
+  categoryHint:
+    "Optional. Helps organize the case. It does not choose a winner, calculate an award, set a percentage, or prefill freelancerContestedAward.",
   descriptionLabel: "Explain what happened",
   descriptionHint:
-    "Describe the agreement, what went wrong, and what outcome you are requesting. Optional. Not stored as case evidence yet.",
+    "Describe the agreement, what went wrong, and what outcome you are requesting. Optional case context only.",
 } as const;
 
 export const EVIDENCE_COPY = {
   heading: "Evidence & case history",
   availableNow: "Available now from the contract account",
   comingLater: "Coming later",
+  nextPhase: "Evidence submission is coming in the next Resolution phase.",
   noInventedHistory: "Only account-derived facts are shown. Event history is not invented.",
 } as const;
 
 export const COMING_LATER_EVIDENCE = [
-  "Off-chain party statements",
   "File attachments",
   "Support or chat message references",
   "Selected contract-message snapshots",
@@ -85,8 +86,13 @@ export const MESSAGE_EVIDENCE_COPY = {
 
 export const PARTY_STATEMENTS_COPY = {
   heading: "Party statements",
-  unavailable:
-    "Structured party statements are not stored yet. There is no Resolution Case backend.",
+  unavailable: "",
+  ready:
+    "Each party may write and update only their own statement. The other party can read a submitted statement. A missing statement does not block resolve_dispute.",
+  ownOnly: "You can edit only your statement.",
+  resolverCannot: "The resolver cannot write a party statement.",
+  save: "Save statement",
+  placeholder: "Describe your position for the case file.",
 } as const;
 
 export const AI_CASE_SUMMARY_COPY = {
@@ -201,9 +207,35 @@ export const DISPUTE_CATEGORIES: readonly DisputeCategory[] = [
 
 export const RESOLUTION_CASE_PERSISTENCE = {
   onChain: false,
-  backend: false,
+  backend: true,
   requiredForOpenDispute: false,
   discardedIfLeft: true,
+} as const;
+
+export const CASE_WORKSPACE_COPY = {
+  heading: "Resolution Case",
+  chainStatus: "On-chain contract status",
+  workflowStatus: "Case workspace status",
+  contractAddress: "Contract address",
+  contractType: "Contract type",
+  initiator: "Dispute initiator",
+  category: "Category",
+  description: "Description",
+  resolver: "Resolver wallet",
+  contested: "Amount under dispute",
+  contestedHint: "Read from the confirmed on-chain Contract account. Not from this database.",
+  snapshotHint:
+    "The stored snapshot is audit data only. Current on-chain Contract state remains authoritative.",
+  onChain: "On-chain",
+  recoveryFailed:
+    "Your dispute is active on-chain. PREMIFLOW could not load the case workspace yet. Retry case recovery.",
+  retry: "Retry case recovery",
+  loading: "Loading the Resolution Case workspace…",
+  signIn: "Verify your wallet to open the case workspace and save statements.",
+  noCategory: "No category saved",
+  noDescription: "No description saved",
+  missingStatement: "No statement submitted yet",
+  saveNotes: "Save category and description",
 } as const;
 
 export type EvidenceFact = {

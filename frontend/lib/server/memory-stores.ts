@@ -1,10 +1,14 @@
 import type {
   AuthChallengeRecord,
   AuthStore,
+  CaseEventRecord,
+  CaseStore,
   MessageCursor,
   MessageRecord,
   MessageStore,
+  PartyStatementRecord,
   RateLimitStore,
+  ResolutionCaseRecord,
   SessionRecord,
   ThreadReadRecord,
 } from "./stores";
@@ -122,6 +126,70 @@ export function createMemoryRateLimitStore(): RateLimitStore {
 
 export function messageIsAfter(message: MessageRecord, cursor: MessageCursor): boolean {
   return compareCursor({ createdAt: message.createdAt, id: message.id }, cursor) > 0;
+}
+
+export function createMemoryCaseStore(): CaseStore {
+  const cases: ResolutionCaseRecord[] = [];
+  const statements: PartyStatementRecord[] = [];
+  const events: CaseEventRecord[] = [];
+  return {
+    async getCaseByContract(contractAddress) {
+      const row = cases.find((item) => item.contractAddress === contractAddress);
+      return row ? { ...row } : null;
+    },
+    async getCaseById(id) {
+      const row = cases.find((item) => item.id === id);
+      return row ? { ...row } : null;
+    },
+    async insertCase(row) {
+      if (cases.some((item) => item.contractAddress === row.contractAddress)) {
+        const error = new Error("duplicate contract_address");
+        (error as Error & { code?: string }).code = "23505";
+        throw error;
+      }
+      const saved = { ...row };
+      cases.push(saved);
+      return { ...saved };
+    },
+    async updateCase(id, patch) {
+      const row = cases.find((item) => item.id === id);
+      if (!row) return null;
+      Object.assign(row, patch);
+      return { ...row };
+    },
+    async listStatements(caseId) {
+      return statements.filter((row) => row.caseId === caseId).map((row) => ({ ...row }));
+    },
+    async getStatement(caseId, partyWallet) {
+      const row = statements.find(
+        (item) => item.caseId === caseId && item.partyWallet === partyWallet
+      );
+      return row ? { ...row } : null;
+    },
+    async upsertStatement(row) {
+      const index = statements.findIndex(
+        (item) => item.caseId === row.caseId && item.partyWallet === row.partyWallet
+      );
+      if (index >= 0) {
+        statements[index] = {
+          ...statements[index],
+          body: row.body,
+          partyRole: row.partyRole,
+          updatedAt: row.updatedAt,
+          submittedAt: row.submittedAt,
+        };
+        return { ...statements[index] };
+      }
+      const saved = { ...row };
+      statements.push(saved);
+      return { ...saved };
+    },
+    async insertEvent(row) {
+      const saved = { ...row };
+      events.push(saved);
+      return { ...saved };
+    },
+  };
 }
 
 export { compareCursor };

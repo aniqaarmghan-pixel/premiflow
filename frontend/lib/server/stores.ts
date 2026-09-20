@@ -71,3 +71,81 @@ export interface RateLimitStore {
   addEvent(bucket: string, at: Date): Promise<void>;
   countSince(bucket: string, since: Date): Promise<number>;
 }
+
+export type OffchainWorkflowStatus =
+  | "awaiting_statements"
+  | "ready_for_resolver"
+  | "under_review"
+  | "settlement_submitted";
+
+export type PartyStatementRole = "employer" | "freelancer";
+
+export type DisputeOpener = "Employer" | "Freelancer";
+
+export type ResolutionCaseRecord = {
+  id: string;
+  contractAddress: string;
+  disputeOpener: DisputeOpener;
+  disputeCategory: string | null;
+  disputeDescription: string | null;
+  resolverWallet: string;
+  workflowStatus: OffchainWorkflowStatus;
+  openedAt: Date;
+  resolvedAt: Date | null;
+  contestedAmountSnapshot: string;
+  openSignature: string | null;
+  resolveSignature: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type PartyStatementRecord = {
+  id: string;
+  caseId: string;
+  partyWallet: string;
+  partyRole: PartyStatementRole;
+  body: string;
+  createdAt: Date;
+  updatedAt: Date;
+  submittedAt: Date;
+};
+
+export type CaseEventRecord = {
+  id: string;
+  caseId: string;
+  eventType: string;
+  actorWallet: string | null;
+  payload: string | null;
+  createdAt: Date;
+};
+
+export type ResolutionCasePatch = Partial<
+  Pick<
+    ResolutionCaseRecord,
+    | "disputeOpener"
+    | "disputeCategory"
+    | "disputeDescription"
+    | "resolverWallet"
+    | "workflowStatus"
+    | "openedAt"
+    | "resolvedAt"
+    | "contestedAmountSnapshot"
+    | "openSignature"
+    | "resolveSignature"
+    | "updatedAt"
+  >
+>;
+
+export interface CaseStore {
+  getCaseByContract(contractAddress: string): Promise<ResolutionCaseRecord | null>;
+  getCaseById(id: string): Promise<ResolutionCaseRecord | null>;
+  insertCase(row: ResolutionCaseRecord): Promise<ResolutionCaseRecord>;
+  updateCase(id: string, patch: ResolutionCasePatch): Promise<ResolutionCaseRecord | null>;
+  listStatements(caseId: string): Promise<PartyStatementRecord[]>;
+  getStatement(
+    caseId: string,
+    partyWallet: string
+  ): Promise<PartyStatementRecord | null>;
+  upsertStatement(row: PartyStatementRecord): Promise<PartyStatementRecord>;
+  insertEvent(row: CaseEventRecord): Promise<CaseEventRecord>;
+}

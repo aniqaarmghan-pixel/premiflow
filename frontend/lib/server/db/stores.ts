@@ -3,16 +3,22 @@ import { and, desc, eq, gt, isNull, lt, or, sql } from "drizzle-orm";
 import type { MessagingDatabase } from "./client";
 import {
   authChallenges,
+  caseEvents,
   contractMessages,
+  partyStatements,
   rateLimitEvents,
+  resolutionCases,
   sessions,
   threadReads,
 } from "./schema";
 import { randomId } from "../crypto";
 import type {
   AuthStore,
+  CaseStore,
   MessageStore,
+  PartyStatementRecord,
   RateLimitStore,
+  ResolutionCaseRecord,
 } from "../stores";
 
 export function createDrizzleAuthStore(db: MessagingDatabase): AuthStore {
@@ -157,6 +163,85 @@ export function createDrizzleRateLimitStore(db: MessagingDatabase): RateLimitSto
           and(eq(rateLimitEvents.bucket, bucket), gt(rateLimitEvents.createdAt, since))
         );
       return Number(row?.count ?? 0);
+    },
+  };
+}
+
+function asCase(row: typeof resolutionCases.$inferSelect): ResolutionCaseRecord {
+  return {
+    ...row,
+    disputeOpener: row.disputeOpener as ResolutionCaseRecord["disputeOpener"],
+    workflowStatus: row.workflowStatus as ResolutionCaseRecord["workflowStatus"],
+  };
+}
+
+function asStatement(row: typeof partyStatements.$inferSelect): PartyStatementRecord {
+  return {
+    ...row,
+    partyRole: row.partyRole as PartyStatementRecord["partyRole"],
+  };
+}
+
+export function createDrizzleCaseStore(db: MessagingDatabase): CaseStore {
+  return {
+    async getCaseByContract(contractAddress) {
+      const [row] = await db
+        .select()
+        .from(resolutionCases)
+        .where(eq(resolutionCases.contractAddress, contractAddress));
+      return row ? asCase(row) : null;
+    },
+    async getCaseById(id) {
+      const [row] = await db.select().from(resolutionCases).where(eq(resolutionCases.id, id));
+      return row ? asCase(row) : null;
+    },
+    async insertCase(row) {
+      const [saved] = await db.insert(resolutionCases).values(row).returning();
+      return asCase(saved);
+    },
+    async updateCase(id, patch) {
+      const rows = await db
+        .update(resolutionCases)
+        .set(patch)
+        .where(eq(resolutionCases.id, id))
+        .returning();
+      return rows[0] ? asCase(rows[0]) : null;
+    },
+    async listStatements(caseId) {
+      const rows = await db
+        .select()
+        .from(partyStatements)
+        .where(eq(partyStatements.caseId, caseId));
+      return rows.map(asStatement);
+    },
+    async getStatement(caseId, partyWallet) {
+      const [row] = await db
+        .select()
+        .from(partyStatements)
+        .where(
+          and(eq(partyStatements.caseId, caseId), eq(partyStatements.partyWallet, partyWallet))
+        );
+      return row ? asStatement(row) : null;
+    },
+    async upsertStatement(row) {
+      const [saved] = await db
+        .insert(partyStatements)
+        .values(row)
+        .onConflictDoUpdate({
+          target: [partyStatements.caseId, partyStatements.partyWallet],
+          set: {
+            body: row.body,
+            partyRole: row.partyRole,
+            updatedAt: row.updatedAt,
+            submittedAt: row.submittedAt,
+          },
+        })
+        .returning();
+      return asStatement(saved);
+    },
+    async insertEvent(row) {
+      const [saved] = await db.insert(caseEvents).values(row).returning();
+      return saved;
     },
   };
 }

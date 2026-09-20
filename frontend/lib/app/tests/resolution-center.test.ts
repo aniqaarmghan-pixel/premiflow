@@ -105,17 +105,18 @@ test("dispute categories exist and do not determine settlement percentage", () =
   assert.equal(preview.employerFromDispute, 30n);
 });
 
-test("category and description are not claimed as persisted case evidence", () => {
+test("category and description persist off-chain and do not choose a settlement split", () => {
   assert.equal(RESOLUTION_CASE_PERSISTENCE.onChain, false);
-  assert.equal(RESOLUTION_CASE_PERSISTENCE.backend, false);
+  assert.equal(RESOLUTION_CASE_PERSISTENCE.backend, true);
   assert.equal(RESOLUTION_CASE_PERSISTENCE.requiredForOpenDispute, false);
   assert.equal(caseNotesAreOnChain(), false);
   assert.equal(caseNotesRequiredToOpenDispute(), false);
   assert.match(CASE_PREPARATION_COPY.notStored, /not recorded on-chain/i);
-  assert.match(CASE_PREPARATION_COPY.notStored, /does not yet have a Resolution Case backend/i);
+  assert.match(CASE_PREPARATION_COPY.notStored, /Resolution Case/i);
   assert.match(CASE_PREPARATION_COPY.pageOnly, /not submitted as evidence/i);
-  assert.match(PARTY_STATEMENTS_COPY.unavailable, /not stored yet/i);
+  assert.match(PARTY_STATEMENTS_COPY.ready, /does not block resolve_dispute/i);
   assert.match(EVIDENCE_COPY.comingLater, /coming later/i);
+  assert.match(EVIDENCE_COPY.nextPhase, /next Resolution phase/i);
 });
 
 test("resolver remains the final decision-maker and AI cannot decide settlement", () => {

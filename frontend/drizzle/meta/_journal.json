@@ -8,6 +8,13 @@
       "when": 1758312000000,
       "tag": "0000_h4b_contract_messages",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1789898734732,
+      "tag": "0001_r2_resolution_cases",
+      "breakpoints": true
     }
   ]
 }
