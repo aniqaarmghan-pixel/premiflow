@@ -73,6 +73,18 @@ export function resetServerEnvForTests(): void {
   cached = null;
 }
 
+/**
+ * Origin for mutating Copilot POSTs. Independent of messaging DATABASE_URL
+ * so Create Assistant can run deterministic fallback during tests/build.
+ */
+export function readAppOrigin(): string {
+  const raw = process.env.APP_ORIGIN?.trim();
+  if (!raw) {
+    throw new ServerConfigError("APP_ORIGIN is not configured.");
+  }
+  return normalizeOrigin(raw);
+}
+
 export function cookieSecureForOrigin(appOrigin: string): boolean {
   return appOrigin.startsWith("https://");
 }

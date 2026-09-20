@@ -1,5 +1,8 @@
 import { AuthError, readSession } from "./auth/service";
 import { CaseAccessError, CaseStateError, CaseValidationError } from "./cases/service";
+import { CopilotSchemaError } from "@/lib/app/copilot-schemas";
+import { CopilotModeError, CopilotValidationError } from "./copilot/service";
+import { CopilotProviderError } from "./copilot/provider";
 import { authConfigFromEnv, productionStores, type MessagingStores } from "./compose";
 import { getServerEnv, ServerConfigError, type ServerEnv } from "./env";
 import { HttpError, SESSION_COOKIE, assertOrigin, jsonError, readCookie } from "./http";
@@ -61,6 +64,15 @@ export function handleRouteError(err: unknown) {
   }
   if (err instanceof ServerConfigError) {
     return jsonError(503, "backend_unavailable", "Messaging is temporarily unavailable.");
+  }
+  if (err instanceof CopilotValidationError || err instanceof CopilotSchemaError) {
+    return jsonError(400, "invalid_copilot", err.message);
+  }
+  if (err instanceof CopilotModeError) {
+    return jsonError(400, "mode_not_available", err.message);
+  }
+  if (err instanceof CopilotProviderError) {
+    return jsonError(502, "copilot_unavailable", "Copilot is temporarily unavailable.");
   }
   return jsonError(500, "internal", "Something went wrong.");
 }
@@ -125,4 +137,30 @@ export async function requireCaseParty(
 export function requireMutatingOrigin(request: Request, env = getServerEnv()): ServerEnv {
   assertOrigin(request, env.appOrigin);
   return env;
+}
+
+/**
+ * Session if messaging env + cookie are present. Missing/expired session is
+ * null so Create Assistant can still return deterministic guidance.
+ * Does not weaken Messages/R2 requireSession.
+ */
+export async function tryOptionalSession(
+  request: Request
+): Promise<{ sessionWallet: string | null; stores: MessagingStores | null }> {
+  try {
+    const env = getServerEnv();
+    const stores = productionStores();
+    const token = readCookie(request.headers.get("cookie"), SESSION_COOKIE);
+    if (!token) return { sessionWallet: null, stores };
+    const session = await readSession(stores.auth, authConfigFromEnv(env), token);
+    return { sessionWallet: session.walletAddress, stores };
+  } catch (err) {
+    if (err instanceof ServerConfigError) {
+      return { sessionWallet: null, stores: null };
+    }
+    if (err instanceof AuthError) {
+      return { sessionWallet: null, stores: null };
+    }
+    throw err;
+  }
 }

@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 import { TypeMotif } from "@/components/contracts/TypeMotif";
+import { CreateCopilotCard } from "@/components/copilot/CreateCopilotCard";
 import { SuccessMoment } from "@/components/contracts/SuccessMoment";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -267,6 +268,13 @@ export function CreateWizard() {
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
       <div>
+        <CreateCopilotCard
+          draft={draft}
+          onApply={(next) => {
+            setDraft(next);
+            setStep(0);
+          }}
+        />
         <ol className="mb-6 flex min-w-0 flex-wrap gap-1">
           {STEPS.map((label, i) => (
             <li key={label}>

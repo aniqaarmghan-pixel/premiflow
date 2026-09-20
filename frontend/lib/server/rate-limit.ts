@@ -6,6 +6,8 @@ export const RATE_LIMITS = {
   verifyWindowMs: 10 * 60 * 1000,
   sendMax: 20,
   sendWindowMs: 60_000,
+  copilotMax: 10,
+  copilotWindowMs: 60_000,
 } as const;
 
 export class RateLimitedError extends Error {
@@ -40,4 +42,8 @@ export function verifyBucket(wallet: string): string {
 
 export function sendBucket(wallet: string, contract: string): string {
   return `send:${wallet}:${contract}`;
+}
+
+export function copilotBucket(wallet: string): string {
+  return `copilot:${wallet}`;
 }
