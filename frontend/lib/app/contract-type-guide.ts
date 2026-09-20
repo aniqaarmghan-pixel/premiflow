@@ -7,21 +7,12 @@ export const CONTRACT_TYPES: readonly PaymentModeName[] = [
   "Hourly",
 ];
 
-export const CONTRACT_TYPE_DECISION_HEADING = "Which contract fits your work?";
-
-export const CONTRACT_TYPE_DECISION_HINTS: readonly {
-  match: string;
-  type: PaymentModeName;
-}[] = [
-  { match: "One specific deliverable", type: "Fixed" },
-  { match: "Several project stages", type: "Milestone" },
-  { match: "Continuous scheduled payment", type: "Streaming" },
-  { match: "Recorded working time", type: "Hourly" },
-];
+export const CONTRACT_TYPE_DECISION_HEADING = "What kind of work are you paying for?";
 
 export type ContractTypeGuide = {
   type: PaymentModeName;
   title: string;
+  customerChoice: string;
   tagline: string;
   bestFor: string;
   compactBestFor: string;
@@ -32,44 +23,60 @@ export type ContractTypeGuide = {
   collectNote?: string;
   goodFor: readonly string[];
   selectedExplanation: string;
+  howPaymentWorks: string;
+  configurePreview: readonly string[];
+  distinction?: string;
 };
 
 export const CONTRACT_TYPE_GUIDES: Record<PaymentModeName, ContractTypeGuide> = {
   Fixed: {
     type: "Fixed",
     title: "Fixed",
+    customerChoice: "One finished job",
     tagline: "One job, one price",
-    bestFor: "Best for a clearly defined task with one final deliverable.",
-    compactBestFor: "Logo, articles, and one-time jobs",
-    exampleHeading: "Example",
-    exampleLines: ["Design a logo for a fixed price."],
-    compactExampleLines: ["Design a logo for a fixed price."],
+    bestFor: "Best for a clearly defined deliverable.",
+    compactBestFor: "Logo, article, and one-time jobs",
+    exampleHeading: "Examples",
+    exampleLines: [
+      "Logo design",
+      "Article",
+      "One-time development task",
+      "A specific completed piece of work",
+    ],
+    compactExampleLines: ["Logo design · Article · One-time development task"],
     explanation:
-      "The freelancer submits the finished work for review. Once approved, the payment becomes available to collect.",
+      "You agree on one total price for one main deliverable. The freelancer submits that finished work for review.",
     goodFor: [
-      "Logo/design work",
+      "Logo design",
       "Articles",
       "Small development tasks",
       "One-time freelance jobs",
     ],
     selectedExplanation:
-      "You'll agree on one total price. The freelancer submits one main deliverable for review.",
+      "You agree on one total price. The freelancer submits the main deliverable for review. After approval, the released amount becomes available for the freelancer to collect.",
+    howPaymentWorks:
+      "You agree on one total price. The freelancer submits the main deliverable for review. After approval, the released amount becomes available for the freelancer to collect.",
+    configurePreview: [
+      "Total price",
+      "Main deliverable",
+      "Review period",
+      "Revisions where applicable",
+    ],
   },
   Milestone: {
     type: "Milestone",
     title: "Milestone",
+    customerChoice: "Several project stages",
     tagline: "Pay by project stage",
-    bestFor: "Best for larger projects divided into separate deliverables.",
+    bestFor: "Best for a larger project split into separate deliverables.",
     compactBestFor: "Websites, apps, and multi-stage work",
     exampleHeading: "Example",
     exampleLines: [
-      "Build a website with separate amounts for Design, Frontend, Backend, and Testing.",
+      "Website project: Design → Frontend → Backend → Testing",
     ],
-    compactExampleLines: [
-      "Build a website with separate amounts for Design, Frontend, Backend, and Testing.",
-    ],
+    compactExampleLines: ["Design → Frontend → Backend → Testing"],
     explanation:
-      "Each milestone has its own deliverable and amount. Work can be submitted and reviewed stage by stage.",
+      "Each stage has its own amount and deliverable. Work can be submitted and reviewed stage by stage.",
     goodFor: [
       "Websites",
       "Apps",
@@ -77,57 +84,120 @@ export const CONTRACT_TYPE_GUIDES: Record<PaymentModeName, ContractTypeGuide> = 
       "Multi-stage freelance work",
     ],
     selectedExplanation:
-      "You'll divide the project into stages with separate amounts and deliverables.",
+      "You divide the project into stages. Each milestone has its own amount and deliverable, allowing work to be submitted and reviewed stage by stage.",
+    howPaymentWorks:
+      "You divide the project into stages. Each milestone has its own amount and deliverable, allowing work to be submitted and reviewed stage by stage.",
+    configurePreview: [
+      "Project stages",
+      "Amount per milestone",
+      "Deliverable per milestone",
+      "Review and revision lifecycle",
+    ],
   },
   Streaming: {
     type: "Streaming",
     title: "Streaming",
-    tagline: "Pay as time passes",
-    bestFor: "Best for ongoing work over a defined start and end time.",
-    compactBestFor: "Consulting, retainers, and scheduled hours",
-    exampleHeading: "Example",
+    customerChoice: "Continuous scheduled payment",
+    tagline: "Pay as contract time passes",
+    bestFor:
+      "Best for work where payment should accrue continuously during an agreed scheduled period.",
+    compactBestFor: "Retainers and scheduled consulting periods",
+    exampleHeading: "Examples",
     exampleLines: [
-      "Fund an 8-hour work period.",
-      "Your equivalent hourly rate is shown automatically.",
+      "Retainers",
+      "Scheduled consulting windows",
+      "Defined engagement periods",
     ],
-    compactExampleLines: ["Fund an 8-hour work period."],
+    compactExampleLines: ["Retainers · Scheduled consulting windows"],
     explanation:
-      "Payment accrues proportionally with time while the stream is active. The main stream does not require a normal deliverable submission.",
+      "Payment accrues automatically as scheduled contract time passes. It does not track actual working sessions.",
     collectNote:
       "Tokens remain in escrow until the freelancer collects available pay.",
     goodFor: [
-      "Scheduled remote work",
-      "Consulting sessions",
       "Retainers",
-      "Time-based work",
+      "Scheduled consulting windows",
+      "Defined engagement periods",
+      "Continuous scheduled payment",
     ],
     selectedExplanation:
-      "You'll fund a defined time period. Pay accrues proportionally while the stream is active.",
+      "Payment accrues with scheduled contract time while the stream is active. It does not measure actual hours worked. Choose Hourly if payment should depend on Start work / Stop work sessions.",
+    howPaymentWorks:
+      "Payment accrues with scheduled contract time while the stream is active. It does not measure actual hours worked. Choose Hourly if payment should depend on Start work / Stop work sessions.",
+    configurePreview: [
+      "Funded amount",
+      "Scheduled duration",
+      "Accrual over contract time",
+      "Review / activation lifecycle where applicable",
+    ],
+    distinction: "Does not track actual hours worked",
   },
   Hourly: {
     type: "Hourly",
     title: "Hourly",
-    tagline: "Pay for working time",
+    customerChoice: "Actual hours worked",
+    tagline: "Pay for recorded working time",
     bestFor:
-      "Best for ongoing freelance work where the freelancer is paid at an agreed hourly rate.",
-    compactBestFor: "Logged freelance sessions",
-    exampleHeading: "Example",
+      "Best for work where payment depends on actual recorded Start work / Stop work sessions.",
+    compactBestFor: "Logged consulting and session-based work",
+    exampleHeading: "Examples",
     exampleLines: [
-      "10 / hour × 8 authorized hours",
-      "Maximum work budget: 80",
-    ],
-    compactExampleLines: ["10 / hour × 8 authorized hours"],
-    explanation:
-      "The employer chooses an hourly rate and authorizes a maximum amount of working time. The maximum work budget is calculated automatically and the employer funds that budget into escrow. The freelancer explicitly starts and stops work sessions. Pay is calculated from recorded working time. Unused funded budget can be settled back to the employer when the contract ends.",
-    collectNote:
-      "Streaming accrues automatically as contract time passes. Hourly accrues only from explicit Start work / Stop work sessions. Tokens stay in escrow until collected.",
-    goodFor: [
-      "Ongoing freelance work",
       "Logged consulting",
-      "Support retainers billed by session",
+      "Session-based support",
       "Work that should not accrue while idle",
     ],
+    compactExampleLines: ["Logged consulting · Session-based support"],
+    explanation:
+      "Payment is based on recorded Start work / Stop work sessions. Calendar time alone does not create Hourly earnings.",
+    collectNote:
+      "Streaming accrues automatically as scheduled contract time passes. Hourly accrues only from explicit Start work / Stop work sessions.",
+    goodFor: [
+      "Logged consulting",
+      "Session-based support",
+      "Work that should not accrue while idle",
+      "Authorized working-time budgets",
+    ],
     selectedExplanation:
-      "You'll set an hourly rate and authorize working time. Pay accrues only from explicit Start work / Stop work sessions, not from the calendar clock.",
+      "Set an hourly rate and maximum authorized working time. The freelancer records eligible work using Start work and Stop work. Unused funded budget can settle according to the Hourly protocol.",
+    howPaymentWorks:
+      "Set an hourly rate and maximum authorized working time. The freelancer records eligible work using Start work and Stop work. Unused funded budget can settle according to the Hourly protocol.",
+    configurePreview: [
+      "Hourly rate",
+      "Maximum authorized work time",
+      "Engagement window",
+      "Recorded work sessions",
+      "Maximum funded work budget",
+      "Optional trial where applicable",
+    ],
+    distinction: "Uses Start work / Stop work sessions",
   },
 };
+
+export const CONTRACT_TYPE_DECISION_HINTS: readonly {
+  match: string;
+  type: PaymentModeName;
+}[] = CONTRACT_TYPES.map((type) => ({
+  match: CONTRACT_TYPE_GUIDES[type].customerChoice,
+  type,
+}));
+
+export const STREAMING_VS_HOURLY = {
+  heading: "Streaming or Hourly?",
+  streamingTitle: "Streaming",
+  streaming:
+    "Payment accrues automatically as scheduled contract time passes. It does not track actual working sessions.",
+  hourlyTitle: "Hourly",
+  hourly:
+    "Payment is based on recorded Start work / Stop work sessions. Calendar time alone does not create Hourly earnings.",
+} as const;
+
+export const HOW_PAYMENT_WORKS_HEADING = "How payment works";
+export const CONFIGURE_PREVIEW_HEADING = "You'll configure";
+export const TYPE_SELECTION_CONTINUE_LABEL = "This fits my work — Continue";
+
+export const TYPE_SELECTION_SUPPORT_NOTE =
+  "Help & Support is for edge cases. PREMIFLOW Assistant is coming later. Neither is required to choose a contract type.";
+
+export function paymentModeForWorkChoice(choice: string): PaymentModeName | null {
+  const hit = CONTRACT_TYPE_DECISION_HINTS.find((hint) => hint.match === choice);
+  return hit?.type ?? null;
+}

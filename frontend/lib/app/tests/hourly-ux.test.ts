@@ -91,7 +91,7 @@ function hourlyContract(
 
 test("Hourly appears as the fourth contract type", () => {
   assert.deepEqual([...CONTRACT_TYPES], ["Fixed", "Milestone", "Streaming", "Hourly"]);
-  assert.equal(CONTRACT_TYPE_GUIDES.Hourly.tagline, "Pay for working time");
+  assert.equal(CONTRACT_TYPE_GUIDES.Hourly.tagline, "Pay for recorded working time");
   assert.equal(typeBlurb("Hourly"), CONTRACT_TYPE_GUIDES.Hourly.selectedExplanation);
 });
 

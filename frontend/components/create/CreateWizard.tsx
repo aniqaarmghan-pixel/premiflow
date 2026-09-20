@@ -19,10 +19,14 @@ import {
   paymentTokenLabel,
 } from "@/lib/app/premiflow";
 import {
+  CONFIGURE_PREVIEW_HEADING,
   CONTRACT_TYPE_DECISION_HEADING,
-  CONTRACT_TYPE_DECISION_HINTS,
   CONTRACT_TYPE_GUIDES,
   CONTRACT_TYPES,
+  HOW_PAYMENT_WORKS_HEADING,
+  STREAMING_VS_HOURLY,
+  TYPE_SELECTION_CONTINUE_LABEL,
+  TYPE_SELECTION_SUPPORT_NOTE,
 } from "@/lib/app/contract-type-guide";
 import {
   HOURLY_COPY,
@@ -574,7 +578,7 @@ export function CreateWizard() {
           </Button>
           {step < STEPS.length - 1 ? (
             <Button type="button" onClick={() => setStep((s) => s + 1)} disabled={!canAdvance}>
-              Continue
+              {step === 0 ? TYPE_SELECTION_CONTINUE_LABEL : "Continue"}
             </Button>
           ) : (
             <Button
@@ -668,33 +672,14 @@ function TypeStep({
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="font-display text-2xl">{CONTRACT_TYPE_DECISION_HEADING}</h2>
-        <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-          {CONTRACT_TYPE_DECISION_HINTS.map((hint) => {
-            const active = hint.type === value;
-            return (
-              <li key={hint.type}>
-                <button
-                  type="button"
-                  onClick={() => onChange(hint.type)}
-                  className={`w-full rounded-2xl border px-3 py-2.5 text-left text-sm transition ${
-                    active
-                      ? "border-accent bg-accent-soft text-ink"
-                      : "border-line bg-paper-2/60 text-ink-soft hover:border-accent/40"
-                  }`}
-                >
-                  <span className="font-medium text-ink">{hint.match}</span>
-                  <span className="mt-0.5 block text-xs text-ink-faint">
-                    → {hint.type}
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <h2 className="font-display text-2xl sm:text-3xl">{CONTRACT_TYPE_DECISION_HEADING}</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
+          Click the situation that matches the work. Each choice maps to an existing PREMIFLOW
+          contract type.
+        </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid min-w-0 gap-4 md:grid-cols-2">
         {CONTRACT_TYPES.map((type) => {
           const selected = type === value;
           const guide = CONTRACT_TYPE_GUIDES[type];
@@ -703,23 +688,35 @@ function TypeStep({
               key={type}
               type="button"
               onClick={() => onChange(type)}
+              aria-pressed={selected}
               whileHover={{ y: -4, scale: 1.01 }}
               animate={selected ? { y: -4, scale: 1.02 } : { y: 0, scale: 1 }}
               transition={{ duration: 0.32, ease: [0.22, 1, 0.36, 1] }}
-              className={`group rounded-[28px] border p-4 text-left transition duration-300 sm:p-5 ${
+              className={`group min-w-0 rounded-[28px] border p-4 text-left transition duration-300 sm:p-5 ${
                 selected
                   ? "border-accent bg-card shadow-[0_18px_40px_-24px_rgba(18,194,184,.55)] ring-2 ring-accent/30"
                   : "border-line bg-paper-2/50 hover:border-accent/40"
               }`}
             >
-              <div className={`rounded-2xl bg-white ${selected ? "" : "hidden sm:block"}`}>
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-faint">
+                  {guide.title}
+                </p>
+                {selected ? (
+                  <span className="rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-semibold text-accent">
+                    Selected
+                  </span>
+                ) : null}
+              </div>
+              <div className={`rounded-2xl bg-white ${selected ? "mt-3" : "mt-3 hidden sm:block"}`}>
                 <TypeMotif type={type} active={selected} />
               </div>
-              <p className={`${selected ? "mt-3" : "sm:mt-3"} font-display text-2xl`}>
-                {guide.title}
-              </p>
-              <p className="text-sm font-semibold text-accent">{guide.tagline}</p>
-              <p className="mt-2 text-sm leading-6 text-ink-soft">{guide.explanation}</p>
+              <h3 className="mt-3 font-display text-2xl leading-7">{guide.customerChoice}</h3>
+              <p className="mt-1 text-sm font-semibold text-ink">{guide.tagline}</p>
+              <p className="mt-2 text-sm leading-6 text-ink-soft">{guide.bestFor}</p>
+              {guide.distinction ? (
+                <p className="mt-2 text-sm font-medium text-ink">{guide.distinction}</p>
+              ) : null}
               <div className="mt-3 rounded-2xl bg-paper px-3 py-2.5">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
                   {guide.exampleHeading}
@@ -730,44 +727,69 @@ function TypeStep({
                   </p>
                 ))}
               </div>
-              {selected ? (
-                <>
-                  <p className="mt-3 text-sm leading-6 text-ink-soft">{guide.bestFor}</p>
-                  {guide.collectNote ? (
-                    <p className="mt-2 text-sm leading-6 text-ink-soft">{guide.collectNote}</p>
-                  ) : null}
-                  <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
-                    Best for
-                  </p>
-                  <ul className="mt-1.5 flex flex-wrap gap-1.5">
-                    {guide.goodFor.map((item) => (
-                      <li
-                        key={item}
-                        className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-ink-soft"
-                      >
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              ) : (
-                <p className="mt-3 text-xs leading-5 text-ink-faint">
-                  Best for {guide.compactBestFor.toLowerCase()}
-                </p>
-              )}
+              {!selected ? (
+                <p className="mt-3 text-xs leading-5 text-ink-faint">{guide.compactBestFor}</p>
+              ) : null}
             </motion.button>
           );
         })}
       </div>
 
-      <div className="rounded-[24px] border border-line bg-card px-4 py-3">
+      <section
+        aria-labelledby="streaming-vs-hourly-heading"
+        className="rounded-[24px] border border-line bg-card p-4 sm:p-5"
+      >
+        <h3 id="streaming-vs-hourly-heading" className="font-display text-xl">
+          {STREAMING_VS_HOURLY.heading}
+        </h3>
+        <div className="mt-3 grid min-w-0 gap-3 sm:grid-cols-2">
+          <div
+            className={`rounded-2xl border px-3 py-3 ${
+              value === "Streaming" ? "border-accent bg-accent-soft/60" : "border-line bg-paper"
+            }`}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-faint">
+              {STREAMING_VS_HOURLY.streamingTitle}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-ink-soft">{STREAMING_VS_HOURLY.streaming}</p>
+          </div>
+          <div
+            className={`rounded-2xl border px-3 py-3 ${
+              value === "Hourly" ? "border-accent bg-accent-soft/60" : "border-line bg-paper"
+            }`}
+          >
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-faint">
+              {STREAMING_VS_HOURLY.hourlyTitle}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-ink-soft">{STREAMING_VS_HOURLY.hourly}</p>
+          </div>
+        </div>
+      </section>
+
+      <section
+        aria-labelledby="how-payment-works-heading"
+        className="rounded-[24px] border border-line bg-card p-4 sm:p-5"
+      >
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-faint">
           {selectedGuide.title} selected
         </p>
-        <p className="mt-1 text-sm leading-6 text-ink-soft">
-          {selectedGuide.selectedExplanation}
+        <h3 id="how-payment-works-heading" className="mt-1 font-display text-2xl">
+          {HOW_PAYMENT_WORKS_HEADING}
+        </h3>
+        <p className="mt-2 text-sm leading-6 text-ink-soft">{selectedGuide.howPaymentWorks}</p>
+        <p className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-ink-faint">
+          {CONFIGURE_PREVIEW_HEADING}
         </p>
-      </div>
+        <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+          {selectedGuide.configurePreview.map((item) => (
+            <li key={item} className="text-sm leading-6 text-ink-soft">
+              {item}
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      <p className="text-xs leading-5 text-ink-faint">{TYPE_SELECTION_SUPPORT_NOTE}</p>
     </div>
   );
 }
