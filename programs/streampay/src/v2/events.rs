@@ -7,7 +7,7 @@
 //! - Phase 1: `ContractCreated`
 //! - Phase 2: `MilestoneAdded`, `TermsFinalized`
 //! - Phase 3: `ContractAccepted`, `ContractDeclined`, `ContractActivated`,
-//!   `ActivationRejected`, `ContractExpired`
+//!   `ActivationRejected`, `ContractExpired`, `ActivationWindowExpired`
 //! - Phase 4: `TrialConfigured`, `TrialSubmitted`, `TrialRevisionRequested`,
 //!   `TrialApproved`, `TrialRejected`, `TrialSettledAndEnded`
 //! - Phase 5: `WorkUnitSubmitted`, `WorkUnitApproved`,
@@ -122,6 +122,17 @@ pub struct ActivationRejected {
     pub employer: Pubkey,
     pub freelancer: Pubkey,
     pub rejected_at: i64,
+}
+
+/// The activation window closed before the main engagement started.
+/// Permissionless. No SPL transfer. Not a dispute.
+#[event]
+pub struct ActivationWindowExpired {
+    pub contract: Pubkey,
+    pub employer: Pubkey,
+    pub freelancer: Pubkey,
+    pub expired_at: i64,
+    pub employer_refundable: u64,
 }
 
 /// A paid trial was configured at contract creation.

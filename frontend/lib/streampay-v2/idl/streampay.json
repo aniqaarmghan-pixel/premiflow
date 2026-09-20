@@ -666,6 +666,43 @@
       "args": []
     },
     {
+      "name": "expire_activation",
+      "docs": [
+        "Permissionless close after the activation window. No SPL transfer."
+      ],
+      "discriminator": [
+        75,
+        53,
+        50,
+        123,
+        83,
+        35,
+        137,
+        45
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "docs": [
+            "Permissionless: the result is determined by clock and contract state."
+          ],
+          "signer": true
+        },
+        {
+          "name": "contract",
+          "writable": true
+        },
+        {
+          "name": "trial_work_unit",
+          "docs": [
+            "Required when a trial is configured; omitted otherwise."
+          ],
+          "optional": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "finalize_review_timeout",
       "docs": [
         "Permissionless auto-release of an expired post-activation review."
@@ -2544,6 +2581,38 @@
     },
     {
       "docs": [
+        "The activation window closed before the main engagement started.",
+        "Permissionless. No SPL transfer. Not a dispute."
+      ],
+      "name": "ActivationWindowExpired",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "expired_at",
+            "type": "i64"
+          },
+          {
+            "name": "employer_refundable",
+            "type": "u64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
         "The freelancer accepted a funded offer. The main stream has not started."
       ],
       "name": "ContractAccepted",
@@ -2767,57 +2836,6 @@
     },
     {
       "docs": [
-        "The contract resolver allocated the contested remainder. No SPL transfer."
-      ],
-      "name": "DisputeResolved",
-      "type": {
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "resolver",
-            "type": "pubkey"
-          },
-          {
-            "name": "resolved_at",
-            "type": "i64"
-          },
-          {
-            "name": "contested_amount",
-            "type": "u64"
-          },
-          {
-            "name": "freelancer_contested_award",
-            "type": "u64"
-          },
-          {
-            "name": "employer_contested_award",
-            "type": "u64"
-          },
-          {
-            "name": "final_freelancer_entitlement",
-            "type": "u64"
-          },
-          {
-            "name": "final_employer_entitlement",
-            "type": "u64"
-          }
-        ],
-        "kind": "struct"
-      }
-    },
-    {
-      "docs": [
         "A contract was created and fully funded into escrow.",
         "",
         "`status` is included because it is the one field an indexer cannot infer:",
@@ -2878,76 +2896,6 @@
     },
     {
       "docs": [
-        "SPL tokens left escrow back to the employer. Real token movement."
-      ],
-      "name": "EmployerRefundClaimed",
-      "type": {
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "mint",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "refunded_amount",
-            "type": "u64"
-          },
-          {
-            "name": "remaining_refundable",
-            "type": "u64"
-          }
-        ],
-        "kind": "struct"
-      }
-    },
-    {
-      "docs": [
-        "SPL tokens left escrow for the freelancer. Real token movement."
-      ],
-      "name": "FreelancerWithdrawal",
-      "type": {
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "mint",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "withdrawn_amount",
-            "type": "u64"
-          },
-          {
-            "name": "remaining_entitlement",
-            "type": "u64"
-          }
-        ],
-        "kind": "struct"
-      }
-    },
-    {
-      "docs": [
         "A party froze the contract into Disputed. No SPL transfer."
       ],
       "name": "DisputeOpened",
@@ -2991,6 +2939,57 @@
           },
           {
             "name": "stream_released_amount",
+            "type": "u64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
+        "The contract resolver allocated the contested remainder. No SPL transfer."
+      ],
+      "name": "DisputeResolved",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "resolver",
+            "type": "pubkey"
+          },
+          {
+            "name": "resolved_at",
+            "type": "i64"
+          },
+          {
+            "name": "contested_amount",
+            "type": "u64"
+          },
+          {
+            "name": "freelancer_contested_award",
+            "type": "u64"
+          },
+          {
+            "name": "employer_contested_award",
+            "type": "u64"
+          },
+          {
+            "name": "final_freelancer_entitlement",
+            "type": "u64"
+          },
+          {
+            "name": "final_employer_entitlement",
             "type": "u64"
           }
         ],
@@ -3050,10 +3049,9 @@
     },
     {
       "docs": [
-        "Time-based streaming earnings were materialized into released accounting.",
-        "No SPL transfer."
+        "SPL tokens left escrow for the freelancer. Real token movement."
       ],
-      "name": "StreamAccrualReleased",
+      "name": "FreelancerWithdrawal",
       "type": {
         "fields": [
           {
@@ -3065,20 +3063,55 @@
             "type": "pubkey"
           },
           {
-            "name": "newly_released",
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
             "type": "u64"
           },
           {
-            "name": "cumulative_stream_released",
+            "name": "withdrawn_amount",
             "type": "u64"
           },
           {
-            "name": "total_released",
+            "name": "remaining_entitlement",
+            "type": "u64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
+        "SPL tokens left escrow back to the employer. Real token movement."
+      ],
+      "name": "EmployerRefundClaimed",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
             "type": "u64"
           },
           {
-            "name": "accrual_time",
-            "type": "i64"
+            "name": "refunded_amount",
+            "type": "u64"
+          },
+          {
+            "name": "remaining_refundable",
+            "type": "u64"
           }
         ],
         "kind": "struct"
@@ -3119,46 +3152,6 @@
           },
           {
             "name": "released_amount",
-            "type": "u64"
-          }
-        ],
-        "kind": "struct"
-      }
-    },
-    {
-      "docs": [
-        "One milestone was defined on a draft contract.",
-        "",
-        "`allocated_amount` is the running total after this milestone, so an indexer",
-        "can tell how much of the escrow is still unallocated without re-reading the",
-        "contract. Titles and specifications are not here: they live in the",
-        "contract's off-chain record."
-      ],
-      "name": "MilestoneAdded",
-      "type": {
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "work_unit",
-            "type": "pubkey"
-          },
-          {
-            "name": "index",
-            "type": "u32"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "due_offset_seconds",
-            "type": "i64"
-          },
-          {
-            "name": "allocated_amount",
             "type": "u64"
           }
         ],
@@ -3258,9 +3251,14 @@
     },
     {
       "docs": [
-        "The employer approved the trial. Compensation is released, not withdrawn."
+        "One milestone was defined on a draft contract.",
+        "",
+        "`allocated_amount` is the running total after this milestone, so an indexer",
+        "can tell how much of the escrow is still unallocated without re-reading the",
+        "contract. Titles and specifications are not here: they live in the",
+        "contract's off-chain record."
       ],
-      "name": "TrialApproved",
+      "name": "MilestoneAdded",
       "type": {
         "fields": [
           {
@@ -3268,20 +3266,24 @@
             "type": "pubkey"
           },
           {
-            "name": "trial_work_unit",
+            "name": "work_unit",
             "type": "pubkey"
           },
           {
-            "name": "employer",
-            "type": "pubkey"
+            "name": "index",
+            "type": "u32"
           },
           {
             "name": "amount",
             "type": "u64"
           },
           {
-            "name": "approved_at",
+            "name": "due_offset_seconds",
             "type": "i64"
+          },
+          {
+            "name": "allocated_amount",
+            "type": "u64"
           }
         ],
         "kind": "struct"
@@ -3313,6 +3315,73 @@
           },
           {
             "name": "finalized_at",
+            "type": "i64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
+        "Time-based streaming earnings were materialized into released accounting.",
+        "No SPL transfer."
+      ],
+      "name": "StreamAccrualReleased",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "newly_released",
+            "type": "u64"
+          },
+          {
+            "name": "cumulative_stream_released",
+            "type": "u64"
+          },
+          {
+            "name": "total_released",
+            "type": "u64"
+          },
+          {
+            "name": "accrual_time",
+            "type": "i64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
+        "The employer approved the trial. Compensation is released, not withdrawn."
+      ],
+      "name": "TrialApproved",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "trial_work_unit",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "approved_at",
             "type": "i64"
           }
         ],
@@ -3383,6 +3452,37 @@
     },
     {
       "docs": [
+        "The employer requested a trial revision."
+      ],
+      "name": "TrialRevisionRequested",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "trial_work_unit",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "revision_count",
+            "type": "u8"
+          },
+          {
+            "name": "action_deadline",
+            "type": "i64"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
         "The employer paid the submitted trial and ended without activating.",
         "No SPL transfer. Not a dispute."
       ],
@@ -3427,6 +3527,41 @@
     },
     {
       "docs": [
+        "The freelancer submitted (or resubmitted) trial work."
+      ],
+      "name": "TrialSubmitted",
+      "type": {
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "trial_work_unit",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "submitted_at",
+            "type": "i64"
+          },
+          {
+            "name": "action_deadline",
+            "type": "i64"
+          },
+          {
+            "name": "revision_count",
+            "type": "u8"
+          }
+        ],
+        "kind": "struct"
+      }
+    },
+    {
+      "docs": [
         "The employer approved a submitted work unit. Compensation is released, not withdrawn."
       ],
       "name": "WorkUnitApproved",
@@ -3462,37 +3597,6 @@
     },
     {
       "docs": [
-        "The employer requested a trial revision."
-      ],
-      "name": "TrialRevisionRequested",
-      "type": {
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "trial_work_unit",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "revision_count",
-            "type": "u8"
-          },
-          {
-            "name": "action_deadline",
-            "type": "i64"
-          }
-        ],
-        "kind": "struct"
-      }
-    },
-    {
-      "docs": [
         "Review timed out and the submitted unit was auto-released. No SPL transfer."
       ],
       "name": "WorkUnitReviewTimedOut",
@@ -3517,41 +3621,6 @@
           {
             "name": "released_at",
             "type": "i64"
-          }
-        ],
-        "kind": "struct"
-      }
-    },
-    {
-      "docs": [
-        "The freelancer submitted (or resubmitted) trial work."
-      ],
-      "name": "TrialSubmitted",
-      "type": {
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "trial_work_unit",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "submitted_at",
-            "type": "i64"
-          },
-          {
-            "name": "action_deadline",
-            "type": "i64"
-          },
-          {
-            "name": "revision_count",
-            "type": "u8"
           }
         ],
         "kind": "struct"
@@ -3675,6 +3744,19 @@
         17,
         62,
         160
+      ]
+    },
+    {
+      "name": "ActivationWindowExpired",
+      "discriminator": [
+        121,
+        10,
+        127,
+        241,
+        67,
+        215,
+        186,
+        62
       ]
     },
     {
@@ -4450,6 +4532,11 @@
       "code": 6178,
       "name": "HourlyOpenSessionBlocksClose",
       "msg": "An open Hourly session blocks cancel or end."
+    },
+    {
+      "code": 6179,
+      "name": "ApprovalWindowNotExpired",
+      "msg": "The employer activation window has not yet closed."
     }
   ]
 }

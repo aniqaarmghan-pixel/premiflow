@@ -327,6 +327,24 @@ export class StreamPayV2Client {
     return txResult({ signature, contract });
   }
 
+  async expireActivation(contract: PublicKey): Promise<TransactionResult> {
+    const caller = connectedWallet(this.program);
+    const fetched = await fetchContract(this.program, contract);
+    const trialWorkUnit =
+      fetched.trialAmount > 0n
+        ? deriveTrialWorkUnitPda(contract, this.program.programId).address
+        : null;
+    const signature = await sendV2Method(this.program, this.program.methods
+      .expireActivation()
+      .accountsPartial({ caller, contract, trialWorkUnit })
+    );
+    return txResult({
+      signature,
+      contract,
+      trialWorkUnit: trialWorkUnit ?? undefined,
+    });
+  }
+
   async approveActivation(contract: PublicKey): Promise<TransactionResult> {
     const employer = connectedWallet(this.program);
     const signature = await sendV2Method(this.program, this.program.methods

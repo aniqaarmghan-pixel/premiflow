@@ -238,6 +238,10 @@ const V2_ERROR_MESSAGES: Record<number, { name: string; message: string }> = {
     name: "HourlyOpenSessionBlocksClose",
     message: "An open Hourly session blocks cancel or end.",
   },
+  6179: {
+    name: "ApprovalWindowNotExpired",
+    message: "The employer activation window has not yet closed.",
+  },
 };
 
 function asError(err: unknown): {

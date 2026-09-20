@@ -298,6 +298,11 @@ Ok(())
         v2::instructions::reject_activation::handle_reject_activation(ctx)
     }
 
+    /// Permissionless close after the activation window. No SPL transfer.
+    pub fn expire_activation(ctx: Context<ExpireActivation>) -> Result<()> {
+        v2::instructions::expire_activation::handle_expire_activation(ctx)
+    }
+
     /// Freelancer submits paid trial work. Does not release funds or activate.
     pub fn submit_trial_work(
         ctx: Context<SubmitTrialWork>,

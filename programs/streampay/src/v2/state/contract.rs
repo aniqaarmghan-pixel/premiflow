@@ -509,9 +509,11 @@ impl Contract {
 
     /// End before any trial work is submitted. Nothing is earned.
     ///
-    /// No stream materialization. No activation timing. Trial, if present,
-    /// stays Defined. Status becomes `ActivationRejected` so existing Claim
-    /// refund applies and Collect pay has a zero cap.
+    /// Used by employer `reject_activation` (T2) and permissionless
+    /// `expire_activation` (T4). No stream materialization. No activation
+    /// timing. Trial, if present, stays Defined. Status becomes
+    /// `ActivationRejected` so existing Claim refund applies and Collect pay
+    /// has a zero cap.
     pub fn settle_unsubmitted_activation_rejection(
         &mut self,
         now: i64,

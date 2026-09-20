@@ -1,6 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 
 import {
+  isActivationWindowOpen,
   isReviewDeadlineActive,
   isStreamCurrentlyAccruing,
   mayAttemptCompletion,
@@ -19,6 +20,7 @@ export type UiAction =
   | "acceptContract"
   | "declineContract"
   | "expireAcceptance"
+  | "expireActivation"
   | "approveActivation"
   | "rejectActivation"
   | "submitTrialWork"
@@ -56,6 +58,7 @@ const LIFECYCLE_ACTIONS: readonly UiAction[] = [
   "acceptContract",
   "declineContract",
   "expireAcceptance",
+  "expireActivation",
   "approveActivation",
   "rejectActivation",
   "submitTrialWork",
@@ -109,12 +112,25 @@ export function availableActions(input: ActionAvailabilityInput): UiAction[] {
   }
 
   if (contract.status === "PendingEmployerApproval") {
+    const windowOpen = isActivationWindowOpen(contract, now);
+    const trialSubmittedOrRevising =
+      trial?.status === "Submitted" || trial?.status === "Revising";
     if (role === "employer") {
       actions.add("rejectActivation");
-      if (!trialConfigured) {
-        actions.add("approveActivation");
+      if (windowOpen) {
+        if (!trialConfigured) {
+          actions.add("approveActivation");
+        } else if (trial?.status === "Submitted") {
+          actions.add("approveTrialAndActivate");
+          actions.add("settleTrialAndEnd");
+          if (
+            now < trial.actionDeadline &&
+            trial.revisionCount < contract.maxRevisions
+          ) {
+            actions.add("requestTrialRevision");
+          }
+        }
       } else if (trial?.status === "Submitted") {
-        actions.add("approveTrialAndActivate");
         actions.add("settleTrialAndEnd");
         if (
           now < trial.actionDeadline &&
@@ -124,10 +140,17 @@ export function availableActions(input: ActionAvailabilityInput): UiAction[] {
         }
       }
     }
-    if (role === "freelancer" && trialConfigured) {
+    if (role === "freelancer" && trialConfigured && windowOpen) {
       if (!trial || trial.status === "Defined" || trial.status === "Revising") {
         actions.add("submitTrialWork");
       }
+    }
+    if (
+      (role === "employer" || role === "freelancer") &&
+      !windowOpen &&
+      !trialSubmittedOrRevising
+    ) {
+      actions.add("expireActivation");
     }
     if (
       (role === "employer" || role === "freelancer") &&

@@ -55,6 +55,10 @@ import {
   trialEmployerDecisions,
 } from "@/lib/app/trial-exit";
 import { OFFER_EXIT_COPY, expireOfferConfirmation } from "@/lib/app/offer-exit";
+import {
+  ACTIVATION_EXIT_COPY,
+  expireActivationConfirmation,
+} from "@/lib/app/activation-exit";
 import { supportTopicHref } from "@/lib/app/support";
 import { formatUnix } from "@/lib/app/datetime";
 import { localMetadataStore } from "@/lib/app/local-metadata";
@@ -288,6 +292,8 @@ export function ContractDetail({ address }: { address: string }) {
           return client.declineContract(contract.address);
         case "expireAcceptance":
           return client.expireAcceptance(contract.address);
+        case "expireActivation":
+          return client.expireActivation(contract.address);
         case "approveActivation":
           return client.approveActivation(contract.address);
         case "rejectActivation":
@@ -674,7 +680,7 @@ export function ContractDetail({ address }: { address: string }) {
               {contract.status === "Resolved"
                 ? "The resolver recorded settlement accounting. Tokens move only when Collect pay or Claim refund is sent."
                 : contract.status === "ActivationRejected"
-                  ? "The contract ended before trial work. Tokens move only when Claim refund is sent. The freelancer has no earned amount to collect."
+                  ? "The main engagement did not start. Tokens move only when Claim refund is sent. The freelancer has no earned amount to collect."
                   : contract.status === "Declined"
                     ? `${OFFER_EXIT_COPY.declinedTitle} ${OFFER_EXIT_COPY.declinedBody} ${OFFER_EXIT_COPY.laterRefund}`
                     : contract.status === "Expired"
@@ -804,9 +810,10 @@ export function ContractDetail({ address }: { address: string }) {
                 confirm?.action === "voidStaleRevision" ||
                 confirm?.action === "rejectActivation"
                   ? "danger"
-                  : confirm?.action === "completeContract" ||
+                  :                       confirm?.action === "completeContract" ||
                       confirm?.action === "settleTrialAndEnd" ||
-                      confirm?.action === "expireAcceptance"
+                      confirm?.action === "expireAcceptance" ||
+                      confirm?.action === "expireActivation"
                     ? "secondary"
                     : "primary"
               }
@@ -1052,6 +1059,19 @@ function ConfirmBody({
     return (
       <div className="space-y-3 text-sm leading-6 text-ink-soft">
         <p>{OFFER_EXIT_COPY.expireBody}</p>
+        <ul className="list-disc space-y-1 pl-5">
+          {copy.points.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+  if (action === "expireActivation") {
+    const copy = expireActivationConfirmation({ contract, decimals });
+    return (
+      <div className="space-y-3 text-sm leading-6 text-ink-soft">
+        <p>{ACTIVATION_EXIT_COPY.body}</p>
         <ul className="list-disc space-y-1 pl-5">
           {copy.points.map((line) => (
             <li key={line}>{line}</li>

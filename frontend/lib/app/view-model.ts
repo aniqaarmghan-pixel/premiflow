@@ -210,7 +210,8 @@ export function contractActionVariant(
   if (
     action === "completeContract" ||
     action === "endHourlyContract" ||
-    action === "expireAcceptance"
+    action === "expireAcceptance" ||
+    action === "expireActivation"
   ) {
     return "secondary";
   }
@@ -399,6 +400,8 @@ export function actionLabel(
       return "Decline offer";
     case "expireAcceptance":
       return "Expire offer";
+    case "expireActivation":
+      return "End expired activation";
     case "approveActivation":
       return "Activate";
     case "rejectActivation":
@@ -461,6 +464,7 @@ export function confirmTitle(
   if (action === "endHourlyContract") return "End hourly contract?";
   if (action === "settleTrialAndEnd") return "Pay trial & don't continue?";
   if (action === "expireAcceptance") return "Expire offer?";
+  if (action === "expireActivation") return "End expired activation?";
   if (action === "declineContract") return "Decline offer?";
   if (action === "rejectActivation") return `${actionLabel(action, context)}?`;
   return actionLabel(action, context);
@@ -479,6 +483,8 @@ export function clientMethodForAction(action: UiAction): string {
       return "declineContract";
     case "expireAcceptance":
       return "expireAcceptance";
+    case "expireActivation":
+      return "expireActivation";
     case "approveActivation":
       return "approveActivation";
     case "rejectActivation":
@@ -539,6 +545,7 @@ export function isEconomicAction(action: UiAction): boolean {
     action === "finalizeReviewTimeout" ||
     action === "declineContract" ||
     action === "expireAcceptance" ||
+    action === "expireActivation" ||
     action === "rejectActivation" ||
     action === "stopHourlySession" ||
     action === "endHourlyContract"

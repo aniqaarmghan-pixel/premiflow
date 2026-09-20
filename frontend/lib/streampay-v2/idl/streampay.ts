@@ -672,6 +672,43 @@ export type Streampay = {
       "args": []
     },
     {
+      "name": "expireActivation",
+      "docs": [
+        "Permissionless close after the activation window. No SPL transfer."
+      ],
+      "discriminator": [
+        75,
+        53,
+        50,
+        123,
+        83,
+        35,
+        137,
+        45
+      ],
+      "accounts": [
+        {
+          "name": "caller",
+          "docs": [
+            "Permissionless: the result is determined by clock and contract state."
+          ],
+          "signer": true
+        },
+        {
+          "name": "contract",
+          "writable": true
+        },
+        {
+          "name": "trialWorkUnit",
+          "docs": [
+            "Required when a trial is configured; omitted otherwise."
+          ],
+          "optional": true
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "finalizeReviewTimeout",
       "docs": [
         "Permissionless auto-release of an expired post-activation review."
@@ -1349,6 +1386,19 @@ export type Streampay = {
         17,
         62,
         160
+      ]
+    },
+    {
+      "name": "activationWindowExpired",
+      "discriminator": [
+        121,
+        10,
+        127,
+        241,
+        67,
+        215,
+        186,
+        62
       ]
     },
     {
@@ -2124,6 +2174,11 @@ export type Streampay = {
       "code": 6178,
       "name": "hourlyOpenSessionBlocksClose",
       "msg": "An open Hourly session blocks cancel or end."
+    },
+    {
+      "code": 6179,
+      "name": "approvalWindowNotExpired",
+      "msg": "The employer activation window has not yet closed."
     }
   ],
   "types": [
@@ -3338,6 +3393,38 @@ export type Streampay = {
       }
     },
     {
+      "name": "activationWindowExpired",
+      "docs": [
+        "The activation window closed before the main engagement started.",
+        "Permissionless. No SPL transfer. Not a dispute."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "expiredAt",
+            "type": "i64"
+          },
+          {
+            "name": "employerRefundable",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "contractAccepted",
       "docs": [
         "The freelancer accepted a funded offer. The main stream has not started."
@@ -3561,57 +3648,6 @@ export type Streampay = {
       }
     },
     {
-      "name": "disputeResolved",
-      "docs": [
-        "The contract resolver allocated the contested remainder. No SPL transfer."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "resolver",
-            "type": "pubkey"
-          },
-          {
-            "name": "resolvedAt",
-            "type": "i64"
-          },
-          {
-            "name": "contestedAmount",
-            "type": "u64"
-          },
-          {
-            "name": "freelancerContestedAward",
-            "type": "u64"
-          },
-          {
-            "name": "employerContestedAward",
-            "type": "u64"
-          },
-          {
-            "name": "finalFreelancerEntitlement",
-            "type": "u64"
-          },
-          {
-            "name": "finalEmployerEntitlement",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
       "name": "contractCreated",
       "docs": [
         "A contract was created and fully funded into escrow.",
@@ -3672,76 +3708,6 @@ export type Streampay = {
       }
     },
     {
-      "name": "employerRefundClaimed",
-      "docs": [
-        "SPL tokens left escrow back to the employer. Real token movement."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "mint",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "refundedAmount",
-            "type": "u64"
-          },
-          {
-            "name": "remainingRefundable",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "freelancerWithdrawal",
-      "docs": [
-        "SPL tokens left escrow for the freelancer. Real token movement."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "mint",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "withdrawnAmount",
-            "type": "u64"
-          },
-          {
-            "name": "remainingEntitlement",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
       "name": "disputeOpened",
       "docs": [
         "A party froze the contract into Disputed. No SPL transfer."
@@ -3787,6 +3753,57 @@ export type Streampay = {
           },
           {
             "name": "streamReleasedAmount",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "disputeResolved",
+      "docs": [
+        "The contract resolver allocated the contested remainder. No SPL transfer."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "resolver",
+            "type": "pubkey"
+          },
+          {
+            "name": "resolvedAt",
+            "type": "i64"
+          },
+          {
+            "name": "contestedAmount",
+            "type": "u64"
+          },
+          {
+            "name": "freelancerContestedAward",
+            "type": "u64"
+          },
+          {
+            "name": "employerContestedAward",
+            "type": "u64"
+          },
+          {
+            "name": "finalFreelancerEntitlement",
+            "type": "u64"
+          },
+          {
+            "name": "finalEmployerEntitlement",
             "type": "u64"
           }
         ]
@@ -3844,10 +3861,9 @@ export type Streampay = {
       }
     },
     {
-      "name": "streamAccrualReleased",
+      "name": "freelancerWithdrawal",
       "docs": [
-        "Time-based streaming earnings were materialized into released accounting.",
-        "No SPL transfer."
+        "SPL tokens left escrow for the freelancer. Real token movement."
       ],
       "type": {
         "kind": "struct",
@@ -3861,20 +3877,55 @@ export type Streampay = {
             "type": "pubkey"
           },
           {
-            "name": "newlyReleased",
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
             "type": "u64"
           },
           {
-            "name": "cumulativeStreamReleased",
+            "name": "withdrawnAmount",
             "type": "u64"
           },
           {
-            "name": "totalReleased",
+            "name": "remainingEntitlement",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "employerRefundClaimed",
+      "docs": [
+        "SPL tokens left escrow back to the employer. Real token movement."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
             "type": "u64"
           },
           {
-            "name": "accrualTime",
-            "type": "i64"
+            "name": "refundedAmount",
+            "type": "u64"
+          },
+          {
+            "name": "remainingRefundable",
+            "type": "u64"
           }
         ]
       }
@@ -3915,46 +3966,6 @@ export type Streampay = {
           },
           {
             "name": "releasedAmount",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "milestoneAdded",
-      "docs": [
-        "One milestone was defined on a draft contract.",
-        "",
-        "`allocated_amount` is the running total after this milestone, so an indexer",
-        "can tell how much of the escrow is still unallocated without re-reading the",
-        "contract. Titles and specifications are not here: they live in the",
-        "contract's off-chain record."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "workUnit",
-            "type": "pubkey"
-          },
-          {
-            "name": "index",
-            "type": "u32"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
-          },
-          {
-            "name": "dueOffsetSeconds",
-            "type": "i64"
-          },
-          {
-            "name": "allocatedAmount",
             "type": "u64"
           }
         ]
@@ -4052,9 +4063,14 @@ export type Streampay = {
       }
     },
     {
-      "name": "trialApproved",
+      "name": "milestoneAdded",
       "docs": [
-        "The employer approved the trial. Compensation is released, not withdrawn."
+        "One milestone was defined on a draft contract.",
+        "",
+        "`allocated_amount` is the running total after this milestone, so an indexer",
+        "can tell how much of the escrow is still unallocated without re-reading the",
+        "contract. Titles and specifications are not here: they live in the",
+        "contract's off-chain record."
       ],
       "type": {
         "kind": "struct",
@@ -4064,20 +4080,24 @@ export type Streampay = {
             "type": "pubkey"
           },
           {
-            "name": "trialWorkUnit",
+            "name": "workUnit",
             "type": "pubkey"
           },
           {
-            "name": "employer",
-            "type": "pubkey"
+            "name": "index",
+            "type": "u32"
           },
           {
             "name": "amount",
             "type": "u64"
           },
           {
-            "name": "approvedAt",
+            "name": "dueOffsetSeconds",
             "type": "i64"
+          },
+          {
+            "name": "allocatedAmount",
+            "type": "u64"
           }
         ]
       }
@@ -4109,6 +4129,73 @@ export type Streampay = {
           },
           {
             "name": "finalizedAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "streamAccrualReleased",
+      "docs": [
+        "Time-based streaming earnings were materialized into released accounting.",
+        "No SPL transfer."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "newlyReleased",
+            "type": "u64"
+          },
+          {
+            "name": "cumulativeStreamReleased",
+            "type": "u64"
+          },
+          {
+            "name": "totalReleased",
+            "type": "u64"
+          },
+          {
+            "name": "accrualTime",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "trialApproved",
+      "docs": [
+        "The employer approved the trial. Compensation is released, not withdrawn."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "trialWorkUnit",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "approvedAt",
             "type": "i64"
           }
         ]
@@ -4177,6 +4264,37 @@ export type Streampay = {
       }
     },
     {
+      "name": "trialRevisionRequested",
+      "docs": [
+        "The employer requested a trial revision."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "trialWorkUnit",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "revisionCount",
+            "type": "u8"
+          },
+          {
+            "name": "actionDeadline",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "trialSettledAndEnded",
       "docs": [
         "The employer paid the submitted trial and ended without activating.",
@@ -4221,6 +4339,41 @@ export type Streampay = {
       }
     },
     {
+      "name": "trialSubmitted",
+      "docs": [
+        "The freelancer submitted (or resubmitted) trial work."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "trialWorkUnit",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "submittedAt",
+            "type": "i64"
+          },
+          {
+            "name": "actionDeadline",
+            "type": "i64"
+          },
+          {
+            "name": "revisionCount",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "workUnitApproved",
       "docs": [
         "The employer approved a submitted work unit. Compensation is released, not withdrawn."
@@ -4256,37 +4409,6 @@ export type Streampay = {
       }
     },
     {
-      "name": "trialRevisionRequested",
-      "docs": [
-        "The employer requested a trial revision."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "trialWorkUnit",
-            "type": "pubkey"
-          },
-          {
-            "name": "employer",
-            "type": "pubkey"
-          },
-          {
-            "name": "revisionCount",
-            "type": "u8"
-          },
-          {
-            "name": "actionDeadline",
-            "type": "i64"
-          }
-        ]
-      }
-    },
-    {
       "name": "workUnitReviewTimedOut",
       "docs": [
         "Review timed out and the submitted unit was auto-released. No SPL transfer."
@@ -4313,41 +4435,6 @@ export type Streampay = {
           {
             "name": "releasedAt",
             "type": "i64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "trialSubmitted",
-      "docs": [
-        "The freelancer submitted (or resubmitted) trial work."
-      ],
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "contract",
-            "type": "pubkey"
-          },
-          {
-            "name": "trialWorkUnit",
-            "type": "pubkey"
-          },
-          {
-            "name": "freelancer",
-            "type": "pubkey"
-          },
-          {
-            "name": "submittedAt",
-            "type": "i64"
-          },
-          {
-            "name": "actionDeadline",
-            "type": "i64"
-          },
-          {
-            "name": "revisionCount",
-            "type": "u8"
           }
         ]
       }

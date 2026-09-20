@@ -5,6 +5,7 @@ export const REQUIRED_V2_INSTRUCTIONS = [
   "accept_contract",
   "decline_contract",
   "expire_acceptance",
+  "expire_activation",
   "approve_activation",
   "reject_activation",
   "submit_trial_work",

@@ -300,6 +300,9 @@ pub enum StreamPayV2Error {
 
     #[msg("An open Hourly session blocks cancel or end.")]
     HourlyOpenSessionBlocksClose,
+
+    #[msg("The employer activation window has not yet closed.")]
+    ApprovalWindowNotExpired,
 }
 
 #[cfg(test)]
@@ -478,6 +481,15 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::ContractAlreadyCompleted), 6165);
         assert_eq!(u32::from(StreamPayV2Error::InvalidHourlyRate), 6166);
         assert_eq!(u32::from(StreamPayV2Error::HourlyOpenSessionBlocksClose), 6178);
+        assert_eq!(u32::from(StreamPayV2Error::ApprovalWindowNotExpired), 6179);
+    }
+
+    #[test]
+    fn v2_t4_error_codes_are_pinned() {
+        assert_eq!(u32::from(StreamPayV2Error::InvalidState), 6111);
+        assert_eq!(u32::from(StreamPayV2Error::ApprovalWindowExpired), 6149);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidTrialState), 6154);
+        assert_eq!(u32::from(StreamPayV2Error::ApprovalWindowNotExpired), 6179);
     }
 
     #[test]

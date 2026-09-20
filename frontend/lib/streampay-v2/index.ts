@@ -98,6 +98,8 @@ export {
   partitionContractsByRole,
   remainingFreelancerClaim,
   remainingEmployerRefund,
+  activationDeadlineUnix,
+  isActivationWindowOpen,
   contestedRemainder,
   projectedMaterializedReleasedAmount,
   projectedContestedRemainder,

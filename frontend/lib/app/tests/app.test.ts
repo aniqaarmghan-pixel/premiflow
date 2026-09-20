@@ -315,6 +315,8 @@ test("notice catalog covers the planned lifecycle events", () => {
   assert.ok(NOTICE_CATALOG.revision_deadline_passed);
   assert.ok(NOTICE_CATALOG.revised_deliverable_submitted);
   assert.equal(noticeKindForAction("approveActivation"), "activation_approved");
+  assert.equal(noticeKindForAction("expireActivation"), "activation_window_ended");
+  assert.match(NOTICE_CATALOG.activation_window_ended.body, /Claim refund/i);
   assert.equal(noticeKindForAction("approveWorkUnit"), "work_approved");
   assert.equal(
     noticeKindForAction("approveTrialAndActivate"),

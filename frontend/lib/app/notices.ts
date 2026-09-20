@@ -10,6 +10,7 @@ export type NoticeKind =
   | "contract_accepted"
   | "contract_declined"
   | "offer_expired"
+  | "activation_window_ended"
   | "activation_approved"
   | "activation_declined"
   | "activation_rejected_disputed"
@@ -69,6 +70,11 @@ export const NOTICE_CATALOG: Record<NoticeKind, NoticeCopy> = {
     kind: "offer_expired",
     title: "Offer expired",
     body: "The acceptance deadline passed before work started. No dispute was opened. Tokens move only when Claim refund is used later.",
+  },
+  activation_window_ended: {
+    kind: "activation_window_ended",
+    title: "Activation window ended",
+    body: "The contract was accepted, but the main engagement did not start before the activation window ended. No dispute was opened. Tokens move only when Claim refund is used later.",
   },
   activation_approved: {
     kind: "activation_approved",
@@ -208,6 +214,8 @@ export function noticeKindForAction(
       return "contract_declined";
     case "expireAcceptance":
       return "offer_expired";
+    case "expireActivation":
+      return "activation_window_ended";
     case "approveActivation":
       return context?.paymentMode === "Hourly"
         ? "hourly_activated"

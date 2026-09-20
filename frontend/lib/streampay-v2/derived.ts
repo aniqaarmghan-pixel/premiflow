@@ -144,6 +144,26 @@ export function equivalentHourlyRateDisplayOnly(
 }
 
 /**
+ * Employer activation deadline: `acceptedAt + activationReviewDuration`.
+ * Matches on-chain `Contract::activation_deadline`.
+ */
+export function activationDeadlineUnix(
+  contract: Pick<ContractView, "acceptedAt" | "activationReviewDuration">
+): number {
+  return contract.acceptedAt + contract.activationReviewDuration;
+}
+
+/**
+ * True while `now < activation deadline`, matching `ApprovalWindowExpired`.
+ */
+export function isActivationWindowOpen(
+  contract: Pick<ContractView, "acceptedAt" | "activationReviewDuration">,
+  now: number
+): boolean {
+  return now < activationDeadlineUnix(contract);
+}
+
+/**
  * Remaining freelancer SPL the program would currently allow to withdraw.
  * Display/UX only — the program is authoritative.
  */
