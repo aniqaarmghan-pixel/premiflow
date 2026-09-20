@@ -1,10 +1,47 @@
 import { z } from "zod";
 
-export const COPILOT_MODES = ["create", "explain", "action", "dispute"] as const;
+export const COPILOT_MODES = ["create", "contract", "action", "dispute"] as const;
 export type CopilotMode = (typeof COPILOT_MODES)[number];
 
 export const COPILOT_CREATE_MODE = "create" as const;
-export const COPILOT_BLOCK1_MODES = [COPILOT_CREATE_MODE] as const;
+export const COPILOT_LIVE_MODES = ["contract", "action", "dispute"] as const;
+export type CopilotLiveMode = (typeof COPILOT_LIVE_MODES)[number];
+
+export const COPILOT_ACTION_IDS = [
+  "addMilestone",
+  "finalizeTerms",
+  "acceptContract",
+  "declineContract",
+  "expireAcceptance",
+  "expireActivation",
+  "approveActivation",
+  "rejectActivation",
+  "submitTrialWork",
+  "requestTrialRevision",
+  "approveTrialAndActivate",
+  "settleTrialAndEnd",
+  "finalizeTrialReviewTimeout",
+  "submitWorkUnit",
+  "requestWorkRevision",
+  "approveWorkUnit",
+  "voidStaleRevision",
+  "finalizeReviewTimeout",
+  "releaseStreamAccrual",
+  "cancelActiveContract",
+  "withdrawFreelancer",
+  "claimEmployerRefund",
+  "openDispute",
+  "resolveDispute",
+  "completeContract",
+  "startHourlySession",
+  "stopHourlySession",
+  "endHourlyContract",
+] as const;
+
+export type CopilotActionId = (typeof COPILOT_ACTION_IDS)[number];
+
+export const COPILOT_ROLES = ["Employer", "Freelancer", "Resolver", "Other"] as const;
+export type CopilotRoleLabel = (typeof COPILOT_ROLES)[number];
 
 export const COPILOT_FORBIDDEN_FIELDS = [
   "mint",
@@ -31,9 +68,26 @@ export const COPILOT_FORBIDDEN_FIELDS = [
   "award",
   "settlementAward",
   "availableActions",
+  "winner",
+  "loser",
+  "faultScore",
+  "recommendedAward",
+  "recommendedPayoutPercentage",
+  "resolverDecision",
+  "settlementInstruction",
 ] as const;
 
 export type CopilotForbiddenField = (typeof COPILOT_FORBIDDEN_FIELDS)[number];
+
+export const DISPUTE_FORBIDDEN_FIELDS = [
+  "winner",
+  "loser",
+  "faultScore",
+  "recommendedAward",
+  "recommendedPayoutPercentage",
+  "resolverDecision",
+  "settlementInstruction",
+] as const;
 
 const uiAmountString = z
   .string()
@@ -92,7 +146,118 @@ export const copilotRequestSchema = z
 
 export type CopilotRequest = z.infer<typeof copilotRequestSchema>;
 
-export const copilotResponseSchema = z
+export const copilotDeadlineFactSchema = z
+  .object({
+    type: z.string().min(1).max(64),
+    timestamp: z.number().int(),
+    passed: z.boolean(),
+    secondsRemaining: z.number().int().nullable(),
+    unlocksAction: z.enum(COPILOT_ACTION_IDS).nullable(),
+  })
+  .strict();
+
+export type CopilotDeadlineFact = z.infer<typeof copilotDeadlineFactSchema>;
+
+export const copilotFinancialFactsSchema = z
+  .object({
+    totalAmount: z.string().max(32),
+    trialAmount: z.string().max(32),
+    mainAmount: z.string().max(32),
+    allocatedAmount: z.string().max(32),
+    releasedAmount: z.string().max(32),
+    withdrawnAmount: z.string().max(32),
+    refundedAmount: z.string().max(32),
+    streamReleasedAmount: z.string().max(32),
+    freelancerSettlementAmount: z.string().max(32),
+    employerRefundableAmount: z.string().max(32),
+    contestedAmount: z.string().max(32),
+    collectableAmount: z.string().max(32),
+    claimableAmount: z.string().max(32),
+  })
+  .strict();
+
+export type CopilotFinancialFacts = z.infer<typeof copilotFinancialFactsSchema>;
+
+export const copilotWorkFactSchema = z
+  .object({
+    kind: z.string().max(32),
+    status: z.string().max(32),
+    amount: z.string().max(32),
+    actionDeadline: z.number().int(),
+    revisionCount: z.number().int().min(0),
+  })
+  .strict();
+
+export const copilotContractExplanationSchema = z
+  .object({
+    summary: z.string().min(1).max(2000),
+    currentState: z.string().min(1).max(800),
+    financialSummary: z.string().min(1).max(800),
+    workSummary: z.string().min(1).max(800),
+    deadlineSummary: z.string().min(1).max(800),
+    availableActions: z.array(z.enum(COPILOT_ACTION_IDS)).max(32),
+    nextExpectedStep: z.string().min(1).max(800),
+    warnings: z.array(z.string().max(400)).max(12),
+    financialFacts: copilotFinancialFactsSchema,
+    deadlines: z.array(copilotDeadlineFactSchema).max(16),
+  })
+  .strict();
+
+export type CopilotContractExplanation = z.infer<typeof copilotContractExplanationSchema>;
+
+export const copilotActionExplanationSchema = z
+  .object({
+    actionId: z.enum(COPILOT_ACTION_IDS),
+    displayName: z.string().min(1).max(80),
+    currentlyAvailable: z.boolean(),
+    actorRole: z.enum(COPILOT_ROLES),
+    explanation: z.string().min(1).max(2000),
+    consequence: z.string().min(1).max(800),
+    requiresWalletSignature: z.boolean(),
+    warnings: z.array(z.string().max(400)).max(12),
+  })
+  .strict();
+
+export type CopilotActionExplanation = z.infer<typeof copilotActionExplanationSchema>;
+
+export const copilotDisputeSummarySchema = z
+  .object({
+    contractFacts: z.string().min(1).max(800),
+    lifecycleSummary: z.string().min(1).max(1200),
+    financialFacts: copilotFinancialFactsSchema,
+    workFacts: z.array(copilotWorkFactSchema).max(64),
+    deadlines: z.array(copilotDeadlineFactSchema).max(16),
+    selectedEvidence: z.array(z.string().max(400)).max(12),
+    missingEvidence: z.array(z.string().max(400)).max(12),
+    unresolvedQuestions: z.array(z.string().max(400)).max(12),
+    neutralSummary: z.string().min(1).max(2000),
+    warnings: z.array(z.string().max(400)).max(12),
+  })
+  .strict();
+
+export type CopilotDisputeSummary = z.infer<typeof copilotDisputeSummarySchema>;
+
+export const copilotNarrativeSchema = z
+  .object({
+    summary: z.string().min(1).max(2000),
+    currentState: z.string().max(800).optional(),
+    financialSummary: z.string().max(800).optional(),
+    workSummary: z.string().max(800).optional(),
+    deadlineSummary: z.string().max(800).optional(),
+    nextExpectedStep: z.string().max(800).optional(),
+    explanation: z.string().max(2000).optional(),
+    consequence: z.string().max(800).optional(),
+    lifecycleSummary: z.string().max(1200).optional(),
+    contractFacts: z.string().max(800).optional(),
+    neutralSummary: z.string().max(2000).optional(),
+    unresolvedQuestions: z.array(z.string().max(400)).max(12).optional(),
+    warnings: z.array(z.string().max(400)).max(12),
+  })
+  .strict();
+
+export type CopilotNarrative = z.infer<typeof copilotNarrativeSchema>;
+
+export const copilotCreateResponseSchema = z
   .object({
     mode: z.literal(COPILOT_CREATE_MODE),
     source: z.enum(["model", "deterministic"]),
@@ -101,7 +266,57 @@ export const copilotResponseSchema = z
   })
   .strict();
 
+export const copilotContractResponseSchema = z
+  .object({
+    mode: z.literal("contract"),
+    source: z.enum(["model", "deterministic"]),
+    role: z.enum(COPILOT_ROLES),
+    explanation: copilotContractExplanationSchema,
+    warnings: z.array(z.string().max(400)).max(16),
+    privateMessagesIncluded: z.literal(false),
+  })
+  .strict();
+
+export const copilotActionResponseSchema = z
+  .object({
+    mode: z.literal("action"),
+    source: z.enum(["model", "deterministic"]),
+    role: z.enum(COPILOT_ROLES),
+    action: copilotActionExplanationSchema,
+    availableActions: z.array(z.enum(COPILOT_ACTION_IDS)).max(32),
+    warnings: z.array(z.string().max(400)).max(16),
+    privateMessagesIncluded: z.literal(false),
+  })
+  .strict();
+
+export const copilotDisputeResponseSchema = z
+  .object({
+    mode: z.literal("dispute"),
+    source: z.enum(["model", "deterministic"]),
+    role: z.enum(COPILOT_ROLES),
+    summary: copilotDisputeSummarySchema,
+    availableActions: z.array(z.enum(COPILOT_ACTION_IDS)).max(32),
+    warnings: z.array(z.string().max(400)).max(16),
+    privateMessagesIncluded: z.literal(false),
+  })
+  .strict();
+
+export const copilotResponseSchema = z.discriminatedUnion("mode", [
+  copilotCreateResponseSchema,
+  copilotContractResponseSchema,
+  copilotActionResponseSchema,
+  copilotDisputeResponseSchema,
+]);
+
+export type CopilotCreateResponse = z.infer<typeof copilotCreateResponseSchema>;
+export type CopilotContractResponse = z.infer<typeof copilotContractResponseSchema>;
+export type CopilotActionResponse = z.infer<typeof copilotActionResponseSchema>;
+export type CopilotDisputeResponse = z.infer<typeof copilotDisputeResponseSchema>;
 export type CopilotResponse = z.infer<typeof copilotResponseSchema>;
+export type CopilotLiveResponse =
+  | CopilotContractResponse
+  | CopilotActionResponse
+  | CopilotDisputeResponse;
 
 export class CopilotSchemaError extends Error {
   constructor(message: string) {
@@ -119,6 +334,12 @@ export function forbiddenFieldsIn(value: unknown): string[] {
   const rec = asRecord(value);
   if (!rec) return [];
   return COPILOT_FORBIDDEN_FIELDS.filter((key) => key in rec);
+}
+
+export function disputeForbiddenFieldsIn(value: unknown): string[] {
+  const rec = asRecord(value);
+  if (!rec) return [];
+  return DISPUTE_FORBIDDEN_FIELDS.filter((key) => key in rec);
 }
 
 export function parseCreateProposal(value: unknown): CopilotCreateProposal {
@@ -151,6 +372,68 @@ export function parseCopilotResponse(value: unknown): CopilotResponse {
   return parsed.data;
 }
 
-export function isBlock1Mode(mode: CopilotMode): mode is typeof COPILOT_CREATE_MODE {
+export function parseContractExplanation(value: unknown): CopilotContractExplanation {
+  const parsed = copilotContractExplanationSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new CopilotSchemaError("Contract explanation is invalid.");
+  }
+  return parsed.data;
+}
+
+export function parseActionExplanation(value: unknown): CopilotActionExplanation {
+  const forbidden = forbiddenFieldsIn(value);
+  if (forbidden.length > 0) {
+    throw new CopilotSchemaError(
+      `Action explanation must not control ${forbidden.join(", ")}.`
+    );
+  }
+  const parsed = copilotActionExplanationSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new CopilotSchemaError("Action explanation is invalid.");
+  }
+  return parsed.data;
+}
+
+export function parseDisputeSummary(value: unknown): CopilotDisputeSummary {
+  const forbidden = disputeForbiddenFieldsIn(value);
+  if (forbidden.length > 0) {
+    throw new CopilotSchemaError(
+      `Dispute summary must not include ${forbidden.join(", ")}.`
+    );
+  }
+  const parsed = copilotDisputeSummarySchema.safeParse(value);
+  if (!parsed.success) {
+    throw new CopilotSchemaError("Dispute summary is invalid.");
+  }
+  return parsed.data;
+}
+
+export function parseNarrative(value: unknown): CopilotNarrative {
+  const forbidden = forbiddenFieldsIn(value);
+  if (forbidden.length > 0) {
+    throw new CopilotSchemaError(
+      `Narrative must not control ${forbidden.join(", ")}.`
+    );
+  }
+  const parsed = copilotNarrativeSchema.safeParse(value);
+  if (!parsed.success) {
+    throw new CopilotSchemaError("Assistant narrative is invalid.");
+  }
+  return parsed.data;
+}
+
+export function isCreateMode(mode: CopilotMode): mode is typeof COPILOT_CREATE_MODE {
   return mode === COPILOT_CREATE_MODE;
 }
+
+export function isLiveMode(mode: CopilotMode): mode is CopilotLiveMode {
+  return (COPILOT_LIVE_MODES as readonly string[]).includes(mode);
+}
+
+export function isKnownActionId(value: string): value is CopilotActionId {
+  return (COPILOT_ACTION_IDS as readonly string[]).includes(value);
+}
+
+/** @deprecated Use isCreateMode. Block 1 name kept for existing imports. */
+export const isBlock1Mode = isCreateMode;
+export const COPILOT_BLOCK1_MODES = [COPILOT_CREATE_MODE] as const;

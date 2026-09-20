@@ -117,7 +117,7 @@ test("runCreateAssistant treats a malicious prompt as data", async () => {
 test("snapshot offsets stay aligned with published identity and case facts", () => {
   assert.equal(CONTRACT_SNAPSHOT_OFFSETS.tokenMint, 73);
   assert.equal(CONTRACT_SNAPSHOT_OFFSETS.totalAmount, 116);
-  assert.equal(CONTRACT_SNAPSHOT_MIN_LEN, 364);
+  assert.equal(CONTRACT_SNAPSHOT_MIN_LEN, 372);
 });
 
 test("snapshot rejects invalid addresses and short/wrong-owner accounts", async () => {

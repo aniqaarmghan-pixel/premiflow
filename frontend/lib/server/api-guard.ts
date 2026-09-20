@@ -1,7 +1,12 @@
 import { AuthError, readSession } from "./auth/service";
 import { CaseAccessError, CaseStateError, CaseValidationError } from "./cases/service";
 import { CopilotSchemaError } from "@/lib/app/copilot-schemas";
-import { CopilotModeError, CopilotValidationError } from "./copilot/service";
+import {
+  CopilotAuthError,
+  CopilotModeError,
+  CopilotValidationError,
+} from "./copilot/service";
+import { ContractSnapshotError } from "./solana/read-contract-snapshot";
 import { CopilotProviderError } from "./copilot/provider";
 import { authConfigFromEnv, productionStores, type MessagingStores } from "./compose";
 import { getServerEnv, ServerConfigError, type ServerEnv } from "./env";
@@ -43,7 +48,14 @@ export function handleRouteError(err: unknown) {
             : 401;
     return jsonError(status, err.code, err.message);
   }
-  if (err instanceof ContractPartiesError || err instanceof ContractCaseFactsError) {
+  if (err instanceof CopilotAuthError) {
+    return jsonError(401, "unauthenticated", err.message);
+  }
+  if (
+    err instanceof ContractPartiesError ||
+    err instanceof ContractCaseFactsError ||
+    err instanceof ContractSnapshotError
+  ) {
     if (err.code === "rpc_failure") {
       return jsonError(502, "rpc_unavailable", "Contract parties could not be checked.");
     }

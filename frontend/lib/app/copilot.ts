@@ -27,7 +27,7 @@ import {
 export const CREATE_COPILOT = {
   title: "Describe your job",
   subtitle:
-    "PREMIFLOW Copilot can suggest a contract type and terms. You review and edit everything before Create.",
+    "PREMIFLOW Assistant can suggest a contract type and terms. You review and edit everything before Create.",
   placeholder:
     "I need a designer for a 30-day project with three milestones and a paid trial.",
   generate: "Suggest terms",
@@ -35,14 +35,14 @@ export const CREATE_COPILOT = {
   dismiss: "Keep editing myself",
   generating: "Reading your description…",
   providerUnavailable:
-    "Live Copilot is not configured. PREMIFLOW suggested conservative terms from your description. Edit anything before Create.",
+    "Live Assistant is not configured. PREMIFLOW suggested conservative terms from your description. Edit anything before Create.",
   sessionHint:
     "Verify your wallet in Messages if you want model-backed suggestions. Manual Create still works.",
-  rateLimited: "Too many Copilot requests. Try again shortly.",
-  error: "Copilot could not prepare a proposal. Continue with the wizard.",
+  rateLimited: "Too many Assistant requests. Try again shortly.",
+  error: "The Assistant could not prepare a proposal. Continue with the wizard.",
   applied: "Suggested terms were copied into the wizard. Review every field before Create.",
   cannotApply: "This suggestion cannot be applied. Continue with the wizard.",
-  neverCreates: "Copilot never creates or funds a contract.",
+  neverCreates: "PREMIFLOW Assistant never creates or funds a contract.",
 } as const;
 
 export type CreateCopilotState =
@@ -272,7 +272,7 @@ export function deterministicCreateProposal(prompt: string): CopilotCreatePropos
 
 export function createSystemContext(): string {
   return [
-    "You are PREMIFLOW Copilot for contract creation only.",
+    "You are PREMIFLOW Assistant for contract creation only.",
     "You propose Create wizard fields. You never create, fund, sign, or send a transaction.",
     "You never choose mint, resolver, decimals, program ID, PDAs, instruction names, account maps, or settlement awards.",
     "Payment modes are distinct:",

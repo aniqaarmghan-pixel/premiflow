@@ -5,6 +5,8 @@ import { useAnchorWallet, useConnection, useWallet } from "@solana/wallet-adapte
 import { PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
+import { CopilotPanel } from "@/components/copilot/CopilotPanel";
+import { roleLabelForAssistant } from "@/lib/app/copilot-live";
 import { Lifecycle } from "@/components/contracts/Lifecycle";
 import { PaymentProgress } from "@/components/contracts/PaymentProgress";
 import { ResolutionCenter } from "@/components/contracts/ResolutionCenter";
@@ -496,37 +498,75 @@ export function ContractDetail({ address }: { address: string }) {
           <StatusBadge status={contract.status} label={presentStatus(contract.status)} />
         </header>
 
+        <nav className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
+          {[
+            ["#overview", "Overview"],
+            ["#work", "Work"],
+            ["#messages", "Messages"],
+            ["#resolution", "Resolution"],
+            ["#assistant", "PREMIFLOW Assistant ✦ AI"],
+          ].map(([href, label]) => (
+            <a
+              key={href}
+              href={href}
+              className={
+                href === "#assistant"
+                  ? "rounded-full border border-cyan/30 px-3 py-1 text-cyan"
+                  : "rounded-full border border-line px-3 py-1 text-ink-faint hover:text-ink"
+              }
+            >
+              {label}
+            </a>
+          ))}
+        </nav>
+
+        <div id="assistant">
+          <CopilotPanel
+            variant="live"
+            contractAddress={contract.address.toBase58()}
+            role={roleLabelForAssistant(role)}
+            paymentMode={presentType(contract.paymentMode)}
+            statusLabel={presentStatus(contract.status)}
+          />
+        </div>
+
         {openDisputeShown ||
         contract.status === "Disputed" ||
         contract.status === "Resolved" ? (
-          <ResolutionCenter
-            contract={contract}
-            units={units}
-            now={now}
-            decimals={decimals}
-            role={role}
-            hourlyState={hourlyState}
-            hourlySession={hourlySession}
-            showOpenGuidance={openDisputeShown}
-            category={disputeCategory}
-            onCategoryChange={setDisputeCategory}
-            description={disputeDescription}
-            onDescriptionChange={setDisputeDescription}
-            recoverGeneration={caseRecoverGeneration}
-            openSignature={caseOpenSignature}
-          />
-        ) : null}
+          <div id="resolution">
+            <ResolutionCenter
+              contract={contract}
+              units={units}
+              now={now}
+              decimals={decimals}
+              role={role}
+              hourlyState={hourlyState}
+              hourlySession={hourlySession}
+              showOpenGuidance={openDisputeShown}
+              category={disputeCategory}
+              onCategoryChange={setDisputeCategory}
+              description={disputeDescription}
+              onDescriptionChange={setDisputeDescription}
+              recoverGeneration={caseRecoverGeneration}
+              openSignature={caseOpenSignature}
+            />
+          </div>
+        ) : (
+          <div id="resolution" />
+        )}
 
         <Card className="p-5">
           <Lifecycle contract={contract} />
         </Card>
 
-        <ContractMessages
-          role={role}
-          paymentMode={contract.paymentMode}
-          contractAddress={contract.address.toBase58()}
-          contractTitle={metadata?.title || "Protected contract"}
-        />
+        <div id="messages">
+          <ContractMessages
+            role={role}
+            paymentMode={contract.paymentMode}
+            contractAddress={contract.address.toBase58()}
+            contractTitle={metadata?.title || "Protected contract"}
+          />
+        </div>
 
         {contract.paymentMode === "Hourly" ? (
           <HourlyShowcase
@@ -573,7 +613,7 @@ export function ContractDetail({ address }: { address: string }) {
         <div className="grid gap-4 lg:grid-cols-2">
           <PaymentProgress contract={contract} decimals={decimals} />
           <Card className="p-5">
-            <p className="text-xs uppercase tracking-[0.16em] text-ink-faint">Overview</p>
+            <p id="overview" className="text-xs uppercase tracking-[0.16em] text-ink-faint">Overview</p>
             <h2 className="mt-1 font-display text-2xl">Parties & terms</h2>
             {metadata?.description ? (
               <p className="mt-3 text-sm leading-6 text-ink-soft">{metadata.description}</p>
@@ -606,6 +646,7 @@ export function ContractDetail({ address }: { address: string }) {
           </Card>
         </div>
 
+        <div id="work" className="space-y-4">
         {contract.trialAmount > 0n ? (
           <Card className="p-5">
             <h2 className="font-display text-2xl">Paid trial</h2>
@@ -676,6 +717,7 @@ export function ContractDetail({ address }: { address: string }) {
             </div>
           </Card>
         ) : null}
+        </div>
 
         {["Cancelled", "Completed", "Resolved", "ActivationRejected", "Declined", "Expired"].includes(
           contract.status

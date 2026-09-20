@@ -4,11 +4,13 @@ export const COPILOT_MAX_UNTRUSTED_CHARS = 2_000;
 const INJECTION_MARKERS = [
   "ignore previous instructions",
   "ignore all previous",
+  "ignore premiflow",
   "disregard previous",
   "you are now",
   "system prompt",
   "developer message",
   "transfer all escrow",
+  "send the escrow",
   "drain escrow",
   "sign the transaction",
   "send the transaction",

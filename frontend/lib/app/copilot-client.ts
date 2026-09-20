@@ -1,4 +1,8 @@
-import type { CopilotResponse } from "@/lib/app/copilot-schemas";
+import type {
+  CopilotCreateResponse,
+  CopilotLiveResponse,
+  CopilotLiveMode,
+} from "@/lib/app/copilot-schemas";
 
 export type CopilotClientError = {
   status: number;
@@ -31,10 +35,27 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return json as T;
 }
 
-export function requestCreateProposal(prompt: string): Promise<CopilotResponse> {
-  return request<CopilotResponse>("/api/copilot", {
+export function requestCreateProposal(prompt: string): Promise<CopilotCreateResponse> {
+  return request<CopilotCreateResponse>("/api/copilot", {
     method: "POST",
     body: JSON.stringify({ mode: "create", prompt }),
+  });
+}
+
+export function requestLiveAssistant(input: {
+  mode: CopilotLiveMode;
+  prompt: string;
+  contractAddress: string;
+  selectedAction?: string;
+}): Promise<CopilotLiveResponse> {
+  return request<CopilotLiveResponse>("/api/copilot", {
+    method: "POST",
+    body: JSON.stringify({
+      mode: input.mode,
+      prompt: input.prompt,
+      contractAddress: input.contractAddress,
+      selectedAction: input.selectedAction,
+    }),
   });
 }
 

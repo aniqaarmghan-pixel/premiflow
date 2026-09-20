@@ -14,7 +14,7 @@ import {
   isCopilotClientError,
   requestCreateProposal,
 } from "@/lib/app/copilot-client";
-import type { CopilotCreateProposal, CopilotResponse } from "@/lib/app/copilot-schemas";
+import type { CopilotCreateProposal, CopilotCreateResponse } from "@/lib/app/copilot-schemas";
 import { presentType } from "@/lib/app/view-model";
 import type { CreateWizardDraft } from "@/lib/app/validation";
 
@@ -27,7 +27,7 @@ export function CreateCopilotCard({
 }) {
   const [prompt, setPrompt] = useState("");
   const [state, setState] = useState<CreateCopilotState>("idle");
-  const [response, setResponse] = useState<CopilotResponse | null>(null);
+  const [response, setResponse] = useState<CopilotCreateResponse | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
   async function generate() {
@@ -75,7 +75,7 @@ export function CreateCopilotCard({
   return (
     <Card className="mb-6 p-5">
       <p className="text-xs font-semibold uppercase tracking-[0.14em] text-ink-faint">
-        PREMIFLOW Copilot
+        PREMIFLOW Assistant ✦ AI
       </p>
       <h2 className="mt-1 font-display text-2xl">{CREATE_COPILOT.title}</h2>
       <p className="mt-1 text-sm text-ink-soft">{CREATE_COPILOT.subtitle}</p>
@@ -127,7 +127,7 @@ function ProposalPreview({
   source,
 }: {
   proposal: CopilotCreateProposal;
-  source?: CopilotResponse["source"];
+  source?: CopilotCreateResponse["source"];
 }) {
   return (
     <div className="mt-4 space-y-3 rounded-2xl border border-line bg-paper-2 px-4 py-3">
