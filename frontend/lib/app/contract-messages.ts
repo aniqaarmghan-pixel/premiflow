@@ -6,15 +6,15 @@ export const CONTRACT_MESSAGES_CONNECTING =
   "Contract messaging is being connected.";
 
 /**
- * H4 runtime status. Do not claim persistence, encryption, or send.
- * There is no message API, session store, or database in this app yet.
+ * H4b: private message APIs exist. Persistence requires DATABASE_URL.
+ * Messages are not end-to-end encrypted.
  */
 export const CONTRACT_MESSAGING_STATUS = {
-  connected: false,
-  persistent: false,
+  connected: true,
+  persistent: true,
   encrypted: false,
   authenticated: false,
-  sendEnabled: false,
+  sendEnabled: true,
   localOnlySendForbidden: true,
   storesOnChain: false,
 } as const;
@@ -56,6 +56,7 @@ export const CONTRACT_MESSAGE_AUTH_PLAN = {
 export const CONTRACT_MESSAGE_PERSISTENCE = {
   recommended: "app_database" as const,
   installInH4: false,
+  implementedInH4b: true,
   comparison: {
     app_database:
       "Smallest production-safe path once PREMIFLOW adds a server session store and a queryable private table keyed by contract address.",
@@ -222,21 +223,21 @@ export function contractMessagesCopy(role: ContractRole): {
 } {
   if (role === "resolver") {
     return {
-      status: CONTRACT_MESSAGES_CONNECTING,
+      status: "Unavailable",
       body: "Private contract messages stay between the employer and freelancer. The resolver does not automatically read this conversation. Only a message snapshot a party later submits as dispute evidence would appear in Resolution Center.",
       audience: "Resolver is not a chat participant.",
     };
   }
   if (!isContractMessageParticipant(role)) {
     return {
-      status: CONTRACT_MESSAGES_CONNECTING,
-      body: "Only this contract's employer and freelancer will be able to use Contract Messages after messaging is connected.",
+      status: "Unavailable",
+      body: "Only this contract's employer and freelancer can use Contract Messages.",
       audience: "You are not a contract-message participant.",
     };
   }
   return {
-    status: CONTRACT_MESSAGES_CONNECTING,
-    body: "PREMIFLOW does not store contract messages yet. There is no Send control because a message typed here would not persist after refresh and would not be authenticated.",
+    status: "Verify wallet",
+    body: "Verify your wallet to open private messages. Send is available only after a verified employer or freelancer session.",
     audience: "Employer and freelancer only.",
   };
 }

@@ -473,7 +473,12 @@ export function ContractDetail({ address }: { address: string }) {
           <Lifecycle contract={contract} />
         </Card>
 
-        <ContractMessages role={role} paymentMode={contract.paymentMode} />
+        <ContractMessages
+          role={role}
+          paymentMode={contract.paymentMode}
+          contractAddress={contract.address.toBase58()}
+          contractTitle={metadata?.title || "Protected contract"}
+        />
 
         {contract.paymentMode === "Hourly" ? (
           <HourlyShowcase

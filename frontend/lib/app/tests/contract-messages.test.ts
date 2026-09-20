@@ -3,7 +3,6 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
-  CONTRACT_MESSAGES_CONNECTING,
   CONTRACT_MESSAGES_TITLE,
   CONTRACT_MESSAGE_AI_POLICY,
   CONTRACT_MESSAGE_AUTH_PLAN,
@@ -37,7 +36,10 @@ test("Messages are available for all four contract types", () => {
     new URL("../../../components/contracts/ContractDetail.tsx", import.meta.url),
     "utf8"
   );
-  assert.match(detail, /<ContractMessages role=\{role\} paymentMode=\{contract\.paymentMode\} \/>/);
+  assert.match(
+    detail,
+    /<ContractMessages[\s\S]*role=\{role\}[\s\S]*paymentMode=\{contract\.paymentMode\}[\s\S]*contractAddress=\{contract\.address\.toBase58\(\)\}/
+  );
   assert.doesNotMatch(detail, /paymentMode === "Hourly"[\s\S]{0,80}ContractMessages/);
 });
 
@@ -63,28 +65,25 @@ test("resolver is not automatically a chat participant", () => {
 });
 
 test("no fake messages and no local-only Send flow", () => {
-  assert.equal(CONTRACT_MESSAGING_STATUS.connected, false);
-  assert.equal(CONTRACT_MESSAGING_STATUS.persistent, false);
-  assert.equal(CONTRACT_MESSAGING_STATUS.sendEnabled, false);
+  assert.equal(CONTRACT_MESSAGING_STATUS.connected, true);
+  assert.equal(CONTRACT_MESSAGING_STATUS.persistent, true);
+  assert.equal(CONTRACT_MESSAGING_STATUS.sendEnabled, true);
   assert.equal(CONTRACT_MESSAGING_STATUS.localOnlySendForbidden, true);
   assert.equal(CONTRACT_MESSAGING_STATUS.encrypted, false);
   assert.equal(CONTRACT_MESSAGING_STATUS.storesOnChain, false);
   assert.equal(localOnlySendIsPresentedAsPersistent(), false);
   assert.equal(CONTRACT_MESSAGES_TITLE, "Messages");
-  assert.equal(contractMessagesCopy("employer").status, CONTRACT_MESSAGES_CONNECTING);
 
   const panel = readFileSync(
     new URL("../../../components/contracts/ContractMessages.tsx", import.meta.url),
     "utf8"
   );
-  assert.match(panel, /CONTRACT_MESSAGES_CONNECTING|copy\.status/);
   assert.match(panel, /CONTRACT_MESSAGES_TITLE/);
-  assert.doesNotMatch(panel, /<button[^>]*>\s*Send/);
-  assert.doesNotMatch(panel, /type=["']submit["']/);
-  assert.doesNotMatch(panel, /localStorage|sessionStorage|useState\(\[\]\)/);
+  assert.match(panel, /shouldShowComposer/);
+  assert.doesNotMatch(panel, /localStorage|sessionStorage/);
   assert.doesNotMatch(panel, /Please work on the dashboard first/);
-  assert.doesNotMatch(panel, /end-to-end encrypted|E2E/);
-  assert.match(panel, /not encrypted yet/i);
+  assert.doesNotMatch(panel, /end-to-end encrypted|E2EE/);
+  assert.match(panel, /CHAT_CARD_PRIVACY/);
 });
 
 test("support, messages, dispute, and assistant stay distinct", () => {
@@ -138,6 +137,7 @@ test("wallet address JSON claims are not authentication", () => {
 test("persistence recommendation stays off-chain and uninstalled in H4", () => {
   assert.equal(CONTRACT_MESSAGE_PERSISTENCE.recommended, "app_database");
   assert.equal(CONTRACT_MESSAGE_PERSISTENCE.installInH4, false);
+  assert.equal(CONTRACT_MESSAGE_PERSISTENCE.implementedInH4b, true);
   assert.match(CONTRACT_MESSAGE_PERSISTENCE.comparison.on_chain, /Rejected/);
   assert.ok(CONTRACT_MESSAGING_BACKEND_REQUIRED.length >= 4);
   assert.equal(WHATSAPP_RECOMMENDATION.required, false);

@@ -8,15 +8,18 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test lib/streampay-v2/tests/*.test.ts lib/app/tests/*.test.ts"
+    "test": "tsx --test lib/streampay-v2/tests/*.test.ts lib/app/tests/*.test.ts lib/server/tests/*.test.ts"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",
+    "@neondatabase/serverless": "^1.1.0",
+    "@noble/curves": "^2.4.0",
     "@solana/spl-token": "^0.4.15",
     "@solana/wallet-adapter-react": "^0.15.40",
     "@solana/wallet-adapter-react-ui": "^0.9.40",
     "@solana/wallet-adapter-wallets": "^0.19.39",
     "@solana/web3.js": "^1.99.0",
+    "drizzle-orm": "^0.45.2",
     "framer-motion": "^13.4.0",
     "lucide-react": "^1.47.0",
     "next": "16.3.5",
@@ -29,6 +32,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "drizzle-kit": "^0.31.10",
     "eslint": "^9",
     "eslint-config-next": "16.3.5",
     "tailwindcss": "^4",
