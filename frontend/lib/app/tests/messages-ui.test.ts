@@ -52,14 +52,15 @@ test("compact Messages card opens a chat dialog and does not inline the thread",
   assert.match(PANEL, /latestMessagePreview/);
   assert.equal(conversationRendersOnContractPage(false), false);
   assert.doesNotMatch(PANEL, /messages\.map\(\(message\) =>/);
-  assert.match(DIALOG, /messages\.map\(\(message\) =>/);
+  assert.match(DIALOG, /items\.map\(\(item\) =>/);
+  assert.match(DIALOG, /ChatMessageBubble/);
 });
 
 test("chat dialog closes from Close and overlay, and uses a bounded history scroller", () => {
   assert.match(DIALOG, /aria-label=\{CLOSE_CHAT_LABEL\}/);
   assert.match(DIALOG, /aria-label="Close chat overlay"/);
   assert.match(DIALOG, /role="dialog"/);
-  assert.match(DIALOG, /sm:h-\[80vh\]/);
+  assert.match(DIALOG, /sm:h-\[min\(90vh,56rem\)\]/);
   assert.match(DIALOG, /h-\[100dvh\]/);
   assert.match(DIALOG, /min-h-0 flex-1 overflow-y-auto/);
   assert.match(DIALOG, /shrink-0 border-t/);
@@ -96,10 +97,8 @@ test("Send is available only after a verified participant session", () => {
 
 test("failed send keeps the draft and offers Retry", () => {
   assert.match(PANEL, /setSendFailed\(true\)/);
-  assert.match(
-    PANEL,
-    /setMessages\(\(current\) => mergeMessagesById\(current, \[result\.message\]\)\);\s*setDraft\(""\);/
-  );
+  assert.match(PANEL, /setDraft\(""\)/);
+  assert.match(PANEL, /mergeMessagesById\(current, \[result\.message\]\)/);
   assert.match(PANEL, /\} catch \{\s*setSendFailed\(true\);/);
   assert.match(DIALOG, /CONTRACT_MESSAGES_TARGET_UX\.failedSend/);
   assert.match(DIALOG, /aria-label="Retry"/);
@@ -214,5 +213,23 @@ test("resolver and AI still have no automatic thread access", () => {
   assert.equal(FUTURE_CHAT_ACTIONS.reply, false);
   assert.equal(FUTURE_CHAT_ACTIONS.addToDisputeEvidence, false);
   assert.equal(FUTURE_CHAT_ACTIONS.premiflowAssistant, false);
-  assert.doesNotMatch(UI, /Attach file|Reply to this message|Ask PREMIFLOW Assistant/);
+  assert.doesNotMatch(UI, /Ask PREMIFLOW Assistant/);
+  assert.match(DIALOG, /ATTACHMENTS_COMING_NEXT_LABEL/);
+  assert.match(DIALOG, /disabled/);
+  assert.doesNotMatch(DIALOG, /type="file"/);
+});
+
+test("premium workspace loads older near top, jumps to latest, and does not force-scroll while reading", () => {
+  assert.match(DIALOG, /isNearTop/);
+  assert.match(DIALOG, /preserveScrollAfterPrepend/);
+  assert.match(DIALOG, /JUMP_TO_LATEST_LABEL/);
+  assert.match(DIALOG, /groupMessagesWithDateSeparators/);
+  assert.match(DIALOG, /shouldForceScrollOnIncoming\(followNewest\)/);
+  assert.match(PANEL, /detectNewActivityWhileReading/);
+  assert.match(PANEL, /loadingEarlier/);
+  assert.match(PANEL, /canRequestEarlierPage/);
+  assert.match(PANEL, /formatUnreadBadge/);
+  assert.match(DIALOG, /max-h-40/);
+  assert.match(DIALOG, /aria-label="Write a message"/);
+  assert.match(DIALOG, /aria-label="Send"/);
 });

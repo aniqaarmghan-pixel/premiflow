@@ -438,7 +438,7 @@ export function actionLabel(
     case "finalizeReviewTimeout":
       return "Release after timeout";
     case "releaseStreamAccrual":
-      return "Record earned pay";
+      return "Release accrued pay";
     case "cancelActiveContract":
       return "Cancel contract";
     case "withdrawFreelancer":

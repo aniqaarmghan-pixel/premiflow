@@ -603,9 +603,12 @@ export function ContractDetail({ address }: { address: string }) {
               contract={contract}
               now={now}
               decimals={decimals}
+              role={role}
               canRelease={actions.includes("releaseStreamAccrual")}
+              canCollect={actions.includes("withdrawFreelancer")}
               busy={tx.busy}
               onRelease={() => requestAction("releaseStreamAccrual")}
+              onCollect={() => requestAction("withdrawFreelancer")}
             />
           </>
         ) : null}
@@ -1425,9 +1428,9 @@ function ConfirmBody({
     return (
       <div className="space-y-3 text-sm leading-6 text-ink-soft">
         <p>
-          Record earned pay writes the program&apos;s accrued amount into released
-          accounting. It does not transfer tokens. The freelancer collects available
-          pay separately.
+          Release accrued pay writes the program&apos;s newly accrued amount into
+          released accounting. It does not transfer tokens. The freelancer collects
+          available pay separately. Collect does not end the stream.
         </p>
         <p>
           The live number on this page is a display estimate only and is not sent as

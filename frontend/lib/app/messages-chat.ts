@@ -6,6 +6,8 @@ import type { MessagesPanelState } from "./messages-panel";
 export const OPEN_CHAT_LABEL = "Open chat";
 export const CLOSE_CHAT_LABEL = "Close";
 export const LOAD_EARLIER_LABEL = "Load earlier messages";
+export const MESSAGES_WORKSPACE_CONNECTED = "Connected";
+export const MESSAGES_WORKSPACE_HEADING = "Messages";
 
 export const CHAT_VERIFY_COPY = {
   headline: "Verify once to keep your contract messages private.",

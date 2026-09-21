@@ -19,7 +19,15 @@ export function estimateStreamAccrualDisplayMs(
 }
 
 export const STREAMING_PAY_EXPLAINER =
-  "Streaming pay accrues automatically with time while the contract is active. Recording earned pay does not transfer tokens. The freelancer collects available pay separately.";
+  "Streaming pay accrues automatically with time while the contract is Active. Accrued value is a display estimate. Release accrued pay records newly accrued value as available for collection — it does not transfer tokens. Collect moves already released tokens from escrow to the freelancer wallet and does not end the stream.";
+
+export const STREAMING_RELEASE_LABEL = "Release accrued pay";
+export const STREAMING_RELEASE_HINT =
+  "This records newly accrued streaming pay as available for collection. It does not transfer tokens.";
+export const STREAMING_COLLECT_HINT =
+  "Collect does not end the stream. While the contract stays Active, more pay can accrue, then be released and collected again.";
+export const STREAMING_ZERO_AVAILABLE_HINT =
+  "Zero available to collect does not mean the stream is complete while the contract remains Active.";
 
 export const STREAMING_TRIAL_STARTED_HEADLINE =
   "Trial approved — main contract started.";
@@ -51,9 +59,9 @@ export const STREAMING_DASHBOARD_LABELS = {
   elapsed: "Time elapsed",
   remaining: "Time remaining",
   hourlyRate: "Equivalent hourly rate",
-  earnedSoFar: "Earned so far",
-  alreadyRecorded: "Recorded for collection",
-  alreadyCollected: "Already collected",
+  earnedSoFar: "Earned so far (accrued)",
+  alreadyRecorded: "Released / recorded",
+  alreadyCollected: "Collected",
   availableToCollect: "Available to collect",
   remainingEscrow: "Remaining escrow",
 } as const;

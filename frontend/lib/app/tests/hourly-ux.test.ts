@@ -344,7 +344,9 @@ test("Collect pay gating", () => {
     now: 1_700_000_010,
   });
   assert.ok(released.includes("withdrawFreelancer"));
-  assert.match(HOURLY_COPY.collectExplain, /Collecting transfers/i);
+  assert.match(HOURLY_COPY.collectExplain, /Collect transfers/i);
+  assert.match(HOURLY_COPY.collectExplain, /does not end the contract/i);
+  assert.match(HOURLY_COPY.openSessionNotCollectable, /after you stop/i);
   assert.match(stopHourlyCopy().points.join(" "), /not automatically transferred/i);
 });
 
@@ -643,4 +645,59 @@ test("active session index sentinel is not a real session", () => {
     }),
     true
   );
+});
+
+test("Hourly salary workspace surfaces rate, session, balances, and gated Collect", () => {
+  const source = readFileSync(
+    new URL("../../../components/contracts/HourlyShowcase.tsx", import.meta.url),
+    "utf8"
+  );
+  assert.match(source, /Hourly rate/);
+  assert.match(source, /HOURLY_COPY\.runningStatus/);
+  assert.match(source, /formatElapsedClock/);
+  assert.match(source, /openSessionNotCollectable/);
+  assert.match(source, /Recorded \/ worked time/);
+  assert.match(source, /Earned \/ released/);
+  assert.match(source, /Collected/);
+  assert.match(source, /Available to collect/);
+  assert.match(source, /Remaining budget/);
+  assert.match(source, /aria-label="Start work"/);
+  assert.match(source, /aria-label="Stop work"/);
+  assert.match(source, /canCollect && onCollect/);
+  assert.match(source, /onCollect/);
+  assert.match(source, /does not end the contract|collectExplain/);
+  assert.match(source, /display only — not\s+added to Available/);
+  assert.doesNotMatch(source, /status\s*=\s*"Completed"|contract\.status\s*=\s*"Completed"/);
+  assert.doesNotMatch(source, /availableToCollect \+ dash\.estimatedSessionValue|estimatedSessionValue \+/);
+
+  const open = makeHourlyState({ sessionCount: 1, activeSessionIndex: 0 });
+  const dash = hourlyDashboard(
+    hourlyContract({ releasedAmount: 80_000_000n }),
+    open,
+    makeHourlySession({ startedAt: 1_000 }),
+    1_000 + 3_600
+  );
+  assert.ok(dash?.hasActiveSession);
+  assert.equal(dash?.availableToCollect, 80_000_000n);
+  assert.ok(dash!.estimatedSessionValue > 0n);
+  assert.notEqual(dash!.availableToCollect, dash!.availableToCollect + dash!.estimatedSessionValue);
+
+  const withReleased = availableActions({
+    wallet: WALLET_B,
+    contract: hourlyContract({ releasedAmount: 10_000_000n }),
+    hourlyState: open,
+    now: 1_700_000_010,
+  });
+  assert.ok(withReleased.includes("withdrawFreelancer"));
+  assert.ok(withReleased.includes("stopHourlySession"));
+
+  const employer = availableActions({
+    wallet: WALLET_A,
+    contract: hourlyContract({ releasedAmount: 10_000_000n }),
+    hourlyState: makeHourlyState(),
+    now: 1_700_000_010,
+  });
+  assert.equal(employer.includes("withdrawFreelancer"), false);
+  assert.match(source, /role === "employer"/);
+  assert.equal(clientMethodForAction("withdrawFreelancer"), "withdrawFreelancer");
 });

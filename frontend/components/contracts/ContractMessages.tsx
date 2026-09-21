@@ -21,11 +21,18 @@ import {
 import {
   CHAT_CARD_PRIVACY,
   COMPACT_AUTH_STATUS,
+  MESSAGES_WORKSPACE_CONNECTED,
   OPEN_CHAT_LABEL,
   latestMessagePreview,
   otherParticipantLabel,
   shortContractChatLabel,
 } from "@/lib/app/messages-chat";
+import {
+  canRequestEarlierPage,
+  detectNewActivityWhileReading,
+  formatUnreadBadge,
+  newestMessageId,
+} from "@/lib/app/messages-history";
 import {
   createChallenge,
   fetchContractMessages,
@@ -79,8 +86,11 @@ export function ContractMessages({
   const [verifyError, setVerifyError] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [followNewest, setFollowNewest] = useState(true);
+  const [loadingEarlier, setLoadingEarlier] = useState(false);
+  const [newActivity, setNewActivity] = useState(false);
   const lastWallet = useRef<string | null>(connectedWallet);
   const cursorInitialized = useRef(false);
+  const newestIdRef = useRef<string | null>(null);
   const visible = useBrowserVisible();
 
   const clearConversation = useCallback(() => {
@@ -88,7 +98,10 @@ export function ContractMessages({
     setUnreadCount(0);
     setSendFailed(false);
     setNextCursor(null);
+    setLoadingEarlier(false);
+    setNewActivity(false);
     cursorInitialized.current = false;
+    newestIdRef.current = null;
   }, []);
 
   const applyApiError = useCallback((err: unknown) => {
@@ -100,7 +113,22 @@ export function ContractMessages({
 
   const loadConversation = useCallback(async () => {
     const page = await fetchContractMessages(contractAddress);
-    setMessages((current) => mergeMessagesById(current, page.messages));
+    setMessages((current) => {
+      const merged = mergeMessagesById(current, page.messages);
+      const previousNewest = newestIdRef.current;
+      const nextNewest = newestMessageId(merged);
+      if (
+        detectNewActivityWhileReading({
+          followNewest,
+          previousNewestId: previousNewest,
+          nextNewestId: nextNewest,
+        })
+      ) {
+        setNewActivity(true);
+      }
+      newestIdRef.current = nextNewest;
+      return merged;
+    });
     setUnreadCount(page.unreadCount);
     if (!cursorInitialized.current) {
       setNextCursor(page.nextCursor);
@@ -116,7 +144,7 @@ export function ContractMessages({
       }
     }
     setState("ready");
-  }, [contractAddress]);
+  }, [contractAddress, followNewest]);
 
   useEffect(() => {
     if (shouldClearConversationOnWalletChange(lastWallet.current, connectedWallet)) {
@@ -162,6 +190,7 @@ export function ContractMessages({
       }
       setState("loading");
       setFollowNewest(true);
+      setNewActivity(false);
       await loadConversation();
     } catch (err) {
       const api = err as ApiError;
@@ -203,7 +232,12 @@ export function ContractMessages({
     try {
       const result = await sendContractMessage(contractAddress, draft);
       setFollowNewest(true);
-      setMessages((current) => mergeMessagesById(current, [result.message]));
+      setNewActivity(false);
+      setMessages((current) => {
+        const merged = mergeMessagesById(current, [result.message]);
+        newestIdRef.current = newestMessageId(merged);
+        return merged;
+      });
       setDraft("");
     } catch {
       setSendFailed(true);
@@ -213,25 +247,35 @@ export function ContractMessages({
   }
 
   async function onLoadEarlier() {
-    if (!nextCursor) return;
+    if (!canRequestEarlierPage({ nextCursor, loadingEarlier })) return;
     setFollowNewest(false);
+    setLoadingEarlier(true);
     try {
       const page = await fetchContractMessages(contractAddress, { cursor: nextCursor });
       setMessages((current) => mergeMessagesById(current, page.messages));
       setNextCursor(page.nextCursor);
     } catch (err) {
       applyApiError(err);
+    } finally {
+      setLoadingEarlier(false);
     }
   }
 
   function openChat() {
     setFollowNewest(true);
+    setNewActivity(false);
     setChatOpen(true);
+  }
+
+  function jumpToLatest() {
+    setFollowNewest(true);
+    setNewActivity(false);
   }
 
   const composerOpen = shouldShowComposer(state) && participant;
   const canSend = composerOpen && !sending && validateMessageBody(draft).ok;
   const preview = state === "ready" ? latestMessagePreview(messages) : null;
+  const unreadLabel = formatUnreadBadge(unreadCount);
   const needsVerify =
     state === "unverified" ||
     state === "verifying" ||
@@ -252,13 +296,13 @@ export function ContractMessages({
             </p>
             <h2
               id="contract-messages-heading"
-              className="mt-1 flex items-center gap-2 font-display text-2xl"
+              className="mt-1 flex flex-wrap items-center gap-2 font-display text-2xl"
             >
               <MessagesSquare size={20} aria-hidden="true" />
               {CONTRACT_MESSAGES_TITLE}
-              {unreadCount > 0 ? (
+              {unreadLabel ? (
                 <span className="rounded-full bg-paper-2 px-2 py-0.5 text-xs font-semibold text-ink-soft">
-                  {unreadCount}
+                  {unreadLabel}
                 </span>
               ) : null}
             </h2>
@@ -292,6 +336,8 @@ export function ContractMessages({
         title={CONTRACT_MESSAGES_TITLE}
         subtitle={CONTRACT_MESSAGES_SUBTITLE}
         contractLabel={shortContractChatLabel(paymentMode, contractTitle)}
+        connectedLabel={state === "ready" ? MESSAGES_WORKSPACE_CONNECTED : null}
+        unreadLabel={unreadLabel}
         onClose={() => setChatOpen(false)}
       >
         {needsVerify ? (
@@ -325,8 +371,12 @@ export function ContractMessages({
             otherLabel={otherParticipantLabel(role)}
             empty={CONTRACT_MESSAGES_TARGET_UX.empty}
             nextCursor={nextCursor}
+            loadingEarlier={loadingEarlier}
             onLoadEarlier={() => void onLoadEarlier()}
             followNewest={followNewest}
+            onFollowNewestChange={setFollowNewest}
+            newActivity={newActivity}
+            onJumpToLatest={jumpToLatest}
           />
         ) : null}
 

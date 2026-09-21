@@ -82,12 +82,17 @@ export function HourlyShowcase({
     return (
       <div className="rounded-[24px] border border-line bg-card p-5">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-ink-faint">
-          Hourly dashboard
+          Hourly salary
         </p>
         <p className="mt-2 text-sm text-ink-soft">Hourly state is not loaded yet.</p>
       </div>
     );
   }
+
+  const collectLabel =
+    dash.availableToCollect > 0n
+      ? `Collect ${amount(dash.availableToCollect)}`
+      : "Collect pay";
 
   return (
     <div
@@ -104,7 +109,7 @@ export function HourlyShowcase({
               running ? "text-cyan" : "text-ink-faint"
             }`}
           >
-            Hourly dashboard
+            Hourly salary
           </p>
           <h3 className="mt-1 font-display text-2xl sm:text-3xl">
             {running ? HOURLY_COPY.runningTitle : presentHourlyHeadline(role, idle)}
@@ -112,12 +117,10 @@ export function HourlyShowcase({
         </div>
         <span
           className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            running
-              ? "bg-cyan/15 text-cyan"
-              : "bg-paper-2 text-ink-soft"
+            running ? "bg-cyan/15 text-cyan" : "bg-paper-2 text-ink-soft"
           }`}
         >
-          {running ? "Session open" : contract.status}
+          {running ? `${HOURLY_COPY.runningStatus}` : contract.status}
         </span>
       </div>
 
@@ -138,32 +141,98 @@ export function HourlyShowcase({
       ) : null}
 
       {running ? (
-        <div className="mt-4 space-y-3">
-          <p className="text-sm text-white/70">
+        <section className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-5" aria-labelledby="hourly-session-heading">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h4 id="hourly-session-heading" className="text-sm font-semibold uppercase tracking-[0.14em] text-cyan">
+              Work session
+            </h4>
+            <p className="text-sm text-white/70">
+              {HOURLY_COPY.runningStatus} · {formatElapsedClock(dash.displayElapsed)}
+            </p>
+          </div>
+          <p className="mt-3 text-sm text-white/70">
             Started {formatSessionStartedAt(dash.sessionStartedAt)}
           </p>
-          <p className="font-display text-4xl tabular-nums tracking-tight sm:text-5xl">
+          <p className="mt-2 font-display text-4xl tabular-nums tracking-tight sm:text-5xl">
             {formatElapsedClock(dash.displayElapsed)}
           </p>
-          <p className="text-sm text-white/60">
-            Estimated session value {amount(dash.estimatedSessionValue)} · display only
+          <p className="mt-2 text-sm text-white/60">
+            Estimated session value {amount(dash.estimatedSessionValue)} · display only — not
+            added to Available
           </p>
-          <p className="text-sm leading-6 text-white/70">{HOURLY_COPY.clockDisclaimer}</p>
+          <p className="mt-3 rounded-2xl bg-white/10 px-3 py-2 text-sm leading-6 text-white">
+            {HOURLY_COPY.openSessionNotCollectable}
+          </p>
+          <p className="mt-2 text-sm leading-6 text-white/70">{HOURLY_COPY.clockDisclaimer}</p>
           {dash.cappedAtEightHours ? (
-            <p className="rounded-2xl bg-white/10 px-3 py-2 text-sm leading-6 text-white">
+            <p className="mt-2 rounded-2xl bg-white/10 px-3 py-2 text-sm leading-6 text-white">
               {HOURLY_COPY.eightHourWarning}
             </p>
           ) : (
-            <p className="text-sm text-white/60">{HOURLY_COPY.eightHourRule}</p>
+            <p className="mt-2 text-sm text-white/60">{HOURLY_COPY.eightHourRule}</p>
           )}
           {dash.shortSessionMayVoid ? (
-            <p className="text-sm text-white/70">{HOURLY_COPY.shortSession}</p>
+            <p className="mt-2 text-sm text-white/70">{HOURLY_COPY.shortSession}</p>
           ) : null}
           {dash.finalRemainderRecorded ? (
-            <p className="text-sm text-white/70">{HOURLY_COPY.shortRemainder}</p>
+            <p className="mt-2 text-sm text-white/70">{HOURLY_COPY.shortRemainder}</p>
           ) : null}
-        </div>
+          {canStop && onStop ? (
+            <div className="mt-4">
+              <Button onClick={onStop} disabled={busy} variant="danger" aria-label="Stop work">
+                Stop work
+              </Button>
+            </div>
+          ) : null}
+        </section>
       ) : null}
+
+      <section className="mt-5" aria-labelledby="hourly-salary-heading">
+        <h4
+          id="hourly-salary-heading"
+          className={`text-sm font-semibold uppercase tracking-[0.14em] ${
+            running ? "text-white/70" : "text-ink-faint"
+          }`}
+        >
+          {HOURLY_COPY.salarySection}
+        </h4>
+        {role === "employer" ? (
+          <p className={`mt-2 text-sm leading-6 ${running ? "text-white/70" : "text-ink-soft"}`}>
+            {HOURLY_COPY.employerSalaryView}
+          </p>
+        ) : null}
+        <dl className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Mini running={running} label="Earned / released" value={amount(dash.earnedReleased)} />
+          <Mini running={running} label="Collected" value={amount(dash.collected)} />
+          <Mini
+            running={running}
+            label="Available to collect"
+            value={amount(dash.availableToCollect)}
+            emphasize
+          />
+          <Mini running={running} label="Remaining budget" value={amount(dash.unusedBudget)} />
+        </dl>
+        <p className={`mt-3 text-sm leading-6 ${running ? "text-white/70" : "text-ink-soft"}`}>
+          {HOURLY_COPY.earningsRecordedOnStop}
+        </p>
+        {canCollect && onCollect ? (
+          <div className="mt-4 flex flex-col gap-2">
+            <div>
+              <Button
+                onClick={onCollect}
+                disabled={busy}
+                variant={running ? "secondary" : "primary"}
+                aria-label={collectLabel}
+              >
+                {collectLabel}
+              </Button>
+            </div>
+            <p className={`text-sm leading-6 ${running ? "text-white/70" : "text-ink-soft"}`}>
+              {HOURLY_COPY.collectExplain} {HOURLY_COPY.collectDoesNotEndSession}
+            </p>
+          </div>
+        ) : null}
+      </section>
 
       <dl className="mt-5 grid gap-3 sm:grid-cols-2">
         <Mini running={running} label="Hourly rate" value={`${amount(dash.hourlyRate)} / hour`} />
@@ -174,7 +243,7 @@ export function HourlyShowcase({
         />
         <Mini
           running={running}
-          label="Recorded time"
+          label="Recorded / worked time"
           value={`${formatHourlyDuration(dash.approvedSeconds)} recorded`}
         />
         <Mini
@@ -183,10 +252,6 @@ export function HourlyShowcase({
           value={`${formatHourlyDuration(dash.remainingAuthorizedSeconds)} remaining`}
         />
         <Mini running={running} label="Maximum work budget" value={amount(dash.maxWorkBudget)} />
-        <Mini running={running} label="Released / earned" value={amount(dash.earnedReleased)} />
-        <Mini running={running} label="Collected" value={amount(dash.collected)} />
-        <Mini running={running} label="Available to collect" value={amount(dash.availableToCollect)} />
-        <Mini running={running} label="Unused budget" value={amount(dash.unusedBudget)} />
         <Mini running={running} label="Engagement" value={hourlyEngagementLabel(contract)} />
       </dl>
 
@@ -196,14 +261,9 @@ export function HourlyShowcase({
             Start work
           </Button>
         ) : null}
-        {canStop && onStop ? (
+        {!running && canStop && onStop ? (
           <Button onClick={onStop} disabled={busy} variant="danger" aria-label="Stop work">
             Stop work
-          </Button>
-        ) : null}
-        {canCollect && onCollect ? (
-          <Button onClick={onCollect} disabled={busy} variant="secondary" aria-label="Collect pay">
-            Collect pay
           </Button>
         ) : null}
         {canEnd && onEnd ? (
@@ -217,11 +277,6 @@ export function HourlyShowcase({
           </Button>
         ) : null}
       </div>
-      {canCollect ? (
-        <p className={`mt-3 text-sm leading-6 ${running ? "text-white/70" : "text-ink-soft"}`}>
-          {HOURLY_COPY.collectExplain}
-        </p>
-      ) : null}
     </div>
   );
 }
@@ -236,13 +291,19 @@ function Mini({
   label,
   value,
   running,
+  emphasize,
 }: {
   label: string;
   value: string;
   running: boolean;
+  emphasize?: boolean;
 }) {
   return (
-    <div className={`rounded-2xl px-3 py-3 ${running ? "bg-white/8" : "bg-paper"}`}>
+    <div
+      className={`rounded-2xl px-3 py-3 ${
+        running ? "bg-white/8" : emphasize ? "bg-paper-2 ring-1 ring-cyan/20" : "bg-paper"
+      }`}
+    >
       <p
         className={`text-[11px] uppercase tracking-wide ${
           running ? "text-white/45" : "text-ink-faint"
@@ -250,7 +311,7 @@ function Mini({
       >
         {label}
       </p>
-      <p className="mt-1 font-medium">{value}</p>
+      <p className={`mt-1 font-medium ${emphasize && !running ? "text-ink" : ""}`}>{value}</p>
     </div>
   );
 }

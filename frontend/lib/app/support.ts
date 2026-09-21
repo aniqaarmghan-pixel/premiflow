@@ -55,7 +55,7 @@ export const SUPPORT_TOPICS: readonly SupportTopic[] = [
     title: "Streaming",
     body: [
       "Streaming pay accrues from the contract clock, not from start/stop work sessions.",
-      "Record earned pay writes accrued value into released accounting. Collect pay transfers it.",
+      "Release accrued pay writes accrued value into released accounting. Collect pay transfers it.",
       "Confusion about the clock or recorded amount is often a support question, not a contractual dispute.",
     ],
   },

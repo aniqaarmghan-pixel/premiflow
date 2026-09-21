@@ -48,7 +48,12 @@ export const HOURLY_COPY = {
   startTitle: "Start work",
   startExplain:
     "Start a work session when you begin working. PREMIFLOW uses the on-chain start and stop times to calculate recorded working time.",
-  runningTitle: "Work session running",
+  runningTitle: "Work session",
+  runningStatus: "Running",
+  openSessionNotCollectable:
+    "Current-session earnings become available after you stop this work session.",
+  earningsRecordedOnStop:
+    "Hourly earnings are recorded when a work session is stopped.",
   clockDisclaimer:
     "The live elapsed clock is a display only. Final recorded time and earnings are calculated from Solana's on-chain clock when the transaction confirms.",
   eightHourRule:
@@ -60,9 +65,14 @@ export const HOURLY_COPY = {
   shortRemainder:
     "If this is the last leftover authorized time below the normal minimum, the protocol can still record that remainder.",
   collectExplain:
-    "Recorded earnings become available to collect. Collecting transfers the available tokens from escrow to your wallet.",
+    "Collect transfers already recorded earnings from escrow to your wallet. It does not end the contract.",
+  collectDoesNotEndSession:
+    "Collect does not end an open work session and does not prevent later sessions.",
+  salarySection: "Salary",
   stopNotWithdraw: "Stopping a session records time. It does not transfer tokens.",
   employerActive: "Freelancer work session is active.",
+  employerSalaryView:
+    "Salary figures below are contract accounting. Collect is a freelancer action.",
   endExplain:
     "Ending the hourly contract stops future work from being started and begins settlement of the recorded earnings and unused budget.",
   trialActive:
