@@ -32,7 +32,7 @@ export const COMPACT_AUTH_STATUS: Record<MessagesPanelState, string> = {
 };
 
 export const FUTURE_CHAT_ACTIONS = {
-  attachments: false,
+  attachments: true,
   reply: false,
   addToDisputeEvidence: false,
   unreadBadgesLive: true,

@@ -5,7 +5,12 @@ export const SCROLL_BOTTOM_FOLLOW_THRESHOLD_PX = 96;
 export const LOADING_EARLIER_LABEL = "Loading earlier messages…";
 export const JUMP_TO_LATEST_LABEL = "Jump to latest";
 export const NEW_ACTIVITY_LABEL = "New messages";
-export const ATTACHMENTS_COMING_NEXT_LABEL = "Attachments coming next";
+export const ATTACHMENTS_ENABLED_LABEL = "Attach files";
+export const ATTACHMENTS_HINT =
+  "PDF, images, Office docs, ZIP, CSV, or text — max 5 files, 10 MiB each.";
+
+/** @deprecated Block 3C enables attachments; kept only for migration-era string searches. */
+export const ATTACHMENTS_COMING_NEXT_LABEL = ATTACHMENTS_ENABLED_LABEL;
 
 export type MessageHistoryItem =
   | { kind: "date"; key: string; label: string }

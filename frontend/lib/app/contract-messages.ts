@@ -79,6 +79,7 @@ export const WHATSAPP_RECOMMENDATION = {
 
 export const CONTRACT_MESSAGE_AI_POLICY = {
   autoReadPrivateChat: false,
+  autoReadAttachments: false,
   decideDisputes: false,
   determinePaymentSplits: false,
   signTransactions: false,

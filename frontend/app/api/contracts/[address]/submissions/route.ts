@@ -34,9 +34,13 @@ export async function GET(
   try {
     const { address } = await context.params;
     const { stores } = await requireMessageParticipant(request, address);
-    const result = await listWorkSubmissions(stores.submissions, {
-      contractAddress: address,
-    });
+    const result = await listWorkSubmissions(
+      stores.submissions,
+      {
+        contractAddress: address,
+      },
+      stores.attachments
+    );
     return NextResponse.json(result);
   } catch (err) {
     return handleRouteError(validationError(err));

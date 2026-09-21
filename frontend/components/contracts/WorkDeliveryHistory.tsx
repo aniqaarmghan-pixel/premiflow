@@ -189,6 +189,25 @@ function SubmissionCard({
               </ul>
             </div>
           ) : null}
+          {submission.attachments && submission.attachments.length > 0 ? (
+            <div>
+              <p className="text-xs uppercase tracking-wide text-ink-faint">Files</p>
+              <ul className="mt-1 space-y-1">
+                {submission.attachments.map((file) => (
+                  <li key={file.id}>
+                    <a
+                      href={file.downloadPath}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-cyan underline-offset-2 hover:underline"
+                    >
+                      {file.displayFilename} ({file.byteSize} bytes) ↗
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
         </>
       ) : null}
     </div>

@@ -14,6 +14,11 @@ import {
 import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/Field";
 import {
+  AttachmentChipList,
+  MessageAttachmentCards,
+  type AttachmentChipModel,
+} from "@/components/contracts/AttachmentChips";
+import {
   CONTRACT_MESSAGE_MAX_LENGTH,
   CONTRACT_MESSAGES_TARGET_UX,
 } from "@/lib/app/contract-messages";
@@ -24,7 +29,8 @@ import {
   messageBubbleSide,
 } from "@/lib/app/messages-chat";
 import {
-  ATTACHMENTS_COMING_NEXT_LABEL,
+  ATTACHMENTS_ENABLED_LABEL,
+  ATTACHMENTS_HINT,
   JUMP_TO_LATEST_LABEL,
   LOADING_EARLIER_LABEL,
   NEW_ACTIVITY_LABEL,
@@ -329,6 +335,7 @@ export function ChatMessageBubble({
         }`}
       >
         <p className="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{message.body}</p>
+        <MessageAttachmentCards attachments={message.attachments ?? []} />
       </div>
       <time className="mt-1 text-[11px] text-ink-faint" dateTime={message.createdAt}>
         {messageTimestampLabel(message.createdAt)}
@@ -342,29 +349,61 @@ export function ChatComposer({
   sending,
   sendFailed,
   canSend,
+  attachments,
   onDraftChange,
   onSend,
+  onPickFiles,
+  onRemoveAttachment,
+  onRetryAttachment,
 }: {
   draft: string;
   sending: boolean;
   sendFailed: boolean;
   canSend: boolean;
+  attachments: readonly AttachmentChipModel[];
   onDraftChange: (value: string) => void;
   onSend: () => void;
+  onPickFiles: (files: FileList | null) => void;
+  onRemoveAttachment: (localId: string) => void;
+  onRetryAttachment: (localId: string) => void;
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="shrink-0 border-t border-line bg-card px-4 py-3 sm:px-5">
+      {attachments.length > 0 ? (
+        <div className="mb-2">
+          <AttachmentChipList
+            items={attachments}
+            disabled={sending}
+            onRemove={onRemoveAttachment}
+            onRetry={onRetryAttachment}
+          />
+        </div>
+      ) : null}
       <div className="flex items-end gap-2">
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="sr-only"
+          multiple
+          accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv,application/zip"
+          aria-label={ATTACHMENTS_ENABLED_LABEL}
+          onChange={(event) => {
+            onPickFiles(event.target.files);
+            event.target.value = "";
+          }}
+        />
         <Button
           type="button"
           variant="ghost"
-          disabled
-          aria-label={ATTACHMENTS_COMING_NEXT_LABEL}
-          title={ATTACHMENTS_COMING_NEXT_LABEL}
+          disabled={sending}
+          aria-label={ATTACHMENTS_ENABLED_LABEL}
+          title={ATTACHMENTS_ENABLED_LABEL}
           className="shrink-0"
+          onClick={() => fileInputRef.current?.click()}
         >
           <Paperclip size={18} aria-hidden="true" />
-          <span className="sr-only">{ATTACHMENTS_COMING_NEXT_LABEL}</span>
+          <span className="sr-only">{ATTACHMENTS_ENABLED_LABEL}</span>
         </Button>
         <Textarea
           value={draft}
@@ -401,7 +440,7 @@ export function ChatComposer({
         <p className="text-xs text-ink-faint">
           {draft.trim().length} / {CONTRACT_MESSAGE_MAX_LENGTH}
         </p>
-        <p className="text-xs text-ink-faint">{ATTACHMENTS_COMING_NEXT_LABEL}</p>
+        <p className="text-xs text-ink-faint">{ATTACHMENTS_HINT}</p>
       </div>
       {sendFailed ? (
         <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-danger">

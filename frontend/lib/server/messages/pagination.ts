@@ -23,13 +23,25 @@ export function decodeMessageCursor(raw: string | null): MessageCursor | null {
   }
 }
 
-export function toPublicMessage(row: MessageRecord) {
+export type PublicMessageAttachment = {
+  id: string;
+  displayFilename: string;
+  contentType: string;
+  byteSize: number;
+  downloadPath: string;
+};
+
+export function toPublicMessage(
+  row: MessageRecord,
+  attachments: PublicMessageAttachment[] = []
+) {
   return {
     id: row.id,
     contractAddress: row.contractAddress,
     senderWallet: row.senderWallet,
     body: row.body,
     createdAt: row.createdAt.toISOString(),
+    attachments,
   };
 }
 

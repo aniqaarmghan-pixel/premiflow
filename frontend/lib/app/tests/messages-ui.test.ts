@@ -91,7 +91,10 @@ test("Send is available only after a verified participant session", () => {
   assert.equal(shouldShowComposer("disconnected"), false);
   assert.equal(shouldShowComposer("unauthorized"), false);
   assert.match(PANEL, /composerOpen = shouldShowComposer\(state\) && participant/);
-  assert.match(PANEL, /canSend = composerOpen && !sending/);
+  assert.match(PANEL, /canSend =/);
+  assert.match(PANEL, /composerOpen &&/);
+  assert.match(PANEL, /!sending/);
+  assert.match(PANEL, /attachmentsReady/);
   assert.match(PANEL, /composerOpen \? \(/);
 });
 
@@ -176,6 +179,7 @@ test("mergeMessagesById prevents duplicates across polls", () => {
         senderWallet: "A",
         body: "hi",
         createdAt: "2026-01-01T00:00:00.000Z",
+        attachments: [],
       },
     ],
     [
@@ -185,6 +189,7 @@ test("mergeMessagesById prevents duplicates across polls", () => {
         senderWallet: "A",
         body: "hi",
         createdAt: "2026-01-01T00:00:00.000Z",
+        attachments: [],
       },
       {
         id: "2",
@@ -192,6 +197,7 @@ test("mergeMessagesById prevents duplicates across polls", () => {
         senderWallet: "B",
         body: "there",
         createdAt: "2026-01-01T00:00:01.000Z",
+        attachments: [],
       },
     ]
   );
@@ -209,14 +215,14 @@ test("resolver and AI still have no automatic thread access", () => {
   const messages = SUPPORT_TOPICS.find((topic) => topic.id === "messages");
   assert.doesNotMatch(messages?.body.join(" ") ?? "", /being connected/);
   assert.match(messages?.body.join(" ") ?? "", /stored by PREMIFLOW off-chain/);
-  assert.equal(FUTURE_CHAT_ACTIONS.attachments, false);
+  assert.equal(FUTURE_CHAT_ACTIONS.attachments, true);
   assert.equal(FUTURE_CHAT_ACTIONS.reply, false);
   assert.equal(FUTURE_CHAT_ACTIONS.addToDisputeEvidence, false);
   assert.equal(FUTURE_CHAT_ACTIONS.premiflowAssistant, false);
   assert.doesNotMatch(UI, /Ask PREMIFLOW Assistant/);
-  assert.match(DIALOG, /ATTACHMENTS_COMING_NEXT_LABEL/);
-  assert.match(DIALOG, /disabled/);
-  assert.doesNotMatch(DIALOG, /type="file"/);
+  assert.match(DIALOG, /ATTACHMENTS_ENABLED_LABEL|type="file"/);
+  assert.match(DIALOG, /type="file"/);
+  assert.doesNotMatch(DIALOG, /Attachments coming next/);
 });
 
 test("premium workspace loads older near top, jumps to latest, and does not force-scroll while reading", () => {

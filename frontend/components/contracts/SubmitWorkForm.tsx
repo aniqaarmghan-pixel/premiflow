@@ -1,9 +1,15 @@
 "use client";
 
+import { useRef } from "react";
+
+import {
+  AttachmentChipList,
+  type AttachmentChipModel,
+} from "@/components/contracts/AttachmentChips";
 import { Button } from "@/components/ui/Button";
 import { Field, Input, Textarea } from "@/components/ui/Field";
 import {
-  DELIVERY_ATTACHMENTS_COMING_NEXT,
+  DELIVERY_FILES_HINT,
   DELIVERY_LINK_MAX,
   DELIVERY_NOTE_MAX_LENGTH,
   emptyDeliveryLink,
@@ -12,13 +18,19 @@ import {
 } from "@/lib/app/work-delivery";
 import type { WorkUnitKind } from "@/lib/streampay-v2";
 
+export type DeliveryAttachmentDraft = AttachmentChipModel & {
+  file: File;
+  attachmentId?: string;
+};
+
 export type DeliveryDraft = {
   note: string;
   links: DeliveryLinkDraft[];
+  attachments: DeliveryAttachmentDraft[];
 };
 
 export function emptyDeliveryDraft(): DeliveryDraft {
-  return { note: "", links: [emptyDeliveryLink()] };
+  return { note: "", links: [emptyDeliveryLink()], attachments: [] };
 }
 
 export function SubmitWorkForm({
@@ -27,6 +39,9 @@ export function SubmitWorkForm({
   revisionLabelText,
   draft,
   onChange,
+  onPickFiles,
+  onRemoveAttachment,
+  onRetryAttachment,
   reviewPeriod,
   revisionRequests,
 }: {
@@ -35,9 +50,14 @@ export function SubmitWorkForm({
   revisionLabelText: string;
   draft: DeliveryDraft;
   onChange: (next: DeliveryDraft) => void;
+  onPickFiles: (files: FileList | null) => void;
+  onRemoveAttachment: (localId: string) => void;
+  onRetryAttachment: (localId: string) => void;
   reviewPeriod?: string;
   revisionRequests?: string;
 }) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   function updateLink(index: number, patch: Partial<DeliveryLinkDraft>) {
     onChange({
       ...draft,
@@ -155,10 +175,40 @@ export function SubmitWorkForm({
         ) : null}
       </div>
 
-      <div className="rounded-2xl border border-dashed border-line bg-paper-2 px-3 py-3">
-        <p className="text-sm font-medium text-ink">Files</p>
-        <p className="mt-1 text-sm text-ink-soft">{DELIVERY_ATTACHMENTS_COMING_NEXT}</p>
-        <p className="mt-1 text-xs text-ink-faint">No upload action in this release.</p>
+      <div className="space-y-3 rounded-2xl border border-line bg-paper-2 px-3 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-sm font-medium text-ink">Files</p>
+            <p className="mt-1 text-xs text-ink-faint">{DELIVERY_FILES_HINT}</p>
+          </div>
+          <div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="sr-only"
+              multiple
+              accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv,application/zip"
+              aria-label="Attach delivery files"
+              onChange={(event) => {
+                onPickFiles(event.target.files);
+                event.target.value = "";
+              }}
+            />
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => fileInputRef.current?.click()}
+              aria-label="Attach delivery files"
+            >
+              Attach files
+            </Button>
+          </div>
+        </div>
+        <AttachmentChipList
+          items={draft.attachments}
+          onRemove={onRemoveAttachment}
+          onRetry={onRetryAttachment}
+        />
       </div>
     </div>
   );

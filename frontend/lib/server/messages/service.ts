@@ -1,15 +1,26 @@
 import { PublicKey } from "@solana/web3.js";
 
 import { CONTRACT_MESSAGE_MAX_LENGTH, validateMessageBody } from "@/lib/app/contract-messages";
+import {
+  assertPendingOwnedAttachments,
+  parseAttachmentIdList,
+  toPublicAttachment,
+} from "../attachments/service";
 import { randomId } from "../crypto";
 import { compareCursor } from "../memory-stores";
 import { RATE_LIMITS, consumeRateLimit, sendBucket } from "../rate-limit";
-import type { MessageRecord, MessageStore, RateLimitStore } from "../stores";
+import type {
+  AttachmentStore,
+  MessageRecord,
+  MessageStore,
+  RateLimitStore,
+} from "../stores";
 import {
   decodeMessageCursor,
   encodeMessageCursor,
   toPublicMessage,
   type PublicContractMessage,
+  type PublicMessageAttachment,
 } from "./pagination";
 
 export const MESSAGE_PAGE_DEFAULT = 30;
@@ -64,9 +75,37 @@ export async function unreadCountForWallet(
   });
 }
 
+async function attachmentsForMessages(
+  attachments: AttachmentStore | undefined,
+  messages: MessageRecord[]
+): Promise<Map<string, PublicMessageAttachment[]>> {
+  const map = new Map<string, PublicMessageAttachment[]>();
+  if (!attachments || messages.length === 0) return map;
+  const rows = await attachments.listForMessages(messages.map((m) => m.id));
+  for (const row of rows) {
+    const pub = toPublicAttachment(row.attachment);
+    const list = map.get(row.messageId) ?? [];
+    list.push({
+      id: pub.id,
+      displayFilename: pub.displayFilename,
+      contentType: pub.contentType,
+      byteSize: pub.byteSize,
+      downloadPath: pub.downloadPath,
+    });
+    map.set(row.messageId, list);
+  }
+  return map;
+}
+
 export async function listContractMessages(
   store: MessageStore,
-  input: { contractAddress: string; cursor: string | null; limit: string | null; wallet: string }
+  input: {
+    contractAddress: string;
+    cursor: string | null;
+    limit: string | null;
+    wallet: string;
+  },
+  attachments?: AttachmentStore
 ): Promise<{
   messages: PublicContractMessage[];
   nextCursor: string | null;
@@ -89,16 +128,28 @@ export async function listContractMessages(
           id: pageDesc[pageDesc.length - 1].id,
         })
       : null;
+  const byMessage = await attachmentsForMessages(attachments, oldestNewest);
   return {
-    messages: oldestNewest.map(toPublicMessage),
+    messages: oldestNewest.map((row) =>
+      toPublicMessage(row, byMessage.get(row.id) ?? [])
+    ),
     nextCursor,
     unreadCount: await unreadCountForWallet(store, contractAddress, input.wallet),
   };
 }
 
 export async function createContractMessage(
-  stores: { messages: MessageStore; rates: RateLimitStore },
-  input: { contractAddress: string; wallet: string; body: unknown },
+  stores: {
+    messages: MessageStore;
+    rates: RateLimitStore;
+    attachments?: AttachmentStore;
+  },
+  input: {
+    contractAddress: string;
+    wallet: string;
+    body: unknown;
+    attachmentIds?: unknown;
+  },
   now = new Date()
 ): Promise<PublicContractMessage> {
   const contractAddress = parseContractAddress(input.contractAddress);
@@ -112,6 +163,20 @@ export async function createContractMessage(
       `Message must be ${CONTRACT_MESSAGE_MAX_LENGTH} characters or fewer.`
     );
   }
+
+  const attachmentIds = parseAttachmentIdList(input.attachmentIds, "message");
+  if (attachmentIds.length > 0 && !stores.attachments) {
+    throw new MessageValidationError("Attachments are unavailable.");
+  }
+  if (attachmentIds.length > 0 && stores.attachments) {
+    await assertPendingOwnedAttachments(stores.attachments, {
+      ids: attachmentIds,
+      contractAddress,
+      uploaderWallet: input.wallet,
+      context: "message",
+    });
+  }
+
   await consumeRateLimit(
     stores.rates,
     sendBucket(input.wallet, contractAddress),
@@ -126,7 +191,23 @@ export async function createContractMessage(
     body: input.body.trim(),
     createdAt: now,
   });
-  return toPublicMessage(saved);
+
+  let publicAttachments: PublicMessageAttachment[] = [];
+  if (attachmentIds.length > 0 && stores.attachments) {
+    const bound = await stores.attachments.bindToMessage(saved.id, attachmentIds);
+    publicAttachments = bound.map((row) => {
+      const pub = toPublicAttachment(row);
+      return {
+        id: pub.id,
+        displayFilename: pub.displayFilename,
+        contentType: pub.contentType,
+        byteSize: pub.byteSize,
+        downloadPath: pub.downloadPath,
+      };
+    });
+  }
+
+  return toPublicMessage(saved, publicAttachments);
 }
 
 export async function markThreadRead(

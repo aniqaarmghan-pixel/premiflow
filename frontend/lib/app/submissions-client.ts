@@ -12,6 +12,7 @@ export type PersistSubmissionInput = {
   onChainSubmissionUri: string;
   transactionSignature: string;
   chainSubmittedAt?: number | string | null;
+  attachmentIds?: string[];
 };
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {

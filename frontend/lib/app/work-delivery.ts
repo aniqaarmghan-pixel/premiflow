@@ -9,8 +9,8 @@ import type { WorkUnitKind, WorkUnitView } from "@/lib/streampay-v2/types";
 export const DELIVERY_NOTE_MAX_LENGTH = 4_000;
 export const DELIVERY_LINK_MAX = 8;
 export const DELIVERY_LINK_LABEL_MAX = 80;
-export const DELIVERY_ATTACHMENTS_COMING_NEXT =
-  "Attachments will be available next.";
+export const DELIVERY_FILES_HINT =
+  "Optional private files — PDF, images, Office docs, ZIP, CSV, or text. Max 10 files, 10 MiB each.";
 
 export type SubmissionKind = "trial" | "fixed" | "milestone";
 
@@ -209,5 +209,6 @@ export const WORK_DELIVERY_SYNC_WARNING =
 
 export const WORK_DELIVERY_AI_POLICY = {
   autoReadDeliveryHistory: false,
+  autoReadAttachments: false,
   autoSummarizeForAssistant: false,
 } as const;

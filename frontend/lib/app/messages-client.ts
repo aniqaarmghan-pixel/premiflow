@@ -75,10 +75,20 @@ export function fetchContractMessages(
   return request<MessagesPage>(`/api/contracts/${address}/messages${suffix}`);
 }
 
-export function sendContractMessage(address: string, body: string) {
+export function sendContractMessage(
+  address: string,
+  body: string,
+  attachmentIds: string[] = []
+) {
   return request<{ message: PublicContractMessage }>(
     `/api/contracts/${address}/messages`,
-    { method: "POST", body: JSON.stringify({ body }) }
+    {
+      method: "POST",
+      body: JSON.stringify({
+        body,
+        ...(attachmentIds.length > 0 ? { attachmentIds } : {}),
+      }),
+    }
   );
 }
 

@@ -38,3 +38,5 @@ id.json
 backups/
 frontend-before-stitch-20260914-131252/
 frontend-working-backup/
+.vercel
+.env*

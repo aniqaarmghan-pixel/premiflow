@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 import {
-  DELIVERY_ATTACHMENTS_COMING_NEXT,
+  DELIVERY_FILES_HINT,
   WORK_DELIVERY_AI_POLICY,
   WORK_DELIVERY_SYNC_WARNING,
   deliverableContextTitle,
@@ -12,6 +12,7 @@ import {
   validateDeliveryPayload,
   validateDeliveryUrl,
 } from "../work-delivery";
+import { ATTACHMENT_AI_POLICY } from "../attachments-policy";
 import { CONTRACT_MESSAGE_AI_POLICY } from "../contract-messages";
 import { makeWorkUnit } from "../../streampay-v2/tests/fixtures";
 
@@ -61,18 +62,18 @@ test("delivery validation accepts notes and multiple https links", () => {
   }
 });
 
-test("UI includes delivery note, links, add/remove, and no fake upload", () => {
+test("UI includes delivery note, links, add/remove, and real file picker", () => {
   assert.match(FORM, /Delivery note/);
   assert.match(FORM, /Add another link/);
   assert.match(FORM, /Remove link/);
-  assert.match(FORM, /DELIVERY_ATTACHMENTS_COMING_NEXT/);
-  assert.equal(DELIVERY_ATTACHMENTS_COMING_NEXT, "Attachments will be available next.");
-  assert.doesNotMatch(FORM, /type="file"/);
-  assert.doesNotMatch(FORM, /input type=\"file\"/);
+  assert.match(FORM, /DELIVERY_FILES_HINT/);
+  assert.match(DELIVERY_FILES_HINT, /Optional private files/);
+  assert.match(FORM, /type="file"/);
   assert.match(HISTORY, /Current submission/);
   assert.match(HISTORY, /Previous submissions/);
   assert.match(HISTORY, /revisionLabel/);
   assert.match(HISTORY, /noopener noreferrer/);
+  assert.match(HISTORY, /submission\.attachments/);
 });
 
 test("employer review actions remain gated by availableActions in WorkUnitPanel", () => {
@@ -109,6 +110,8 @@ test("unsafe URLs rejected by shared validator", () => {
 test("Assistant privacy remains default-off for delivery history", () => {
   assert.equal(WORK_DELIVERY_AI_POLICY.autoReadDeliveryHistory, false);
   assert.equal(WORK_DELIVERY_AI_POLICY.autoSummarizeForAssistant, false);
+  assert.equal(WORK_DELIVERY_AI_POLICY.autoReadAttachments, false);
+  assert.equal(ATTACHMENT_AI_POLICY.autoReadAttachments, false);
   assert.equal(CONTRACT_MESSAGE_AI_POLICY.autoReadPrivateChat, false);
   assert.doesNotMatch(DETAIL, /\/api\/copilot/);
   assert.doesNotMatch(FORM, /\/api\/copilot/);

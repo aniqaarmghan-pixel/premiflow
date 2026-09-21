@@ -1,4 +1,8 @@
 import { AuthError, readSession } from "./auth/service";
+import {
+  AttachmentAccessError,
+  AttachmentValidationError,
+} from "./attachments/service";
 import { CaseAccessError, CaseStateError, CaseValidationError } from "./cases/service";
 import { CopilotSchemaError } from "@/lib/app/copilot-schemas";
 import {
@@ -9,6 +13,7 @@ import {
 import { ContractSnapshotError } from "./solana/read-contract-snapshot";
 import { CopilotProviderError } from "./copilot/provider";
 import { authConfigFromEnv, productionStores, type MessagingStores } from "./compose";
+import { BlobConfigError } from "./blob/env";
 import { getServerEnv, ServerConfigError, type ServerEnv } from "./env";
 import { HttpError, SESSION_COOKIE, assertOrigin, jsonError, readCookie } from "./http";
 import { isAuthorizedMessageWallet } from "./messages/authorize";
@@ -47,6 +52,15 @@ export function handleRouteError(err: unknown) {
             ? 400
             : 401;
     return jsonError(status, err.code, err.message);
+  }
+  if (err instanceof AttachmentValidationError) {
+    return jsonError(400, "invalid_attachment", err.message);
+  }
+  if (err instanceof AttachmentAccessError) {
+    return jsonError(403, "forbidden", err.message);
+  }
+  if (err instanceof BlobConfigError) {
+    return jsonError(503, "backend_unavailable", "Attachment storage is temporarily unavailable.");
   }
   if (err instanceof CopilotAuthError) {
     return jsonError(401, "unauthenticated", err.message);

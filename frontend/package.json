@@ -20,6 +20,7 @@
     "@solana/wallet-adapter-react-ui": "^0.9.40",
     "@solana/wallet-adapter-wallets": "^0.19.39",
     "@solana/web3.js": "^1.99.0",
+    "@vercel/blob": "^2.8.0",
     "ai": "^7.0.107",
     "drizzle-orm": "^0.45.2",
     "framer-motion": "^13.4.0",

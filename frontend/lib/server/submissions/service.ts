@@ -5,9 +5,18 @@ import {
   type SubmissionKind,
 } from "@/lib/app/work-delivery";
 import { MAX_URI_LEN } from "@/lib/streampay-v2/constants";
+import {
+  AttachmentAccessError,
+  AttachmentValidationError,
+  assertPendingOwnedAttachments,
+  parseAttachmentIdList,
+  toPublicAttachment,
+  type PublicAttachment,
+} from "../attachments/service";
 import { randomId } from "../crypto";
 import { RATE_LIMITS, consumeRateLimit, sendBucket } from "../rate-limit";
 import type {
+  AttachmentStore,
   RateLimitStore,
   SubmissionStore,
   WorkSubmissionWithLinks,
@@ -66,6 +75,7 @@ const persistBodySchema = z
       .max(128)
       .regex(/^[1-9A-HJ-NP-Za-km-z]+$/, "Transaction signature is invalid."),
     chainSubmittedAt: z.union([z.number().int().positive(), z.string().datetime()]).optional().nullable(),
+    attachmentIds: z.array(z.string()).max(10).optional(),
   })
   .strict();
 
@@ -91,7 +101,10 @@ export function isAuthorizedSubmissionWriter(
   return wallet === parties.freelancer;
 }
 
-function toPublicSubmission(row: WorkSubmissionWithLinks) {
+function toPublicSubmission(
+  row: WorkSubmissionWithLinks,
+  attachments: PublicAttachment[] = []
+) {
   return {
     id: row.id,
     contractAddress: row.contractAddress,
@@ -112,14 +125,37 @@ function toPublicSubmission(row: WorkSubmissionWithLinks) {
       label: link.label,
       position: link.position,
     })),
+    attachments: attachments.map((item) => ({
+      id: item.id,
+      displayFilename: item.displayFilename,
+      contentType: item.contentType,
+      byteSize: item.byteSize,
+      downloadPath: item.downloadPath,
+    })),
   };
 }
 
 export type PublicWorkSubmission = ReturnType<typeof toPublicSubmission>;
 
+async function attachmentsForSubmissions(
+  attachments: AttachmentStore | undefined,
+  rows: WorkSubmissionWithLinks[]
+): Promise<Map<string, PublicAttachment[]>> {
+  const map = new Map<string, PublicAttachment[]>();
+  if (!attachments || rows.length === 0) return map;
+  const bound = await attachments.listForSubmissions(rows.map((row) => row.id));
+  for (const item of bound) {
+    const list = map.get(item.submissionId) ?? [];
+    list.push(toPublicAttachment(item.attachment));
+    map.set(item.submissionId, list);
+  }
+  return map;
+}
+
 export async function listWorkSubmissions(
   store: SubmissionStore,
-  input: { contractAddress: string }
+  input: { contractAddress: string },
+  attachments?: AttachmentStore
 ): Promise<{ submissions: PublicWorkSubmission[] }> {
   let contractAddress: string;
   try {
@@ -131,7 +167,12 @@ export async function listWorkSubmissions(
     throw err;
   }
   const rows = await store.listByContract(contractAddress);
-  return { submissions: rows.map(toPublicSubmission) };
+  const bySubmission = await attachmentsForSubmissions(attachments, rows);
+  return {
+    submissions: rows.map((row) =>
+      toPublicSubmission(row, bySubmission.get(row.id) ?? [])
+    ),
+  };
 }
 
 function parseChainSubmittedAt(raw: unknown): Date | null {
@@ -153,7 +194,11 @@ function parseChainSubmittedAt(raw: unknown): Date | null {
 }
 
 export async function persistConfirmedWorkSubmission(
-  stores: { submissions: SubmissionStore; rates: RateLimitStore },
+  stores: {
+    submissions: SubmissionStore;
+    rates: RateLimitStore;
+    attachments?: AttachmentStore;
+  },
   input: {
     contractAddress: string;
     sessionWallet: string;
@@ -198,6 +243,48 @@ export async function persistConfirmedWorkSubmission(
       throw err;
     }
   })();
+
+  let attachmentIds: string[] = [];
+  try {
+    attachmentIds = parseAttachmentIdList(
+      parsed.data.attachmentIds ?? [],
+      "work_submission"
+    );
+  } catch (err) {
+    if (err instanceof AttachmentValidationError) {
+      throw new SubmissionValidationError(err.message);
+    }
+    throw err;
+  }
+
+  if (attachmentIds.length > 0) {
+    if (!stores.attachments) {
+      throw new SubmissionValidationError("Attachments are unavailable.");
+    }
+    try {
+      await assertPendingOwnedAttachments(stores.attachments, {
+        ids: attachmentIds,
+        contractAddress,
+        uploaderWallet: input.sessionWallet,
+        context: "work_submission",
+      });
+    } catch (err) {
+      // Idempotent retry: attachments may already be bound to an existing submission.
+      const existingEarly = await stores.submissions.getByTransactionSignature(
+        parsed.data.transactionSignature
+      );
+      if (!existingEarly) {
+        if (err instanceof AttachmentValidationError) {
+          throw new SubmissionValidationError(err.message);
+        }
+        if (err instanceof AttachmentAccessError) {
+          throw new SubmissionAccessError(err.message);
+        }
+        throw err;
+      }
+    }
+  }
+
   await consumeRateLimit(
     stores.rates,
     sendBucket(input.sessionWallet, contractAddress),
@@ -209,7 +296,23 @@ export async function persistConfirmedWorkSubmission(
     parsed.data.transactionSignature
   );
   if (existing) {
-    return { submission: toPublicSubmission(existing), created: false };
+    let attachments: PublicAttachment[] = [];
+    if (stores.attachments) {
+      if (attachmentIds.length > 0) {
+        const pending = (
+          await stores.attachments.listByIds(attachmentIds)
+        ).filter((row) => row.status === "pending");
+        if (pending.length > 0) {
+          await stores.attachments.bindToSubmission(
+            existing.id,
+            pending.map((row) => row.id)
+          );
+        }
+      }
+      const bound = await stores.attachments.listForSubmissions([existing.id]);
+      attachments = bound.map((item) => toPublicAttachment(item.attachment));
+    }
+    return { submission: toPublicSubmission(existing, attachments), created: false };
   }
 
   const now = new Date();
@@ -234,5 +337,11 @@ export async function persistConfirmedWorkSubmission(
     }))
   );
 
-  return { submission: toPublicSubmission(saved), created: true };
+  let attachments: PublicAttachment[] = [];
+  if (attachmentIds.length > 0 && stores.attachments) {
+    const bound = await stores.attachments.bindToSubmission(saved.id, attachmentIds);
+    attachments = bound.map((row) => toPublicAttachment(row));
+  }
+
+  return { submission: toPublicSubmission(saved, attachments), created: true };
 }

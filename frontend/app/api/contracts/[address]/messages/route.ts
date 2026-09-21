@@ -26,12 +26,16 @@ export async function GET(
     const { address } = await context.params;
     const { stores, session } = await requireMessageParticipant(request, address);
     const url = new URL(request.url);
-    const result = await listContractMessages(stores.messages, {
-      contractAddress: address,
-      cursor: url.searchParams.get("cursor"),
-      limit: url.searchParams.get("limit"),
-      wallet: session.walletAddress,
-    });
+    const result = await listContractMessages(
+      stores.messages,
+      {
+        contractAddress: address,
+        cursor: url.searchParams.get("cursor"),
+        limit: url.searchParams.get("limit"),
+        wallet: session.walletAddress,
+      },
+      stores.attachments
+    );
     return NextResponse.json(result);
   } catch (err) {
     return handleRouteError(validationError(err));
@@ -51,6 +55,7 @@ export async function POST(
       contractAddress: address,
       wallet: session.walletAddress,
       body: body.body,
+      attachmentIds: body.attachmentIds,
     });
     return NextResponse.json({ message });
   } catch (err) {

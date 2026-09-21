@@ -3,7 +3,7 @@
 import { getMint } from "@solana/spl-token";
 import { useAnchorWallet, useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 
 import { CopilotPanel } from "@/components/copilot/CopilotPanel";
 import { roleLabelForAssistant } from "@/lib/app/copilot-live";
@@ -17,9 +17,19 @@ import { StreamShowcase } from "@/components/contracts/StreamShowcase";
 import {
   emptyDeliveryDraft,
   SubmitWorkForm,
+  type DeliveryAttachmentDraft,
   type DeliveryDraft,
 } from "@/components/contracts/SubmitWorkForm";
 import { WorkDeliveryHistory } from "@/components/contracts/WorkDeliveryHistory";
+import {
+  discardPendingAttachment,
+  uploadContractAttachment,
+} from "@/lib/app/attachments-client";
+import {
+  WORK_ATTACHMENT_MAX,
+  validateAttachmentFile,
+} from "@/lib/app/attachments-policy";
+import type { ApiError } from "@/lib/app/messages-client";
 import { ConnectPrompt } from "@/components/shell/ConnectPrompt";
 import { PageFade } from "@/components/shell/PageFade";
 import { Address } from "@/components/ui/Address";
@@ -318,14 +328,132 @@ export function ContractDetail({ address }: { address: string }) {
     deliveryNote: deliveryDraft.note,
     links: deliveryDraft.links,
   });
+  const deliveryAttachmentsReady =
+    deliveryDraft.attachments.length === 0 ||
+    deliveryDraft.attachments.every((item) => item.status === "uploaded" && item.attachmentId);
+  const deliveryAttachmentsFailed = deliveryDraft.attachments.some(
+    (item) => item.status === "failed"
+  );
   const confirmBlocked =
     confirm?.action === "openDispute"
       ? !openPresentation.canSubmit
       : confirm?.action === "resolveDispute"
         ? decimals == null || Boolean(resolveParsed.error) || !resolvePreview.valid
         : confirm?.action === "submitWorkUnit" || confirm?.action === "submitTrialWork"
-          ? !deliveryValidation.ok
+          ? !deliveryValidation.ok || !deliveryAttachmentsReady || deliveryAttachmentsFailed
           : false;
+
+  async function uploadDeliveryAttachment(localId: string, file: File) {
+    if (!contract) return;
+    setDeliveryDraft((current) => ({
+      ...current,
+      attachments: current.attachments.map((item) =>
+        item.localId === localId
+          ? { ...item, status: "uploading", progress: 0, error: null }
+          : item
+      ),
+    }));
+    try {
+      const result = await uploadContractAttachment(
+        contract.address.toBase58(),
+        file,
+        "work_submission",
+        (ratio) => {
+          setDeliveryDraft((current) => ({
+            ...current,
+            attachments: current.attachments.map((item) =>
+              item.localId === localId ? { ...item, progress: ratio } : item
+            ),
+          }));
+        }
+      );
+      setDeliveryDraft((current) => ({
+        ...current,
+        attachments: current.attachments.map((item) =>
+          item.localId === localId
+            ? {
+                ...item,
+                status: "uploaded",
+                progress: 1,
+                attachmentId: result.attachment.id,
+                error: null,
+              }
+            : item
+        ),
+      }));
+    } catch (err) {
+      const api = err as ApiError;
+      setDeliveryDraft((current) => ({
+        ...current,
+        attachments: current.attachments.map((item) =>
+          item.localId === localId
+            ? { ...item, status: "failed", error: api.message ?? "Upload failed." }
+            : item
+        ),
+      }));
+    }
+  }
+
+  function onPickDeliveryFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const room = WORK_ATTACHMENT_MAX - deliveryDraft.attachments.length;
+    if (room <= 0) return;
+    const additions: DeliveryAttachmentDraft[] = [];
+    for (const file of Array.from(files).slice(0, room)) {
+      const policy = validateAttachmentFile({
+        filename: file.name,
+        contentType: file.type || "application/octet-stream",
+        byteSize: file.size,
+      });
+      const localId = crypto.randomUUID();
+      if (!policy.ok) {
+        additions.push({
+          localId,
+          file,
+          displayFilename: file.name || "file",
+          byteSize: file.size,
+          status: "failed",
+          error: policy.error,
+        });
+        continue;
+      }
+      additions.push({
+        localId,
+        file,
+        displayFilename: policy.displayFilename,
+        byteSize: policy.byteSize,
+        status: "selected",
+      });
+    }
+    setDeliveryDraft((current) => ({
+      ...current,
+      attachments: [...current.attachments, ...additions],
+    }));
+    for (const item of additions) {
+      if (item.status === "selected") void uploadDeliveryAttachment(item.localId, item.file);
+    }
+  }
+
+  async function onRemoveDeliveryAttachment(localId: string) {
+    const target = deliveryDraft.attachments.find((item) => item.localId === localId);
+    setDeliveryDraft((current) => ({
+      ...current,
+      attachments: current.attachments.filter((item) => item.localId !== localId),
+    }));
+    if (target?.attachmentId && contract) {
+      try {
+        await discardPendingAttachment(contract.address.toBase58(), target.attachmentId);
+      } catch {
+        // Best-effort pending cleanup.
+      }
+    }
+  }
+
+  function onRetryDeliveryAttachment(localId: string) {
+    const target = deliveryDraft.attachments.find((item) => item.localId === localId);
+    if (!target) return;
+    void uploadDeliveryAttachment(localId, target.file);
+  }
 
   async function persistDeliveryHistory(
     payload: Parameters<typeof persistContractSubmission>[1]
@@ -533,6 +661,9 @@ export function ContractDetail({ address }: { address: string }) {
           onChainSubmissionUri: submitDelivery.onChainSubmissionUri,
           transactionSignature: signature,
           chainSubmittedAt: refreshed.submittedAt > 0 ? refreshed.submittedAt : null,
+          attachmentIds: deliveryDraft.attachments
+            .filter((item) => item.status === "uploaded" && item.attachmentId)
+            .map((item) => item.attachmentId!),
         });
         setDeliveryDraft(emptyDeliveryDraft());
       }
@@ -1031,6 +1162,9 @@ export function ContractDetail({ address }: { address: string }) {
             setUri={setUri}
             deliveryDraft={deliveryDraft}
             setDeliveryDraft={setDeliveryDraft}
+            onPickDeliveryFiles={onPickDeliveryFiles}
+            onRemoveDeliveryAttachment={(localId) => void onRemoveDeliveryAttachment(localId)}
+            onRetryDeliveryAttachment={onRetryDeliveryAttachment}
             confirmUnit={confirm.unit ?? (confirm.action === "submitTrialWork" ? trial : undefined)}
             awardUi={awardUi}
             setAwardUi={setAwardUi}
@@ -1210,6 +1344,9 @@ function ConfirmBody({
   setUri,
   deliveryDraft,
   setDeliveryDraft,
+  onPickDeliveryFiles,
+  onRemoveDeliveryAttachment,
+  onRetryDeliveryAttachment,
   confirmUnit,
   awardUi,
   setAwardUi,
@@ -1224,7 +1361,10 @@ function ConfirmBody({
   uri: string;
   setUri: (v: string) => void;
   deliveryDraft: DeliveryDraft;
-  setDeliveryDraft: (draft: DeliveryDraft) => void;
+  setDeliveryDraft: Dispatch<SetStateAction<DeliveryDraft>>;
+  onPickDeliveryFiles: (files: FileList | null) => void;
+  onRemoveDeliveryAttachment: (localId: string) => void;
+  onRetryDeliveryAttachment: (localId: string) => void;
   confirmUnit?: WorkUnitView | null;
   awardUi: string;
   setAwardUi: (v: string) => void;
@@ -1255,6 +1395,9 @@ function ConfirmBody({
           revisionLabelText={revisionLabel(unit?.revisionCount ?? 0)}
           draft={deliveryDraft}
           onChange={setDeliveryDraft}
+          onPickFiles={onPickDeliveryFiles}
+          onRemoveAttachment={onRemoveDeliveryAttachment}
+          onRetryAttachment={onRetryDeliveryAttachment}
           reviewPeriod={copy?.reviewPeriod}
           revisionRequests={copy?.revisionRequests}
         />

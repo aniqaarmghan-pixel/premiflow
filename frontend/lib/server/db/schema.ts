@@ -287,3 +287,117 @@ export const contractWorkSubmissionLinks = pgTable(
     ),
   ]
 );
+
+/**
+ * Private attachment metadata (Vercel Blob). Bytes live in Blob store only.
+ * Bindings enforce one active use per attachment (message XOR work submission).
+ */
+export const contractAttachments = pgTable(
+  "contract_attachments",
+  {
+    id: uuid("id").primaryKey(),
+    contractAddress: text("contract_address").notNull(),
+    uploaderWallet: text("uploader_wallet").notNull(),
+    context: text("context").notNull(),
+    blobPathname: text("blob_pathname").notNull(),
+    blobUrl: text("blob_url").notNull(),
+    displayFilename: text("display_filename").notNull(),
+    contentType: text("content_type").notNull(),
+    byteSize: integer("byte_size").notNull(),
+    status: text("status").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    deletedAt: timestamp("deleted_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("contract_attachments_pathname_uidx").on(table.blobPathname),
+    index("contract_attachments_contract_created_idx").on(
+      table.contractAddress,
+      table.createdAt,
+      table.id
+    ),
+    index("contract_attachments_uploader_status_idx").on(
+      table.uploaderWallet,
+      table.status,
+      table.createdAt
+    ),
+    check(
+      "contract_attachments_context_enum",
+      sql`${table.context} in ('message', 'work_submission')`
+    ),
+    check(
+      "contract_attachments_status_enum",
+      sql`${table.status} in ('pending', 'active', 'deleted')`
+    ),
+    check(
+      "contract_attachments_filename_len",
+      sql`char_length(${table.displayFilename}) between 1 and 180`
+    ),
+    check(
+      "contract_attachments_content_type_len",
+      sql`char_length(${table.contentType}) between 1 and 120`
+    ),
+    check(
+      "contract_attachments_byte_size_positive",
+      sql`${table.byteSize} > 0 AND ${table.byteSize} <= 10485760`
+    ),
+    check(
+      "contract_attachments_pathname_len",
+      sql`char_length(${table.blobPathname}) between 1 and 512`
+    ),
+  ]
+);
+
+export const messageAttachments = pgTable(
+  "message_attachments",
+  {
+    messageId: uuid("message_id")
+      .notNull()
+      .references(() => contractMessages.id, { onDelete: "cascade" }),
+    attachmentId: uuid("attachment_id")
+      .notNull()
+      .references(() => contractAttachments.id, { onDelete: "restrict" }),
+    position: integer("position").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.messageId, table.attachmentId],
+      name: "message_attachments_pk",
+    }),
+    uniqueIndex("message_attachments_attachment_uidx").on(table.attachmentId),
+    index("message_attachments_message_idx").on(table.messageId, table.position),
+    check(
+      "message_attachments_position_nonneg",
+      sql`${table.position} >= 0`
+    ),
+  ]
+);
+
+export const workSubmissionAttachments = pgTable(
+  "work_submission_attachments",
+  {
+    submissionId: uuid("submission_id")
+      .notNull()
+      .references(() => contractWorkSubmissions.id, { onDelete: "cascade" }),
+    attachmentId: uuid("attachment_id")
+      .notNull()
+      .references(() => contractAttachments.id, { onDelete: "restrict" }),
+    position: integer("position").notNull(),
+  },
+  (table) => [
+    primaryKey({
+      columns: [table.submissionId, table.attachmentId],
+      name: "work_submission_attachments_pk",
+    }),
+    uniqueIndex("work_submission_attachments_attachment_uidx").on(
+      table.attachmentId
+    ),
+    index("work_submission_attachments_submission_idx").on(
+      table.submissionId,
+      table.position
+    ),
+    check(
+      "work_submission_attachments_position_nonneg",
+      sql`${table.position} >= 0`
+    ),
+  ]
+);

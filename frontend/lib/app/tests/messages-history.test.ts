@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  ATTACHMENTS_COMING_NEXT_LABEL,
+  ATTACHMENTS_ENABLED_LABEL,
   JUMP_TO_LATEST_LABEL,
   canRequestEarlierPage,
   detectNewActivityWhileReading,
@@ -29,6 +29,7 @@ function msg(
     senderWallet: "A",
     body,
     createdAt,
+    attachments: [],
   };
 }
 
@@ -117,6 +118,6 @@ test("unread badge formatting without inventing read receipts", () => {
   assert.equal(newestMessageId([msg("a", "2026-01-01T00:00:00.000Z"), msg("b", "2026-01-02T00:00:00.000Z")]), "b");
 });
 
-test("attachments remain coming-next, not a fake working upload", () => {
-  assert.equal(ATTACHMENTS_COMING_NEXT_LABEL, "Attachments coming next");
+test("attachment picker is enabled for private message uploads", () => {
+  assert.equal(ATTACHMENTS_ENABLED_LABEL, "Attach files");
 });

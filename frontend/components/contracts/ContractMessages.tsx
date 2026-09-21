@@ -45,6 +45,15 @@ import {
   type ApiError,
 } from "@/lib/app/messages-client";
 import {
+  discardPendingAttachment,
+  uploadContractAttachment,
+} from "@/lib/app/attachments-client";
+import {
+  MESSAGE_ATTACHMENT_MAX,
+  validateAttachmentFile,
+} from "@/lib/app/attachments-policy";
+import type { AttachmentChipModel } from "@/components/contracts/AttachmentChips";
+import {
   MESSAGES_PANEL_COPY,
   MESSAGES_POLL_MS,
   mergeMessagesById,
@@ -59,6 +68,11 @@ import {
 } from "@/lib/app/messages-panel";
 import type { PublicContractMessage } from "@/lib/server/messages/pagination";
 import type { ContractRole, PaymentModeName } from "@/lib/streampay-v2";
+
+type PendingComposerAttachment = AttachmentChipModel & {
+  file: File;
+  attachmentId?: string;
+};
 
 export function ContractMessages({
   role,
@@ -81,6 +95,9 @@ export function ContractMessages({
   const [unreadCount, setUnreadCount] = useState(0);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
+  const [pendingAttachments, setPendingAttachments] = useState<PendingComposerAttachment[]>(
+    []
+  );
   const [sending, setSending] = useState(false);
   const [sendFailed, setSendFailed] = useState(false);
   const [verifyError, setVerifyError] = useState<string | null>(null);
@@ -97,6 +114,7 @@ export function ContractMessages({
     setMessages([]);
     setUnreadCount(0);
     setSendFailed(false);
+    setPendingAttachments([]);
     setNextCursor(null);
     setLoadingEarlier(false);
     setNewActivity(false);
@@ -224,13 +242,127 @@ export function ContractMessages({
     };
   }, [connectedWallet, loadConversation, participant, state]);
 
+  async function uploadOne(localId: string, file: File) {
+    setPendingAttachments((current) =>
+      current.map((item) =>
+        item.localId === localId
+          ? { ...item, status: "uploading", progress: 0, error: null }
+          : item
+      )
+    );
+    try {
+      const result = await uploadContractAttachment(
+        contractAddress,
+        file,
+        "message",
+        (ratio) => {
+          setPendingAttachments((current) =>
+            current.map((item) =>
+              item.localId === localId ? { ...item, progress: ratio } : item
+            )
+          );
+        }
+      );
+      setPendingAttachments((current) =>
+        current.map((item) =>
+          item.localId === localId
+            ? {
+                ...item,
+                status: "uploaded",
+                progress: 1,
+                attachmentId: result.attachment.id,
+                error: null,
+              }
+            : item
+        )
+      );
+    } catch (err) {
+      const api = err as ApiError;
+      setPendingAttachments((current) =>
+        current.map((item) =>
+          item.localId === localId
+            ? {
+                ...item,
+                status: "failed",
+                error: api.message ?? "Upload failed.",
+              }
+            : item
+        )
+      );
+    }
+  }
+
+  function onPickFiles(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    const room = MESSAGE_ATTACHMENT_MAX - pendingAttachments.length;
+    if (room <= 0) return;
+    const additions: PendingComposerAttachment[] = [];
+    for (const file of Array.from(files).slice(0, room)) {
+      const policy = validateAttachmentFile({
+        filename: file.name,
+        contentType: file.type || "application/octet-stream",
+        byteSize: file.size,
+      });
+      const localId = crypto.randomUUID();
+      if (!policy.ok) {
+        additions.push({
+          localId,
+          file,
+          displayFilename: file.name || "file",
+          byteSize: file.size,
+          status: "failed",
+          error: policy.error,
+        });
+        continue;
+      }
+      additions.push({
+        localId,
+        file,
+        displayFilename: policy.displayFilename,
+        byteSize: policy.byteSize,
+        status: "selected",
+      });
+    }
+    setPendingAttachments((current) => [...current, ...additions]);
+    for (const item of additions) {
+      if (item.status === "selected") {
+        void uploadOne(item.localId, item.file);
+      }
+    }
+  }
+
+  async function onRemoveAttachment(localId: string) {
+    const target = pendingAttachments.find((item) => item.localId === localId);
+    setPendingAttachments((current) => current.filter((item) => item.localId !== localId));
+    if (target?.attachmentId) {
+      try {
+        await discardPendingAttachment(contractAddress, target.attachmentId);
+      } catch {
+        // Best-effort orphan cleanup; send will only bind uploaded ids that remain.
+      }
+    }
+  }
+
+  function onRetryAttachment(localId: string) {
+    const target = pendingAttachments.find((item) => item.localId === localId);
+    if (!target) return;
+    void uploadOne(localId, target.file);
+  }
+
   async function onSend() {
     const parsed = validateMessageBody(draft);
     if (!parsed.ok) return;
+    if (pendingAttachments.some((item) => item.status === "uploading")) return;
+    if (pendingAttachments.some((item) => item.status === "failed" || item.status === "selected")) {
+      return;
+    }
+    const attachmentIds = pendingAttachments
+      .filter((item) => item.status === "uploaded" && item.attachmentId)
+      .map((item) => item.attachmentId!);
     setSending(true);
     setSendFailed(false);
     try {
-      const result = await sendContractMessage(contractAddress, draft);
+      const result = await sendContractMessage(contractAddress, draft, attachmentIds);
       setFollowNewest(true);
       setNewActivity(false);
       setMessages((current) => {
@@ -239,6 +371,7 @@ export function ContractMessages({
         return merged;
       });
       setDraft("");
+      setPendingAttachments([]);
     } catch {
       setSendFailed(true);
     } finally {
@@ -273,7 +406,15 @@ export function ContractMessages({
   }
 
   const composerOpen = shouldShowComposer(state) && participant;
-  const canSend = composerOpen && !sending && validateMessageBody(draft).ok;
+  const attachmentsReady =
+    pendingAttachments.length === 0 ||
+    pendingAttachments.every((item) => item.status === "uploaded");
+  const canSend =
+    composerOpen &&
+    !sending &&
+    validateMessageBody(draft).ok &&
+    attachmentsReady &&
+    !pendingAttachments.some((item) => item.status === "failed");
   const preview = state === "ready" ? latestMessagePreview(messages) : null;
   const unreadLabel = formatUnreadBadge(unreadCount);
   const needsVerify =
@@ -386,8 +527,12 @@ export function ContractMessages({
             sending={sending}
             sendFailed={sendFailed}
             canSend={canSend}
+            attachments={pendingAttachments}
             onDraftChange={setDraft}
             onSend={() => void onSend()}
+            onPickFiles={onPickFiles}
+            onRemoveAttachment={(localId) => void onRemoveAttachment(localId)}
+            onRetryAttachment={onRetryAttachment}
           />
         ) : null}
       </ContractChatDialog>

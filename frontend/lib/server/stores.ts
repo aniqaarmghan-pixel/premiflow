@@ -188,3 +188,60 @@ export interface SubmissionStore {
   ): Promise<WorkSubmissionWithLinks | null>;
   listByContract(contractAddress: string): Promise<WorkSubmissionWithLinks[]>;
 }
+
+export type AttachmentContextKind = "message" | "work_submission";
+export type AttachmentStatus = "pending" | "active" | "deleted";
+
+export type AttachmentRecord = {
+  id: string;
+  contractAddress: string;
+  uploaderWallet: string;
+  context: AttachmentContextKind;
+  blobPathname: string;
+  blobUrl: string;
+  displayFilename: string;
+  contentType: string;
+  byteSize: number;
+  status: AttachmentStatus;
+  createdAt: Date;
+  deletedAt: Date | null;
+};
+
+export type MessageAttachmentBinding = {
+  messageId: string;
+  attachmentId: string;
+  position: number;
+};
+
+export type WorkSubmissionAttachmentBinding = {
+  submissionId: string;
+  attachmentId: string;
+  position: number;
+};
+
+export interface AttachmentStore {
+  insertPending(row: AttachmentRecord): Promise<AttachmentRecord>;
+  getById(id: string): Promise<AttachmentRecord | null>;
+  listByIds(ids: string[]): Promise<AttachmentRecord[]>;
+  markDeleted(id: string, now: Date): Promise<AttachmentRecord | null>;
+  bindToMessage(
+    messageId: string,
+    attachmentIds: string[],
+    now?: Date
+  ): Promise<AttachmentRecord[]>;
+  bindToSubmission(
+    submissionId: string,
+    attachmentIds: string[],
+    now?: Date
+  ): Promise<AttachmentRecord[]>;
+  listForMessages(messageIds: string[]): Promise<
+    { messageId: string; attachment: AttachmentRecord; position: number }[]
+  >;
+  listForSubmissions(submissionIds: string[]): Promise<
+    { submissionId: string; attachment: AttachmentRecord; position: number }[]
+  >;
+  findMessageBinding(attachmentId: string): Promise<MessageAttachmentBinding | null>;
+  findSubmissionBinding(
+    attachmentId: string
+  ): Promise<WorkSubmissionAttachmentBinding | null>;
+}
