@@ -10,7 +10,11 @@ import type {
   RateLimitStore,
   ResolutionCaseRecord,
   SessionRecord,
+  SubmissionStore,
   ThreadReadRecord,
+  WorkSubmissionLinkRecord,
+  WorkSubmissionRecord,
+  WorkSubmissionWithLinks,
 } from "./stores";
 
 function compareCursor(a: MessageCursor, b: MessageCursor): number {
@@ -188,6 +192,60 @@ export function createMemoryCaseStore(): CaseStore {
       const saved = { ...row };
       events.push(saved);
       return { ...saved };
+    },
+  };
+}
+
+export function createMemorySubmissionStore(): SubmissionStore {
+  const submissions: WorkSubmissionRecord[] = [];
+  const links: WorkSubmissionLinkRecord[] = [];
+
+  function withLinks(row: WorkSubmissionRecord): WorkSubmissionWithLinks {
+    return {
+      ...row,
+      links: links
+        .filter((link) => link.submissionId === row.id)
+        .sort((a, b) => a.position - b.position)
+        .map((link) => ({ ...link })),
+    };
+  }
+
+  return {
+    async insertSubmission(row, linkRows) {
+      if (row.transactionSignature) {
+        const existing = submissions.find(
+          (item) => item.transactionSignature === row.transactionSignature
+        );
+        if (existing) return withLinks(existing);
+      }
+      const saved = { ...row };
+      submissions.push(saved);
+      for (const link of linkRows) {
+        links.push({
+          id: `link-${links.length + 1}`,
+          submissionId: saved.id,
+          url: link.url,
+          label: link.label,
+          position: link.position,
+        });
+      }
+      return withLinks(saved);
+    },
+    async getByTransactionSignature(signature) {
+      if (!signature) return null;
+      const row = submissions.find((item) => item.transactionSignature === signature);
+      return row ? withLinks(row) : null;
+    },
+    async listByContract(contractAddress) {
+      return submissions
+        .filter((row) => row.contractAddress === contractAddress)
+        .sort((a, b) => {
+          if (a.createdAt.getTime() !== b.createdAt.getTime()) {
+            return b.createdAt.getTime() - a.createdAt.getTime();
+          }
+          return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
+        })
+        .map((row) => withLinks(row));
     },
   };
 }

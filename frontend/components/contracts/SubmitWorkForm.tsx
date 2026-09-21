@@ -1,0 +1,165 @@
+"use client";
+
+import { Button } from "@/components/ui/Button";
+import { Field, Input, Textarea } from "@/components/ui/Field";
+import {
+  DELIVERY_ATTACHMENTS_COMING_NEXT,
+  DELIVERY_LINK_MAX,
+  DELIVERY_NOTE_MAX_LENGTH,
+  emptyDeliveryLink,
+  submitWorkHeading,
+  type DeliveryLinkDraft,
+} from "@/lib/app/work-delivery";
+import type { WorkUnitKind } from "@/lib/streampay-v2";
+
+export type DeliveryDraft = {
+  note: string;
+  links: DeliveryLinkDraft[];
+};
+
+export function emptyDeliveryDraft(): DeliveryDraft {
+  return { note: "", links: [emptyDeliveryLink()] };
+}
+
+export function SubmitWorkForm({
+  kind,
+  contextTitle,
+  revisionLabelText,
+  draft,
+  onChange,
+  reviewPeriod,
+  revisionRequests,
+}: {
+  kind: WorkUnitKind;
+  contextTitle: string;
+  revisionLabelText: string;
+  draft: DeliveryDraft;
+  onChange: (next: DeliveryDraft) => void;
+  reviewPeriod?: string;
+  revisionRequests?: string;
+}) {
+  function updateLink(index: number, patch: Partial<DeliveryLinkDraft>) {
+    onChange({
+      ...draft,
+      links: draft.links.map((link, i) => (i === index ? { ...link, ...patch } : link)),
+    });
+  }
+
+  function removeLink(index: number) {
+    if (draft.links.length <= 1) return;
+    onChange({
+      ...draft,
+      links: draft.links.filter((_, i) => i !== index),
+    });
+  }
+
+  function addLink() {
+    if (draft.links.length >= DELIVERY_LINK_MAX) return;
+    onChange({
+      ...draft,
+      links: [...draft.links, emptyDeliveryLink()],
+    });
+  }
+
+  return (
+    <div className="space-y-4 text-sm leading-6 text-ink-soft">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-faint">
+          {submitWorkHeading(kind)}
+        </p>
+        <p className="mt-1 font-medium text-ink">Delivering: {contextTitle}</p>
+        <p className="mt-1 text-xs text-ink-faint">{revisionLabelText}</p>
+      </div>
+
+      {reviewPeriod || revisionRequests ? (
+        <dl className="grid gap-2 sm:grid-cols-2">
+          {reviewPeriod ? (
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-ink-faint">Review period</dt>
+              <dd className="font-medium text-ink">{reviewPeriod}</dd>
+            </div>
+          ) : null}
+          {revisionRequests ? (
+            <div>
+              <dt className="text-xs uppercase tracking-wide text-ink-faint">
+                Revision requests allowed
+              </dt>
+              <dd className="font-medium text-ink">{revisionRequests}</dd>
+            </div>
+          ) : null}
+        </dl>
+      ) : null}
+
+      <Field
+        label="Delivery note"
+        hint={`Describe what you are delivering. Max ${DELIVERY_NOTE_MAX_LENGTH} characters.`}
+      >
+        <Textarea
+          value={draft.note}
+          maxLength={DELIVERY_NOTE_MAX_LENGTH}
+          aria-label="Delivery note"
+          className="min-h-[96px] resize-none"
+          placeholder="Completed the second landing-page revision. Updated typography, responsive spacing and mobile navigation."
+          onChange={(event) => onChange({ ...draft, note: event.target.value })}
+        />
+        <p className="mt-1 text-xs text-ink-faint">
+          {draft.note.trim().length} / {DELIVERY_NOTE_MAX_LENGTH}
+        </p>
+      </Field>
+
+      <div className="space-y-3">
+        <p className="text-sm font-medium text-ink">Work links</p>
+        <p className="text-xs text-ink-faint">
+          At least one https:// link is required. The first link is recorded on-chain as the
+          submission reference (max 200 characters).
+        </p>
+        {draft.links.map((link, index) => (
+          <div
+            key={`link-${index}`}
+            className="space-y-2 rounded-2xl border border-line bg-paper p-3"
+          >
+            <Field label={index === 0 ? "Primary link label (optional)" : "Link label (optional)"}>
+              <Input
+                value={link.label}
+                maxLength={80}
+                aria-label={`Link ${index + 1} label`}
+                placeholder={index === 0 ? "Figma design" : "Live preview"}
+                onChange={(event) => updateLink(index, { label: event.target.value })}
+              />
+            </Field>
+            <Field label={index === 0 ? "Primary https:// URL" : "https:// URL"}>
+              <Input
+                value={link.url}
+                maxLength={200}
+                aria-label={`Link ${index + 1} URL`}
+                placeholder="https://…"
+                onChange={(event) => updateLink(index, { url: event.target.value })}
+              />
+            </Field>
+            {draft.links.length > 1 ? (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => removeLink(index)}
+                aria-label={`Remove link ${index + 1}`}
+              >
+                Remove link
+              </Button>
+            ) : null}
+          </div>
+        ))}
+        {draft.links.length < DELIVERY_LINK_MAX ? (
+          <Button type="button" variant="secondary" onClick={addLink} aria-label="Add another link">
+            + Add another link
+          </Button>
+        ) : null}
+      </div>
+
+      <div className="rounded-2xl border border-dashed border-line bg-paper-2 px-3 py-3">
+        <p className="text-sm font-medium text-ink">Files</p>
+        <p className="mt-1 text-sm text-ink-soft">{DELIVERY_ATTACHMENTS_COMING_NEXT}</p>
+        <p className="mt-1 text-xs text-ink-faint">No upload action in this release.</p>
+      </div>
+    </div>
+  );
+}

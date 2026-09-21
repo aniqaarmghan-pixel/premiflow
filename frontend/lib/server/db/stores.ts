@@ -5,6 +5,8 @@ import {
   authChallenges,
   caseEvents,
   contractMessages,
+  contractWorkSubmissionLinks,
+  contractWorkSubmissions,
   partyStatements,
   rateLimitEvents,
   resolutionCases,
@@ -19,6 +21,11 @@ import type {
   PartyStatementRecord,
   RateLimitStore,
   ResolutionCaseRecord,
+  SubmissionStore,
+  WorkSubmissionKind,
+  WorkSubmissionLinkRecord,
+  WorkSubmissionRecord,
+  WorkSubmissionWithLinks,
 } from "../stores";
 
 export function createDrizzleAuthStore(db: MessagingDatabase): AuthStore {
@@ -242,6 +249,88 @@ export function createDrizzleCaseStore(db: MessagingDatabase): CaseStore {
     async insertEvent(row) {
       const [saved] = await db.insert(caseEvents).values(row).returning();
       return saved;
+    },
+  };
+}
+
+function asSubmission(row: typeof contractWorkSubmissions.$inferSelect): WorkSubmissionRecord {
+  return {
+    ...row,
+    submissionKind: row.submissionKind as WorkSubmissionKind,
+  };
+}
+
+function asLink(row: typeof contractWorkSubmissionLinks.$inferSelect): WorkSubmissionLinkRecord {
+  return { ...row };
+}
+
+async function loadLinks(
+  db: MessagingDatabase,
+  submissionId: string
+): Promise<WorkSubmissionLinkRecord[]> {
+  const rows = await db
+    .select()
+    .from(contractWorkSubmissionLinks)
+    .where(eq(contractWorkSubmissionLinks.submissionId, submissionId))
+    .orderBy(contractWorkSubmissionLinks.position);
+  return rows.map(asLink);
+}
+
+export function createDrizzleSubmissionStore(db: MessagingDatabase): SubmissionStore {
+  return {
+    async insertSubmission(row, links) {
+      if (row.transactionSignature) {
+        const existing = await this.getByTransactionSignature(row.transactionSignature);
+        if (existing) return existing;
+      }
+      try {
+        await db.insert(contractWorkSubmissions).values(row);
+        if (links.length > 0) {
+          await db.insert(contractWorkSubmissionLinks).values(
+            links.map((link) => ({
+              id: randomId(),
+              submissionId: row.id,
+              url: link.url,
+              label: link.label,
+              position: link.position,
+            }))
+          );
+        }
+      } catch (err) {
+        if (row.transactionSignature) {
+          const raced = await this.getByTransactionSignature(row.transactionSignature);
+          if (raced) return raced;
+        }
+        throw err;
+      }
+      return {
+        ...row,
+        links: await loadLinks(db, row.id),
+      };
+    },
+    async getByTransactionSignature(signature) {
+      if (!signature) return null;
+      const [row] = await db
+        .select()
+        .from(contractWorkSubmissions)
+        .where(eq(contractWorkSubmissions.transactionSignature, signature));
+      if (!row) return null;
+      return { ...asSubmission(row), links: await loadLinks(db, row.id) };
+    },
+    async listByContract(contractAddress) {
+      const rows = await db
+        .select()
+        .from(contractWorkSubmissions)
+        .where(eq(contractWorkSubmissions.contractAddress, contractAddress))
+        .orderBy(desc(contractWorkSubmissions.createdAt), desc(contractWorkSubmissions.id));
+      const out: WorkSubmissionWithLinks[] = [];
+      for (const row of rows) {
+        out.push({
+          ...asSubmission(row),
+          links: await loadLinks(db, row.id),
+        });
+      }
+      return out;
     },
   };
 }

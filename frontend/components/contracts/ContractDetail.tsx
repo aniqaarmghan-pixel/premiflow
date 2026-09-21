@@ -14,6 +14,12 @@ import { StatusBadge } from "@/components/contracts/StatusBadge";
 import { ContractMessages } from "@/components/contracts/ContractMessages";
 import { HourlyShowcase } from "@/components/contracts/HourlyShowcase";
 import { StreamShowcase } from "@/components/contracts/StreamShowcase";
+import {
+  emptyDeliveryDraft,
+  SubmitWorkForm,
+  type DeliveryDraft,
+} from "@/components/contracts/SubmitWorkForm";
+import { WorkDeliveryHistory } from "@/components/contracts/WorkDeliveryHistory";
 import { ConnectPrompt } from "@/components/shell/ConnectPrompt";
 import { PageFade } from "@/components/shell/PageFade";
 import { Address } from "@/components/ui/Address";
@@ -70,6 +76,18 @@ import {
   STREAMING_PAY_EXPLAINER,
   streamingTrialStartedCopy,
 } from "@/lib/app/stream-display";
+import {
+  fetchContractSubmissions,
+  persistContractSubmission,
+  type PublicWorkSubmission,
+} from "@/lib/app/submissions-client";
+import {
+  WORK_DELIVERY_SYNC_WARNING,
+  deliverableContextTitle,
+  revisionLabel,
+  submissionKindFromWorkUnit,
+  validateDeliveryPayload,
+} from "@/lib/app/work-delivery";
 import {
   actionLabel,
   completeContractCopy,
@@ -158,6 +176,13 @@ export function ContractDetail({ address }: { address: string }) {
     unit?: WorkUnitView;
   } | null>(null);
   const [uri, setUri] = useState("");
+  const [deliveryDraft, setDeliveryDraft] = useState<DeliveryDraft>(() => emptyDeliveryDraft());
+  const [submissions, setSubmissions] = useState<PublicWorkSubmission[]>([]);
+  const [historySyncWarning, setHistorySyncWarning] = useState<string | null>(null);
+  const [pendingHistoryPayload, setPendingHistoryPayload] = useState<Parameters<
+    typeof persistContractSubmission
+  >[1] | null>(null);
+  const [syncBusy, setSyncBusy] = useState(false);
   const [awardUi, setAwardUi] = useState("");
   const [milestoneAmountUi, setMilestoneAmountUi] = useState("");
   const [milestoneDue, setMilestoneDue] = useState("3600");
@@ -210,7 +235,7 @@ export function ContractDetail({ address }: { address: string }) {
         setMetadata(null);
       }
       setStatus("ready");
-      return fetched;
+      return { contract: fetched, units: work };
     } catch (err) {
       setStatus("error");
       setError(err instanceof Error ? err.message : "Could not load this contract.");
@@ -224,6 +249,22 @@ export function ContractDetail({ address }: { address: string }) {
     }, 0);
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  useEffect(() => {
+    if (status !== "ready" || !contract) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const page = await fetchContractSubmissions(contract.address.toBase58());
+        if (!cancelled) setSubmissions(page.submissions);
+      } catch {
+        // History is optional until the wallet session is verified.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [contract, status, caseRecoverGeneration]);
 
   const { trial, main } = splitTrialUnits(units);
 
@@ -273,16 +314,57 @@ export function ContractDetail({ address }: { address: string }) {
     resolveParsed.amount != null
       ? resolutionPreview(contract, resolveParsed.amount)
       : resolutionPreview(contract, 0n);
+  const deliveryValidation = validateDeliveryPayload({
+    deliveryNote: deliveryDraft.note,
+    links: deliveryDraft.links,
+  });
   const confirmBlocked =
     confirm?.action === "openDispute"
       ? !openPresentation.canSubmit
       : confirm?.action === "resolveDispute"
         ? decimals == null || Boolean(resolveParsed.error) || !resolvePreview.valid
-        : false;
+        : confirm?.action === "submitWorkUnit" || confirm?.action === "submitTrialWork"
+          ? !deliveryValidation.ok
+          : false;
+
+  async function persistDeliveryHistory(
+    payload: Parameters<typeof persistContractSubmission>[1]
+  ): Promise<boolean> {
+    setSyncBusy(true);
+    try {
+      const result = await persistContractSubmission(contract!.address.toBase58(), payload);
+      setSubmissions((current) => {
+        const without = current.filter((row) => row.id !== result.submission.id);
+        return [result.submission, ...without];
+      });
+      setHistorySyncWarning(null);
+      setPendingHistoryPayload(null);
+      return true;
+    } catch {
+      setPendingHistoryPayload(payload);
+      setHistorySyncWarning(WORK_DELIVERY_SYNC_WARNING);
+      return false;
+    } finally {
+      setSyncBusy(false);
+    }
+  }
 
   async function execute(action: UiAction, unit?: WorkUnitView) {
     if (!client || !contract) return;
     let signature: string | undefined;
+    const submitDelivery =
+      action === "submitWorkUnit" || action === "submitTrialWork"
+        ? deliveryValidation.ok
+          ? deliveryValidation.value
+          : null
+        : null;
+    if (
+      (action === "submitWorkUnit" || action === "submitTrialWork") &&
+      !submitDelivery
+    ) {
+      return;
+    }
+    const submissionUri = submitDelivery?.onChainSubmissionUri ?? uri;
     const ok = await tx.run(
       actionLabel(action, { workUnitStatus: unit?.status }),
       async () => {
@@ -303,10 +385,10 @@ export function ContractDetail({ address }: { address: string }) {
         case "rejectActivation":
           return client.rejectActivation(contract.address);
         case "submitTrialWork": {
-          const hash = await hashBytes(new TextEncoder().encode(uri));
+          const hash = await hashBytes(new TextEncoder().encode(submissionUri));
           return client.submitTrialWork({
             contract: contract.address,
-            submissionUri: uri,
+            submissionUri,
             submissionHash: hash,
           });
         }
@@ -320,11 +402,11 @@ export function ContractDetail({ address }: { address: string }) {
           return client.finalizeTrialReviewTimeout(contract.address);
         case "submitWorkUnit": {
           if (!unit) throw new Error("Choose a work unit.");
-          const hash = await hashBytes(new TextEncoder().encode(uri));
+          const hash = await hashBytes(new TextEncoder().encode(submissionUri));
           return client.submitWorkUnit({
             contract: contract.address,
             workUnit: unit.address,
-            submissionUri: uri,
+            submissionUri,
             submissionHash: hash,
           });
         }
@@ -431,7 +513,30 @@ export function ContractDetail({ address }: { address: string }) {
     if (ok) {
       const latest = await load();
       await refreshList();
-      if (latest && shouldRecoverAfterAction(action, latest.status)) {
+      if (
+        (action === "submitWorkUnit" || action === "submitTrialWork") &&
+        submitDelivery &&
+        signature &&
+        unit
+      ) {
+        const refreshed =
+          latest?.units.find((row) => row.address.equals(unit.address)) ?? unit;
+        await persistDeliveryHistory({
+          submissionKind: submissionKindFromWorkUnit(unit.kind),
+          workUnitIndex: unit.index,
+          revisionNumber: refreshed.revisionCount,
+          deliveryNote: submitDelivery.deliveryNote,
+          links: submitDelivery.links.map((link) => ({
+            url: link.url,
+            label: link.label,
+          })),
+          onChainSubmissionUri: submitDelivery.onChainSubmissionUri,
+          transactionSignature: signature,
+          chainSubmittedAt: refreshed.submittedAt > 0 ? refreshed.submittedAt : null,
+        });
+        setDeliveryDraft(emptyDeliveryDraft());
+      }
+      if (latest?.contract && shouldRecoverAfterAction(action, latest.contract.status)) {
         setCaseOpenSignature(signature ?? null);
         setCaseRecoverGeneration((n) => n + 1);
       }
@@ -446,6 +551,10 @@ export function ContractDetail({ address }: { address: string }) {
   }
 
   function requestAction(action: UiAction, unit?: WorkUnitView) {
+    if (action === "submitWorkUnit" || action === "submitTrialWork") {
+      setDeliveryDraft(emptyDeliveryDraft());
+      setUri("");
+    }
     if (needsConfirmation(action)) {
       setConfirm({ action, unit });
       return;
@@ -676,6 +785,24 @@ export function ContractDetail({ address }: { address: string }) {
                       (trial.status === "Submitted" || trial.status === "Revising"))
                 )}
                 busy={tx.busy}
+                submissions={submissions}
+                historySyncWarning={
+                  pendingHistoryPayload &&
+                  pendingHistoryPayload.submissionKind ===
+                    submissionKindFromWorkUnit(trial.kind) &&
+                  pendingHistoryPayload.workUnitIndex === trial.index
+                    ? historySyncWarning
+                    : null
+                }
+                onRetrySync={
+                  pendingHistoryPayload &&
+                  pendingHistoryPayload.submissionKind ===
+                    submissionKindFromWorkUnit(trial.kind) &&
+                  pendingHistoryPayload.workUnitIndex === trial.index
+                    ? () => void persistDeliveryHistory(pendingHistoryPayload)
+                    : undefined
+                }
+                syncBusy={syncBusy}
                 onAction={(action) => requestAction(action, trial)}
               />
             ) : (
@@ -713,6 +840,24 @@ export function ContractDetail({ address }: { address: string }) {
                       now,
                     }).filter((a) => UNIT_ACTIONS.includes(a))}
                     busy={tx.busy}
+                    submissions={submissions}
+                    historySyncWarning={
+                      pendingHistoryPayload &&
+                      pendingHistoryPayload.submissionKind ===
+                        submissionKindFromWorkUnit(unit.kind) &&
+                      pendingHistoryPayload.workUnitIndex === unit.index
+                        ? historySyncWarning
+                        : null
+                    }
+                    onRetrySync={
+                      pendingHistoryPayload &&
+                      pendingHistoryPayload.submissionKind ===
+                        submissionKindFromWorkUnit(unit.kind) &&
+                      pendingHistoryPayload.workUnitIndex === unit.index
+                        ? () => void persistDeliveryHistory(pendingHistoryPayload)
+                        : undefined
+                    }
+                    syncBusy={syncBusy}
                     onAction={(action) => requestAction(action, unit)}
                   />
                 ))
@@ -884,6 +1029,9 @@ export function ContractDetail({ address }: { address: string }) {
             now={now}
             uri={uri}
             setUri={setUri}
+            deliveryDraft={deliveryDraft}
+            setDeliveryDraft={setDeliveryDraft}
+            confirmUnit={confirm.unit ?? (confirm.action === "submitTrialWork" ? trial : undefined)}
             awardUi={awardUi}
             setAwardUi={setAwardUi}
             disputeCategory={disputeCategory}
@@ -904,6 +1052,10 @@ function WorkUnitPanel({
   now,
   actions,
   busy,
+  submissions,
+  historySyncWarning,
+  onRetrySync,
+  syncBusy,
   onAction,
 }: {
   unit: WorkUnitView;
@@ -913,6 +1065,10 @@ function WorkUnitPanel({
   now: number;
   actions: UiAction[];
   busy: boolean;
+  submissions: readonly PublicWorkSubmission[];
+  historySyncWarning?: string | null;
+  onRetrySync?: () => void;
+  syncBusy?: boolean;
   onAction: (action: UiAction) => void;
 }) {
   const revision =
@@ -924,13 +1080,14 @@ function WorkUnitPanel({
         })
       : null;
   const voidCopy = voidDeliverableCopy({ contract, unit, now });
+  const kind = submissionKindFromWorkUnit(unit.kind);
 
   return (
     <div className="rounded-2xl border border-line bg-paper p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-xs uppercase tracking-wide text-ink-faint">
-            {unit.kind} · #{unit.index}
+            {deliverableContextTitle(unit)}
           </p>
           <p className="font-medium">{workUnitStatusLabel(unit.status)}</p>
         </div>
@@ -968,8 +1125,21 @@ function WorkUnitPanel({
           label="Revisions used"
           value={revisionsUsedLabel(unit.revisionCount, contract.maxRevisions)}
         />
-        <Row label="Submission URI" value={unit.submissionUri || "None"} />
+        <Row
+          label="On-chain reference"
+          value={unit.submissionUri || "None"}
+        />
       </dl>
+
+      <WorkDeliveryHistory
+        submissions={submissions}
+        kind={kind}
+        workUnitIndex={unit.index}
+        syncWarning={historySyncWarning}
+        onRetrySync={onRetrySync}
+        retryBusy={syncBusy}
+      />
+
       {actions.length > 0 ? (
         unit.kind === "Trial" &&
         unit.status === "Submitted" &&
@@ -1038,6 +1208,9 @@ function ConfirmBody({
   now,
   uri,
   setUri,
+  deliveryDraft,
+  setDeliveryDraft,
+  confirmUnit,
   awardUi,
   setAwardUi,
   disputeCategory,
@@ -1050,62 +1223,56 @@ function ConfirmBody({
   now: number;
   uri: string;
   setUri: (v: string) => void;
+  deliveryDraft: DeliveryDraft;
+  setDeliveryDraft: (draft: DeliveryDraft) => void;
+  confirmUnit?: WorkUnitView | null;
   awardUi: string;
   setAwardUi: (v: string) => void;
   disputeCategory: DisputeCategoryId | "";
   hourlySessionOpen?: boolean;
   workUnitStatus?: WorkUnitView["status"];
 }) {
-  if (action === "submitWorkUnit") {
-    const copy = officialDeliverableCopy(contract);
+  if (action === "submitWorkUnit" || action === "submitTrialWork") {
+    const unit = confirmUnit;
+    const copy = action === "submitWorkUnit" ? officialDeliverableCopy(contract) : null;
     return (
-      <div className="space-y-4 text-sm leading-6 text-ink-soft">
-        <p>{copy.intro}</p>
-        <p>{copy.messagesHint}</p>
-        <dl className="grid gap-2 sm:grid-cols-2">
-          <div>
-            <dt className="text-xs uppercase tracking-wide text-ink-faint">
-              {copy.reviewPeriodLabel}
-            </dt>
-            <dd className="font-medium text-ink">{copy.reviewPeriod}</dd>
-          </div>
-          <div>
-            <dt className="text-xs uppercase tracking-wide text-ink-faint">
-              {copy.revisionRequestsLabel}
-            </dt>
-            <dd className="font-medium text-ink">{copy.revisionRequests}</dd>
-          </div>
-        </dl>
-        <Field label={copy.fieldLabel} hint={copy.fieldHint}>
-          <Input
-            value={uri}
-            onChange={(e) => setUri(e.target.value)}
-            placeholder="https://…"
-          />
-        </Field>
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-ink-faint">
-            After submission
+      <div className="space-y-4">
+        {copy ? (
+          <>
+            <p className="text-sm leading-6 text-ink-soft">{copy.intro}</p>
+            <p className="text-sm leading-6 text-ink-soft">{copy.messagesHint}</p>
+          </>
+        ) : (
+          <p className="text-sm leading-6 text-ink-soft">
+            Official paid-trial submission for employer review. Drafts belong in Messages.
           </p>
-          <ul className="mt-1 list-disc space-y-1 pl-5">
-            {copy.consequences.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-        </div>
-        <p>{copy.recordedReference}</p>
-        <p className="font-medium text-ink">{copy.acknowledgement}</p>
+        )}
+        <SubmitWorkForm
+          kind={unit?.kind ?? (action === "submitTrialWork" ? "Trial" : "Fixed")}
+          contextTitle={
+            unit ? deliverableContextTitle(unit) : action === "submitTrialWork" ? "Paid Trial" : "Deliverable"
+          }
+          revisionLabelText={revisionLabel(unit?.revisionCount ?? 0)}
+          draft={deliveryDraft}
+          onChange={setDeliveryDraft}
+          reviewPeriod={copy?.reviewPeriod}
+          revisionRequests={copy?.revisionRequests}
+        />
+        {copy ? (
+          <div className="text-sm leading-6 text-ink-soft">
+            <p className="text-xs font-medium uppercase tracking-wide text-ink-faint">
+              After submission
+            </p>
+            <ul className="mt-1 list-disc space-y-1 pl-5">
+              {copy.consequences.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+            <p className="mt-3">{copy.recordedReference}</p>
+            <p className="mt-2 font-medium text-ink">{copy.acknowledgement}</p>
+          </div>
+        ) : null}
       </div>
-    );
-  }
-  if (action === "submitTrialWork") {
-    return (
-      <Field
-        label="Submission URI"
-        hint="A link to the trial deliverable. This app does not host files. Max 200 characters."
-      >
-        <Input value={uri} onChange={(e) => setUri(e.target.value)} placeholder="https://…" />
-      </Field>
     );
   }
   if (action === "expireAcceptance") {

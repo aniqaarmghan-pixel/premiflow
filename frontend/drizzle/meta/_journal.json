@@ -15,6 +15,13 @@
       "when": 1789898734732,
       "tag": "0001_r2_resolution_cases",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790000000000,
+      "tag": "0002_work_delivery_history",
+      "breakpoints": true
     }
   ]
 }

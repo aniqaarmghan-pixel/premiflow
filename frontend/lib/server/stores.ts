@@ -149,3 +149,42 @@ export interface CaseStore {
   upsertStatement(row: PartyStatementRecord): Promise<PartyStatementRecord>;
   insertEvent(row: CaseEventRecord): Promise<CaseEventRecord>;
 }
+
+export type WorkSubmissionKind = "trial" | "fixed" | "milestone";
+
+export type WorkSubmissionRecord = {
+  id: string;
+  contractAddress: string;
+  submissionKind: WorkSubmissionKind;
+  workUnitIndex: number;
+  revisionNumber: number;
+  freelancerWallet: string;
+  deliveryNote: string;
+  onChainSubmissionUri: string;
+  transactionSignature: string | null;
+  chainSubmittedAt: Date | null;
+  createdAt: Date;
+};
+
+export type WorkSubmissionLinkRecord = {
+  id: string;
+  submissionId: string;
+  url: string;
+  label: string | null;
+  position: number;
+};
+
+export type WorkSubmissionWithLinks = WorkSubmissionRecord & {
+  links: WorkSubmissionLinkRecord[];
+};
+
+export interface SubmissionStore {
+  insertSubmission(
+    row: WorkSubmissionRecord,
+    links: Omit<WorkSubmissionLinkRecord, "id" | "submissionId">[]
+  ): Promise<WorkSubmissionWithLinks>;
+  getByTransactionSignature(
+    signature: string
+  ): Promise<WorkSubmissionWithLinks | null>;
+  listByContract(contractAddress: string): Promise<WorkSubmissionWithLinks[]>;
+}

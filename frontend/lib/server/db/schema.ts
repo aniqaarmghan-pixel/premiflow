@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   check,
   index,
+  integer,
   pgTable,
   primaryKey,
   text,
@@ -196,6 +197,93 @@ export const caseEvents = pgTable(
     check(
       "case_events_type_len",
       sql`char_length(${table.eventType}) between 1 and 64`
+    ),
+  ]
+);
+
+/**
+ * Append-only off-chain delivery history for Submit Trial / Submit Work.
+ * Solana remains authoritative for eligibility and review lifecycle.
+ * Block 3C attachments will reference submissionId — do not store file bytes here.
+ */
+export const contractWorkSubmissions = pgTable(
+  "contract_work_submissions",
+  {
+    id: uuid("id").primaryKey(),
+    contractAddress: text("contract_address").notNull(),
+    submissionKind: text("submission_kind").notNull(),
+    workUnitIndex: integer("work_unit_index").notNull(),
+    revisionNumber: integer("revision_number").notNull(),
+    freelancerWallet: text("freelancer_wallet").notNull(),
+    deliveryNote: text("delivery_note").notNull(),
+    onChainSubmissionUri: text("on_chain_submission_uri").notNull(),
+    transactionSignature: text("transaction_signature"),
+    chainSubmittedAt: timestamp("chain_submitted_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index("contract_work_submissions_contract_created_idx").on(
+      table.contractAddress,
+      table.createdAt,
+      table.id
+    ),
+    index("contract_work_submissions_contract_unit_idx").on(
+      table.contractAddress,
+      table.submissionKind,
+      table.workUnitIndex,
+      table.revisionNumber
+    ),
+    uniqueIndex("contract_work_submissions_tx_sig_uidx").on(table.transactionSignature),
+    check(
+      "contract_work_submissions_kind_enum",
+      sql`${table.submissionKind} in ('trial', 'fixed', 'milestone')`
+    ),
+    check(
+      "contract_work_submissions_note_len",
+      sql`char_length(${table.deliveryNote}) between 1 and 4000`
+    ),
+    check(
+      "contract_work_submissions_uri_len",
+      sql`char_length(${table.onChainSubmissionUri}) between 1 and 200`
+    ),
+    check(
+      "contract_work_submissions_revision_nonneg",
+      sql`${table.revisionNumber} >= 0`
+    ),
+    check(
+      "contract_work_submissions_index_nonneg",
+      sql`${table.workUnitIndex} >= 0`
+    ),
+  ]
+);
+
+export const contractWorkSubmissionLinks = pgTable(
+  "contract_work_submission_links",
+  {
+    id: uuid("id").primaryKey(),
+    submissionId: uuid("submission_id")
+      .notNull()
+      .references(() => contractWorkSubmissions.id, { onDelete: "cascade" }),
+    url: text("url").notNull(),
+    label: text("label"),
+    position: integer("position").notNull(),
+  },
+  (table) => [
+    index("contract_work_submission_links_submission_idx").on(
+      table.submissionId,
+      table.position
+    ),
+    check(
+      "contract_work_submission_links_url_len",
+      sql`char_length(${table.url}) between 1 and 200`
+    ),
+    check(
+      "contract_work_submission_links_label_len",
+      sql`${table.label} is null or char_length(${table.label}) between 1 and 80`
+    ),
+    check(
+      "contract_work_submission_links_position_nonneg",
+      sql`${table.position} >= 0`
     ),
   ]
 );
