@@ -14,7 +14,7 @@ export function Tabs({
   return (
     <div
       role="tablist"
-      className="flex min-w-0 max-w-full flex-wrap gap-1 rounded-full border border-line bg-card p-1"
+      className="inline-flex min-w-0 max-w-full flex-wrap gap-0.5 rounded-full border border-line bg-card/70 p-0.5"
     >
       {tabs.map((tab) => {
         const active = tab.id === value;
@@ -24,7 +24,7 @@ export function Tabs({
             role="tab"
             aria-selected={active}
             onClick={() => onChange(tab.id)}
-            className={`relative min-w-0 flex-1 whitespace-nowrap rounded-full px-2.5 py-1.5 text-sm transition ${
+            className={`relative min-h-9 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition sm:min-h-0 sm:px-2.5 sm:py-1 ${
               active ? "text-white" : "text-ink-soft hover:text-ink"
             }`}
           >
@@ -38,7 +38,7 @@ export function Tabs({
             <span className="relative z-10">
               {tab.label}
               {tab.count != null ? (
-                <span className="ml-1.5 text-[11px] opacity-70">{tab.count}</span>
+                <span className="ml-1 text-[10px] opacity-70">{tab.count}</span>
               ) : null}
             </span>
           </button>

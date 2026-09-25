@@ -7,7 +7,7 @@ export const brand = {
   shortName: "Premiflow",
   markLabel: "PF",
   eyebrow: "PREMIFLOW",
-  tagline: "Work protected. Value in motion.",
+  tagline: "Work freely. Get paid securely.",
   description:
     "Employers fund work up front. Freelancers get protected payment. One wallet can hire and work at the same time.",
   networkLabel: "Solana Devnet",

@@ -25,6 +25,7 @@ import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { HeroFlow } from "@/components/illustrations/HeroFlow";
 import { brand } from "@/lib/brand";
+import { OVERVIEW_DASHBOARD_HREFS } from "@/lib/app/contracts-list-query";
 import { formatUnix } from "@/lib/app/datetime";
 import { formatTokenAmount } from "@/lib/app/money";
 import {
@@ -33,6 +34,9 @@ import {
   presentType,
 } from "@/lib/app/view-model";
 import { useContracts } from "@/lib/hooks/ContractsProvider";
+
+const NAV_CARD_FOCUS =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2";
 
 export function OverviewPage() {
   const { connected, publicKey } = useWallet();
@@ -44,7 +48,7 @@ export function OverviewPage() {
       <PageFade>
         <Hero />
         <WhyPremiflowTeaser />
-        <div className="mt-8">
+        <div className="mt-6">
           <ConnectPrompt />
         </div>
       </PageFade>
@@ -91,20 +95,21 @@ export function OverviewPage() {
     <PageFade>
       <Hero />
       <WhyPremiflowTeaser />
-      <div className="mt-8 grid gap-4 lg:grid-cols-12">
-        <Card className="relative overflow-hidden p-6 lg:col-span-8">
+      <div className="mt-5 grid gap-3 lg:grid-cols-12">
+        <Card className="relative overflow-hidden p-4 sm:p-5 lg:col-span-8">
           <div className="pointer-events-none absolute -right-8 -top-10 h-40 w-40 rounded-full bg-accent/15 blur-3xl" />
           <div className="flex items-center gap-2 text-accent">
-            <ShieldCheck size={16} />
-            <p className="text-xs font-semibold uppercase tracking-[0.18em]">Protected value</p>
+            <ShieldCheck size={15} />
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em]">Protected value</p>
           </div>
-          <h2 className="mt-2 font-display text-3xl sm:text-4xl">Balances that stay in motion</h2>
-          <p className="mt-2 text-sm text-ink-faint">
+          <h2 className="mt-1.5 font-display text-xl sm:text-3xl">Balances that stay in motion</h2>
+          <p className="mt-1.5 text-sm text-ink-faint">
             Derived from fetched contract accounts for this wallet. Not a live bank balance.
           </p>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <MoneyTile
-              icon={<Wallet size={16} />}
+              href={OVERVIEW_DASHBOARD_HREFS.availableToWithdraw}
+              icon={<Wallet size={15} />}
               label="Available to withdraw"
               value={formatTokenAmount(summary.availableToWithdraw, sharedDecimals)}
               hint={
@@ -115,7 +120,8 @@ export function OverviewPage() {
               tone="teal"
             />
             <MoneyTile
-              icon={<ShieldCheck size={16} />}
+              href={OVERVIEW_DASHBOARD_HREFS.availableRefund}
+              icon={<ShieldCheck size={15} />}
               label="Available refund"
               value={formatTokenAmount(summary.availableRefund, sharedDecimals)}
               hint={
@@ -127,16 +133,16 @@ export function OverviewPage() {
             />
           </div>
         </Card>
-        <Card className="flex flex-col justify-between overflow-hidden bg-[linear-gradient(180deg,#07111f,#0c1b2e)] p-6 text-white lg:col-span-4">
+        <Card className="flex flex-col justify-between overflow-hidden bg-[linear-gradient(180deg,#07111f,#0c1b2e)] p-4 sm:p-5 text-white lg:col-span-4">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan">Roles</p>
-            <h2 className="mt-2 font-display text-3xl">One wallet, both sides</h2>
-            <p className="mt-2 text-sm leading-6 text-white/65">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan">Roles</p>
+            <h2 className="mt-1.5 font-display text-xl sm:text-2xl">One wallet, both sides</h2>
+            <p className="mt-1.5 text-sm leading-5 text-white/65">
               Hiring and working are per contract. You may employ someone and also work for someone
               else from the same address.
             </p>
           </div>
-          <div className="mt-6 grid grid-cols-2 gap-3">
+          <div className="mt-4 grid grid-cols-2 gap-2.5">
             <Stat
               label="Hiring"
               value={String(summary.hiring)}
@@ -153,38 +159,42 @@ export function OverviewPage() {
         </Card>
         <Bento
           className="lg:col-span-3"
-          icon={<Layers size={16} />}
+          href={OVERVIEW_DASHBOARD_HREFS.activeContracts}
+          icon={<Layers size={15} />}
           label="Active contracts"
           value={summary.active}
           tone="teal"
         />
         <Bento
           className="lg:col-span-3"
-          icon={<GitPullRequest size={16} />}
+          href={OVERVIEW_DASHBOARD_HREFS.pendingReviews}
+          icon={<GitPullRequest size={15} />}
           label="Pending reviews"
           value={summary.pendingReviews}
           tone="violet"
         />
         <Bento
           className="lg:col-span-3"
-          icon={<Waves size={16} />}
+          href={OVERVIEW_DASHBOARD_HREFS.liveStreams}
+          icon={<Waves size={15} />}
           label="Live streams"
           value={summary.streamingActive}
           tone="blue"
         />
         <Bento
           className="lg:col-span-3"
-          icon={<Briefcase size={16} />}
+          href={OVERVIEW_DASHBOARD_HREFS.allContracts}
+          icon={<Briefcase size={15} />}
           label="All contracts"
           value={grouped.all.length}
           tone="navy"
         />
       </div>
 
-      <section className="mt-8">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 font-display text-2xl">
-            <Timer size={18} className="text-accent" />
+      <section className="mt-5">
+        <div className="mb-2.5 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 font-display text-xl">
+            <Timer size={16} className="text-accent" />
             Streaming now
           </h2>
           <Link href="/contracts" className="text-sm font-medium text-accent">
@@ -199,7 +209,7 @@ export function OverviewPage() {
             action={{ label: "Create a contract", onClick: () => router.push("/create") }}
           />
         ) : (
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2">
             {streaming.map((c) => (
               <ContractCard
                 key={c.address.toBase58()}
@@ -211,11 +221,11 @@ export function OverviewPage() {
         )}
       </section>
 
-      <section className="mt-8 grid gap-4 lg:grid-cols-2">
-        <Card className="p-5">
-          <h2 className="font-display text-2xl">Needs review</h2>
+      <section className="mt-5 grid gap-3 lg:grid-cols-2">
+        <Card className="p-4">
+          <h2 className="font-display text-xl">Needs review</h2>
           {pending.length === 0 ? (
-            <div className="mt-4">
+            <div className="mt-3">
               <EmptyState
                 kind="reviews"
                 title="Inbox is clear"
@@ -223,12 +233,12 @@ export function OverviewPage() {
               />
             </div>
           ) : (
-            <ul className="mt-3 space-y-3">
+            <ul className="mt-2.5 space-y-2">
               {pending.map((c) => (
                 <li key={c.address.toBase58()}>
                   <Link
                     href={`/contracts/${c.address.toBase58()}`}
-                    className="block rounded-2xl bg-paper px-3 py-3 transition hover:bg-accent-soft"
+                    className="block rounded-2xl bg-paper px-3 py-2.5 transition hover:bg-accent-soft"
                   >
                     <p className="font-medium">{presentType(c.paymentMode)}</p>
                     <p className="text-xs text-ink-faint">
@@ -240,15 +250,15 @@ export function OverviewPage() {
             </ul>
           )}
         </Card>
-        <Card className="p-5">
-          <h2 className="font-display text-2xl">Lifecycle stamps</h2>
+        <Card className="p-4">
+          <h2 className="font-display text-xl">Lifecycle stamps</h2>
           <p className="mt-1 text-xs text-ink-faint">
             Only timestamps currently stored on the contract account. Not a full event history.
           </p>
           {recent.length === 0 ? (
-            <p className="mt-3 text-sm text-ink-faint">No contracts yet.</p>
+            <p className="mt-2.5 text-sm text-ink-faint">No contracts yet.</p>
           ) : (
-            <ul className="mt-3 space-y-3">
+            <ul className="mt-2.5 space-y-2">
               {recent.map((c) => (
                 <li key={c.address.toBase58()} className="text-sm">
                   <Link href={`/contracts/${c.address.toBase58()}`} className="font-medium">
@@ -267,34 +277,38 @@ export function OverviewPage() {
 
 function Hero() {
   return (
-    <div className="relative overflow-hidden rounded-[32px] border border-white/10 bg-[linear-gradient(135deg,#06101c_0%,#0b1d33_48%,#102a3d_100%)] px-5 py-8 text-white sm:px-8 sm:py-10">
+    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(135deg,#06101c_0%,#0b1d33_48%,#102a3d_100%)] px-3.5 py-5 text-white sm:rounded-[28px] sm:px-6 sm:py-7">
       <div className="pointer-events-none absolute -left-16 top-0 h-56 w-56 rounded-full bg-cyan/20 blur-3xl" />
       <div className="pointer-events-none absolute right-0 top-10 h-64 w-64 rounded-full bg-violet/20 blur-3xl" />
-      <div className="relative grid min-w-0 items-center gap-8 lg:grid-cols-[1.05fr_.95fr]">
+      <div className="relative grid min-w-0 items-center gap-4 sm:gap-5 lg:grid-cols-[1.05fr_.95fr] lg:gap-6">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-cyan">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan">
             {brand.eyebrow}
           </p>
-          <h1 className="mt-4 font-display text-[1.85rem] leading-[1.12] text-white sm:text-5xl lg:text-6xl">
+          <h1 className="mt-2 font-display text-[1.4rem] leading-[1.18] text-white sm:mt-2.5 sm:text-[2.35rem] lg:text-[2.75rem]">
             {brand.tagline}
           </h1>
-          <p className="mt-4 max-w-xl text-base leading-7 text-white/70">{brand.description}</p>
-          <div className="mt-7 flex flex-wrap gap-3">
-            <Link href="/create">
-              <Button>Create contract</Button>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-white/70 sm:mt-2.5 sm:text-[0.95rem]">
+            {brand.description}
+          </p>
+          <div className="mt-3.5 flex flex-col gap-2.5 sm:mt-4 sm:flex-row sm:flex-wrap">
+            <Link href="/create" className="w-full sm:w-auto">
+              <Button className="w-full px-3.5 py-2.5 text-[13px] sm:w-auto sm:py-2">
+                Create contract
+              </Button>
             </Link>
-            <Link href="/contracts">
+            <Link href="/contracts" className="w-full sm:w-auto">
               <Button
                 variant="secondary"
-                className="border-white/15 bg-white/5 text-white hover:bg-white/10"
+                className="w-full border-white/15 bg-white/5 px-3.5 py-2.5 text-[13px] text-white hover:bg-white/10 sm:w-auto sm:py-2"
               >
                 Explore contracts
               </Button>
             </Link>
           </div>
         </div>
-        <div className="min-w-0 overflow-hidden rounded-[28px] border border-white/10 bg-white/5">
-          <HeroFlow />
+        <div className="min-w-0 overflow-hidden rounded-xl border border-white/10 bg-white/5 sm:rounded-2xl">
+          <HeroFlow dense />
         </div>
       </div>
     </div>
@@ -302,12 +316,14 @@ function Hero() {
 }
 
 function MoneyTile({
+  href,
   icon,
   label,
   value,
   hint,
   tone,
 }: {
+  href: string;
   icon: ReactNode;
   label: string;
   value: string;
@@ -315,28 +331,34 @@ function MoneyTile({
   tone: "teal" | "violet";
 }) {
   return (
-    <div
-      className={`rounded-3xl px-4 py-4 ${
+    <Link
+      href={href}
+      aria-label={`${label}: ${value}. Open matching contracts.`}
+      className={`block cursor-pointer rounded-2xl px-3.5 py-3 transition hover:brightness-[0.97] active:scale-[0.99] ${NAV_CARD_FOCUS} ${
         tone === "teal" ? "bg-accent-soft" : "bg-gold-soft"
       }`}
     >
-      <p className="flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-ink-faint">
+      <p className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wide text-ink-faint">
         {icon}
         {label}
       </p>
-      <p className="mt-2 font-display text-4xl tracking-tight tabular-nums text-ink">{value}</p>
+      <p className="mt-1.5 font-display text-xl tracking-tight tabular-nums text-ink sm:text-3xl">
+        {value}
+      </p>
       <p className="mt-1 text-xs text-ink-faint">{hint}</p>
-    </div>
+    </Link>
   );
 }
 
 function Bento({
+  href,
   icon,
   label,
   value,
   tone,
   className = "",
 }: {
+  href: string;
   icon: ReactNode;
   label: string;
   value: number;
@@ -350,8 +372,12 @@ function Bento({
     navy: "from-ink/10 to-white",
   };
   return (
-    <Card className={`overflow-hidden bg-gradient-to-br p-5 ${tones[tone]} ${className}`}>
-      <p className="flex items-center gap-2 text-xs font-medium text-ink-faint">
+    <Link
+      href={href}
+      aria-label={`${label}: ${value}. Open matching contracts.`}
+      className={`block cursor-pointer overflow-hidden rounded-[var(--radius)] border border-line bg-gradient-to-br p-3.5 shadow-[var(--shadow)] transition hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-[0_18px_36px_-24px_rgba(18,194,184,.45)] active:translate-y-0 sm:p-4 ${NAV_CARD_FOCUS} ${tones[tone]} ${className}`}
+    >
+      <p className="flex items-center gap-2 text-[11px] font-medium text-ink-faint">
         {icon}
         {label}
       </p>
@@ -359,11 +385,11 @@ function Bento({
         key={value}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mt-3 font-display text-4xl"
+        className="mt-2 font-display text-2xl sm:text-3xl"
       >
         {value}
       </motion.p>
-    </Card>
+    </Link>
   );
 }
 
@@ -381,10 +407,15 @@ function Stat({
   return (
     <Link
       href={href}
-      className={`rounded-2xl px-4 py-4 ${dark ? "bg-white/8 hover:bg-white/12" : "bg-paper"}`}
+      aria-label={`${label}: ${value}. Open matching contracts.`}
+      className={`block cursor-pointer rounded-2xl px-3 py-3 transition ${NAV_CARD_FOCUS} ${
+        dark
+          ? "bg-white/8 hover:bg-white/14"
+          : "bg-paper hover:bg-accent-soft"
+      }`}
     >
-      <p className={`text-xs ${dark ? "text-white/55" : "text-ink-faint"}`}>{label}</p>
-      <p className="mt-1 font-display text-3xl">{value}</p>
+      <p className={`text-[11px] ${dark ? "text-white/55" : "text-ink-faint"}`}>{label}</p>
+      <p className="mt-0.5 font-display text-2xl">{value}</p>
     </Link>
   );
 }

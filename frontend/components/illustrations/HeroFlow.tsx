@@ -1,20 +1,45 @@
 "use client";
 
-import { useId } from "react";
+import { useEffect, useId, useState } from "react";
 
 const TRACK = "M70 92 C 160 28, 250 156, 360 78 S 500 40, 530 88";
 
-export function HeroFlow({ compact = false }: { compact?: boolean }) {
+/**
+ * Decorative employer → escrow → freelancer flow.
+ *
+ * SMIL <animateMotion> mutates SVG transforms in the browser before React
+ * hydrates, which produces a server/client DOM mismatch. Particles therefore
+ * render at a static rest position until after mount, then motion is attached.
+ */
+export function HeroFlow({
+  compact = false,
+  dense = false,
+}: {
+  compact?: boolean;
+  /** Slightly shorter hero illustration for Overview density. */
+  dense?: boolean;
+}) {
   const raw = useId().replace(/:/g, "");
   const strokeId = `pf-hero-stroke-${raw}`;
   const softId = `pf-soft-${raw}`;
   const glowId = `pf-part-glow-${raw}`;
   const shieldId = `pf-shield-${raw}`;
   const trackId = `pf-hero-track-${raw}`;
+  const [motionReady, setMotionReady] = useState(false);
+
+  useEffect(() => {
+    setMotionReady(true);
+  }, []);
+
+  const heightClass = compact
+    ? "h-28"
+    : dense
+      ? "min-h-[140px] sm:min-h-[175px] lg:min-h-[220px]"
+      : "min-h-[180px] sm:min-h-[220px] lg:min-h-[280px]";
 
   return (
     <div
-      className={`relative overflow-hidden ${compact ? "h-28" : "min-h-[220px] sm:min-h-[280px]"}`}
+      className={`relative overflow-hidden ${heightClass}`}
       aria-hidden={compact ? true : undefined}
     >
       {!compact ? (
@@ -87,6 +112,9 @@ export function HeroFlow({ compact = false }: { compact?: boolean }) {
           glow="#2ee6d6"
           core="#ffffff"
           filterId={glowId}
+          motionReady={motionReady}
+          restX={70}
+          restY={92}
         />
         <Particle
           className="pf-am"
@@ -95,6 +123,9 @@ export function HeroFlow({ compact = false }: { compact?: boolean }) {
           glow="#8b7bff"
           core="#f3f0ff"
           filterId={glowId}
+          motionReady={motionReady}
+          restX={300}
+          restY={102}
         />
         <Particle
           className="pf-am"
@@ -103,6 +134,9 @@ export function HeroFlow({ compact = false }: { compact?: boolean }) {
           glow="#4f8cff"
           core="#ffffff"
           filterId={glowId}
+          motionReady={motionReady}
+          restX={530}
+          restY={88}
         />
 
         <g>
@@ -165,6 +199,9 @@ function Particle({
   core,
   filterId,
   className,
+  motionReady,
+  restX,
+  restY,
 }: {
   trackId: string;
   delay: string;
@@ -172,15 +209,20 @@ function Particle({
   core: string;
   filterId: string;
   className?: string;
+  motionReady: boolean;
+  restX: number;
+  restY: number;
 }) {
   return (
-    <g className={className}>
+    <g className={className} transform={motionReady ? undefined : `translate(${restX} ${restY})`}>
       <circle r="11" fill={glow} opacity="0.38" filter={`url(#${filterId})`} />
       <circle r="5.4" fill={core} />
       <circle r="3.2" fill={glow} />
-      <animateMotion dur="3.2s" begin={delay} repeatCount="indefinite" rotate="0">
-        <mpath href={`#${trackId}`} xlinkHref={`#${trackId}`} />
-      </animateMotion>
+      {motionReady ? (
+        <animateMotion dur="3.2s" begin={delay} repeatCount="indefinite" rotate="0">
+          <mpath href={`#${trackId}`} />
+        </animateMotion>
+      ) : null}
     </g>
   );
 }

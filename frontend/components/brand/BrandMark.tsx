@@ -1,4 +1,19 @@
+import Image from "next/image";
+
 import { brand } from "@/lib/brand";
+
+/** Approved Premiflow mark — high-res source; UI scales DOWN only. */
+const MARK_SRC = "/brand/premiflow-mark.png";
+const MARK_INTRINSIC = 512;
+
+const NAVY = "#081F2A";
+const CYAN = "#3BB3D0";
+
+/**
+ * Transparent padding in the approved 512² mark (~120×112 opaque content).
+ * Zoom to fill the slot without editing the PNG; keep a little edge margin.
+ */
+const MARK_ZOOM = 512 / 136;
 
 export function BrandMark({
   size = 36,
@@ -9,35 +24,47 @@ export function BrandMark({
   light?: boolean;
   wordmark?: boolean;
 }) {
-  const id = light ? "pf-mark-light" : "pf-mark";
+  const wordmarkStyle =
+    size >= 56
+      ? { fontSize: "1.48rem", letterSpacing: "-0.02em" }
+      : size >= 44
+        ? { fontSize: "1.4rem", letterSpacing: "-0.02em" }
+        : size >= 32
+          ? { fontSize: "1.2rem", letterSpacing: "-0.02em" }
+          : { fontSize: "1.15rem", letterSpacing: "-0.02em" };
+  const gap = size >= 56 ? 12 : size >= 44 ? 14 : 12;
+
   return (
-    <span className="inline-flex items-center gap-2.5">
-      <svg
-        width={size}
-        height={size}
-        viewBox="0 0 36 36"
-        aria-hidden="true"
-        className="shrink-0"
+    <span className="inline-flex items-center" style={{ gap }}>
+      <span
+        className="relative inline-block shrink-0 overflow-hidden"
+        style={{ width: size, height: size }}
+        aria-hidden
       >
-        <defs>
-          <linearGradient id={id} x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#12c2b8" />
-            <stop offset="1" stopColor="#6b7cff" />
-          </linearGradient>
-        </defs>
-        <rect width="36" height="36" rx="12" fill={light ? "#0c1b2e" : `url(#${id})`} />
-        <path
-          d="M8 23 C14 10, 22 26, 29 13"
-          fill="none"
-          stroke={light ? `url(#${id})` : "white"}
-          strokeWidth="2.4"
-          strokeLinecap="round"
+        <Image
+          src={MARK_SRC}
+          alt=""
+          width={MARK_INTRINSIC}
+          height={MARK_INTRINSIC}
+          sizes={`${Math.ceil(size * MARK_ZOOM)}px`}
+          quality={95}
+          priority
+          className="pointer-events-none absolute left-1/2 top-1/2 max-w-none"
+          style={{
+            width: size,
+            height: size,
+            transform: `translate(-50%, -50%) scale(${MARK_ZOOM})`,
+          }}
         />
-        <circle cx="29" cy="13" r="2.4" fill={light ? "#2ee6d6" : "white"} />
-      </svg>
+      </span>
       {wordmark ? (
-        <span className={`text-[1.15rem] font-extrabold tracking-[-0.06em] ${light ? "text-white" : "text-ink"}`}>
-          {brand.name}
+        <span
+          className="font-extrabold leading-none"
+          style={wordmarkStyle}
+          aria-label={brand.name}
+        >
+          <span style={{ color: light ? "#FFFFFF" : NAVY }}>PREMI</span>
+          <span style={{ color: CYAN }}>FLOW</span>
         </span>
       ) : (
         <span className="sr-only">{brand.name}</span>

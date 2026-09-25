@@ -7,13 +7,16 @@ export function Card({
   children,
   className = "",
   hover = false,
+  id,
 }: {
   children: ReactNode;
   className?: string;
   hover?: boolean;
+  id?: string;
 }) {
   return (
     <motion.div
+      id={id}
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={
