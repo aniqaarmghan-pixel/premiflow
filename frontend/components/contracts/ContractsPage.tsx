@@ -10,15 +10,17 @@ import { ConnectPrompt } from "@/components/shell/ConnectPrompt";
 import { PageFade } from "@/components/shell/PageFade";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { Field, Input, Select } from "@/components/ui/Field";
+import { Input, Select } from "@/components/ui/Field";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Tabs } from "@/components/ui/Tabs";
 import {
-  filterContracts,
-  presentStatus,
-  type RoleFilter,
-  type StatusFilter,
-} from "@/lib/app/view-model";
+  buildContractsListHref,
+  contractsListEmptyCopy,
+  filterContractsByListQuery,
+  parseContractsListQuery,
+  type ContractsListStatusFilter,
+} from "@/lib/app/contracts-list-query";
+import { presentStatus, type RoleFilter } from "@/lib/app/view-model";
 import { useContracts } from "@/lib/hooks/ContractsProvider";
 import type { ContractStatus } from "@/lib/streampay-v2";
 
@@ -41,25 +43,35 @@ export function ContractsPage() {
   const params = useSearchParams();
   const router = useRouter();
   const { status, error, grouped, decimalsByMint, refresh } = useContracts();
-  const initialRole = (params.get("role") as RoleFilter | null) ?? "all";
-  const [role, setRole] = useState<RoleFilter>(
-    initialRole === "hiring" || initialRole === "working" ? initialRole : "all"
-  );
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [lookup, setLookup] = useState("");
 
+  const query = useMemo(() => parseContractsListQuery(params), [params]);
+
   const list = useMemo(
-    () => filterContracts(grouped, role, statusFilter),
-    [grouped, role, statusFilter]
+    () => filterContractsByListQuery(grouped, query),
+    [grouped, query]
   );
+
+  function replaceQuery(
+    patch: Partial<{
+      role: RoleFilter;
+      status: ContractsListStatusFilter;
+      type: typeof query.type;
+      claim: typeof query.claim;
+    }>
+  ) {
+    router.replace(buildContractsListHref({ ...query, ...patch }), {
+      scroll: false,
+    });
+  }
 
   if (!connected) return <ConnectPrompt />;
 
   if (status === "loading" || status === "idle") {
     return (
-      <div className="grid gap-4 md:grid-cols-2">
-        <Skeleton className="h-48" />
-        <Skeleton className="h-48" />
+      <div className="grid gap-3 md:grid-cols-2">
+        <Skeleton className="h-40" />
+        <Skeleton className="h-40" />
       </div>
     );
   }
@@ -74,36 +86,34 @@ export function ContractsPage() {
     );
   }
 
-  const emptyCopy =
-    role === "hiring"
-      ? {
-          title: "No hiring contracts",
-          body: "When you fund work, those contracts appear here. The same wallet can still show Working contracts separately.",
-        }
-      : role === "working"
-        ? {
-            title: "No working contracts",
-            body: "When someone hires this wallet, those contracts appear here.",
-          }
-        : {
-            title: "No contracts yet",
-            body: "Create a protected contract or wait for an employer to send one to this wallet.",
-          };
+  const emptyCopy = contractsListEmptyCopy(query);
+  const statusSelectValue: string =
+    query.status === "all" ? "all" : query.status;
 
   return (
     <PageFade>
-      <div className="flex flex-wrap items-end justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-2.5">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan">Contracts</p>
-          <h1 className="mt-1 font-display text-4xl">Your work and hires</h1>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan">
+            Contracts
+          </p>
+          <h1 className="mt-0.5 font-display text-[1.65rem] tracking-tight sm:text-3xl">
+            Your work and hires
+          </h1>
         </div>
-        <Button onClick={() => router.push("/create")}>Create contract</Button>
+        <Button
+          onClick={() => router.push("/create")}
+          className="w-full px-3.5 py-2.5 text-[13px] sm:w-auto sm:py-1.5"
+        >
+          Create contract
+        </Button>
       </div>
-      <div className="mt-6 flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="min-w-0 flex-1">
+
+      <div className="mt-3 flex min-w-0 flex-col gap-2 sm:mt-3.5 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0 overflow-x-auto pb-0.5 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <Tabs
-            value={role}
-            onChange={(id) => setRole(id as RoleFilter)}
+            value={query.role}
+            onChange={(id) => replaceQuery({ role: id as RoleFilter })}
             tabs={[
               { id: "all", label: "All", count: grouped.all.length },
               { id: "hiring", label: "Hiring", count: grouped.hiring.length },
@@ -113,12 +123,21 @@ export function ContractsPage() {
         </div>
         <div className="w-full min-w-0 lg:w-52 lg:shrink-0">
           <Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+            value={statusSelectValue}
+            onChange={(e) => {
+              const next = e.target.value as ContractsListStatusFilter;
+              replaceQuery({
+                status: next,
+                // Changing status via the control clears type/claim deep-links
+                // unless they remain compatible — keep type/claim so combined
+                // URLs stay editable from the select alone for status.
+              });
+            }}
             aria-label="Filter by status"
-            className="max-w-full"
+            className="max-w-full py-2 text-[13px] sm:py-1.5"
           >
             <option value="all">All statuses</option>
+            <option value="review">Pending reviews</option>
             {STATUSES.map((s) => (
               <option key={s} value={s}>
                 {presentStatus(s)}
@@ -127,8 +146,33 @@ export function ContractsPage() {
           </Select>
         </div>
       </div>
+
+      {(query.type !== "all" || query.claim !== "none") && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-ink-soft">
+          {query.type !== "all" ? (
+            <span className="rounded-full bg-paper px-2.5 py-1">
+              Type: {query.type}
+            </span>
+          ) : null}
+          {query.claim !== "none" ? (
+            <span className="rounded-full bg-paper px-2.5 py-1">
+              Claim: {query.claim}
+            </span>
+          ) : null}
+          <button
+            type="button"
+            className="font-medium text-accent underline-offset-2 hover:underline"
+            onClick={() =>
+              replaceQuery({ type: "all", claim: "none", status: query.status })
+            }
+          >
+            Clear type / claim filters
+          </button>
+        </div>
+      )}
+
       <form
-        className="mt-4 flex min-w-0 flex-col gap-2 sm:flex-row"
+        className="mt-2.5 flex min-w-0 flex-col gap-2 sm:mt-3 sm:flex-row sm:items-end"
         onSubmit={(e) => {
           e.preventDefault();
           try {
@@ -139,21 +183,30 @@ export function ContractsPage() {
           }
         }}
       >
-        <Field label="Open by contract address" hint="Useful for the designated resolver.">
+        <label className="block w-full min-w-0 max-w-full space-y-1 sm:max-w-[26rem]">
+          <span className="text-[13px] font-medium text-ink">Open by contract address</span>
           <Input
             value={lookup}
             onChange={(e) => setLookup(e.target.value)}
             placeholder="Contract PDA"
-            className="min-w-0"
+            className="min-w-0 py-2.5 text-[13px] sm:py-1.5"
           />
-        </Field>
-        <div className="sm:pt-7">
-          <Button type="submit" variant="secondary">
+          <span className="block text-[11px] text-ink-faint">
+            Useful for the designated resolver.
+          </span>
+        </label>
+        <div className="sm:pb-5">
+          <Button
+            type="submit"
+            variant="secondary"
+            className="w-full px-3.5 py-2.5 text-[13px] sm:w-auto sm:py-1.5"
+          >
             Open
           </Button>
         </div>
       </form>
-      <div className="mt-6 grid gap-4 md:grid-cols-2">
+
+      <div className="mt-3.5 grid gap-3 md:grid-cols-2">
         {list.length === 0 ? (
           <div className="md:col-span-2">
             <EmptyState

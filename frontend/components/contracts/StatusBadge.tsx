@@ -17,6 +17,21 @@ const TONE: Record<ContractStatus, "neutral" | "accent" | "gold" | "danger" | "o
   Resolved: "ok",
 };
 
-export function StatusBadge({ status, label }: { status: ContractStatus; label: string }) {
-  return <Badge tone={TONE[status]}>{label}</Badge>;
+export function StatusBadge({
+  status,
+  label,
+  compact = false,
+}: {
+  status: ContractStatus;
+  label: string;
+  compact?: boolean;
+}) {
+  return (
+    <Badge
+      tone={TONE[status]}
+      className={compact ? "px-2 py-0.5 text-[10px]" : undefined}
+    >
+      {label}
+    </Badge>
+  );
 }
