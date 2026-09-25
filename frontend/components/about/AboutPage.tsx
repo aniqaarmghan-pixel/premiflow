@@ -249,10 +249,11 @@ export function AboutPage() {
             <h2 id="about-assistant-heading" className="mt-2 font-display text-2xl">
               {ABOUT_ASSISTANT.heading}
             </h2>
+            <p className="mt-2 text-sm font-medium text-ink">{ABOUT_ASSISTANT.tagline}</p>
             <p className="mt-2 text-sm leading-6 text-ink-soft">{ABOUT_ASSISTANT.note}</p>
             <div className="mt-4 grid min-w-0 gap-4 sm:grid-cols-2">
               <div>
-                <h3 className="text-sm font-semibold text-ink">Intended later</h3>
+                <h3 className="text-sm font-semibold text-ink">{ABOUT_ASSISTANT.canHelpHeading}</h3>
                 <ul className="mt-2 space-y-1 text-sm leading-6 text-ink-soft">
                   {ABOUT_ASSISTANT.intended.map((item) => (
                     <li key={item}>{item}</li>
@@ -260,7 +261,7 @@ export function AboutPage() {
                 </ul>
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-ink">Will not</h3>
+                <h3 className="text-sm font-semibold text-ink">{ABOUT_ASSISTANT.willNotHeading}</h3>
                 <ul className="mt-2 space-y-1 text-sm leading-6 text-ink-soft">
                   {ABOUT_ASSISTANT.willNot.map((item) => (
                     <li key={item}>{item}</li>
@@ -293,18 +294,22 @@ export function AboutPage() {
 
 export function WhyPremiflowTeaser() {
   return (
-    <Card className="mt-8 p-5 sm:p-6">
-      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan">
+    <Card className="mt-5 p-4 sm:p-5">
+      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan">
         About
       </p>
-      <h2 className="mt-2 font-display text-2xl sm:text-3xl">{ABOUT_HOME_TEASER.heading}</h2>
-      <p className="mt-2 max-w-2xl text-sm leading-7 text-ink-soft">{ABOUT_HOME_TEASER.body}</p>
-      <p className="mt-3 text-sm font-medium text-ink">{ABOUT_HOME_TEASER.models}</p>
-      <div className="mt-4">
+      <h2 className="mt-1.5 font-display text-xl sm:text-2xl">{ABOUT_HOME_TEASER.heading}</h2>
+      <p className="mt-1.5 max-w-2xl text-sm leading-6 text-ink-soft">{ABOUT_HOME_TEASER.body}</p>
+      <p className="mt-2 text-sm font-medium text-ink">{ABOUT_HOME_TEASER.models}</p>
+      <div className="mt-3">
         <Link href={ABOUT_HOME_TEASER.href}>
-          <Button variant="secondary" aria-label={ABOUT_HOME_TEASER.button}>
+          <Button
+            variant="secondary"
+            aria-label={ABOUT_HOME_TEASER.button}
+            className="min-h-11 px-3.5 py-2.5 text-[13px] sm:min-h-0 sm:px-3.5 sm:py-2"
+          >
             {ABOUT_HOME_TEASER.button}
-            <ArrowRight size={16} aria-hidden="true" />
+            <ArrowRight size={15} aria-hidden="true" />
           </Button>
         </Link>
       </div>

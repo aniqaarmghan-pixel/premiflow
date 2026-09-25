@@ -19,18 +19,12 @@ export function SupportPage() {
 
         <Card className="border-line bg-paper p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-faint">
-            Coming later
+            {SUPPORT_PAGE.assistantStatus}
           </p>
           <h2 className="mt-1 font-display text-2xl">{PREMIFLOW_ASSISTANT.name}</h2>
-          <p className="mt-2 text-sm font-medium text-ink">{SUPPORT_PAGE.assistantComingLater}</p>
-          <p className="mt-2 text-sm leading-6 text-ink-soft">
-            This feature is not active. There is no chatbot and no AI backend on this page.
-          </p>
-          <p className="mt-3 text-sm leading-6 text-ink-soft">
-            A future assistant may explain contract state and help organize a case. It will not
-            decide who wins, allocate escrow, replace the designated resolver, or sign
-            resolve_dispute.
-          </p>
+          <p className="mt-2 text-sm font-medium text-ink">{SUPPORT_PAGE.assistantTagline}</p>
+          <p className="mt-2 text-sm leading-6 text-ink-soft">{SUPPORT_PAGE.assistantBody}</p>
+          <p className="mt-3 text-sm leading-6 text-ink-soft">{SUPPORT_PAGE.assistantWillNot}</p>
         </Card>
 
         {SUPPORT_TOPICS.map((topic) => (

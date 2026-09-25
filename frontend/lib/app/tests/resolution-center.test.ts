@@ -121,7 +121,8 @@ test("category and description persist off-chain and do not choose a settlement 
 
 test("resolver remains the final decision-maker and AI cannot decide settlement", () => {
   assert.equal(assistantDecidesSettlement(), false);
-  assert.equal(PREMIFLOW_ASSISTANT.comingLater, true);
+  assert.equal(PREMIFLOW_ASSISTANT.comingLater, false);
+  assert.match(PREMIFLOW_ASSISTANT.navLabel, /AI guidance throughout PREMIFLOW/i);
   assert.ok(PREMIFLOW_ASSISTANT.mustNot.some((line) => /decide who wins/i.test(line)));
   assert.ok(PREMIFLOW_ASSISTANT.mustNot.some((line) => /allocate escrow/i.test(line)));
   assert.ok(PREMIFLOW_ASSISTANT.mustNot.some((line) => /replace the designated resolver/i.test(line)));
@@ -303,6 +304,11 @@ test("Resolution Center UI does not invent AI analysis or attachment storage", (
     new URL("../../../components/support/SupportPage.tsx", import.meta.url),
     "utf8"
   );
-  assert.match(support, /no chatbot/i);
-  assert.match(support, /coming later/i);
+  assert.match(support, /SUPPORT_PAGE\.assistantStatus/);
+  assert.match(support, /SUPPORT_PAGE\.assistantWillNot/);
+  assert.doesNotMatch(support, /Coming later/);
+  assert.doesNotMatch(support, /no chatbot/i);
+  assert.equal(SUPPORT_PAGE.assistantStatus, "Available now");
+  assert.match(SUPPORT_PAGE.assistantTagline, /AI guidance throughout PREMIFLOW/i);
+  assert.doesNotMatch(SUPPORT_PAGE.intro, /AI assistant yet/i);
 });

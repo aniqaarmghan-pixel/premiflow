@@ -7,13 +7,17 @@ export const CONTRACT_TYPES: readonly PaymentModeName[] = [
   "Hourly",
 ];
 
-export const CONTRACT_TYPE_DECISION_HEADING = "What kind of work are you paying for?";
+export const CONTRACT_TYPE_DECISION_HEADING = "How will this work be paid?";
 
 export type ContractTypeGuide = {
   type: PaymentModeName;
   title: string;
   customerChoice: string;
   tagline: string;
+  /** One-line card copy for compact Create UI. */
+  cardSummary: string;
+  /** Secondary “Best for” line on Create type cards. */
+  cardBestFor: string;
   bestFor: string;
   compactBestFor: string;
   exampleHeading: string;
@@ -34,6 +38,8 @@ export const CONTRACT_TYPE_GUIDES: Record<PaymentModeName, ContractTypeGuide> = 
     title: "Fixed",
     customerChoice: "One finished job",
     tagline: "One job, one price",
+    cardSummary: "One price for a defined job.",
+    cardBestFor: "one-off deliverables.",
     bestFor: "Best for a clearly defined deliverable.",
     compactBestFor: "Logo, article, and one-time jobs",
     exampleHeading: "Examples",
@@ -68,6 +74,8 @@ export const CONTRACT_TYPE_GUIDES: Record<PaymentModeName, ContractTypeGuide> = 
     title: "Milestone",
     customerChoice: "Several project stages",
     tagline: "Pay by project stage",
+    cardSummary: "Pay as agreed stages are completed.",
+    cardBestFor: "projects with clear stages.",
     bestFor: "Best for a larger project split into separate deliverables.",
     compactBestFor: "Websites, apps, and multi-stage work",
     exampleHeading: "Example",
@@ -99,6 +107,8 @@ export const CONTRACT_TYPE_GUIDES: Record<PaymentModeName, ContractTypeGuide> = 
     title: "Streaming",
     customerChoice: "Continuous scheduled payment",
     tagline: "Pay as contract time passes",
+    cardSummary: "Payment accrues over the contract schedule.",
+    cardBestFor: "ongoing scheduled work.",
     bestFor:
       "Best for work where payment should accrue continuously during an agreed scheduled period.",
     compactBestFor: "Retainers and scheduled consulting periods",
@@ -136,6 +146,8 @@ export const CONTRACT_TYPE_GUIDES: Record<PaymentModeName, ContractTypeGuide> = 
     title: "Hourly",
     customerChoice: "Actual hours worked",
     tagline: "Pay for recorded working time",
+    cardSummary: "Track approved work time and pay by the hour.",
+    cardBestFor: "flexible work where hours vary.",
     bestFor:
       "Best for work where payment depends on actual recorded Start work / Stop work sessions.",
     compactBestFor: "Logged consulting and session-based work",
@@ -192,10 +204,10 @@ export const STREAMING_VS_HOURLY = {
 
 export const HOW_PAYMENT_WORKS_HEADING = "How payment works";
 export const CONFIGURE_PREVIEW_HEADING = "You'll configure";
-export const TYPE_SELECTION_CONTINUE_LABEL = "This fits my work — Continue";
+export const TYPE_SELECTION_CONTINUE_LABEL = "Continue";
 
 export const TYPE_SELECTION_SUPPORT_NOTE =
-  "Help & Support is for edge cases. PREMIFLOW Assistant is coming later. Neither is required to choose a contract type.";
+  "Need help choosing? Open Help & Support or ask PREMIFLOW Assistant.";
 
 export function paymentModeForWorkChoice(choice: string): PaymentModeName | null {
   const hit = CONTRACT_TYPE_DECISION_HINTS.find((hint) => hint.match === choice);

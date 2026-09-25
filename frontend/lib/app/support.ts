@@ -3,8 +3,13 @@ import { PREMIFLOW_ASSISTANT, RESOLVER_EXPLANATION } from "@/lib/app/resolution-
 export const SUPPORT_PAGE = {
   title: "Help & Support",
   intro:
-    "This is static PREMIFLOW help. There is no live chat, ticket queue, or AI assistant yet.",
-  assistantComingLater: PREMIFLOW_ASSISTANT.navLabel,
+    "This is static PREMIFLOW help. There is no live chat or ticket queue. For guided questions, use the floating PREMIFLOW Assistant.",
+  assistantStatus: "Available now",
+  assistantTagline: PREMIFLOW_ASSISTANT.navLabel,
+  assistantBody:
+    "PREMIFLOW Assistant can explain contract types, protected payments, status and actions, paid trials, Collect / Claim, disputes and the resolver’s role, and how to navigate PREMIFLOW.",
+  assistantWillNot:
+    "It does not sign wallet transactions, move funds, create or fund contracts, approve work, Collect or Claim, cancel contracts, resolve disputes, or decide winners.",
 } as const;
 
 export type SupportTopicId =

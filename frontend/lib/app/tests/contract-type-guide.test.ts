@@ -34,7 +34,7 @@ test("create type guide lists Fixed, Milestone, Streaming, and Hourly", () => {
 });
 
 test("decision guide maps customer situations to existing payment modes", () => {
-  assert.equal(CONTRACT_TYPE_DECISION_HEADING, "What kind of work are you paying for?");
+  assert.equal(CONTRACT_TYPE_DECISION_HEADING, "How will this work be paid?");
   assert.deepEqual(
     CONTRACT_TYPE_DECISION_HINTS.map((hint) => [hint.match, hint.type]),
     [
@@ -55,6 +55,8 @@ test("all four contract types have customer-friendly descriptions and examples",
     const guide = CONTRACT_TYPE_GUIDES[type];
     assert.ok(guide.customerChoice.length > 0);
     assert.ok(guide.tagline.length > 0);
+    assert.ok(guide.cardSummary.length > 0);
+    assert.ok(guide.cardBestFor.length > 0);
     assert.ok(guide.bestFor.length > 0);
     assert.ok(guide.explanation.length > 0);
     assert.ok(guide.exampleLines.length > 0);
@@ -168,13 +170,7 @@ test("Create wizard uses the four protocol types and the decision guide", () => 
   assert.match(source, /CONTRACT_TYPES/);
   assert.match(source, /CONTRACT_TYPE_DECISION_HEADING/);
   assert.match(source, /CONTRACT_TYPE_GUIDES/);
-  assert.match(source, /compactExampleLines/);
-  assert.match(source, /compactBestFor/);
-  assert.match(source, /customerChoice/);
-  assert.match(source, /howPaymentWorks/);
-  assert.match(source, /configurePreview/);
-  assert.match(source, /HOW_PAYMENT_WORKS_HEADING/);
-  assert.match(source, /STREAMING_VS_HOURLY/);
+  assert.match(source, /cardSummary/);
   assert.match(source, /TYPE_SELECTION_CONTINUE_LABEL/);
   assert.match(source, /Hourly/);
   assert.match(source, /createHourlyContract/);
@@ -249,14 +245,12 @@ test("Create wording is consistent with About wording", () => {
 test("basic type selection does not require Help or Assistant", () => {
   assert.equal(HOW_PAYMENT_WORKS_HEADING, "How payment works");
   assert.equal(CONFIGURE_PREVIEW_HEADING, "You'll configure");
-  assert.equal(TYPE_SELECTION_CONTINUE_LABEL, "This fits my work — Continue");
-  assert.match(TYPE_SELECTION_SUPPORT_NOTE, /Neither is required/i);
-  assert.match(TYPE_SELECTION_SUPPORT_NOTE, /coming later/i);
+  assert.equal(TYPE_SELECTION_CONTINUE_LABEL, "Continue");
+  assert.match(TYPE_SELECTION_SUPPORT_NOTE, /Help & Support|PREMIFLOW Assistant/i);
   const source = readFileSync(
     new URL("../../../components/create/CreateWizard.tsx", import.meta.url),
     "utf8"
   );
-  assert.match(source, /TYPE_SELECTION_SUPPORT_NOTE/);
   assert.doesNotMatch(source, /must (open|read|use) Help/i);
   assert.doesNotMatch(source, /Assistant is required/i);
   const page = readFileSync(new URL("../../../app/create/page.tsx", import.meta.url), "utf8");

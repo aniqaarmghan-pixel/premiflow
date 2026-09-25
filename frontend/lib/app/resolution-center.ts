@@ -103,16 +103,20 @@ export const AI_CASE_SUMMARY_COPY = {
 
 export const PREMIFLOW_ASSISTANT = {
   name: "PREMIFLOW Assistant",
-  comingLater: true,
-  navLabel: "AI contract assistance — coming later",
+  /** Live floating guidance is available; Resolution Center AI case summary is still separate. */
+  comingLater: false,
+  navLabel: "AI guidance throughout PREMIFLOW.",
   intended: [
-    "Explain contract state",
-    "Explain why an action is or is not available",
-    "Distinguish support problems from contractual disputes",
-    "Organize dispute statements and evidence",
-    "Summarize both sides for the resolver",
+    "Explain contract types and protected payments",
+    "Explain contract state and available actions",
+    "Explain paid trials, Collect, and Claim",
+    "Explain disputes and the resolver’s role",
+    "Help navigate PREMIFLOW",
   ],
   mustNot: [
+    "Sign wallet transactions or move funds",
+    "Create or fund contracts independently",
+    "Approve work, Collect, Claim, or cancel contracts",
     "Automatically decide who wins",
     "Automatically allocate escrow",
     "Replace the designated resolver",

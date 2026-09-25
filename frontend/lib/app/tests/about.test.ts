@@ -128,14 +128,17 @@ test("Resolution Center description is truthful", () => {
   assert.match(ABOUT_DISPUTES.note, /does not decide disputes/i);
 });
 
-test("trust model, vision, assistant coming later, and CTA exist", () => {
+test("trust model, vision, live assistant, and CTA exist", () => {
   assert.match(ABOUT_TRUST.heading, /Make the agreement clearer/i);
   assert.equal(ABOUT_TRUST.layers.length, 4);
   assert.match(ABOUT_VISION.idea, /without either side having to rely only on blind trust/i);
-  assert.equal(ABOUT_ASSISTANT.status, "Coming later");
-  assert.match(ABOUT_ASSISTANT.note, /no assistant backend/i);
-  assert.ok(ABOUT_ASSISTANT.willNot.some((line) => /Automatically decide disputes/i.test(line)));
+  assert.equal(ABOUT_ASSISTANT.status, "Available now");
+  assert.match(ABOUT_ASSISTANT.tagline, /AI guidance throughout PREMIFLOW/i);
+  assert.match(ABOUT_ASSISTANT.note, /floating PREMIFLOW Assistant/i);
+  assert.doesNotMatch(ABOUT_ASSISTANT.status + ABOUT_ASSISTANT.note, /coming later|no assistant backend/i);
+  assert.ok(ABOUT_ASSISTANT.willNot.some((line) => /Resolve disputes or decide winners/i.test(line)));
   assert.ok(ABOUT_ASSISTANT.willNot.some((line) => /private Contract Messages/i.test(line)));
+  assert.ok(ABOUT_ASSISTANT.willNot.some((line) => /Sign wallet transactions/i.test(line)));
   assert.deepEqual(
     ABOUT_CTA.actions.map((action) => action.href),
     ["/create", "/contracts", "/support"]

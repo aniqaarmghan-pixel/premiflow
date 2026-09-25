@@ -220,23 +220,30 @@ export const ABOUT_VISION = {
 
 export const ABOUT_ASSISTANT = {
   heading: "PREMIFLOW Assistant",
-  status: "Coming later",
+  status: "Available now",
+  tagline: "AI guidance throughout PREMIFLOW.",
+  canHelpHeading: "Can help with",
+  willNotHeading: "Will not",
   intended: [
-    "Explain contract types",
-    "Explain current contract state",
-    "Explain available actions",
-    "Explain payment calculations",
-    "Help distinguish support from a dispute",
-    "Help organize selected dispute information",
+    "Understand contract types (Fixed, Milestone, Streaming, Hourly)",
+    "Understand protected payments and escrow basics",
+    "Understand contract status and available actions",
+    "Understand paid trials",
+    "Understand Collect pay and Claim refund",
+    "Understand disputes and the resolver’s role",
+    "Navigate PREMIFLOW (Create, Contracts, Support)",
   ],
   willNot: [
-    "Control wallet funds",
-    "Sign transactions",
-    "Automatically decide disputes",
-    "Automatically decide payment splits",
+    "Sign wallet transactions",
+    "Move funds or control escrow",
+    "Create or fund contracts on its own",
+    "Approve work",
+    "Collect or Claim for you",
+    "Cancel contracts",
+    "Resolve disputes or decide winners",
     "Automatically read private Contract Messages",
   ],
-  note: "There is no assistant backend on this page. This is a future guidance feature, not a live chatbot.",
+  note: "Open the floating PREMIFLOW Assistant anytime for guidance. It explains and suggests — your wallet confirms every on-chain action.",
 } as const;
 
 export const ABOUT_CTA = {

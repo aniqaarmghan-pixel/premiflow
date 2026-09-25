@@ -38,12 +38,7 @@ import {
   upsertResolutionCaseStatement,
   type ApiError,
 } from "@/lib/app/resolution-case-client";
-import {
-  createChallenge,
-  fetchSession,
-  signatureToBase64,
-  verifyChallenge,
-} from "@/lib/app/messages-client";
+import { ensureMessagingSession } from "@/lib/app/messaging-session";
 import { supportTopicHref } from "@/lib/app/support";
 import { Card } from "@/components/ui/Card";
 import { Address } from "@/components/ui/Address";
@@ -182,14 +177,14 @@ export function ResolutionCenter({
   }, [address, contract.status, role, recoverGeneration]);
 
   async function onVerifyWallet() {
-    if (!connectedWallet || !signMessage) return;
+    if (!connectedWallet) return;
     setVerifyBusy(true);
     try {
-      const challenge = await createChallenge(connectedWallet);
-      const signature = await signMessage(new TextEncoder().encode(challenge.message));
-      await verifyChallenge(challenge.challengeId, signatureToBase64(signature));
-      const me = await fetchSession();
-      if (me.wallet !== connectedWallet) {
+      const { session } = await ensureMessagingSession({
+        wallet: connectedWallet,
+        signMessage,
+      });
+      if (session.wallet !== connectedWallet) {
         setCaseState("unauthenticated");
         return;
       }
