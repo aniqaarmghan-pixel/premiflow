@@ -13,6 +13,13 @@ import {
 } from "@/lib/app/copilot-schemas";
 import { createSystemContext, deterministicCreateProposal } from "@/lib/app/copilot";
 import {
+  classifyCreateAssistantIntent,
+  deterministicGuideAnswer,
+  fallbackGuideAnswer,
+  formatNarrativeGuideText,
+  GUIDE_ANSWER_ASSUMPTION,
+} from "@/lib/app/copilot-assistant-voice";
+import {
   bindActionExplanation,
   deterministicContractExplanation,
   deterministicDisputeSummary,
@@ -67,6 +74,47 @@ function withSafetyWarnings(
   return { ...proposal, warnings };
 }
 
+/** Neutral create-schema shell so guide answers never inherit job-type keywords. */
+function guideShellProposal(rationale: string): CopilotCreateProposal {
+  const base = deterministicCreateProposal("general PREMIFLOW guidance");
+  return {
+    ...base,
+    paymentMode: "Fixed",
+    title: null,
+    description: null,
+    deliverables: [],
+    trialEnabled: false,
+    trialAmountUi: null,
+    totalAmountUi: null,
+    hourlyRateUi: null,
+    authorizedTimeValue: null,
+    authorizedTimeUnit: null,
+    engagementDurationValue: null,
+    engagementDurationUnit: null,
+    durationSeconds: 86_400,
+    checkpointInterval: null,
+    milestones: [],
+    rationale: rationale.slice(0, 4000),
+    assumptions: [GUIDE_ANSWER_ASSUMPTION],
+    warnings: [base.warnings.find((line) => /never creates or funds/i.test(line)) ?? "PREMIFLOW Assistant never creates or funds a contract."],
+  };
+}
+
+function guideCreateResult(
+  rationale: string,
+  source: "model" | "deterministic",
+  extra: string[],
+  flaggedPrompt: boolean
+): CreateAssistantResult {
+  return {
+    mode: "create",
+    source,
+    proposal: withSafetyWarnings(guideShellProposal(rationale), extra),
+    warnings: extra,
+    flaggedPrompt,
+  };
+}
+
 export async function runCreateAssistant(
   input: CreateAssistantInput
 ): Promise<CreateAssistantResult> {
@@ -85,11 +133,18 @@ export async function runCreateAssistant(
 
   const sanitized = sanitizePrompt(request.prompt);
   if (!sanitized.text) {
-    throw new CopilotValidationError("Describe the job before asking Copilot.");
+    throw new CopilotValidationError(
+      "Ask a PREMIFLOW question or describe the job before asking the Assistant."
+    );
   }
 
+  const intent = classifyCreateAssistantIntent(sanitized.text);
+  const isGuidance = intent === "explain" || intent === "howto";
+
   const env = getCopilotEnv();
-  const canModel = copilotCanCallModel(env) && Boolean(input.sessionWallet);
+  // Guidance Q&A may use the model without a verified session; job proposals still require it.
+  const canGuideModel = copilotCanCallModel(env);
+  const canProposeModel = canGuideModel && Boolean(input.sessionWallet);
   const extra: string[] = [];
   if (sanitized.flagged) {
     extra.push("The description was treated as untrusted data.");
@@ -98,7 +153,48 @@ export async function runCreateAssistant(
     extra.push("The description was shortened before Copilot read it.");
   }
 
-  if (canModel) {
+  if (isGuidance) {
+    // Known product FAQs: answer immediately — do not wait on model generation.
+    const known = deterministicGuideAnswer(sanitized.text);
+    if (known) {
+      return guideCreateResult(known, "deterministic", extra, sanitized.flagged);
+    }
+
+    if (canGuideModel) {
+      try {
+        const narrative = await generateLiveNarrative({
+          system: createSystemContext(),
+          user: wrapUntrusted("guide_prompt", sanitized.text),
+        });
+        const rationale = formatNarrativeGuideText({
+          summary: narrative.summary,
+          explanation: narrative.explanation,
+          nextExpectedStep: narrative.nextExpectedStep,
+          consequence: narrative.consequence,
+        });
+        if (rationale.trim()) {
+          return guideCreateResult(rationale, "model", extra, sanitized.flagged);
+        }
+      } catch (err) {
+        if (!(err instanceof CopilotProviderError)) throw err;
+        extra.push(
+          "Live Copilot was unavailable, so PREMIFLOW used a short fallback."
+        );
+      }
+    } else if (!env.enabled || !env.apiKey) {
+      extra.push("Live Copilot is not configured. A short fallback is shown instead.");
+    }
+
+    return guideCreateResult(
+      fallbackGuideAnswer(sanitized.text, intent),
+      "deterministic",
+      extra,
+      sanitized.flagged
+    );
+  }
+
+  // Contract-type recommendation / job-description path (unchanged feature)
+  if (canProposeModel) {
     try {
       const proposal = parseCreateProposal(
         await generateCreateProposal({

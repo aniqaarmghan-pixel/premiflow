@@ -11,7 +11,7 @@ export type CopilotEnv = {
 };
 
 const DEFAULT_MODEL = "gpt-4o-mini";
-const DEFAULT_MAX_OUTPUT_TOKENS = 1_200;
+const DEFAULT_MAX_OUTPUT_TOKENS = 2_800;
 
 let cached: CopilotEnv | null = null;
 

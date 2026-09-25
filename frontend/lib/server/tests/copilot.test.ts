@@ -72,6 +72,74 @@ test("create assistant falls back to deterministic without a session or key", as
   parseCreateProposal(result.proposal);
 });
 
+test("explain/howto prompts never become Suggested-type job proposals", async () => {
+  const streaming = await runCreateAssistant({
+    body: { mode: "create", prompt: "Explain streaming contract" },
+    sessionWallet: null,
+  });
+  assert.equal(streaming.source, "deterministic");
+  assert.ok(streaming.proposal.assumptions.some((line) => /explains PREMIFLOW/i.test(line)));
+  assert.match(streaming.proposal.rationale, /Streaming/i);
+  assert.match(streaming.proposal.rationale, /accrues/i);
+  assert.doesNotMatch(streaming.proposal.rationale, /Suggested type/i);
+  parseCreateProposal(streaming.proposal);
+
+  const dispute = await runCreateAssistant({
+    body: {
+      mode: "create",
+      prompt: "if i have a dispute how it will be resolved?",
+    },
+    sessionWallet: null,
+  });
+  assert.equal(dispute.source, "deterministic");
+  assert.match(dispute.proposal.rationale, /resolver/i);
+  assert.doesNotMatch(
+    dispute.proposal.rationale,
+    /I can explain PREMIFLOW topics such as Fixed, Milestone/i
+  );
+
+  const trial = await runCreateAssistant({
+    body: { mode: "create", prompt: "What is a paid trial?" },
+    sessionWallet: null,
+  });
+  assert.ok(trial.proposal.assumptions.some((line) => /explains PREMIFLOW/i.test(line)));
+  assert.match(trial.proposal.rationale, /trial/i);
+  assert.ok(trial.proposal.rationale.split("\n\n").length >= 3);
+
+  const howto = await runCreateAssistant({
+    body: { mode: "create", prompt: "How do I create a milestone contract?" },
+    sessionWallet: null,
+  });
+  assert.ok(howto.proposal.assumptions.some((line) => /explains PREMIFLOW/i.test(line)));
+  assert.match(howto.proposal.rationale, /1\./);
+
+  const recommend = await runCreateAssistant({
+    body: {
+      mode: "create",
+      prompt:
+        "I need a designer for a project with three stages. Which contract should I use?",
+    },
+    sessionWallet: null,
+  });
+  assert.equal(recommend.proposal.paymentMode, "Milestone");
+  assert.ok(
+    !recommend.proposal.assumptions.some((line) => /explains PREMIFLOW/i.test(line))
+  );
+  assert.match(recommend.proposal.rationale, /Milestone/i);
+
+  const stages = await runCreateAssistant({
+    body: {
+      mode: "create",
+      prompt: "I need a designer for three project stages",
+    },
+    sessionWallet: null,
+  });
+  assert.equal(stages.proposal.paymentMode, "Milestone");
+  assert.ok(
+    !stages.proposal.assumptions.some((line) => /explains PREMIFLOW/i.test(line))
+  );
+});
+
 test("unsupported Copilot modes are rejected", async () => {
   await assert.rejects(
     () =>

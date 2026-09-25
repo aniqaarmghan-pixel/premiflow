@@ -206,13 +206,17 @@ test("Create Copilot UI never calls createContract or StreamPayV2Client", () => 
     new URL("../../../components/copilot/CreateCopilotCard.tsx", import.meta.url),
     "utf8"
   );
+  const floating = readFileSync(
+    new URL("../../../components/copilot/FloatingCreateGuidance.tsx", import.meta.url),
+    "utf8"
+  );
   const helper = readFileSync(new URL("../copilot.ts", import.meta.url), "utf8");
   const client = readFileSync(new URL("../copilot-client.ts", import.meta.url), "utf8");
   const service = readFileSync(
     new URL("../../server/copilot/service.ts", import.meta.url),
     "utf8"
   );
-  for (const source of [card, helper, client, service]) {
+  for (const source of [card, floating, helper, client, service]) {
     assert.doesNotMatch(source, /createContract\(/);
     assert.doesNotMatch(source, /createHourlyContract\(/);
     assert.doesNotMatch(source, /new StreamPayV2Client/);
@@ -222,7 +226,7 @@ test("Create Copilot UI never calls createContract or StreamPayV2Client", () => 
     new URL("../../../components/create/CreateWizard.tsx", import.meta.url),
     "utf8"
   );
-  assert.match(wizard, /CreateCopilotCard/);
+  assert.doesNotMatch(wizard, /CreateCopilotCard/);
   assert.match(wizard, /createContract/);
 });
 
@@ -233,7 +237,7 @@ test("manual Create flow still uses the existing wizard submit path", () => {
   );
   assert.match(wizard, /validateCreateDraft/);
   assert.match(wizard, /client\.createContract/);
-  assert.match(wizard, /CreateCopilotCard/);
+  assert.doesNotMatch(wizard, /CreateCopilotCard/);
 });
 
 test("no NEXT_PUBLIC AI secret variable exists in Copilot files", () => {

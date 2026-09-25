@@ -127,7 +127,7 @@ export const copilotCreateProposalSchema = z
     acceptanceDeadlineOffsetSeconds: z.number().int().min(60).max(7_776_000),
     startMode: z.enum(["OnActivation", "Scheduled"]),
     milestones: z.array(copilotMilestoneSchema).max(64),
-    rationale: z.string().min(1).max(2000),
+    rationale: z.string().min(1).max(4000),
     assumptions: z.array(z.string().max(400)).max(12),
     warnings: z.array(z.string().max(400)).max(12),
   })
@@ -190,13 +190,13 @@ export const copilotWorkFactSchema = z
 
 export const copilotContractExplanationSchema = z
   .object({
-    summary: z.string().min(1).max(2000),
-    currentState: z.string().min(1).max(800),
-    financialSummary: z.string().min(1).max(800),
-    workSummary: z.string().min(1).max(800),
-    deadlineSummary: z.string().min(1).max(800),
+    summary: z.string().min(1).max(4000),
+    currentState: z.string().min(1).max(2000),
+    financialSummary: z.string().min(1).max(2000),
+    workSummary: z.string().min(1).max(2000),
+    deadlineSummary: z.string().min(1).max(2000),
     availableActions: z.array(z.enum(COPILOT_ACTION_IDS)).max(32),
-    nextExpectedStep: z.string().min(1).max(800),
+    nextExpectedStep: z.string().min(1).max(2000),
     warnings: z.array(z.string().max(400)).max(12),
     financialFacts: copilotFinancialFactsSchema,
     deadlines: z.array(copilotDeadlineFactSchema).max(16),
@@ -211,8 +211,8 @@ export const copilotActionExplanationSchema = z
     displayName: z.string().min(1).max(80),
     currentlyAvailable: z.boolean(),
     actorRole: z.enum(COPILOT_ROLES),
-    explanation: z.string().min(1).max(2000),
-    consequence: z.string().min(1).max(800),
+    explanation: z.string().min(1).max(4000),
+    consequence: z.string().min(1).max(2000),
     requiresWalletSignature: z.boolean(),
     warnings: z.array(z.string().max(400)).max(12),
   })
@@ -222,15 +222,15 @@ export type CopilotActionExplanation = z.infer<typeof copilotActionExplanationSc
 
 export const copilotDisputeSummarySchema = z
   .object({
-    contractFacts: z.string().min(1).max(800),
-    lifecycleSummary: z.string().min(1).max(1200),
+    contractFacts: z.string().min(1).max(2000),
+    lifecycleSummary: z.string().min(1).max(2000),
     financialFacts: copilotFinancialFactsSchema,
     workFacts: z.array(copilotWorkFactSchema).max(64),
     deadlines: z.array(copilotDeadlineFactSchema).max(16),
     selectedEvidence: z.array(z.string().max(400)).max(12),
     missingEvidence: z.array(z.string().max(400)).max(12),
     unresolvedQuestions: z.array(z.string().max(400)).max(12),
-    neutralSummary: z.string().min(1).max(2000),
+    neutralSummary: z.string().min(1).max(4000),
     warnings: z.array(z.string().max(400)).max(12),
   })
   .strict();
@@ -239,17 +239,17 @@ export type CopilotDisputeSummary = z.infer<typeof copilotDisputeSummarySchema>;
 
 export const copilotNarrativeSchema = z
   .object({
-    summary: z.string().min(1).max(2000),
-    currentState: z.string().max(800).optional(),
-    financialSummary: z.string().max(800).optional(),
-    workSummary: z.string().max(800).optional(),
-    deadlineSummary: z.string().max(800).optional(),
-    nextExpectedStep: z.string().max(800).optional(),
-    explanation: z.string().max(2000).optional(),
-    consequence: z.string().max(800).optional(),
-    lifecycleSummary: z.string().max(1200).optional(),
-    contractFacts: z.string().max(800).optional(),
-    neutralSummary: z.string().max(2000).optional(),
+    summary: z.string().min(1).max(4000),
+    currentState: z.string().max(2000).optional(),
+    financialSummary: z.string().max(2000).optional(),
+    workSummary: z.string().max(2000).optional(),
+    deadlineSummary: z.string().max(2000).optional(),
+    nextExpectedStep: z.string().max(2000).optional(),
+    explanation: z.string().max(4000).optional(),
+    consequence: z.string().max(2000).optional(),
+    lifecycleSummary: z.string().max(2000).optional(),
+    contractFacts: z.string().max(2000).optional(),
+    neutralSummary: z.string().max(4000).optional(),
     unresolvedQuestions: z.array(z.string().max(400)).max(12).optional(),
     warnings: z.array(z.string().max(400)).max(12),
   })
