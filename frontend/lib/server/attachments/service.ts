@@ -11,6 +11,7 @@ import {
 } from "@/lib/app/attachments-policy";
 import { randomId } from "../crypto";
 import type { BlobStorage } from "../blob/adapter";
+import { BlobConfigError } from "../blob/env";
 import { buildAttachmentObjectKey } from "../blob/keys";
 import { parseContractAddress, MessageValidationError } from "../messages/service";
 import { RATE_LIMITS, consumeRateLimit } from "../rate-limit";
@@ -28,6 +29,30 @@ import { isAuthorizedMessageWallet } from "../messages/authorize";
 
 export { ATTACHMENT_AI_POLICY };
 
+/** Sanitized client-facing copy when storage fails after a valid file policy check. */
+export const ATTACHMENT_STORAGE_UNAVAILABLE_MESSAGE =
+  "Attachment storage is temporarily unavailable. Try again in a moment.";
+
+/** Safe upload timing — never logs tokens, cookies, or file bytes. */
+function logAttachmentUploadTiming(payload: {
+  context: AttachmentContext;
+  contentType: string;
+  byteSize: number;
+  validationMs: number;
+  rateLimitMs: number;
+  blobPutMs: number;
+  dbMs: number;
+  totalMs: number;
+}): void {
+  if (
+    process.env.NODE_ENV !== "development" &&
+    process.env.ATTACHMENT_UPLOAD_TIMING !== "1"
+  ) {
+    return;
+  }
+  console.info("[premiflow:attachment-upload]", payload);
+}
+
 export class AttachmentValidationError extends Error {
   constructor(message: string) {
     super(message);
@@ -42,8 +67,94 @@ export class AttachmentAccessError extends Error {
   }
 }
 
+/** Storage/provider failure — not an invalid user file. Maps to 503. */
+export class AttachmentStorageError extends Error {
+  constructor(
+    message: string = ATTACHMENT_STORAGE_UNAVAILABLE_MESSAGE,
+    options?: { cause?: unknown }
+  ) {
+    super(message, options);
+    this.name = "AttachmentStorageError";
+  }
+}
+
 export function uploadBucket(wallet: string, contract: string): string {
   return `upload:${wallet}:${contract}`;
+}
+
+function redactSensitiveText(value: string): string {
+  return value
+    .replace(/vercel_blob_[A-Za-z0-9_]+/gi, "[redacted]")
+    .replace(/Bearer\s+\S+/gi, "Bearer [redacted]")
+    .replace(/premiflow_session=[^;\s]+/gi, "premiflow_session=[redacted]")
+    .slice(0, 300);
+}
+
+/** Safe diagnostic fields for server logs — never includes tokens, cookies, or file bytes. */
+export function buildAttachmentBlobFailureLog(
+  context: {
+    operation: "putPrivate";
+    contractAddress: string;
+    attachmentContext: AttachmentContext;
+    contentType: string;
+    byteSize: number;
+  },
+  err: unknown
+): Record<string, unknown> {
+  const base: Record<string, unknown> = {
+    scope: "attachments",
+    operation: context.operation,
+    contractAddress: context.contractAddress,
+    attachmentContext: context.attachmentContext,
+    contentType: context.contentType,
+    byteSize: context.byteSize,
+  };
+  if (err instanceof Error) {
+    const withExtras = err as Error & {
+      code?: unknown;
+      status?: unknown;
+      statusCode?: unknown;
+    };
+    base.errorName = err.name;
+    base.errorMessage = redactSensitiveText(err.message);
+    if (withExtras.code != null) base.errorCode = String(withExtras.code).slice(0, 80);
+    const status = withExtras.status ?? withExtras.statusCode;
+    if (typeof status === "number") base.errorStatus = status;
+    if (err.cause != null && err.cause instanceof Error) {
+      base.causeName = err.cause.name;
+      base.causeMessage = redactSensitiveText(err.cause.message);
+    }
+    return base;
+  }
+  base.errorMessage = redactSensitiveText(String(err));
+  return base;
+}
+
+export function logAttachmentBlobFailure(
+  context: Parameters<typeof buildAttachmentBlobFailureLog>[0],
+  err: unknown,
+  log: (entry: Record<string, unknown>) => void = (entry) => {
+    console.error("[attachments]", JSON.stringify(entry));
+  }
+): void {
+  log(buildAttachmentBlobFailureLog(context, err));
+}
+
+/**
+ * Map a Blob put failure to a thrown error for the route layer.
+ * BlobConfigError stays distinct; other failures become AttachmentStorageError.
+ */
+export function throwMappedBlobPutFailure(
+  context: Parameters<typeof buildAttachmentBlobFailureLog>[0],
+  err: unknown
+): never {
+  logAttachmentBlobFailure(context, err);
+  if (err instanceof BlobConfigError) {
+    throw err;
+  }
+  throw new AttachmentStorageError(ATTACHMENT_STORAGE_UNAVAILABLE_MESSAGE, {
+    cause: err,
+  });
 }
 
 export type PublicAttachment = {
@@ -147,6 +258,7 @@ export async function uploadPendingAttachment(
   },
   now = new Date()
 ): Promise<PublicAttachment> {
+  const t0 = Date.now();
   const contractAddress = (() => {
     try {
       return parseContractAddress(input.contractAddress);
@@ -166,6 +278,7 @@ export async function uploadPendingAttachment(
     byteSize: input.byteSize,
   });
   if (!policy.ok) throw new AttachmentValidationError(policy.error);
+  const tValidated = Date.now();
 
   await consumeRateLimit(
     stores.rates,
@@ -174,6 +287,7 @@ export async function uploadPendingAttachment(
     RATE_LIMITS.sendWindowMs,
     now
   );
+  const tRateLimited = Date.now();
 
   const pathname = buildAttachmentObjectKey({
     contractAddress,
@@ -189,9 +303,19 @@ export async function uploadPendingAttachment(
       contentType: policy.contentType,
       byteSize: policy.byteSize,
     });
-  } catch {
-    throw new AttachmentValidationError("Attachment upload failed.");
+  } catch (err) {
+    throwMappedBlobPutFailure(
+      {
+        operation: "putPrivate",
+        contractAddress,
+        attachmentContext: context,
+        contentType: policy.contentType,
+        byteSize: policy.byteSize,
+      },
+      err
+    );
   }
+  const tBlob = Date.now();
 
   const saved = await stores.attachments.insertPending({
     id: randomId(),
@@ -206,6 +330,18 @@ export async function uploadPendingAttachment(
     status: "pending",
     createdAt: now,
     deletedAt: null,
+  });
+  const tDb = Date.now();
+
+  logAttachmentUploadTiming({
+    context,
+    contentType: policy.contentType,
+    byteSize: policy.byteSize,
+    validationMs: tValidated - t0,
+    rateLimitMs: tRateLimited - tValidated,
+    blobPutMs: tBlob - tRateLimited,
+    dbMs: tDb - tBlob,
+    totalMs: tDb - t0,
   });
 
   return toPublicAttachment(saved);

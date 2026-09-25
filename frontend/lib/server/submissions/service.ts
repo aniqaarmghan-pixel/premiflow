@@ -219,20 +219,6 @@ export async function persistConfirmedWorkSubmission(
     throw new SubmissionValidationError(issue?.message ?? "Invalid submission payload.");
   }
 
-  const delivery = validateDeliveryPayload({
-    deliveryNote: parsed.data.deliveryNote,
-    links: parsed.data.links,
-  });
-  if (!delivery.ok) {
-    throw new SubmissionValidationError(delivery.error);
-  }
-
-  if (parsed.data.onChainSubmissionUri !== delivery.value.onChainSubmissionUri) {
-    throw new SubmissionValidationError(
-      "onChainSubmissionUri must match the primary HTTPS work link."
-    );
-  }
-
   const contractAddress = (() => {
     try {
       return parseContractAddress(input.contractAddress);
@@ -255,6 +241,21 @@ export async function persistConfirmedWorkSubmission(
       throw new SubmissionValidationError(err.message);
     }
     throw err;
+  }
+
+  const delivery = validateDeliveryPayload({
+    deliveryNote: parsed.data.deliveryNote,
+    links: parsed.data.links,
+    uploadedAttachmentIds: attachmentIds,
+  });
+  if (!delivery.ok) {
+    throw new SubmissionValidationError(delivery.error);
+  }
+
+  if (parsed.data.onChainSubmissionUri !== delivery.value.onChainSubmissionUri) {
+    throw new SubmissionValidationError(
+      "onChainSubmissionUri must match the primary delivery reference."
+    );
   }
 
   if (attachmentIds.length > 0) {

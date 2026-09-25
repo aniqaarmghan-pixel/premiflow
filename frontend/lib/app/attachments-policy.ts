@@ -130,6 +130,24 @@ export function maxFilesForContext(context: AttachmentContext): number {
   return context === "message" ? MESSAGE_ATTACHMENT_MAX : WORK_ATTACHMENT_MAX;
 }
 
+/** Human label for the shared per-file size cap (keep in sync with ATTACHMENT_MAX_BYTES). */
+export function attachmentMaxSizeLabel(): string {
+  return "10 MiB";
+}
+
+/**
+ * Canonical UI copy for attachment limits by context.
+ * Messages intentionally allow fewer files than work submissions.
+ */
+export function attachmentLimitsHint(context: AttachmentContext): string {
+  const maxFiles = maxFilesForContext(context);
+  const size = attachmentMaxSizeLabel();
+  if (context === "message") {
+    return `PDF, images, Office docs, ZIP, CSV, or text — max ${maxFiles} files, ${size} each.`;
+  }
+  return `Optional private files — PDF, images, Office docs, ZIP, CSV, or text. Max ${maxFiles} files, ${size} each.`;
+}
+
 export type FilePolicyResult =
   | {
       ok: true;

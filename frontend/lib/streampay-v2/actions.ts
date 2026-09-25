@@ -180,7 +180,16 @@ export function availableActions(input: ActionAvailabilityInput): UiAction[] {
           ) {
             actions.add("endHourlyContract");
           }
-        } else {
+        } else if (
+          // Fixed/Milestone that can successfully complete should emphasize
+          // Mark finished — Cancel remains legal on-chain but cannot claw back
+          // already-released amounts, so hide it from the normal Actions list.
+          !(
+            (contract.paymentMode === "Fixed" ||
+              contract.paymentMode === "Milestone") &&
+            mayAttemptCompletion(contract, now)
+          )
+        ) {
           actions.add("cancelActiveContract");
         }
       }

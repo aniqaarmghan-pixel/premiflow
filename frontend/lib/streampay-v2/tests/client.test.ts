@@ -90,7 +90,8 @@ test("error parser maps StreamPayV2Error codes and wallet rejection", () => {
   );
   assert.equal(pending.kind, "pending_confirmation");
   assert.equal(pending.signature, SIG);
-  assert.match(pending.uiMessage, /may still have landed/i);
+  assert.match(pending.uiMessage, /do not retry yet/i);
+  assert.match(pending.uiMessage, /may still complete on-chain/i);
 
   const onChain = parseClientError(
     new TransactionFailedOnChainError(SIG, {
@@ -102,10 +103,18 @@ test("error parser maps StreamPayV2Error codes and wallet rejection", () => {
   assert.equal(onChain.signature, SIG);
 
   const expired = parseClientError(
-    new TransactionExpiredBeforeSubmitError("fetchedHash", "signedHash", 0)
+    new TransactionExpiredBeforeSubmitError("fetchedHash", "signedHash", 0, {
+      signWaitMs: 0,
+      lastValidBlockHeight: 0,
+      fetchedBlockHeight: null,
+      postSignBlockHeight: null,
+      remainingValidBlocks: 0,
+      isBlockhashValid: false,
+    })
   );
   assert.equal(expired.kind, "expired_before_submit");
-  assert.match(expired.uiMessage, /expired before submission/i);
+  assert.match(expired.uiMessage, /nothing was submitted/i);
+  assert.doesNotMatch(expired.uiMessage, /may still have landed/i);
 });
 
 test("contract decode converts Anchor BN/enum representation", () => {

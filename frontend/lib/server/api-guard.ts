@@ -1,6 +1,7 @@
 import { AuthError, readSession } from "./auth/service";
 import {
   AttachmentAccessError,
+  AttachmentStorageError,
   AttachmentValidationError,
 } from "./attachments/service";
 import { CaseAccessError, CaseStateError, CaseValidationError } from "./cases/service";
@@ -58,6 +59,9 @@ export function handleRouteError(err: unknown) {
   }
   if (err instanceof AttachmentAccessError) {
     return jsonError(403, "forbidden", err.message);
+  }
+  if (err instanceof AttachmentStorageError) {
+    return jsonError(503, "backend_unavailable", err.message);
   }
   if (err instanceof BlobConfigError) {
     return jsonError(503, "backend_unavailable", "Attachment storage is temporarily unavailable.");

@@ -10,6 +10,7 @@ import {
   ATTACHMENT_MAX_BYTES,
   MESSAGE_ATTACHMENT_MAX,
   WORK_ATTACHMENT_MAX,
+  attachmentLimitsHint,
   sanitizeDisplayFilename,
   validateAttachmentFile,
 } from "@/lib/app/attachments-policy";
@@ -19,16 +20,22 @@ import { WALLET_A, WALLET_B, WALLET_C } from "@/lib/streampay-v2/tests/fixtures"
 import { PREMIFLOW_RESOLVER } from "@/lib/app/premiflow";
 
 import {
+  ATTACHMENT_STORAGE_UNAVAILABLE_MESSAGE,
   AttachmentAccessError,
+  AttachmentStorageError,
   AttachmentValidationError,
   assertCanReadAttachment,
   assertCanUploadAttachment,
   authorizeAttachmentDownload,
+  buildAttachmentBlobFailureLog,
   deletePendingAttachment,
   parseAttachmentIdList,
+  throwMappedBlobPutFailure,
   uploadPendingAttachment,
 } from "../attachments/service";
-import { createMemoryBlobStorage } from "../blob/adapter";
+import { createMemoryBlobStorage, type BlobStorage } from "../blob/adapter";
+import { BlobConfigError } from "../blob/env";
+import { handleRouteError } from "../api-guard";
 import { buildAttachmentObjectKey } from "../blob/keys";
 import { createMemoryAttachmentStore } from "../memory-attachments";
 import { createMemoryMessageStore, createMemoryRateLimitStore, createMemorySubmissionStore } from "../memory-stores";
@@ -128,6 +135,9 @@ test("file policy accepts professional types and rejects dangerous ones", () => 
   assert.equal(sanitizeDisplayFilename(""), null);
   assert.equal(MESSAGE_ATTACHMENT_MAX, 5);
   assert.equal(WORK_ATTACHMENT_MAX, 10);
+  assert.match(attachmentLimitsHint("message"), /max 5 files/);
+  assert.match(attachmentLimitsHint("work_submission"), /Max 10 files/);
+  assert.doesNotMatch(attachmentLimitsHint("message"), /max 10 files/);
 });
 
 test("storage keys are randomized and do not trust raw filenames as paths", () => {
@@ -231,6 +241,165 @@ test("upload creates pending metadata; delete pending works; arbitrary pathname 
   const adapterSrc = readFileSync(join(ROOT, "lib/server/blob/adapter.ts"), "utf8");
   assert.doesNotMatch(adapterSrc, /putFromUrl/);
   assert.match(adapterSrc, /access:\s*"private"/);
+});
+
+test("Blob/storage failure is distinguishable from invalid attachment input", async () => {
+  const stores = fixtureStores();
+  const secretToken = "vercel_blob_rw_secret_should_not_leak";
+  const failingBlob: BlobStorage = {
+    async putPrivate() {
+      const err = new Error(`put failed with ${secretToken} and Bearer abc.def`);
+      (err as Error & { code?: string; status?: number }).code = "store_error";
+      (err as Error & { status?: number }).status = 502;
+      throw err;
+    },
+    async getPrivate() {
+      return null;
+    },
+    async deletePrivate() {},
+  };
+
+  await assert.rejects(
+    () =>
+      uploadPendingAttachment(stores, failingBlob, {
+        contractAddress: CONTRACT,
+        sessionWallet: FREELANCER,
+        parties: parties(),
+        context: "work_submission",
+        filename: "deliverable.png",
+        contentType: "image/png",
+        byteSize: 64,
+        body: Buffer.alloc(64, 1),
+      }),
+    (err: unknown) => {
+      assert.ok(err instanceof AttachmentStorageError);
+      assert.equal(err.message, ATTACHMENT_STORAGE_UNAVAILABLE_MESSAGE);
+      assert.ok(err.cause instanceof Error);
+      assert.match((err.cause as Error).message, /vercel_blob_rw_secret/);
+      return true;
+    }
+  );
+
+  await assert.rejects(
+    () =>
+      uploadPendingAttachment(stores, createMemoryBlobStorage(), {
+        contractAddress: CONTRACT,
+        sessionWallet: FREELANCER,
+        parties: parties(),
+        context: "work_submission",
+        filename: "malware.exe",
+        contentType: "application/octet-stream",
+        byteSize: 64,
+        body: Buffer.alloc(64, 1),
+      }),
+    (err: unknown) => {
+      assert.ok(err instanceof AttachmentValidationError);
+      assert.equal(err instanceof AttachmentStorageError, false);
+      return true;
+    }
+  );
+});
+
+test("storage failure logs redact secrets and map to 503 backend_unavailable", async () => {
+  const secret = "vercel_blob_rw_TOPSECRET99";
+  const err = new Error(`upstream rejected ${secret}`);
+  (err as Error & { code?: string; status?: number }).code = "forbidden";
+  (err as Error & { status?: number }).status = 403;
+
+  assert.throws(
+    () =>
+      throwMappedBlobPutFailure(
+        {
+          operation: "putPrivate",
+          contractAddress: CONTRACT,
+          attachmentContext: "work_submission",
+          contentType: "image/png",
+          byteSize: 2_831_155,
+        },
+        err
+      ),
+    AttachmentStorageError
+  );
+
+  const entry = buildAttachmentBlobFailureLog(
+    {
+      operation: "putPrivate",
+      contractAddress: CONTRACT,
+      attachmentContext: "work_submission",
+      contentType: "image/png",
+      byteSize: 2_831_155,
+    },
+    err
+  );
+  assert.equal(entry.operation, "putPrivate");
+  assert.equal(entry.contractAddress, CONTRACT);
+  assert.equal(entry.attachmentContext, "work_submission");
+  assert.equal(entry.contentType, "image/png");
+  assert.equal(entry.byteSize, 2_831_155);
+  assert.equal(entry.errorStatus, 403);
+  assert.equal(entry.errorCode, "forbidden");
+  assert.match(String(entry.errorMessage), /\[redacted\]/);
+  assert.doesNotMatch(JSON.stringify(entry), /TOPSECRET99/);
+  assert.doesNotMatch(JSON.stringify(entry), /vercel_blob_rw_TOPSECRET/);
+
+  const response = handleRouteError(
+    new AttachmentStorageError(ATTACHMENT_STORAGE_UNAVAILABLE_MESSAGE, { cause: err })
+  );
+  assert.equal(response.status, 503);
+  const body = await response.json();
+  assert.equal(body.error.code, "backend_unavailable");
+  assert.equal(body.error.message, ATTACHMENT_STORAGE_UNAVAILABLE_MESSAGE);
+  assert.doesNotMatch(JSON.stringify(body), /TOPSECRET/);
+  assert.doesNotMatch(JSON.stringify(body), /upstream rejected/);
+});
+
+test("BlobConfigError from put remains configuration/unavailable, not invalid_attachment", async () => {
+  const stores = fixtureStores();
+  const failingBlob: BlobStorage = {
+    async putPrivate() {
+      throw new BlobConfigError("Private attachment storage is not configured.");
+    },
+    async getPrivate() {
+      return null;
+    },
+    async deletePrivate() {},
+  };
+  await assert.rejects(
+    () =>
+      uploadPendingAttachment(stores, failingBlob, {
+        contractAddress: CONTRACT,
+        sessionWallet: FREELANCER,
+        parties: parties(),
+        context: "work_submission",
+        filename: "ok.png",
+        contentType: "image/png",
+        byteSize: 32,
+        body: Buffer.alloc(32, 1),
+      }),
+    BlobConfigError
+  );
+  const response = handleRouteError(
+    new BlobConfigError("Private attachment storage is not configured.")
+  );
+  assert.equal(response.status, 503);
+  const body = await response.json();
+  assert.equal(body.error.code, "backend_unavailable");
+  assert.notEqual(body.error.code, "invalid_attachment");
+  assert.doesNotMatch(body.error.message, /BLOB_READ_WRITE_TOKEN/);
+});
+
+test("attachment upload source no longer uses a bare Blob catch", () => {
+  const service = readFileSync(join(ROOT, "lib/server/attachments/service.ts"), "utf8");
+  assert.match(service, /throwMappedBlobPutFailure/);
+  assert.match(service, /AttachmentStorageError/);
+  assert.doesNotMatch(service, /Attachment upload failed\./);
+  assert.doesNotMatch(service, /catch \{\s*throw new AttachmentValidationError/);
+  const upload = readFileSync(
+    join(ROOT, "app/api/contracts/[address]/attachments/route.ts"),
+    "utf8"
+  );
+  assert.match(upload, /AttachmentStorageError/);
+  assert.match(upload, /backend_unavailable/);
 });
 
 test("pending uploads are uploader-only until bound; active work files are employer-readable", async () => {
@@ -402,6 +571,37 @@ test("work submission binds attachments only after confirmed persist; tx sig rem
   assert.equal(second.created, false);
   assert.equal(second.submission.id, first.submission.id);
   assert.equal(second.submission.attachments.length, 1);
+});
+
+test("work submission accepts note + attachment without external HTTPS link", async () => {
+  const stores = fixtureStores();
+  const blob = createMemoryBlobStorage();
+  const { attachment } = await uploadOn(stores, blob, {
+    wallet: FREELANCER,
+    context: "work_submission",
+  });
+  const uri = `https://premiflow.app/deliverable/attachment/${attachment.id}`;
+  const saved = await persistConfirmedWorkSubmission(stores, {
+    contractAddress: CONTRACT,
+    sessionWallet: FREELANCER,
+    parties: parties(),
+    body: {
+      submissionKind: "fixed",
+      workUnitIndex: 0,
+      revisionNumber: 0,
+      deliveryNote: "PNG deliverable attached.",
+      links: [],
+      onChainSubmissionUri: uri,
+      transactionSignature:
+        "2VERv8NMvzbJMEkV8xnrLkEaWRtSz9CosKDYjCJjBRnbJLgp8uirBgmQpjKhoR4tjF3ZpRzrFmBV6UjKdiSVnBM",
+      chainSubmittedAt: 1_700_000_002,
+      attachmentIds: [attachment.id],
+    },
+  });
+  assert.equal(saved.created, true);
+  assert.equal(saved.submission.onChainSubmissionUri, uri);
+  assert.equal(saved.submission.links.length, 0);
+  assert.equal(saved.submission.attachments.length, 1);
 });
 
 test("AI privacy: attachments are never auto-read or forwarded to Copilot", () => {

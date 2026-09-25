@@ -114,6 +114,7 @@ test("failed, wallet rejection, pending, and confirming produce no success notic
   const dedupe = new NoticeDedupe();
   const phases: TxPhase[] = [
     "ready",
+    "preparing",
     "awaiting_wallet",
     "submitting",
     "confirming",

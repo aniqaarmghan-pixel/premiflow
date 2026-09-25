@@ -71,6 +71,7 @@ test("Verify wallet is never started automatically", () => {
   assert.doesNotMatch(PANEL, /useEffect\([\s\S]{0,200}onVerifyWallet/);
   assert.doesNotMatch(PANEL, /useEffect\([\s\S]{0,400}signMessage/);
   assert.match(PANEL, /unverified/);
+  assert.match(PANEL, /ensureMessagingSession/);
 });
 
 test("Verify wallet copy is shown in the chat dialog", () => {

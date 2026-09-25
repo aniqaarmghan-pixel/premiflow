@@ -3,7 +3,19 @@ import { PublicKey, SystemProgram, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
 
 import { STREAMPAY_PROGRAM_ID } from "@/lib/streampay-v2/constants";
 
-/** Devnet test mint already used by the live PREMIFLOW Fixed contract. */
+/**
+ * Devnet test mint already used by the live PREMIFLOW Fixed contract.
+ *
+ * Phantom "Unknown" / "Unknown +1 Unknown" for transfers of this mint is wallet
+ * presentation only: the mint is classic SPL Token with no Metaplex Token Metadata
+ * PDA, so Phantom has no name/symbol to show. SPL transfer_checked still moves the
+ * correct amount between the correct ATAs. Do not change payment instructions to
+ * influence wallet UI.
+ *
+ * Production / durable test tokens should create Metaplex Token Metadata (or the
+ * Token-2022 metadata extension) for the mint so wallets can display name + symbol
+ * (e.g. "PFT"). Prefer creating metadata once at mint setup time — never mid-payment.
+ */
 const TEST_TOKEN_MINT = "9JTBN7QLcoam7LkN44YDhtMQsYt4zKLW7KUE4FscgZtx";
 
 /** Devnet resolver already bound on the live PREMIFLOW Fixed contract. */

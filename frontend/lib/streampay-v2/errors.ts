@@ -2,7 +2,13 @@ import {
   TransactionConfirmationUnknownError,
   TransactionFailedOnChainError,
 } from "./confirm";
-import { TransactionExpiredBeforeSubmitError } from "./send";
+import {
+  formatExpiredBeforeSubmitDevDiagnostic,
+  TransactionExpiredBeforeSubmitError,
+} from "./send";
+
+export const TRANSACTION_PENDING_CONFIRMATION_MESSAGE =
+  "The transaction was submitted, but PREMIFLOW could not confirm it in time. It may still complete on-chain. Do not retry yet while its status is being verified.";
 
 export type ParsedClientError = {
   kind:
@@ -21,6 +27,8 @@ export type ParsedClientError = {
   uiMessage: string;
   raw: string;
   signature?: string;
+  /** Development-only technical line; never set in production. */
+  diagnostic?: string;
 };
 
 const V2_ERROR_MESSAGES: Record<number, { name: string; message: string }> = {
@@ -338,6 +346,10 @@ export function parseClientError(err: unknown): ParsedClientError {
       name: err.name,
       uiMessage: err.message,
       raw,
+      diagnostic:
+        process.env.NODE_ENV === "development"
+          ? formatExpiredBeforeSubmitDevDiagnostic(err)
+          : undefined,
     };
   }
 
@@ -346,8 +358,7 @@ export function parseClientError(err: unknown): ParsedClientError {
       kind: "pending_confirmation",
       name: err.name,
       signature: err.signature,
-      uiMessage:
-        "The transaction was sent, but confirmation timed out. It may still have landed. Check the signature before sending again.",
+      uiMessage: TRANSACTION_PENDING_CONFIRMATION_MESSAGE,
       raw,
     };
   }
@@ -383,8 +394,7 @@ export function parseClientError(err: unknown): ParsedClientError {
       kind: "pending_confirmation",
       name: parsed.name,
       signature,
-      uiMessage:
-        "The transaction was sent, but confirmation timed out. It may still have landed. Check the signature before sending again.",
+      uiMessage: TRANSACTION_PENDING_CONFIRMATION_MESSAGE,
       raw,
     };
   }

@@ -6,8 +6,11 @@ import { formatReviewPeriod } from "../datetime";
 import { NOTICE_CATALOG, noticeKindForAction } from "../notices";
 import { assertMetadataUri } from "../../streampay-v2/metadata";
 import { availableActions } from "../../streampay-v2/actions";
+import { readFileSync } from "node:fs";
+
 import {
   actionLabel,
+  actionsSectionGuidance,
   completeContractCopy,
   dashboardSummary,
   filterContracts,
@@ -21,7 +24,13 @@ import {
   terminalMutationActions,
   withdrawFreelancerCopy,
 } from "../view-model";
-import { isTxBusy, txPhaseLabel, txReducer, initialTxState } from "../tx-state";
+import {
+  isTxBusy,
+  txPhaseDetail,
+  txPhaseLabel,
+  txReducer,
+  initialTxState,
+} from "../tx-state";
 import {
   employerRemainder,
   milestonesFullyAllocated,
@@ -104,10 +113,23 @@ test("financial progress derivation", () => {
 
 test("transaction-state reducer", () => {
   let state = initialTxState;
+  state = txReducer(state, { type: "start" });
+  assert.equal(state.phase, "preparing");
+  assert.equal(isTxBusy(state.phase), true);
+  assert.equal(txPhaseLabel("preparing"), "Preparing transaction…");
   state = txReducer(state, { type: "wallet" });
   assert.equal(state.phase, "awaiting_wallet");
   assert.equal(isTxBusy(state.phase), true);
+  assert.equal(txPhaseLabel("awaiting_wallet"), "Waiting for wallet approval…");
+  assert.equal(
+    txPhaseDetail("awaiting_wallet"),
+    "Review and approve the transaction in your wallet."
+  );
+  assert.equal(txPhaseLabel("submitting"), "Submitting transaction…");
   state = txReducer(state, { type: "submit" });
+  assert.equal(txPhaseLabel("submitting"), "Submitting transaction…");
+  state = txReducer(state, { type: "confirm", signature: "sig" });
+  assert.equal(txPhaseLabel("confirming"), "Confirming on Devnet…");
   state = txReducer(state, { type: "success", signature: "sig" });
   assert.equal(state.phase, "success");
   assert.equal(txPhaseLabel("success"), "Success");
@@ -125,6 +147,144 @@ test("transaction-state reducer", () => {
   assert.equal(state.signature, "sig");
   assert.equal(isTxBusy(state.phase), true);
   assert.equal(txPhaseLabel("pending_confirmation"), "Confirmation unknown");
+  state = txReducer(state, {
+    type: "fail",
+    message: "Nothing was submitted.",
+    diagnostic:
+      "Wallet approval: 54.2s · Remaining: 7 blocks · Blockhash: invalid · Threshold: ≤10 refused",
+  });
+  assert.equal(state.phase, "failed");
+  assert.equal(state.message, "Nothing was submitted.");
+  assert.equal(
+    state.diagnostic,
+    "Wallet approval: 54.2s · Remaining: 7 blocks · Blockhash: invalid · Threshold: ≤10 refused"
+  );
+});
+
+test("actions section guidance for PendingEmployerApproval", () => {
+  assert.equal(
+    actionsSectionGuidance({
+      status: "PendingEmployerApproval",
+      role: "freelancer",
+      actions: [],
+    }),
+    "No action needed right now. Waiting for the employer to activate the contract."
+  );
+  assert.match(
+    actionsSectionGuidance({
+      status: "PendingEmployerApproval",
+      role: "employer",
+      actions: ["approveActivation", "rejectActivation"],
+    }),
+    /Activation is available/i
+  );
+  assert.match(
+    actionsSectionGuidance({
+      status: "PendingEmployerApproval",
+      role: "employer",
+      actions: ["approveActivation", "rejectActivation"],
+    }),
+    /before work begins/i
+  );
+  assert.equal(
+    actionsSectionGuidance({
+      status: "Active",
+      role: "freelancer",
+      actions: ["submitWorkUnit"],
+      paymentMode: "Fixed",
+      workUnitStatus: "Defined",
+    }),
+    "Contract is active. Submit your deliverable before the deadline."
+  );
+  assert.equal(
+    actionsSectionGuidance({
+      status: "Active",
+      role: "employer",
+      actions: ["cancelActiveContract"],
+      paymentMode: "Fixed",
+      workUnitStatus: "Defined",
+    }),
+    "Contract is active. Waiting for the freelancer to submit the deliverable."
+  );
+  assert.equal(
+    actionsSectionGuidance({
+      status: "Active",
+      role: "employer",
+      actions: ["approveWorkUnit", "requestWorkRevision"],
+      paymentMode: "Fixed",
+      workUnitStatus: "Submitted",
+    }),
+    "Review the submitted deliverable. Approve it, or request a revision while the review window is open."
+  );
+  assert.equal(
+    actionsSectionGuidance({
+      status: "Active",
+      role: "employer",
+      actions: [],
+      paymentMode: "Fixed",
+      workUnitStatus: "Revising",
+    }),
+    "Waiting for the freelancer to submit a revised official deliverable."
+  );
+  assert.equal(
+    actionsSectionGuidance({
+      status: "Active",
+      role: "employer",
+      actions: ["completeContract"],
+      paymentMode: "Fixed",
+      workUnitStatus: "Released",
+    }),
+    "All deliverables are approved. Mark the contract finished when the work is complete."
+  );
+  assert.equal(
+    actionsSectionGuidance({
+      status: "Active",
+      role: "freelancer",
+      actions: ["completeContract", "withdrawFreelancer"],
+      paymentMode: "Fixed",
+      workUnitStatus: "Released",
+      claimRemaining: 1_000_000n,
+    }),
+    "Your deliverable has been approved. Payment is available to collect."
+  );
+  assert.equal(
+    actionsSectionGuidance({
+      status: "Active",
+      role: "freelancer",
+      actions: ["completeContract"],
+      paymentMode: "Fixed",
+      workUnitStatus: "Released",
+      claimRemaining: 0n,
+    }),
+    "Your deliverable has been approved. Mark the contract finished when you are ready, or wait for the employer."
+  );
+  assert.doesNotMatch(
+    actionsSectionGuidance({
+      status: "Active",
+      role: "employer",
+      actions: ["cancelActiveContract"],
+      paymentMode: "Fixed",
+      workUnitStatus: "Defined",
+    }),
+    /program still authorizes/i
+  );
+});
+
+test("contract detail uses Contract details heading and shared tx status", () => {
+  const detail = readFileSync(
+    new URL("../../../components/contracts/ContractDetail.tsx", import.meta.url),
+    "utf8"
+  );
+  assert.match(detail, />Contract details</);
+  assert.doesNotMatch(detail, /Parties & terms/);
+  assert.doesNotMatch(detail, /Buttons follow current availability/);
+  assert.doesNotMatch(detail, /program still authorizes/);
+  assert.match(detail, /actionsSectionGuidance/);
+  assert.match(detail, /TransactionStatus state=\{tx\.state\}/);
+  assert.match(detail, /id="actions"/);
+  assert.match(detail, /Need help with this contract/);
+  assert.match(detail, /Resolution & dispute information/);
+  assert.match(detail, /disputeActive/);
 });
 
 test("create-contract form validation", () => {

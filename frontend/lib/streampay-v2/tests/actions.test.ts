@@ -16,6 +16,7 @@ import {
   WALLET_B,
   WALLET_C,
   makeContract,
+  makeHourlyState,
   makeWorkUnit,
 } from "./fixtures";
 
@@ -222,6 +223,11 @@ test("open dispute requires a positive contested remainder", () => {
   assert.ok(!freelancerFull.includes("openDispute"));
   assert.ok(employerFull.includes("completeContract"));
   assert.ok(freelancerFull.includes("completeContract"));
+  assert.ok(
+    !employerFull.includes("cancelActiveContract"),
+    "completion-ready Fixed must not expose Cancel alongside Mark finished"
+  );
+  assert.ok(!freelancerFull.includes("cancelActiveContract"));
 
   const completed = makeContract({
     status: "Completed",
@@ -711,4 +717,177 @@ test("voiding one Milestone does not hide remaining Defined unit submission", ()
   assert.ok(!employerVoided.includes("completeContract"));
   assert.ok(freelancerRemaining.includes("submitWorkUnit"));
   assert.ok(!freelancerRemaining.includes("voidStaleRevision"));
+});
+
+test("Fixed Active Defined keeps Cancel and hides Complete", () => {
+  const contract = makeContract({
+    status: "Active",
+    paymentMode: "Fixed",
+    openReviewCount: 0,
+    workUnitCount: 1,
+    releasedUnitCount: 0,
+    allocatedAmount: 10n,
+    mainAmount: 10n,
+    totalAmount: 10n,
+    releasedAmount: 0n,
+  });
+  const unit = makeWorkUnit({ kind: "Fixed", status: "Defined" });
+  const employer = availableActions({
+    wallet: WALLET_A,
+    contract,
+    workUnit: unit,
+    now: 1_000,
+  });
+  assert.ok(employer.includes("cancelActiveContract"));
+  assert.ok(!employer.includes("completeContract"));
+  assert.ok(!employer.includes("approveWorkUnit"));
+});
+
+test("Fixed Active Submitted blocks Cancel while review is open", () => {
+  const contract = makeContract({
+    status: "Active",
+    paymentMode: "Fixed",
+    openReviewCount: 1,
+    workUnitCount: 1,
+    releasedUnitCount: 0,
+    allocatedAmount: 10n,
+    mainAmount: 10n,
+  });
+  const unit = makeWorkUnit({
+    kind: "Fixed",
+    status: "Submitted",
+    actionDeadline: 2_000,
+  });
+  const employer = availableActions({
+    wallet: WALLET_A,
+    contract,
+    workUnit: unit,
+    now: 1_000,
+  });
+  assert.ok(employer.includes("approveWorkUnit"));
+  assert.ok(employer.includes("requestWorkRevision"));
+  assert.ok(!employer.includes("cancelActiveContract"));
+  assert.ok(!employer.includes("completeContract"));
+});
+
+test("Fixed Active Released + completion-ready hides Cancel and shows Complete", () => {
+  const contract = makeContract({
+    status: "Active",
+    paymentMode: "Fixed",
+    openReviewCount: 0,
+    workUnitCount: 1,
+    releasedUnitCount: 1,
+    allocatedAmount: 10n,
+    mainAmount: 10n,
+    totalAmount: 10n,
+    releasedAmount: 10n,
+    withdrawnAmount: 0n,
+  });
+  const unit = makeWorkUnit({ kind: "Fixed", status: "Released" });
+  const employer = availableActions({
+    wallet: WALLET_A,
+    contract,
+    workUnit: unit,
+    now: 1_000,
+  });
+  const freelancer = availableActions({
+    wallet: WALLET_B,
+    contract,
+    workUnit: unit,
+    now: 1_000,
+  });
+  assert.ok(employer.includes("completeContract"));
+  assert.ok(!employer.includes("cancelActiveContract"));
+  assert.ok(freelancer.includes("completeContract"));
+  assert.ok(freelancer.includes("withdrawFreelancer"));
+  assert.ok(!freelancer.includes("cancelActiveContract"));
+});
+
+test("Milestone with one Released unit still allows Cancel when not completion-ready", () => {
+  const contract = makeContract({
+    status: "Active",
+    paymentMode: "Milestone",
+    openReviewCount: 0,
+    workUnitCount: 2,
+    releasedUnitCount: 1,
+    allocatedAmount: 100n,
+    mainAmount: 100n,
+    totalAmount: 100n,
+    releasedAmount: 40n,
+    withdrawnAmount: 0n,
+  });
+  const released = makeWorkUnit({
+    kind: "Milestone",
+    status: "Released",
+    index: 0,
+    amount: 40n,
+  });
+  const employer = availableActions({
+    wallet: WALLET_A,
+    contract,
+    workUnit: released,
+    now: 1_000,
+  });
+  assert.ok(employer.includes("cancelActiveContract"));
+  assert.ok(!employer.includes("completeContract"));
+});
+
+test("Milestone completion-ready hides Cancel like Fixed", () => {
+  const contract = makeContract({
+    status: "Active",
+    paymentMode: "Milestone",
+    openReviewCount: 0,
+    workUnitCount: 2,
+    releasedUnitCount: 2,
+    allocatedAmount: 100n,
+    mainAmount: 100n,
+    totalAmount: 100n,
+    releasedAmount: 100n,
+  });
+  const employer = availableActions({
+    wallet: WALLET_A,
+    contract,
+    now: 1_000,
+  });
+  assert.ok(employer.includes("completeContract"));
+  assert.ok(!employer.includes("cancelActiveContract"));
+});
+
+test("Streaming Active still exposes Cancel when openReviewCount is 0", () => {
+  const contract = makeContract({
+    status: "Active",
+    paymentMode: "Streaming",
+    openReviewCount: 0,
+    startTime: 1_000,
+    endTime: 10_000,
+    mainAmount: 100n,
+    totalAmount: 100n,
+    allocatedAmount: 100n,
+  });
+  const employer = availableActions({
+    wallet: WALLET_A,
+    contract,
+    now: 2_000,
+  });
+  assert.ok(employer.includes("cancelActiveContract"));
+  assert.ok(!employer.includes("completeContract"));
+});
+
+test("Hourly Active with idle session still uses endHourlyContract not Cancel", () => {
+  const contract = makeContract({
+    status: "Active",
+    paymentMode: "Hourly",
+    openReviewCount: 0,
+    mainAmount: 100n,
+    totalAmount: 100n,
+    allocatedAmount: 100n,
+  });
+  const employer = availableActions({
+    wallet: WALLET_A,
+    contract,
+    now: 1_000,
+    hourlyState: makeHourlyState({ contract: contract.address }),
+  });
+  assert.ok(employer.includes("endHourlyContract"));
+  assert.ok(!employer.includes("cancelActiveContract"));
 });

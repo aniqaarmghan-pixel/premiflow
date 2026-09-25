@@ -4,9 +4,8 @@ import { getMint } from "@solana/spl-token";
 import { useAnchorWallet, useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { useCallback, useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import Link from "next/link";
 
-import { CopilotPanel } from "@/components/copilot/CopilotPanel";
-import { roleLabelForAssistant } from "@/lib/app/copilot-live";
 import { Lifecycle } from "@/components/contracts/Lifecycle";
 import { PaymentProgress } from "@/components/contracts/PaymentProgress";
 import { ResolutionCenter } from "@/components/contracts/ResolutionCenter";
@@ -19,6 +18,7 @@ import {
   SubmitWorkForm,
   type DeliveryAttachmentDraft,
   type DeliveryDraft,
+  type DeliverySessionUi,
 } from "@/components/contracts/SubmitWorkForm";
 import { WorkDeliveryHistory } from "@/components/contracts/WorkDeliveryHistory";
 import {
@@ -30,6 +30,11 @@ import {
   validateAttachmentFile,
 } from "@/lib/app/attachments-policy";
 import type { ApiError } from "@/lib/app/messages-client";
+import {
+  ensureMessagingSession,
+  messagingSessionErrorMessage,
+  readExistingMessagingSession,
+} from "@/lib/app/messaging-session";
 import { ConnectPrompt } from "@/components/shell/ConnectPrompt";
 import { PageFade } from "@/components/shell/PageFade";
 import { Address } from "@/components/ui/Address";
@@ -100,6 +105,7 @@ import {
 } from "@/lib/app/work-delivery";
 import {
   actionLabel,
+  actionsSectionGuidance,
   completeContractCopy,
   confirmTitle,
   contractActionVariant,
@@ -127,6 +133,7 @@ import { useTx } from "@/lib/hooks/useTx";
 import { useContracts } from "@/lib/hooks/ContractsProvider";
 import {
   availableActions,
+  activationDeadlineUnix,
   deriveHourlySessionPda,
   deriveHourlyStatePda,
   fetchContract,
@@ -166,7 +173,7 @@ const TRIAL_ACTIONS: UiAction[] = [
 ];
 
 export function ContractDetail({ address }: { address: string }) {
-  const { connected, publicKey } = useWallet();
+  const { connected, publicKey, signMessage } = useWallet();
   const wallet = useAnchorWallet();
   const { connection } = useConnection();
   const client = useStreamPayClient();
@@ -187,6 +194,10 @@ export function ContractDetail({ address }: { address: string }) {
   } | null>(null);
   const [uri, setUri] = useState("");
   const [deliveryDraft, setDeliveryDraft] = useState<DeliveryDraft>(() => emptyDeliveryDraft());
+  const [deliverySession, setDeliverySession] = useState<DeliverySessionUi>({
+    status: "unknown",
+    error: null,
+  });
   const [submissions, setSubmissions] = useState<PublicWorkSubmission[]>([]);
   const [historySyncWarning, setHistorySyncWarning] = useState<string | null>(null);
   const [pendingHistoryPayload, setPendingHistoryPayload] = useState<Parameters<
@@ -276,6 +287,42 @@ export function ContractDetail({ address }: { address: string }) {
     };
   }, [contract, status, caseRecoverGeneration]);
 
+  useEffect(() => {
+    const isSubmit =
+      confirm?.action === "submitWorkUnit" || confirm?.action === "submitTrialWork";
+    if (!isSubmit) {
+      setDeliverySession({ status: "unknown", error: null });
+      return;
+    }
+    const walletAddress = publicKey?.toBase58() ?? null;
+    if (!walletAddress) {
+      setDeliverySession({ status: "needs_verify", error: null });
+      return;
+    }
+    let cancelled = false;
+    setDeliverySession({ status: "unknown", error: null });
+    void (async () => {
+      try {
+        const existing = await readExistingMessagingSession(walletAddress);
+        if (cancelled) return;
+        if (existing === "mismatch") {
+          setDeliverySession({ status: "needs_verify", error: null });
+          return;
+        }
+        if (existing) {
+          setDeliverySession({ status: "ready", error: null });
+          return;
+        }
+        setDeliverySession({ status: "needs_verify", error: null });
+      } catch {
+        if (!cancelled) setDeliverySession({ status: "needs_verify", error: null });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [confirm?.action, publicKey]);
+
   const { trial, main } = splitTrialUnits(units);
 
   const actions = useMemo(() => {
@@ -324,9 +371,13 @@ export function ContractDetail({ address }: { address: string }) {
     resolveParsed.amount != null
       ? resolutionPreview(contract, resolveParsed.amount)
       : resolutionPreview(contract, 0n);
+  const uploadedDeliveryAttachmentIds = deliveryDraft.attachments
+    .filter((item) => item.status === "uploaded" && item.attachmentId)
+    .map((item) => item.attachmentId!);
   const deliveryValidation = validateDeliveryPayload({
     deliveryNote: deliveryDraft.note,
     links: deliveryDraft.links,
+    uploadedAttachmentIds: uploadedDeliveryAttachmentIds,
   });
   const deliveryAttachmentsReady =
     deliveryDraft.attachments.length === 0 ||
@@ -334,17 +385,63 @@ export function ContractDetail({ address }: { address: string }) {
   const deliveryAttachmentsFailed = deliveryDraft.attachments.some(
     (item) => item.status === "failed"
   );
+  const deliveryAttachmentsPending = deliveryDraft.attachments.some(
+    (item) => item.status === "uploading" || item.status === "selected"
+  );
   const confirmBlocked =
     confirm?.action === "openDispute"
       ? !openPresentation.canSubmit
       : confirm?.action === "resolveDispute"
         ? decimals == null || Boolean(resolveParsed.error) || !resolvePreview.valid
         : confirm?.action === "submitWorkUnit" || confirm?.action === "submitTrialWork"
-          ? !deliveryValidation.ok || !deliveryAttachmentsReady || deliveryAttachmentsFailed
+          ? !deliveryValidation.ok ||
+            !deliveryAttachmentsReady ||
+            deliveryAttachmentsFailed ||
+            deliveryAttachmentsPending
           : false;
+
+  async function onVerifyDeliveryWallet() {
+    const walletAddress = publicKey?.toBase58();
+    if (!walletAddress) {
+      setDeliverySession({
+        status: "failed",
+        error: "Connect your freelancer wallet to verify.",
+      });
+      return;
+    }
+    setDeliverySession({ status: "verifying", error: null });
+    try {
+      await ensureMessagingSession({
+        wallet: walletAddress,
+        signMessage,
+      });
+      setDeliverySession({ status: "ready", error: null });
+    } catch (err) {
+      setDeliverySession({
+        status: "failed",
+        error: messagingSessionErrorMessage(err),
+      });
+    }
+  }
 
   async function uploadDeliveryAttachment(localId: string, file: File) {
     if (!contract) return;
+    const walletAddress = publicKey?.toBase58();
+    if (!walletAddress) {
+      setDeliveryDraft((current) => ({
+        ...current,
+        attachments: current.attachments.map((item) =>
+          item.localId === localId
+            ? {
+                ...item,
+                status: "failed",
+                error: "Connect your freelancer wallet to upload files.",
+              }
+            : item
+        ),
+      }));
+      return;
+    }
     setDeliveryDraft((current) => ({
       ...current,
       attachments: current.attachments.map((item) =>
@@ -354,6 +451,11 @@ export function ContractDetail({ address }: { address: string }) {
       ),
     }));
     try {
+      await ensureMessagingSession({
+        wallet: walletAddress,
+        signMessage,
+      });
+      setDeliverySession({ status: "ready", error: null });
       const result = await uploadContractAttachment(
         contract.address.toBase58(),
         file,
@@ -383,11 +485,21 @@ export function ContractDetail({ address }: { address: string }) {
       }));
     } catch (err) {
       const api = err as ApiError;
+      const message = messagingSessionErrorMessage(err);
+      if (
+        api.code === "unauthenticated" ||
+        api.code === "session_mismatch" ||
+        api.code === "wallet_cannot_sign" ||
+        api.code === "expired_session" ||
+        api.code === "revoked_session"
+      ) {
+        setDeliverySession({ status: "failed", error: message });
+      }
       setDeliveryDraft((current) => ({
         ...current,
         attachments: current.attachments.map((item) =>
           item.localId === localId
-            ? { ...item, status: "failed", error: api.message ?? "Upload failed." }
+            ? { ...item, status: "failed", error: message }
             : item
         ),
       }));
@@ -395,6 +507,7 @@ export function ContractDetail({ address }: { address: string }) {
   }
 
   function onPickDeliveryFiles(files: FileList | null) {
+    if (deliverySession.status !== "ready") return;
     if (!files || files.length === 0) return;
     const room = WORK_ATTACHMENT_MAX - deliveryDraft.attachments.length;
     if (room <= 0) return;
@@ -716,17 +829,59 @@ export function ContractDetail({ address }: { address: string }) {
       return 0;
     });
 
+  const disputeActive =
+    contract.status === "Disputed" || contract.status === "Resolved";
+  const headerDeadline =
+    contract.status === "PendingAcceptance" && contract.acceptanceDeadline > 0
+      ? {
+          label: "Acceptance deadline",
+          value: formatUnix(contract.acceptanceDeadline),
+        }
+      : contract.status === "PendingEmployerApproval" && contract.acceptedAt > 0
+        ? {
+            label: "Activation deadline",
+            value: formatUnix(activationDeadlineUnix(contract)),
+          }
+        : contract.status === "Active" && contract.endTime > 0
+          ? { label: "End", value: formatUnix(contract.endTime) }
+          : null;
+
+  const primaryUnitButtons = main.flatMap((unit) => {
+    const unitActs = availableActions({
+      wallet: publicKey,
+      contract,
+      workUnit: unit,
+      trialUnit: trial,
+      now,
+    }).filter((a) => UNIT_ACTIONS.includes(a));
+    return unitActs.map((action) => ({ action, unit }));
+  });
+
   return (
     <PageFade>
-      <div className="space-y-6">
-        <header className="flex flex-wrap items-start justify-between gap-4">
-          <div className="min-w-0">
+      <div className="space-y-5 sm:space-y-6">
+        <header className="flex min-w-0 flex-wrap items-start justify-between gap-3 sm:gap-4">
+          <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan">
               {presentType(contract.paymentMode)} · {roleLabel(role)}
             </p>
-            <h1 className="mt-1 font-display text-4xl tracking-tight">
+            <h1 className="mt-1 break-words font-display text-[1.75rem] tracking-tight sm:text-4xl">
               {metadata?.title || "Protected contract"}
             </h1>
+            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink-soft">
+              <span>
+                Funded{" "}
+                <span className="font-medium text-ink">
+                  {formatTokenAmount(contract.totalAmount, decimals)}
+                </span>
+              </span>
+              {headerDeadline ? (
+                <span>
+                  {headerDeadline.label}{" "}
+                  <span className="font-medium text-ink">{headerDeadline.value}</span>
+                </span>
+              ) : null}
+            </div>
             <div className="mt-3 flex items-center gap-3">
               <Identicon seed={other.address.toBase58()} />
               <div className="min-w-0">
@@ -738,41 +893,7 @@ export function ContractDetail({ address }: { address: string }) {
           <StatusBadge status={contract.status} label={presentStatus(contract.status)} />
         </header>
 
-        <nav className="flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.16em]">
-          {[
-            ["#overview", "Overview"],
-            ["#work", "Work"],
-            ["#messages", "Messages"],
-            ["#resolution", "Resolution"],
-            ["#assistant", "PREMIFLOW Assistant ✦ AI"],
-          ].map(([href, label]) => (
-            <a
-              key={href}
-              href={href}
-              className={
-                href === "#assistant"
-                  ? "rounded-full border border-cyan/30 px-3 py-1 text-cyan"
-                  : "rounded-full border border-line px-3 py-1 text-ink-faint hover:text-ink"
-              }
-            >
-              {label}
-            </a>
-          ))}
-        </nav>
-
-        <div id="assistant">
-          <CopilotPanel
-            variant="live"
-            contractAddress={contract.address.toBase58()}
-            role={roleLabelForAssistant(role)}
-            paymentMode={presentType(contract.paymentMode)}
-            statusLabel={presentStatus(contract.status)}
-          />
-        </div>
-
-        {openDisputeShown ||
-        contract.status === "Disputed" ||
-        contract.status === "Resolved" ? (
+        {disputeActive ? (
           <div id="resolution">
             <ResolutionCenter
               contract={contract}
@@ -791,217 +912,79 @@ export function ContractDetail({ address }: { address: string }) {
               openSignature={caseOpenSignature}
             />
           </div>
-        ) : (
-          <div id="resolution" />
-        )}
-
-        <Card className="p-5">
-          <Lifecycle contract={contract} />
-        </Card>
-
-        <div id="messages">
-          <ContractMessages
-            role={role}
-            paymentMode={contract.paymentMode}
-            contractAddress={contract.address.toBase58()}
-            contractTitle={metadata?.title || "Protected contract"}
-          />
-        </div>
-
-        {contract.paymentMode === "Hourly" ? (
-          <HourlyShowcase
-            contract={contract}
-            hourlyState={hourlyState}
-            hourlySession={hourlySession}
-            now={now}
-            decimals={decimals}
-            role={role}
-            canStart={actions.includes("startHourlySession")}
-            canStop={actions.includes("stopHourlySession")}
-            canEnd={actions.includes("endHourlyContract")}
-            canCollect={actions.includes("withdrawFreelancer")}
-            busy={tx.busy}
-            onStart={() => requestAction("startHourlySession")}
-            onStop={() => requestAction("stopHourlySession")}
-            onEnd={() => requestAction("endHourlyContract")}
-            onCollect={() => requestAction("withdrawFreelancer")}
-          />
         ) : null}
 
-        {contract.paymentMode === "Streaming" ? (
-          <>
-            {trialStarted ? (
-              <Card className="border-cyan/30 bg-[linear-gradient(180deg,rgba(46,230,214,0.08),transparent)] p-5">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan">
-                  Paid trial
-                </p>
-                <h2 className="mt-1 font-display text-2xl">{trialStarted.headline}</h2>
-                <p className="mt-2 text-sm leading-6 text-ink-soft">{trialStarted.body}</p>
-              </Card>
-            ) : null}
-            <StreamShowcase
-              contract={contract}
-              now={now}
-              decimals={decimals}
-              role={role}
-              canRelease={actions.includes("releaseStreamAccrual")}
-              canCollect={actions.includes("withdrawFreelancer")}
-              busy={tx.busy}
-              onRelease={() => requestAction("releaseStreamAccrual")}
-              onCollect={() => requestAction("withdrawFreelancer")}
-            />
-          </>
-        ) : null}
-
-        <div className="grid gap-4 lg:grid-cols-2">
-          <PaymentProgress contract={contract} decimals={decimals} />
-          <Card className="p-5">
-            <p id="overview" className="text-xs uppercase tracking-[0.16em] text-ink-faint">Overview</p>
-            <h2 className="mt-1 font-display text-2xl">Parties & terms</h2>
-            {metadata?.description ? (
-              <p className="mt-3 text-sm leading-6 text-ink-soft">{metadata.description}</p>
-            ) : (
-              <p className="mt-3 text-sm text-ink-faint">
-                Off-chain notes are stored in this browser when the contract was created here.
-              </p>
-            )}
-            <dl className="mt-4 space-y-2 text-sm">
-              <Row label="Employer" value={<Address value={contract.employer.toBase58()} />} />
-              <Row label="Freelancer" value={<Address value={contract.freelancer.toBase58()} />} />
-              <Row
-                label={resolver.roleTitle}
-                value={
-                  resolver.isTrustedLabel ? resolver.displayName : <Address value={resolver.address} />
-                }
-              />
-              <Row label="Token mint" value={<Address value={contract.tokenMint.toBase58()} />} />
-              <Row label="Total" value={formatTokenAmount(contract.totalAmount, decimals)} />
-              <Row label="Main" value={formatTokenAmount(contract.mainAmount, decimals)} />
-              {contract.trialAmount > 0n ? (
-                <Row label="Trial" value={formatTokenAmount(contract.trialAmount, decimals)} />
-              ) : null}
-              <Row label="Created" value={formatUnix(contract.createdAt)} />
-              <Row label="Accepted" value={formatUnix(contract.acceptedAt)} />
-              <Row label="Start" value={formatUnix(contract.startTime)} />
-              <Row label="End" value={formatUnix(contract.endTime)} />
-              <Row label="Acceptance deadline" value={formatUnix(contract.acceptanceDeadline)} />
-            </dl>
-          </Card>
-        </div>
-
-        <div id="work" className="space-y-4">
-        {contract.trialAmount > 0n ? (
-          <Card className="p-5">
-            <h2 className="font-display text-2xl">Paid trial</h2>
-            <p className="mt-1 text-sm text-ink-soft">
-              The trial is funded and reviewed before the main contract activates. Approving it
-              does not rewrite the main amount.
-            </p>
-            {trial ? (
-              <WorkUnitPanel
-                unit={trial}
-                contract={contract}
-                decimals={decimals}
-                role={role}
-                now={now}
-                actions={availableActions({
-                  wallet: publicKey,
-                  contract,
-                  trialUnit: trial,
-                  now,
-                }).filter(
-                  (a) =>
-                    TRIAL_ACTIONS.includes(a) ||
-                    (a === "rejectActivation" &&
-                      (trial.status === "Submitted" || trial.status === "Revising"))
-                )}
-                busy={tx.busy}
-                submissions={submissions}
-                historySyncWarning={
-                  pendingHistoryPayload &&
-                  pendingHistoryPayload.submissionKind ===
-                    submissionKindFromWorkUnit(trial.kind) &&
-                  pendingHistoryPayload.workUnitIndex === trial.index
-                    ? historySyncWarning
-                    : null
-                }
-                onRetrySync={
-                  pendingHistoryPayload &&
-                  pendingHistoryPayload.submissionKind ===
-                    submissionKindFromWorkUnit(trial.kind) &&
-                  pendingHistoryPayload.workUnitIndex === trial.index
-                    ? () => void persistDeliveryHistory(pendingHistoryPayload)
-                    : undefined
-                }
-                syncBusy={syncBusy}
-                onAction={(action) => requestAction(action, trial)}
-              />
-            ) : (
-              <p className="mt-3 text-sm text-ink-faint">Trial unit not found yet.</p>
-            )}
-          </Card>
-        ) : null}
-
-        {contract.paymentMode !== "Streaming" && contract.paymentMode !== "Hourly" ? (
-          <Card className="p-5">
-            <h2 className="font-display text-2xl">
-              {contract.paymentMode === "Milestone" ? "Milestones" : "Deliverable"}
-            </h2>
-            <p className="mt-1 text-sm text-ink-soft">
-              Official review starts only from this card. Drafts and progress updates will belong
-              in Messages when messaging is connected.
-            </p>
-            <div className="mt-4 space-y-3">
-              {main.length === 0 ? (
-                <p className="text-sm text-ink-faint">No work units loaded.</p>
-              ) : (
-                main.map((unit) => (
-                  <WorkUnitPanel
-                    key={unit.address.toBase58()}
-                    unit={unit}
-                    contract={contract}
-                    decimals={decimals}
-                    role={role}
-                    now={now}
-                    actions={availableActions({
-                      wallet: publicKey,
-                      contract,
-                      workUnit: unit,
-                      trialUnit: trial,
-                      now,
-                    }).filter((a) => UNIT_ACTIONS.includes(a))}
-                    busy={tx.busy}
-                    submissions={submissions}
-                    historySyncWarning={
-                      pendingHistoryPayload &&
-                      pendingHistoryPayload.submissionKind ===
-                        submissionKindFromWorkUnit(unit.kind) &&
-                      pendingHistoryPayload.workUnitIndex === unit.index
-                        ? historySyncWarning
-                        : null
-                    }
-                    onRetrySync={
-                      pendingHistoryPayload &&
-                      pendingHistoryPayload.submissionKind ===
-                        submissionKindFromWorkUnit(unit.kind) &&
-                      pendingHistoryPayload.workUnitIndex === unit.index
-                        ? () => void persistDeliveryHistory(pendingHistoryPayload)
-                        : undefined
-                    }
-                    syncBusy={syncBusy}
-                    onAction={(action) => requestAction(action, unit)}
-                  />
-                ))
-              )}
+        <Card id="actions" className="scroll-mt-20 p-4 sm:p-5">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan">
+            Next step
+          </p>
+          <h2 className="mt-1 font-display text-2xl">Actions</h2>
+          <p className="mt-1 text-sm text-ink-soft">
+            {actionsSectionGuidance({
+              status: contract.status,
+              role,
+              actions,
+              paymentMode: contract.paymentMode,
+              workUnitStatus:
+                main.find((unit) => unit.status === "Submitted")?.status ??
+                main.find((unit) => unit.status === "Revising")?.status ??
+                main.find((unit) => unit.status === "Defined")?.status ??
+                main[0]?.status ??
+                null,
+              claimRemaining: remainingFreelancerClaim(contract),
+            })}
+          </p>
+          {tx.state.phase !== "ready" ? (
+            <div className="mt-4">
+              <TransactionStatus state={tx.state} />
             </div>
-          </Card>
-        ) : null}
-        </div>
+          ) : null}
+          {contractButtons.length > 0 || primaryUnitButtons.length > 0 ? (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {primaryUnitButtons.map(({ action, unit }) => (
+                <Button
+                  key={`${unit.address.toBase58()}-${action}`}
+                  variant={contractActionVariant(action)}
+                  disabled={tx.busy}
+                  onClick={() => requestAction(action, unit)}
+                >
+                  {actionLabel(action, { workUnitStatus: unit.status })}
+                </Button>
+              ))}
+              {contractButtons.map((action) => (
+                <Button
+                  key={action}
+                  variant={contractActionVariant(action)}
+                  disabled={tx.busy}
+                  onClick={() => requestAction(action)}
+                >
+                  {actionLabel(action, { workUnitStatus: trial?.status })}
+                </Button>
+              ))}
+            </div>
+          ) : null}
+          {actions.includes("addMilestone") ? (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <Field label="Next milestone amount">
+                <Input
+                  value={milestoneAmountUi}
+                  onChange={(e) => setMilestoneAmountUi(e.target.value)}
+                />
+              </Field>
+              <Field label="Due offset (seconds)">
+                <Input
+                  value={milestoneDue}
+                  onChange={(e) => setMilestoneDue(e.target.value)}
+                />
+              </Field>
+            </div>
+          ) : null}
+        </Card>
 
         {["Cancelled", "Completed", "Resolved", "ActivationRejected", "Declined", "Expired"].includes(
           contract.status
         ) ? (
-          <Card className="p-5">
+          <Card className="p-4 sm:p-5">
             <h2 className="font-display text-2xl">Settlement</h2>
             <p className="mt-1 text-sm text-ink-soft">
               {contract.status === "Resolved"
@@ -1057,51 +1040,280 @@ export function ContractDetail({ address }: { address: string }) {
           </Card>
         ) : null}
 
-        <Card className="p-5">
-          <h2 className="font-display text-2xl">Actions</h2>
-          <p className="mt-1 text-sm text-ink-faint">
-            {contract.status === "Disputed" && role !== "resolver"
-              ? "This contract is frozen. Only the designated resolver can record the settlement."
-              : "Buttons follow current availability. The program still authorizes every instruction."}
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            {contractButtons.length === 0 ? (
-              <p className="text-sm text-ink-faint">No contract-level actions right now.</p>
+        {contract.paymentMode === "Hourly" ? (
+          <HourlyShowcase
+            contract={contract}
+            hourlyState={hourlyState}
+            hourlySession={hourlySession}
+            now={now}
+            decimals={decimals}
+            role={role}
+            canStart={actions.includes("startHourlySession")}
+            canStop={actions.includes("stopHourlySession")}
+            canEnd={actions.includes("endHourlyContract")}
+            canCollect={actions.includes("withdrawFreelancer")}
+            busy={tx.busy}
+            onStart={() => requestAction("startHourlySession")}
+            onStop={() => requestAction("stopHourlySession")}
+            onEnd={() => requestAction("endHourlyContract")}
+            onCollect={() => requestAction("withdrawFreelancer")}
+          />
+        ) : null}
+
+        {contract.paymentMode === "Streaming" ? (
+          <>
+            {trialStarted ? (
+              <Card className="border-cyan/30 bg-[linear-gradient(180deg,rgba(46,230,214,0.08),transparent)] p-5">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan">
+                  Paid trial
+                </p>
+                <h2 className="mt-1 font-display text-2xl">{trialStarted.headline}</h2>
+                <p className="mt-2 text-sm leading-6 text-ink-soft">{trialStarted.body}</p>
+              </Card>
+            ) : null}
+            <StreamShowcase
+              contract={contract}
+              now={now}
+              decimals={decimals}
+              role={role}
+              canRelease={actions.includes("releaseStreamAccrual")}
+              canCollect={actions.includes("withdrawFreelancer")}
+              busy={tx.busy}
+              onRelease={() => requestAction("releaseStreamAccrual")}
+              onCollect={() => requestAction("withdrawFreelancer")}
+            />
+          </>
+        ) : null}
+
+        <div id="work" className="scroll-mt-20 space-y-4">
+        {contract.trialAmount > 0n ? (
+          <Card className="p-4 sm:p-5">
+            <h2 className="font-display text-2xl">Paid trial</h2>
+            <p className="mt-1 text-sm text-ink-soft">
+              The trial is funded and reviewed before the main contract activates. Approving it
+              does not rewrite the main amount.
+            </p>
+            {trial ? (
+              <WorkUnitPanel
+                unit={trial}
+                contract={contract}
+                decimals={decimals}
+                role={role}
+                now={now}
+                actions={availableActions({
+                  wallet: publicKey,
+                  contract,
+                  trialUnit: trial,
+                  now,
+                }).filter(
+                  (a) =>
+                    TRIAL_ACTIONS.includes(a) ||
+                    (a === "rejectActivation" &&
+                      (trial.status === "Submitted" || trial.status === "Revising"))
+                )}
+                busy={tx.busy}
+                submissions={submissions}
+                historySyncWarning={
+                  pendingHistoryPayload &&
+                  pendingHistoryPayload.submissionKind ===
+                    submissionKindFromWorkUnit(trial.kind) &&
+                  pendingHistoryPayload.workUnitIndex === trial.index
+                    ? historySyncWarning
+                    : null
+                }
+                onRetrySync={
+                  pendingHistoryPayload &&
+                  pendingHistoryPayload.submissionKind ===
+                    submissionKindFromWorkUnit(trial.kind) &&
+                  pendingHistoryPayload.workUnitIndex === trial.index
+                    ? () => void persistDeliveryHistory(pendingHistoryPayload)
+                    : undefined
+                }
+                syncBusy={syncBusy}
+                onAction={(action) => requestAction(action, trial)}
+              />
             ) : (
-              contractButtons.map((action) => (
-                <Button
-                  key={action}
-                  variant={contractActionVariant(action)}
-                  disabled={tx.busy}
-                  onClick={() => requestAction(action)}
-                >
-                  {actionLabel(action, { workUnitStatus: trial?.status })}
-                </Button>
-              ))
+              <p className="mt-3 text-sm text-ink-faint">Trial unit not found yet.</p>
             )}
-          </div>
-          {actions.includes("addMilestone") ? (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <Field label="Next milestone amount">
-                <Input
-                  value={milestoneAmountUi}
-                  onChange={(e) => setMilestoneAmountUi(e.target.value)}
-                />
-              </Field>
-              <Field label="Due offset (seconds)">
-                <Input
-                  value={milestoneDue}
-                  onChange={(e) => setMilestoneDue(e.target.value)}
-                />
-              </Field>
+          </Card>
+        ) : null}
+
+        {contract.paymentMode !== "Streaming" && contract.paymentMode !== "Hourly" ? (
+          <Card className="p-4 sm:p-5">
+            <h2 className="font-display text-2xl">
+              {contract.paymentMode === "Milestone" ? "Milestones" : "Deliverable"}
+            </h2>
+            <p className="mt-1 text-sm text-ink-soft">
+              Official review starts only from this card. Drafts and progress updates will belong
+              in Messages when messaging is connected.
+            </p>
+            <div className="mt-4 space-y-3">
+              {main.length === 0 ? (
+                <p className="text-sm text-ink-faint">No work units loaded.</p>
+              ) : (
+                main.map((unit) => (
+                  <WorkUnitPanel
+                    key={unit.address.toBase58()}
+                    unit={unit}
+                    contract={contract}
+                    decimals={decimals}
+                    role={role}
+                    now={now}
+                    actions={availableActions({
+                      wallet: publicKey,
+                      contract,
+                      workUnit: unit,
+                      trialUnit: trial,
+                      now,
+                    }).filter((a) => UNIT_ACTIONS.includes(a))}
+                    busy={tx.busy}
+                    submissions={submissions}
+                    historySyncWarning={
+                      pendingHistoryPayload &&
+                      pendingHistoryPayload.submissionKind ===
+                        submissionKindFromWorkUnit(unit.kind) &&
+                      pendingHistoryPayload.workUnitIndex === unit.index
+                        ? historySyncWarning
+                        : null
+                    }
+                    onRetrySync={
+                      pendingHistoryPayload &&
+                      pendingHistoryPayload.submissionKind ===
+                        submissionKindFromWorkUnit(unit.kind) &&
+                      pendingHistoryPayload.workUnitIndex === unit.index
+                        ? () => void persistDeliveryHistory(pendingHistoryPayload)
+                        : undefined
+                    }
+                    syncBusy={syncBusy}
+                    onAction={(action) => requestAction(action, unit)}
+                  />
+                ))
+              )}
             </div>
-          ) : null}
-          <div className="mt-4">
-            <TransactionStatus state={tx.state} />
+          </Card>
+        ) : null}
+        </div>
+
+        <div id="payment" className="scroll-mt-20">
+          <PaymentProgress contract={contract} decimals={decimals} />
+        </div>
+
+        <div id="messages" className="scroll-mt-20">
+          <ContractMessages
+            role={role}
+            paymentMode={contract.paymentMode}
+            contractAddress={contract.address.toBase58()}
+            contractTitle={metadata?.title || "Protected contract"}
+          />
+        </div>
+
+        <Card id="overview" className="scroll-mt-20 p-4 sm:p-5">
+          <p className="text-xs uppercase tracking-[0.16em] text-ink-faint">Overview</p>
+          <h2 className="mt-1 font-display text-2xl">Contract details</h2>
+          {metadata?.description ? (
+            <p className="mt-3 text-sm leading-6 text-ink-soft">{metadata.description}</p>
+          ) : (
+            <p className="mt-3 text-sm text-ink-faint">
+              Off-chain notes are stored in this browser when the contract was created here.
+            </p>
+          )}
+          <dl className="mt-4 space-y-2 text-sm">
+            <Row label="Employer" value={<Address value={contract.employer.toBase58()} />} />
+            <Row label="Freelancer" value={<Address value={contract.freelancer.toBase58()} />} />
+            <Row
+              label={resolver.roleTitle}
+              value={
+                resolver.isTrustedLabel ? resolver.displayName : <Address value={resolver.address} />
+              }
+            />
+            <Row label="Token mint" value={<Address value={contract.tokenMint.toBase58()} />} />
+            <Row label="Total" value={formatTokenAmount(contract.totalAmount, decimals)} />
+            <Row label="Main" value={formatTokenAmount(contract.mainAmount, decimals)} />
+            {contract.trialAmount > 0n ? (
+              <Row label="Trial" value={formatTokenAmount(contract.trialAmount, decimals)} />
+            ) : null}
+            <Row label="Created" value={formatUnix(contract.createdAt)} />
+            <Row label="Accepted" value={formatUnix(contract.acceptedAt)} />
+            <Row label="Start" value={formatUnix(contract.startTime)} />
+            <Row label="End" value={formatUnix(contract.endTime)} />
+            <Row label="Acceptance deadline" value={formatUnix(contract.acceptanceDeadline)} />
+          </dl>
+          <div className="mt-5">
+            <Lifecycle contract={contract} />
           </div>
         </Card>
 
-        <details className="rounded-[24px] border border-line bg-card p-5">
+        {!disputeActive ? (
+          <Card id="support" className="scroll-mt-20 border-dashed p-4 sm:p-5">
+            <h2 className="font-display text-xl">Need help with this contract?</h2>
+            <p className="mt-1 text-sm leading-6 text-ink-soft">
+              Get support, learn about disputes, or open the Resolution Center.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Link href="/support">
+                <Button variant="secondary" className="text-[13px]">
+                  Help & Support
+                </Button>
+              </Link>
+              <Link href={supportTopicHref("disputes")}>
+                <Button variant="ghost" className="text-[13px]">
+                  About disputes
+                </Button>
+              </Link>
+              {openDisputeShown ? (
+                <a href="#resolution">
+                  <Button variant="ghost" className="text-[13px]">
+                    Resolution Center
+                  </Button>
+                </a>
+              ) : null}
+            </div>
+          </Card>
+        ) : (
+          <div id="support" className="scroll-mt-20" />
+        )}
+
+        {!disputeActive && openDisputeShown ? (
+          <details
+            id="resolution"
+            className="scroll-mt-20 rounded-[24px] border border-line bg-card p-4 sm:p-5"
+          >
+            <summary className="cursor-pointer list-none font-display text-xl marker:content-none [&::-webkit-details-marker]:hidden">
+              <span className="flex flex-wrap items-center justify-between gap-2">
+                <span>Resolution & dispute information</span>
+                <span className="text-xs font-sans font-semibold uppercase tracking-[0.14em] text-ink-faint">
+                  Secondary
+                </span>
+              </span>
+            </summary>
+            <p className="mt-2 text-sm text-ink-soft">
+              This section is for dispute preparation. It is not required for ordinary work on an
+              active contract.
+            </p>
+            <div className="mt-4">
+              <ResolutionCenter
+                contract={contract}
+                units={units}
+                now={now}
+                decimals={decimals}
+                role={role}
+                hourlyState={hourlyState}
+                hourlySession={hourlySession}
+                showOpenGuidance={openDisputeShown}
+                category={disputeCategory}
+                onCategoryChange={setDisputeCategory}
+                description={disputeDescription}
+                onDescriptionChange={setDisputeDescription}
+                recoverGeneration={caseRecoverGeneration}
+                openSignature={caseOpenSignature}
+              />
+            </div>
+          </details>
+        ) : !disputeActive ? (
+          <div id="resolution" />
+        ) : null}
+
+        <details className="rounded-[24px] border border-line bg-card p-4 sm:p-5">
           <summary className="cursor-pointer text-sm font-medium">Advanced details</summary>
           <div className="mt-4 space-y-2">
             <Row label="Contract PDA" value={<Address value={contract.address.toBase58()} />} />
@@ -1165,6 +1377,8 @@ export function ContractDetail({ address }: { address: string }) {
             onPickDeliveryFiles={onPickDeliveryFiles}
             onRemoveDeliveryAttachment={(localId) => void onRemoveDeliveryAttachment(localId)}
             onRetryDeliveryAttachment={onRetryDeliveryAttachment}
+            deliverySession={deliverySession}
+            onVerifyDeliveryWallet={() => void onVerifyDeliveryWallet()}
             confirmUnit={confirm.unit ?? (confirm.action === "submitTrialWork" ? trial : undefined)}
             awardUi={awardUi}
             setAwardUi={setAwardUi}
@@ -1347,6 +1561,8 @@ function ConfirmBody({
   onPickDeliveryFiles,
   onRemoveDeliveryAttachment,
   onRetryDeliveryAttachment,
+  deliverySession,
+  onVerifyDeliveryWallet,
   confirmUnit,
   awardUi,
   setAwardUi,
@@ -1365,6 +1581,8 @@ function ConfirmBody({
   onPickDeliveryFiles: (files: FileList | null) => void;
   onRemoveDeliveryAttachment: (localId: string) => void;
   onRetryDeliveryAttachment: (localId: string) => void;
+  deliverySession: DeliverySessionUi;
+  onVerifyDeliveryWallet: () => void;
   confirmUnit?: WorkUnitView | null;
   awardUi: string;
   setAwardUi: (v: string) => void;
@@ -1398,6 +1616,8 @@ function ConfirmBody({
           onPickFiles={onPickDeliveryFiles}
           onRemoveAttachment={onRemoveDeliveryAttachment}
           onRetryAttachment={onRetryDeliveryAttachment}
+          deliverySession={deliverySession}
+          onVerifyWallet={onVerifyDeliveryWallet}
           reviewPeriod={copy?.reviewPeriod}
           revisionRequests={copy?.revisionRequests}
         />

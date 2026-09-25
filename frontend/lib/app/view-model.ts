@@ -82,6 +82,107 @@ export function presentStatus(status: ContractStatus): string {
   return contractStatusLabel(status);
 }
 
+/**
+ * Short user-facing Actions section copy. Availability still comes from
+ * `availableActions` — this only explains the current wait or next step.
+ *
+ * Pass the full availability list (including unit-scoped actions) so Fixed /
+ * Milestone guidance can distinguish submit / review / revise / complete.
+ */
+export function actionsSectionGuidance(input: {
+  status: ContractStatus;
+  role: ContractRole;
+  actions: readonly UiAction[];
+  paymentMode?: PaymentModeName;
+  /** Primary Fixed/Milestone unit under review, when known. */
+  workUnitStatus?: WorkUnitStatus | null;
+  /** Remaining freelancer claim in base units; used after approval. */
+  claimRemaining?: bigint;
+}): string {
+  const { status, role, actions, paymentMode, workUnitStatus } = input;
+  const claimRemaining = input.claimRemaining ?? 0n;
+
+  if (status === "Disputed" && role !== "resolver") {
+    return "This contract is frozen. Only the designated resolver can record the settlement.";
+  }
+  if (status === "Disputed" && role === "resolver") {
+    return "Record how the contested amount is split between the freelancer and employer.";
+  }
+
+  if (status === "PendingEmployerApproval") {
+    if (role === "freelancer") {
+      return "No action needed right now. Waiting for the employer to activate the contract.";
+    }
+    if (role === "employer") {
+      if (
+        actions.includes("approveActivation") ||
+        actions.includes("approveTrialAndActivate")
+      ) {
+        return "Activation is available. Approve activation to start the work window — required before work begins.";
+      }
+      if (actions.includes("rejectActivation") || actions.length > 0) {
+        return "Review activation and trial status, then activate or respond when ready.";
+      }
+      return "Waiting for the next activation step on this contract.";
+    }
+  }
+
+  if (status === "PendingAcceptance" && role === "freelancer") {
+    return "Review the offer, then accept or decline before the acceptance deadline.";
+  }
+  if (status === "PendingAcceptance" && role === "employer") {
+    return "Waiting for the freelancer to accept or decline this offer.";
+  }
+
+  if (status === "Active" && (paymentMode === "Fixed" || paymentMode === "Milestone")) {
+    const underReview =
+      actions.includes("approveWorkUnit") || workUnitStatus === "Submitted";
+    const revising =
+      workUnitStatus === "Revising" || actions.includes("voidStaleRevision");
+
+    if (role === "employer") {
+      if (actions.includes("completeContract")) {
+        return "All deliverables are approved. Mark the contract finished when the work is complete.";
+      }
+      if (underReview) {
+        return "Review the submitted deliverable. Approve it, or request a revision while the review window is open.";
+      }
+      if (revising) {
+        return "Waiting for the freelancer to submit a revised official deliverable.";
+      }
+      return "Contract is active. Waiting for the freelancer to submit the deliverable.";
+    }
+
+    if (role === "freelancer") {
+      if (actions.includes("completeContract")) {
+        if (claimRemaining > 0n || actions.includes("withdrawFreelancer")) {
+          return "Your deliverable has been approved. Payment is available to collect.";
+        }
+        return "Your deliverable has been approved. Mark the contract finished when you are ready, or wait for the employer.";
+      }
+      if (
+        paymentMode === "Fixed" &&
+        workUnitStatus === "Released" &&
+        (claimRemaining > 0n || actions.includes("withdrawFreelancer"))
+      ) {
+        return "Your deliverable has been approved. Payment is available to collect.";
+      }
+      if (revising) {
+        return "Revision requested. Prepare and resubmit your official deliverable before the revision deadline.";
+      }
+      if (underReview) {
+        return "Your deliverable is under employer review. Payment is not transferred yet.";
+      }
+      return "Contract is active. Submit your deliverable before the deadline.";
+    }
+  }
+
+  if (actions.length === 0) {
+    return "No contract-level actions right now.";
+  }
+  return "Choose an action for this contract stage.";
+}
+
 export function presentType(type: ContractType | "Hourly"): string {
   return paymentModeLabel(type);
 }

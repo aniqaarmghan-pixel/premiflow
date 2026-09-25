@@ -20,7 +20,7 @@ export const V2_SEND_COMMITMENT: Commitment = "confirmed";
 export const BLOCKHASH_NEAR_EXPIRY_REMAINING = 10;
 
 export const TRANSACTION_EXPIRED_BEFORE_SUBMIT_MESSAGE =
-  "The transaction expired before submission. Please try again.";
+  "Your wallet approval took longer than this transaction's validity window (~60–90s on Solana). Nothing was submitted or charged. Approve promptly when Phantom opens, then try again.";
 
 export type V2SendWallet = {
   publicKey: PublicKey;
@@ -38,15 +38,56 @@ export type BlockhashBoundarySnapshot = {
   phase: "before_sign" | "after_sign";
   fetchedBlockhash: string;
   lastValidBlockHeight: number;
+  /** Pre-sign height is not fetched (keeps Phantom open sooner). */
+  fetchedBlockHeight: number | null;
   currentBlockHeight: number | null;
   remainingValidBlocks: number | null;
   isFetchedBlockhashValid: boolean | null;
+  signWaitMs?: number;
   signedBlockhash?: string;
   signedMatchesFetched?: boolean;
   serializedBlockhash?: string;
   serializedMatchesFetched?: boolean;
   isSignedBlockhashValid?: boolean | null;
 };
+
+/** Timing/height fields captured for expire-before-submit diagnosis. */
+export type ExpiredBeforeSubmitDiagnostics = {
+  signWaitMs: number;
+  lastValidBlockHeight: number;
+  fetchedBlockHeight: number | null;
+  postSignBlockHeight: number | null;
+  remainingValidBlocks: number | null;
+  isBlockhashValid: boolean | null;
+};
+
+/** Progress phases emitted by the shared send pipeline for UI status. */
+export type SendPipelinePhase =
+  | "preparing"
+  | "awaiting_wallet"
+  | "submitting"
+  | "confirming";
+
+export type SendPipelinePhaseHandler = (
+  phase: SendPipelinePhase,
+  detail?: { signature?: string }
+) => void;
+
+let sendPipelinePhaseHandler: SendPipelinePhaseHandler | undefined;
+
+/** Subscribe to shared send-pipeline progress (cleared by the caller after a run). */
+export function setSendPipelinePhaseHandler(
+  handler: SendPipelinePhaseHandler | undefined
+): void {
+  sendPipelinePhaseHandler = handler;
+}
+
+function emitSendPipelinePhase(
+  phase: SendPipelinePhase,
+  detail?: { signature?: string }
+): void {
+  sendPipelinePhaseHandler?.(phase, detail);
+}
 
 export type V2SendDeps = {
   connection: Connection;
@@ -66,6 +107,8 @@ export type V2SendDeps = {
     signature: string
   ) => Promise<ConfirmSignatureOutcome>;
   onBlockhashDiagnostics?: (snapshot: BlockhashBoundarySnapshot) => void;
+  /** Override clock for tests. */
+  nowMs?: () => number;
 };
 
 /** Signed locally, but the blockhash is already dead. Nothing was sent. */
@@ -73,18 +116,50 @@ export class TransactionExpiredBeforeSubmitError extends Error {
   readonly fetchedBlockhash: string;
   readonly signedBlockhash: string;
   readonly remainingValidBlocks: number | null;
+  readonly signWaitMs: number;
+  readonly lastValidBlockHeight: number;
+  readonly fetchedBlockHeight: number | null;
+  readonly postSignBlockHeight: number | null;
+  readonly isBlockhashValid: boolean | null;
 
   constructor(
     fetchedBlockhash: string,
     signedBlockhash: string,
-    remainingValidBlocks: number | null
+    remainingValidBlocks: number | null,
+    diagnostics: ExpiredBeforeSubmitDiagnostics
   ) {
     super(TRANSACTION_EXPIRED_BEFORE_SUBMIT_MESSAGE);
     this.name = "TransactionExpiredBeforeSubmitError";
     this.fetchedBlockhash = fetchedBlockhash;
     this.signedBlockhash = signedBlockhash;
     this.remainingValidBlocks = remainingValidBlocks;
+    this.signWaitMs = diagnostics.signWaitMs;
+    this.lastValidBlockHeight = diagnostics.lastValidBlockHeight;
+    this.fetchedBlockHeight = diagnostics.fetchedBlockHeight;
+    this.postSignBlockHeight = diagnostics.postSignBlockHeight;
+    this.isBlockhashValid = diagnostics.isBlockhashValid;
   }
+}
+
+/** Compact development-only line for failed-tx UI (never shown in production). */
+export function formatExpiredBeforeSubmitDevDiagnostic(
+  diagnostics: Pick<
+    ExpiredBeforeSubmitDiagnostics,
+    "signWaitMs" | "remainingValidBlocks" | "isBlockhashValid"
+  >
+): string {
+  const seconds = (diagnostics.signWaitMs / 1000).toFixed(1);
+  const remaining =
+    diagnostics.remainingValidBlocks == null
+      ? "unknown"
+      : `${diagnostics.remainingValidBlocks} blocks`;
+  const validity =
+    diagnostics.isBlockhashValid === false
+      ? "invalid"
+      : diagnostics.isBlockhashValid === true
+        ? "rpc-valid"
+        : "unknown";
+  return `Wallet approval: ${seconds}s · Remaining: ${remaining} · Blockhash: ${validity} · Threshold: ≤${BLOCKHASH_NEAR_EXPIRY_REMAINING} refused`;
 }
 
 export function isLegacyTransaction(
@@ -147,6 +222,11 @@ function emitDiagnostics(
   console.info("[streampay-v2:blockhash]", snapshot);
 }
 
+function logDevSendTiming(payload: Record<string, unknown>): void {
+  if (process.env.NODE_ENV !== "development") return;
+  console.info("[streampay-v2:send-timing]", payload);
+}
+
 function shouldRefuseExpiredSend(
   isValid: boolean | null,
   remaining: number | null
@@ -162,6 +242,10 @@ function shouldRefuseExpiredSend(
  * Fresh confirmed blockhash immediately before the one wallet signature,
  * then one HTTP send + HTTP confirmation. Never resends. Never skipPreflight.
  * Does not send a signed transaction whose blockhash is already dead.
+ *
+ * Pre-sign height/validity RPCs are intentionally skipped: getLatestBlockhash
+ * just returned the authoritative values, and those checks would only shrink
+ * the user's Phantom approval window. Post-sign checks still refuse stale txs.
  */
 export async function sendV2Transaction(
   transaction: Transaction | VersionedTransaction,
@@ -171,6 +255,7 @@ export async function sendV2Transaction(
     throw new Error("V2 send helper expects a legacy Transaction");
   }
 
+  const nowMs = deps.nowMs ?? Date.now;
   const getLatestBlockhash =
     deps.getLatestBlockhash ??
     ((commitment: Commitment) => deps.connection.getLatestBlockhash(commitment));
@@ -197,21 +282,20 @@ export async function sendV2Transaction(
   transaction.recentBlockhash = latest.blockhash;
   transaction.lastValidBlockHeight = latest.lastValidBlockHeight;
 
-  const heightBefore = await readBlockHeight(getBlockHeight);
-  const validBefore = await readIsValid(isBlockhashValid, latest.blockhash);
   emitDiagnostics(deps.onBlockhashDiagnostics, {
     phase: "before_sign",
     fetchedBlockhash: latest.blockhash,
     lastValidBlockHeight: latest.lastValidBlockHeight,
-    currentBlockHeight: heightBefore,
-    remainingValidBlocks: remainingBlocks(
-      latest.lastValidBlockHeight,
-      heightBefore
-    ),
-    isFetchedBlockhashValid: validBefore,
+    fetchedBlockHeight: null,
+    currentBlockHeight: null,
+    remainingValidBlocks: null,
+    isFetchedBlockhashValid: null,
   });
 
+  emitSendPipelinePhase("awaiting_wallet");
+  const signStartedAt = nowMs();
   const signed = await deps.wallet.signTransaction(transaction);
+  const signWaitMs = Math.max(0, nowMs() - signStartedAt);
   if (!isLegacyTransaction(signed)) {
     throw new Error("V2 send helper expects a legacy Transaction");
   }
@@ -235,9 +319,11 @@ export async function sendV2Transaction(
     phase: "after_sign",
     fetchedBlockhash: latest.blockhash,
     lastValidBlockHeight: latest.lastValidBlockHeight,
+    fetchedBlockHeight: null,
     currentBlockHeight: heightAfter,
     remainingValidBlocks: remainingAfter,
     isFetchedBlockhashValid: validFetchedAfter,
+    signWaitMs,
     signedBlockhash,
     signedMatchesFetched,
     serializedBlockhash,
@@ -249,14 +335,33 @@ export async function sendV2Transaction(
     ? validFetchedAfter
     : validSignedAfter;
   const remainingForSend = signedMatchesFetched ? remainingAfter : null;
+
+  logDevSendTiming({
+    signWaitMs,
+    fetchedBlockHeight: null,
+    lastValidBlockHeight: latest.lastValidBlockHeight,
+    postSignBlockHeight: heightAfter,
+    remainingValidBlocks: remainingAfter,
+    isBlockhashValid: validityForSend,
+  });
+
   if (shouldRefuseExpiredSend(validityForSend, remainingForSend)) {
     throw new TransactionExpiredBeforeSubmitError(
       latest.blockhash,
       signedBlockhash,
-      remainingForSend
+      remainingForSend,
+      {
+        signWaitMs,
+        lastValidBlockHeight: latest.lastValidBlockHeight,
+        fetchedBlockHeight: null,
+        postSignBlockHeight: heightAfter,
+        remainingValidBlocks: remainingForSend,
+        isBlockhashValid: validityForSend,
+      }
     );
   }
 
+  emitSendPipelinePhase("submitting");
   let signature: TransactionSignature;
   try {
     signature = await sendRawTransaction(raw, sendOptions());
@@ -264,6 +369,7 @@ export async function sendV2Transaction(
     throw err;
   }
 
+  emitSendPipelinePhase("confirming", { signature });
   const confirmation = await confirmSignature(deps.connection, signature);
   throwIfNotConfirmed(confirmation);
   return signature;
@@ -282,6 +388,7 @@ export async function sendV2Method(
   if (!wallet) {
     throw new Error("wallet is not connected");
   }
+  emitSendPipelinePhase("preparing");
   const transaction = await builder.transaction();
   return sendV2Transaction(transaction, {
     connection: program.provider.connection,

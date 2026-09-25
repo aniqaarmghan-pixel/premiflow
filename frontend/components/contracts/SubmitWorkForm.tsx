@@ -8,6 +8,7 @@ import {
 } from "@/components/contracts/AttachmentChips";
 import { Button } from "@/components/ui/Button";
 import { Field, Input, Textarea } from "@/components/ui/Field";
+import { DELIVERY_SESSION_COPY } from "@/lib/app/messaging-session";
 import {
   DELIVERY_FILES_HINT,
   DELIVERY_LINK_MAX,
@@ -29,6 +30,11 @@ export type DeliveryDraft = {
   attachments: DeliveryAttachmentDraft[];
 };
 
+export type DeliverySessionUi = {
+  status: "unknown" | "ready" | "needs_verify" | "verifying" | "failed";
+  error: string | null;
+};
+
 export function emptyDeliveryDraft(): DeliveryDraft {
   return { note: "", links: [emptyDeliveryLink()], attachments: [] };
 }
@@ -42,6 +48,8 @@ export function SubmitWorkForm({
   onPickFiles,
   onRemoveAttachment,
   onRetryAttachment,
+  deliverySession,
+  onVerifyWallet,
   reviewPeriod,
   revisionRequests,
 }: {
@@ -53,10 +61,18 @@ export function SubmitWorkForm({
   onPickFiles: (files: FileList | null) => void;
   onRemoveAttachment: (localId: string) => void;
   onRetryAttachment: (localId: string) => void;
+  deliverySession: DeliverySessionUi;
+  onVerifyWallet: () => void;
   reviewPeriod?: string;
   revisionRequests?: string;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const filesReady = deliverySession.status === "ready";
+  const verifying = deliverySession.status === "verifying";
+  const needsVerify =
+    deliverySession.status === "needs_verify" ||
+    deliverySession.status === "failed" ||
+    deliverySession.status === "unknown";
 
   function updateLink(index: number, patch: Partial<DeliveryLinkDraft>) {
     onChange({
@@ -130,8 +146,8 @@ export function SubmitWorkForm({
       <div className="space-y-3">
         <p className="text-sm font-medium text-ink">Work links</p>
         <p className="text-xs text-ink-faint">
-          At least one https:// link is required. The first link is recorded on-chain as the
-          submission reference (max 200 characters).
+          Add at least one https:// link or upload a file. When a link is present, the first
+          link is recorded on-chain as the submission reference (max 200 characters).
         </p>
         {draft.links.map((link, index) => (
           <div
@@ -181,29 +197,54 @@ export function SubmitWorkForm({
             <p className="text-sm font-medium text-ink">Files</p>
             <p className="mt-1 text-xs text-ink-faint">{DELIVERY_FILES_HINT}</p>
           </div>
-          <div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              className="sr-only"
-              multiple
-              accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv,application/zip"
-              aria-label="Attach delivery files"
-              onChange={(event) => {
-                onPickFiles(event.target.files);
-                event.target.value = "";
-              }}
-            />
+          {filesReady ? (
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                className="sr-only"
+                multiple
+                accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.csv,.zip,.doc,.docx,.xls,.xlsx,.ppt,.pptx,application/pdf,image/png,image/jpeg,image/webp,text/plain,text/csv,application/zip"
+                aria-label="Attach delivery files"
+                onChange={(event) => {
+                  onPickFiles(event.target.files);
+                  event.target.value = "";
+                }}
+              />
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => fileInputRef.current?.click()}
+                aria-label="Attach delivery files"
+              >
+                Attach files
+              </Button>
+            </div>
+          ) : null}
+        </div>
+        {needsVerify || verifying ? (
+          <div className="space-y-2 rounded-xl border border-line bg-paper px-3 py-3">
+            <p className="text-sm font-medium text-ink">{DELIVERY_SESSION_COPY.needsVerifyHeadline}</p>
+            <p className="text-xs leading-5 text-ink-faint">
+              {verifying
+                ? DELIVERY_SESSION_COPY.verifying
+                : DELIVERY_SESSION_COPY.needsVerifyDetail}
+            </p>
             <Button
               type="button"
-              variant="secondary"
-              onClick={() => fileInputRef.current?.click()}
-              aria-label="Attach delivery files"
+              onClick={onVerifyWallet}
+              disabled={verifying}
+              aria-label="Verify wallet"
             >
-              Attach files
+              {DELIVERY_SESSION_COPY.button}
             </Button>
+            {deliverySession.error ? (
+              <p className="text-sm text-danger" role="alert">
+                {deliverySession.error}
+              </p>
+            ) : null}
           </div>
-        </div>
+        ) : null}
         <AttachmentChipList
           items={draft.attachments}
           onRemove={onRemoveAttachment}

@@ -136,6 +136,7 @@ export {
   parseClientError,
   withDeliverableRaceMessage,
   DELIVERABLE_STATE_CHANGED_MESSAGE,
+  TRANSACTION_PENDING_CONFIRMATION_MESSAGE,
   V2_ERROR_MESSAGES,
 } from "./errors";
 export type { ParsedClientError } from "./errors";
@@ -151,13 +152,22 @@ export {
 export {
   sendV2Transaction,
   sendV2Method,
+  setSendPipelinePhaseHandler,
   V2_SEND_COMMITMENT,
   BLOCKHASH_NEAR_EXPIRY_REMAINING,
   TRANSACTION_EXPIRED_BEFORE_SUBMIT_MESSAGE,
   TransactionExpiredBeforeSubmitError,
+  formatExpiredBeforeSubmitDevDiagnostic,
   recentBlockhashFromSerialized,
 } from "./send";
-export type { BlockhashBoundarySnapshot, LatestBlockhash, V2SendDeps } from "./send";
+export type {
+  BlockhashBoundarySnapshot,
+  ExpiredBeforeSubmitDiagnostics,
+  LatestBlockhash,
+  V2SendDeps,
+  SendPipelinePhase,
+  SendPipelinePhaseHandler,
+} from "./send";
 export type {
   ConfirmSignatureOutcome,
   ConfirmSignatureOptions,

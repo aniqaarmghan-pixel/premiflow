@@ -154,8 +154,16 @@ test("Hourly create wizard uses createHourlyContract and existing modes use crea
   assert.match(source, /createContract/);
   assert.match(source, /paymentMode === "Hourly"/);
   assert.match(source, /HourlyPaymentFields/);
+  // Hourly submit uses the dedicated client path; other modes use createContract.
+  assert.match(
+    source,
+    /paymentMode === "Hourly"\s*\?\s*await client\.createHourlyContract/
+  );
+  assert.match(source, /: await client\.createContract\(/);
   assert.doesNotMatch(source, /type="mint"|editable mint|Resolver wallet/);
-  assert.match(source, /Payment token/);
+  // Condensed Payment step shows a read-only configured token label (not a mint input).
+  assert.match(source, /paymentTokenLabel\(draft\.mint\)/);
+  assert.match(source, />Token</);
   const hourlyFields = source.slice(
     source.indexOf("function HourlyPaymentFields"),
     source.indexOf("function HourlyReviewLines")
@@ -168,9 +176,18 @@ test("Hourly create hides Fixed deliverable and Milestone builder", () => {
     new URL("../../../components/create/CreateWizard.tsx", import.meta.url),
     "utf8"
   );
+  // Deliverables textarea is gated off for Hourly; Milestone builder only for Milestone.
   assert.match(source, /paymentMode !== "Hourly"/);
-  assert.match(source, /do not use a Fixed-style main deliverable/);
+  assert.match(source, /no separate deliverable list/);
   assert.match(source, /paymentMode === "Milestone" \?/);
+  assert.match(source, /paymentMode === "Milestone" \? \(\s*<MilestoneBuilder/);
+  assert.doesNotMatch(
+    source.slice(
+      source.indexOf("function HourlyPaymentFields"),
+      source.indexOf("function HourlyReviewLines")
+    ),
+    /MilestoneBuilder|Deliverables/
+  );
 });
 
 test("Hourly create has no Streaming wording in Hourly payment fields", () => {
@@ -577,13 +594,15 @@ test("Hourly review summary distinguishes authorized time from engagement window
   );
   assert.match(source, /hourlyCreateReviewLines/);
   assert.match(source, /Engagement window/);
-  assert.match(source, /authorizedVsEngagement/);
-  const hourlySchedule = source.slice(
-    source.indexOf('draft.paymentMode === "Hourly" ? ('),
-    source.indexOf("Duration (seconds)")
+  assert.match(source, /Authorized working time/);
+  // Wizard surfaces the shared product distinction (not a seconds-only engagement field).
+  assert.match(source, /HOURLY_COPY\.authorizedVsEngagement/);
+  const scheduleHourly = source.slice(
+    source.indexOf('label="Engagement window"'),
+    source.indexOf('label="Duration (seconds)"')
   );
-  assert.doesNotMatch(hourlySchedule, /Engagement duration \(seconds\)/);
-  assert.match(hourlySchedule, /engagementDurationValue/);
+  assert.doesNotMatch(scheduleHourly, /Engagement duration \(seconds\)/);
+  assert.match(scheduleHourly, /engagementDurationValue/);
 });
 
 test("Fixed Milestone and Streaming create paths remain intact", () => {

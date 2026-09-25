@@ -8,6 +8,7 @@ import { unlockNoticeAudio } from "@/lib/app/notice-sound";
 import { withDisputeRaceMessage } from "@/lib/app/dispute-ux";
 import {
   parseClientError,
+  setSendPipelinePhaseHandler,
   withDeliverableRaceMessage,
   type PaymentModeName,
   type UiAction,
@@ -42,11 +43,27 @@ export function useTx() {
       typeof context === "string" ? { action: context } : context ?? {};
     if (isTxBusy(state.phase)) return false;
     unlockNoticeAudio();
-    dispatch({ type: "wallet" });
+    dispatch({ type: "start" });
+    setSendPipelinePhaseHandler((phase, detail) => {
+      switch (phase) {
+        case "preparing":
+          dispatch({ type: "start" });
+          break;
+        case "awaiting_wallet":
+          dispatch({ type: "wallet" });
+          break;
+        case "submitting":
+          dispatch({ type: "submit" });
+          break;
+        case "confirming":
+          if (detail?.signature) {
+            dispatch({ type: "confirm", signature: detail.signature });
+          }
+          break;
+      }
+    });
     try {
-      dispatch({ type: "submit" });
       const result = await fn();
-      dispatch({ type: "confirm", signature: result.signature });
       dispatch({ type: "success", signature: result.signature });
       if (!resolved.suppressNotice) {
         notices.notifyConfirmed({
@@ -71,8 +88,14 @@ export function useTx() {
         });
         return false;
       }
-      dispatch({ type: "fail", message: parsed.uiMessage || `${label} failed.` });
+      dispatch({
+        type: "fail",
+        message: parsed.uiMessage || `${label} failed.`,
+        diagnostic: parsed.diagnostic,
+      });
       return false;
+    } finally {
+      setSendPipelinePhaseHandler(undefined);
     }
   }
 

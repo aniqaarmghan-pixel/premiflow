@@ -34,16 +34,17 @@ import {
   newestMessageId,
 } from "@/lib/app/messages-history";
 import {
-  createChallenge,
   fetchContractMessages,
   fetchSession,
   logoutSession,
   markContractMessagesRead,
   sendContractMessage,
-  signatureToBase64,
-  verifyChallenge,
   type ApiError,
 } from "@/lib/app/messages-client";
+import {
+  ensureMessagingSession,
+  messagingSessionErrorMessage,
+} from "@/lib/app/messaging-session";
 import {
   discardPendingAttachment,
   uploadContractAttachment,
@@ -189,20 +190,14 @@ export function ContractMessages({
 
   async function onVerifyWallet() {
     if (!connectedWallet) return;
-    if (!signMessage) {
-      setVerifyError("This wallet cannot sign login messages.");
-      setState("verify_failed");
-      return;
-    }
     setVerifyError(null);
     setState("verifying");
     try {
-      const challenge = await createChallenge(connectedWallet);
-      const signature = await signMessage(new TextEncoder().encode(challenge.message));
-      await verifyChallenge(challenge.challengeId, signatureToBase64(signature));
-      const me = await fetchSession();
-      if (!sessionMatchesConnectedWallet(me.wallet, connectedWallet)) {
-        await logoutSession().catch(() => undefined);
+      const { session } = await ensureMessagingSession({
+        wallet: connectedWallet,
+        signMessage,
+      });
+      if (!sessionMatchesConnectedWallet(session.wallet, connectedWallet)) {
         setState("session_mismatch");
         return;
       }
@@ -212,7 +207,11 @@ export function ContractMessages({
       await loadConversation();
     } catch (err) {
       const api = err as ApiError;
-      setVerifyError(api.message);
+      setVerifyError(messagingSessionErrorMessage(err));
+      if (api.code === "session_mismatch") {
+        setState("session_mismatch");
+        return;
+      }
       setState(panelStateFromApiError(api.status, api.code) ?? "verify_failed");
     }
   }

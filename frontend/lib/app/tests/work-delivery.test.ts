@@ -62,13 +62,82 @@ test("delivery validation accepts notes and multiple https links", () => {
   }
 });
 
-test("UI includes delivery note, links, add/remove, and real file picker", () => {
+test("delivery validation: note + uploaded attachment without links", () => {
+  const attachmentId = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+  const ok = validateDeliveryPayload({
+    deliveryNote: "Final PNG deliverable attached.",
+    links: [{ url: "", label: "" }],
+    uploadedAttachmentIds: [attachmentId],
+  });
+  assert.equal(ok.ok, true);
+  if (ok.ok) {
+    assert.equal(ok.value.links.length, 0);
+    assert.equal(
+      ok.value.onChainSubmissionUri,
+      `https://premiflow.app/deliverable/attachment/${attachmentId}`
+    );
+  }
+});
+
+test("delivery validation rejects note-only and attachment-only without note", () => {
+  assert.equal(
+    validateDeliveryPayload({
+      deliveryNote: "Note only.",
+      links: [{ url: "", label: "" }],
+      uploadedAttachmentIds: [],
+    }).ok,
+    false
+  );
+  assert.equal(
+    validateDeliveryPayload({
+      deliveryNote: "   ",
+      links: [{ url: "https://example.com/work", label: "" }],
+    }).ok,
+    false
+  );
+  assert.equal(
+    validateDeliveryPayload({
+      deliveryNote: "Has note",
+      links: [],
+      uploadedAttachmentIds: [],
+    }).ok,
+    false
+  );
+  const pendingDoesNotCount = validateDeliveryPayload({
+    deliveryNote: "Has note",
+    links: [{ url: "", label: "" }],
+    // callers must only pass successfully uploaded ids
+    uploadedAttachmentIds: [],
+  });
+  assert.equal(pendingDoesNotCount.ok, false);
+});
+
+test("delivery validation prefers primary HTTPS link over attachment uri", () => {
+  const attachmentId = "11111111-2222-3333-4444-555555555555";
+  const ok = validateDeliveryPayload({
+    deliveryNote: "Both link and file.",
+    links: [{ url: "https://figma.example/primary", label: "Figma" }],
+    uploadedAttachmentIds: [attachmentId],
+  });
+  assert.equal(ok.ok, true);
+  if (ok.ok) {
+    assert.equal(ok.value.onChainSubmissionUri, "https://figma.example/primary");
+  }
+});
+
+test("UI includes delivery note, links, add/remove, real file picker, and session verify gate", () => {
   assert.match(FORM, /Delivery note/);
   assert.match(FORM, /Add another link/);
   assert.match(FORM, /Remove link/);
   assert.match(FORM, /DELIVERY_FILES_HINT/);
   assert.match(DELIVERY_FILES_HINT, /Optional private files/);
+  assert.match(DELIVERY_FILES_HINT, /Max 10 files/);
   assert.match(FORM, /type="file"/);
+  assert.match(FORM, /at least one https:\/\/ link or upload a file/i);
+  assert.match(FORM, /DELIVERY_SESSION_COPY/);
+  assert.match(FORM, /aria-label="Verify wallet"/);
+  assert.match(DETAIL, /ensureMessagingSession/);
+  assert.match(DETAIL, /uploadedDeliveryAttachmentIds/);
   assert.match(HISTORY, /Current submission/);
   assert.match(HISTORY, /Previous submissions/);
   assert.match(HISTORY, /revisionLabel/);

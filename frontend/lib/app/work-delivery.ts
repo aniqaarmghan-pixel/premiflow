@@ -5,12 +5,23 @@
 
 import { MAX_URI_LEN } from "@/lib/streampay-v2/constants";
 import type { WorkUnitKind, WorkUnitView } from "@/lib/streampay-v2/types";
+import { attachmentLimitsHint } from "@/lib/app/attachments-policy";
 
 export const DELIVERY_NOTE_MAX_LENGTH = 4_000;
 export const DELIVERY_LINK_MAX = 8;
 export const DELIVERY_LINK_LABEL_MAX = 80;
-export const DELIVERY_FILES_HINT =
-  "Optional private files — PDF, images, Office docs, ZIP, CSV, or text. Max 10 files, 10 MiB each.";
+/** Canonical work-submission attachment limits — derived from attachments-policy. */
+export const DELIVERY_FILES_HINT = attachmentLimitsHint("work_submission");
+
+/**
+ * Deterministic HTTPS on-chain submission_uri when the deliverable is an uploaded
+ * file (no external work link). Not a public download URL — private bytes stay
+ * behind authenticated attachment download routes.
+ */
+export const ATTACHMENT_DELIVERABLE_URI_PREFIX =
+  "https://premiflow.app/deliverable/attachment/";
+
+const ATTACHMENT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export type SubmissionKind = "trial" | "fixed" | "milestone";
 
@@ -28,8 +39,9 @@ export type ValidatedDeliveryLink = {
 export type ValidatedDeliveryPayload = {
   deliveryNote: string;
   links: ValidatedDeliveryLink[];
-  /** Primary HTTPS link used as the on-chain submission_uri (≤ MAX_URI_LEN). */
+  /** Primary HTTPS reference used as the on-chain submission_uri (≤ MAX_URI_LEN). */
   onChainSubmissionUri: string;
+  uploadedAttachmentIds: string[];
 };
 
 export function submissionKindFromWorkUnit(kind: WorkUnitKind): SubmissionKind {
@@ -63,6 +75,10 @@ export function submitWorkHeading(kind: WorkUnitKind): string {
 
 export function emptyDeliveryLink(): DeliveryLinkDraft {
   return { url: "", label: "" };
+}
+
+export function attachmentDeliverableUri(attachmentId: string): string {
+  return `${ATTACHMENT_DELIVERABLE_URI_PREFIX}${attachmentId}`;
 }
 
 export function validateDeliveryNote(raw: unknown): { ok: true; value: string } | { ok: false; error: string } {
@@ -135,18 +151,51 @@ export function validateDeliveryLabel(raw: unknown): { ok: true; value: string |
   return { ok: true, value: trimmed };
 }
 
+function parseUploadedAttachmentIds(raw: unknown): { ok: true; value: string[] } | { ok: false; error: string } {
+  if (raw == null) return { ok: true, value: [] };
+  if (!Array.isArray(raw)) {
+    return { ok: false, error: "Uploaded attachments are invalid." };
+  }
+  const ids: string[] = [];
+  for (const item of raw) {
+    if (typeof item !== "string" || !ATTACHMENT_ID_RE.test(item)) {
+      return { ok: false, error: "Uploaded attachments are invalid." };
+    }
+    ids.push(item);
+  }
+  if (new Set(ids).size !== ids.length) {
+    return { ok: false, error: "Uploaded attachments are invalid." };
+  }
+  return { ok: true, value: ids };
+}
+
+function isBlankLinkRow(record: Record<string, unknown>): boolean {
+  const url = typeof record.url === "string" ? record.url.trim() : "";
+  const label = typeof record.label === "string" ? record.label.trim() : "";
+  return !url && !label;
+}
+
+/**
+ * Confirm / persist rule:
+ * - delivery note required
+ * - at least one deliverable reference: valid HTTPS link OR successfully uploaded attachment
+ * - additional links must be valid if supplied
+ * - blank link rows are ignored (form starts with one empty row)
+ * - pending/failed attachments must not be passed as uploadedAttachmentIds
+ */
 export function validateDeliveryPayload(input: {
   deliveryNote: unknown;
   links: unknown;
+  uploadedAttachmentIds?: unknown;
 }): { ok: true; value: ValidatedDeliveryPayload } | { ok: false; error: string } {
   const note = validateDeliveryNote(input.deliveryNote);
   if (!note.ok) return note;
 
+  const attachments = parseUploadedAttachmentIds(input.uploadedAttachmentIds);
+  if (!attachments.ok) return attachments;
+
   if (!Array.isArray(input.links)) {
-    return { ok: false, error: "At least one work link is required." };
-  }
-  if (input.links.length < 1) {
-    return { ok: false, error: "At least one work link is required." };
+    return { ok: false, error: "Work links are invalid." };
   }
   if (input.links.length > DELIVERY_LINK_MAX) {
     return {
@@ -162,18 +211,32 @@ export function validateDeliveryPayload(input: {
       return { ok: false, error: "Each work link must be an object." };
     }
     const record = row as Record<string, unknown>;
+    if (isBlankLinkRow(record)) continue;
     const url = validateDeliveryUrl(record.url);
     if (!url.ok) return url;
     const label = validateDeliveryLabel(record.label);
     if (!label.ok) return label;
-    links.push({ url: url.value, label: label.value, position: i });
+    links.push({ url: url.value, label: label.value, position: links.length });
   }
 
-  const primary = links[0].url;
-  if (primary.length > MAX_URI_LEN) {
+  if (links.length < 1 && attachments.value.length < 1) {
     return {
       ok: false,
-      error: `Primary delivery link must be at most ${MAX_URI_LEN} characters for on-chain recording.`,
+      error: "Add at least one https:// work link or upload a file.",
+    };
+  }
+
+  let onChainSubmissionUri: string;
+  if (links.length > 0) {
+    onChainSubmissionUri = links[0]!.url;
+  } else {
+    onChainSubmissionUri = attachmentDeliverableUri(attachments.value[0]!);
+  }
+
+  if (onChainSubmissionUri.length > MAX_URI_LEN) {
+    return {
+      ok: false,
+      error: `Primary delivery reference must be at most ${MAX_URI_LEN} characters for on-chain recording.`,
     };
   }
 
@@ -182,7 +245,8 @@ export function validateDeliveryPayload(input: {
     value: {
       deliveryNote: note.value,
       links,
-      onChainSubmissionUri: primary,
+      onChainSubmissionUri,
+      uploadedAttachmentIds: attachments.value,
     },
   };
 }
