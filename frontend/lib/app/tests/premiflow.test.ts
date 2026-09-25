@@ -153,7 +153,14 @@ test("normal Create UI has no editable mint or resolver account fields", () => {
   assert.match(wizard, /lockedCreatePayment\(\)/);
   assert.match(wizard, /tokenMint: payment.mint/);
   assert.match(wizard, /resolver: payment.resolver.address/);
-  assert.match(wizard, /Advanced contract details/);
+  // Condensed Review shows read-only mint/resolver under Advanced settings (not editable inputs).
+  assert.match(wizard, /Advanced settings/);
+  assert.match(wizard, /<Address value=\{draft\.mint\}/);
+  assert.match(wizard, /<Address value=\{draft\.resolver\}/);
+  assert.doesNotMatch(
+    wizard.slice(wizard.indexOf("function ReviewPanel"), wizard.length),
+    /<Input[^>]*(mint|resolver)|onChange=\{[^}]*mint|onChange=\{[^}]*resolver/i
+  );
 });
 
 test("form state cannot override the configured mint or resolver", () => {

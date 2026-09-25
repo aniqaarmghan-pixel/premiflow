@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MISSING_RPC_MESSAGE = "Devnet RPC is not configured on the server.";
+const MISSING_RPC_MESSAGE = "Solana RPC is not configured on the server for the active PREMIFLOW cluster.";
 
 function jsonRpcError(status: number, code: number, message: string, id: unknown = null) {
   return NextResponse.json(
@@ -65,7 +65,7 @@ export async function POST(request: Request) {
       cache: "no-store",
     });
   } catch {
-    return jsonRpcError(502, -32043, "Upstream Devnet RPC request failed.");
+    return jsonRpcError(502, -32043, "Upstream Solana RPC request failed.");
   }
 
   const body = await upstream.text();
