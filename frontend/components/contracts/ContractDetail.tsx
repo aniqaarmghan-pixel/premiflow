@@ -3,7 +3,7 @@
 import { getMint } from "@solana/spl-token";
 import { useAnchorWallet, useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { useCallback, useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import Link from "next/link";
 
 import { Lifecycle } from "@/components/contracts/Lifecycle";
@@ -119,9 +119,11 @@ import {
   roleForContract,
   roleLabel,
   splitTrialUnits,
+  summaryWorkUnitActions,
   voidDeliverableCopy,
   voidStaleRevisionCopy,
   withdrawFreelancerCopy,
+  workUnitsHaveOwnCards,
 } from "@/lib/app/view-model";
 import {
   parseDisputeAwardInput,
@@ -846,15 +848,17 @@ export function ContractDetail({ address }: { address: string }) {
           ? { label: "End", value: formatUnix(contract.endTime) }
           : null;
 
-  const primaryUnitButtons = main.flatMap((unit) => {
-    const unitActs = availableActions({
-      wallet: publicKey,
-      contract,
-      workUnit: unit,
-      trialUnit: trial,
-      now,
-    }).filter((a) => UNIT_ACTIONS.includes(a));
-    return unitActs.map((action) => ({ action, unit }));
+  const primaryUnitButtons = summaryWorkUnitActions({
+    paymentMode: contract.paymentMode,
+    units: main,
+    actionsFor: (unit) =>
+      availableActions({
+        wallet: publicKey,
+        contract,
+        workUnit: unit,
+        trialUnit: trial,
+        now,
+      }).filter((a) => UNIT_ACTIONS.includes(a)),
   });
 
   return (
@@ -1138,7 +1142,7 @@ export function ContractDetail({ address }: { address: string }) {
           </Card>
         ) : null}
 
-        {contract.paymentMode !== "Streaming" && contract.paymentMode !== "Hourly" ? (
+        {workUnitsHaveOwnCards(contract.paymentMode) ? (
           <Card className="p-4 sm:p-5">
             <h2 className="font-display text-2xl">
               {contract.paymentMode === "Milestone" ? "Milestones" : "Deliverable"}
@@ -1199,12 +1203,14 @@ export function ContractDetail({ address }: { address: string }) {
         </div>
 
         <div id="messages" className="scroll-mt-20">
-          <ContractMessages
-            role={role}
-            paymentMode={contract.paymentMode}
-            contractAddress={contract.address.toBase58()}
-            contractTitle={metadata?.title || "Protected contract"}
-          />
+          <Suspense fallback={null}>
+            <ContractMessages
+              role={role}
+              paymentMode={contract.paymentMode}
+              contractAddress={contract.address.toBase58()}
+              contractTitle={metadata?.title || "Protected contract"}
+            />
+          </Suspense>
         </div>
 
         <Card id="overview" className="scroll-mt-20 p-4 sm:p-5">

@@ -245,3 +245,45 @@ export interface AttachmentStore {
     attachmentId: string
   ): Promise<WorkSubmissionAttachmentBinding | null>;
 }
+
+export type NotificationRecord = {
+  id: string;
+  recipientWallet: string;
+  type: string;
+  contractAddress: string | null;
+  title: string;
+  body: string;
+  href: string | null;
+  payload: Record<string, unknown> | null;
+  uniqueKey: string;
+  createdAt: Date;
+  readAt: Date | null;
+};
+
+export type NotificationCursor = {
+  createdAt: Date;
+  id: string;
+};
+
+export interface NotificationStore {
+  insertIdempotent(row: NotificationRecord): Promise<{
+    row: NotificationRecord;
+    created: boolean;
+  }>;
+  getByIdForWallet(
+    id: string,
+    recipientWallet: string
+  ): Promise<NotificationRecord | null>;
+  listForWallet(
+    recipientWallet: string,
+    cursor: NotificationCursor | null,
+    limit: number
+  ): Promise<NotificationRecord[]>;
+  countUnread(recipientWallet: string): Promise<number>;
+  markRead(
+    id: string,
+    recipientWallet: string,
+    now: Date
+  ): Promise<NotificationRecord | null>;
+  markAllRead(recipientWallet: string, now: Date): Promise<number>;
+}

@@ -3,6 +3,7 @@ import {
   check,
   index,
   integer,
+  jsonb,
   pgTable,
   primaryKey,
   text,
@@ -398,6 +399,76 @@ export const workSubmissionAttachments = pgTable(
     check(
       "work_submission_attachments_position_nonneg",
       sql`${table.position} >= 0`
+    ),
+  ]
+);
+
+/**
+ * Persistent wallet-scoped in-app notifications (off-chain).
+ * Solana remains authoritative for contract/payment state; rows are delivery hints only.
+ * Do not store private chat message bodies in payload.
+ */
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: uuid("id").primaryKey(),
+    recipientWallet: text("recipient_wallet").notNull(),
+    type: text("type").notNull(),
+    contractAddress: text("contract_address"),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    href: text("href"),
+    payload: jsonb("payload").$type<Record<string, unknown> | null>(),
+    uniqueKey: text("unique_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (table) => [
+    uniqueIndex("notifications_recipient_unique_key_uidx").on(
+      table.recipientWallet,
+      table.uniqueKey
+    ),
+    index("notifications_recipient_read_created_idx").on(
+      table.recipientWallet,
+      table.readAt,
+      table.createdAt
+    ),
+    check(
+      "notifications_type_enum",
+      sql`${table.type} in (
+        'message_received',
+        'contract_offer_received',
+        'offer_accepted',
+        'offer_declined',
+        'awaiting_activation',
+        'contract_activated',
+        'work_submitted',
+        'revision_requested',
+        'revised_work_submitted',
+        'work_approved',
+        'payment_released',
+        'payment_withdrawn',
+        'contract_cancelled',
+        'dispute_opened',
+        'dispute_resolved',
+        'deadline_warning'
+      )`
+    ),
+    check(
+      "notifications_title_len",
+      sql`char_length(${table.title}) between 1 and 200`
+    ),
+    check(
+      "notifications_body_len",
+      sql`char_length(${table.body}) between 1 and 2000`
+    ),
+    check(
+      "notifications_unique_key_len",
+      sql`char_length(${table.uniqueKey}) between 1 and 200`
+    ),
+    check(
+      "notifications_href_len",
+      sql`${table.href} is null or char_length(${table.href}) between 1 and 500`
     ),
   ]
 );

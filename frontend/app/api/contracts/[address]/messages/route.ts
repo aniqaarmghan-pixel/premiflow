@@ -7,6 +7,7 @@ import {
   createContractMessage,
   listContractMessages,
 } from "@/lib/server/messages/service";
+import { notifyOtherPartyOfMessage } from "@/lib/server/notifications/message-received";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -49,7 +50,7 @@ export async function POST(
   try {
     requireMutatingOrigin(request);
     const { address } = await context.params;
-    const { stores, session } = await requireMessageParticipant(request, address);
+    const { stores, session, parties } = await requireMessageParticipant(request, address);
     const body = await readJsonObject(request);
     const message = await createContractMessage(stores, {
       contractAddress: address,
@@ -57,6 +58,22 @@ export async function POST(
       body: body.body,
       attachmentIds: body.attachmentIds,
     });
+    // Message is authoritative once persisted. Notification is best-effort so a
+    // Neon inbox write failure never undoes chat delivery.
+    try {
+      await notifyOtherPartyOfMessage(stores.notifications, {
+        contractAddress: message.contractAddress,
+        messageId: message.id,
+        senderWallet: session.walletAddress,
+        parties,
+      });
+    } catch (notifyErr) {
+      console.error("[notifications] message_received emit failed", {
+        messageId: message.id,
+        contractAddress: message.contractAddress,
+        error: notifyErr instanceof Error ? notifyErr.message : "unknown",
+      });
+    }
     return NextResponse.json({ message });
   } catch (err) {
     return handleRouteError(validationError(err));

@@ -18,6 +18,10 @@ import { BlobConfigError } from "./blob/env";
 import { getServerEnv, ServerConfigError, type ServerEnv } from "./env";
 import { HttpError, SESSION_COOKIE, assertOrigin, jsonError, readCookie } from "./http";
 import { isAuthorizedMessageWallet } from "./messages/authorize";
+import {
+  NotificationAccessError,
+  NotificationValidationError,
+} from "./notifications/service";
 import { RateLimitedError } from "./rate-limit";
 import {
   ContractPartiesError,
@@ -32,6 +36,47 @@ import {
 } from "./solana/read-contract-case-facts";
 import type { PartyStatementRole, SessionRecord } from "./stores";
 import { casePartyRoleFromChain } from "./cases/authorize";
+
+/**
+ * Safe server-only fields for unclassified route failures.
+ * Never include cookies, tokens, headers, secrets, or DATABASE_URL.
+ */
+export function buildUnknownRouteErrorLog(err: unknown): Record<string, unknown> {
+  if (err instanceof Error) {
+    const entry: Record<string, unknown> = {
+      name: err.name,
+      message: err.message,
+    };
+    if (typeof err.stack === "string" && err.stack.length > 0) {
+      entry.stack = err.stack;
+    }
+    if ("cause" in err && err.cause !== undefined) {
+      const cause = err.cause;
+      if (cause instanceof Error) {
+        entry.cause = {
+          name: cause.name,
+          message: cause.message,
+          ...(typeof cause.stack === "string" && cause.stack.length > 0
+            ? { stack: cause.stack }
+            : {}),
+        };
+      } else {
+        entry.cause = String(cause);
+      }
+    }
+    return entry;
+  }
+  return { name: typeof err, message: String(err) };
+}
+
+export function logUnknownRouteError(
+  err: unknown,
+  log: (entry: Record<string, unknown>) => void = (entry) => {
+    console.error("[api] unknown route error", JSON.stringify(entry));
+  }
+): void {
+  log(buildUnknownRouteErrorLog(err));
+}
 
 export function handleRouteError(err: unknown) {
   if (err instanceof HttpError) return jsonError(err.status, err.code, err.message);
@@ -65,6 +110,12 @@ export function handleRouteError(err: unknown) {
   }
   if (err instanceof BlobConfigError) {
     return jsonError(503, "backend_unavailable", "Attachment storage is temporarily unavailable.");
+  }
+  if (err instanceof NotificationValidationError) {
+    return jsonError(400, "invalid_notification", err.message);
+  }
+  if (err instanceof NotificationAccessError) {
+    return jsonError(404, "not_found", err.message);
   }
   if (err instanceof CopilotAuthError) {
     return jsonError(401, "unauthenticated", err.message);
@@ -104,6 +155,7 @@ export function handleRouteError(err: unknown) {
   if (err instanceof CopilotProviderError) {
     return jsonError(502, "copilot_unavailable", "Copilot is temporarily unavailable.");
   }
+  logUnknownRouteError(err);
   return jsonError(500, "internal", "Something went wrong.");
 }
 

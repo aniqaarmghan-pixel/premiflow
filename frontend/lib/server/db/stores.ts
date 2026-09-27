@@ -7,6 +7,7 @@ import {
   contractMessages,
   contractWorkSubmissionLinks,
   contractWorkSubmissions,
+  notifications,
   partyStatements,
   rateLimitEvents,
   resolutionCases,
@@ -18,6 +19,8 @@ import type {
   AuthStore,
   CaseStore,
   MessageStore,
+  NotificationRecord,
+  NotificationStore,
   PartyStatementRecord,
   RateLimitStore,
   ResolutionCaseRecord,
@@ -331,6 +334,131 @@ export function createDrizzleSubmissionStore(db: MessagingDatabase): SubmissionS
         });
       }
       return out;
+    },
+  };
+}
+
+function asNotification(row: typeof notifications.$inferSelect): NotificationRecord {
+  const payload = row.payload;
+  return {
+    ...row,
+    payload:
+      payload && typeof payload === "object" && !Array.isArray(payload)
+        ? (payload as Record<string, unknown>)
+        : null,
+  };
+}
+
+export function createDrizzleNotificationStore(db: MessagingDatabase): NotificationStore {
+  return {
+    async insertIdempotent(row) {
+      const inserted = await db
+        .insert(notifications)
+        .values({
+          id: row.id,
+          recipientWallet: row.recipientWallet,
+          type: row.type,
+          contractAddress: row.contractAddress,
+          title: row.title,
+          body: row.body,
+          href: row.href,
+          payload: row.payload,
+          uniqueKey: row.uniqueKey,
+          createdAt: row.createdAt,
+          readAt: row.readAt,
+        })
+        .onConflictDoNothing({
+          target: [notifications.recipientWallet, notifications.uniqueKey],
+        })
+        .returning();
+      if (inserted[0]) {
+        return { row: asNotification(inserted[0]), created: true };
+      }
+      const [existing] = await db
+        .select()
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.recipientWallet, row.recipientWallet),
+            eq(notifications.uniqueKey, row.uniqueKey)
+          )
+        );
+      if (!existing) {
+        throw new Error("Notification insert conflict without existing row.");
+      }
+      return { row: asNotification(existing), created: false };
+    },
+    async getByIdForWallet(id, recipientWallet) {
+      const [row] = await db
+        .select()
+        .from(notifications)
+        .where(
+          and(eq(notifications.id, id), eq(notifications.recipientWallet, recipientWallet))
+        );
+      return row ? asNotification(row) : null;
+    },
+    async listForWallet(recipientWallet, cursor, limit) {
+      const rows = await db
+        .select()
+        .from(notifications)
+        .where(
+          cursor
+            ? and(
+                eq(notifications.recipientWallet, recipientWallet),
+                or(
+                  lt(notifications.createdAt, cursor.createdAt),
+                  and(
+                    eq(notifications.createdAt, cursor.createdAt),
+                    lt(notifications.id, cursor.id)
+                  )
+                )
+              )
+            : eq(notifications.recipientWallet, recipientWallet)
+        )
+        .orderBy(desc(notifications.createdAt), desc(notifications.id))
+        .limit(limit);
+      return rows.map(asNotification);
+    },
+    async countUnread(recipientWallet) {
+      const [row] = await db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.recipientWallet, recipientWallet),
+            isNull(notifications.readAt)
+          )
+        );
+      return Number(row?.count ?? 0);
+    },
+    async markRead(id, recipientWallet, now) {
+      const updated = await db
+        .update(notifications)
+        .set({ readAt: now })
+        .where(
+          and(
+            eq(notifications.id, id),
+            eq(notifications.recipientWallet, recipientWallet),
+            isNull(notifications.readAt)
+          )
+        )
+        .returning();
+      if (updated[0]) return asNotification(updated[0]);
+      const existing = await this.getByIdForWallet(id, recipientWallet);
+      return existing;
+    },
+    async markAllRead(recipientWallet, now) {
+      const updated = await db
+        .update(notifications)
+        .set({ readAt: now })
+        .where(
+          and(
+            eq(notifications.recipientWallet, recipientWallet),
+            isNull(notifications.readAt)
+          )
+        )
+        .returning({ id: notifications.id });
+      return updated.length;
     },
   };
 }

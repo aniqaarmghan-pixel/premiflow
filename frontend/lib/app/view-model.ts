@@ -183,6 +183,26 @@ export function actionsSectionGuidance(input: {
   return "Choose an action for this contract stage.";
 }
 
+/** Fixed and Milestone work units render their own cards with per-unit controls. */
+export function workUnitsHaveOwnCards(paymentMode: PaymentModeName): boolean {
+  return paymentMode !== "Streaming" && paymentMode !== "Hourly";
+}
+
+/**
+ * Unit-scoped buttons for the contract-level Actions card. Empty when each
+ * unit's card already shows them, so no unit action is rendered twice.
+ */
+export function summaryWorkUnitActions<U>(input: {
+  paymentMode: PaymentModeName;
+  units: readonly U[];
+  actionsFor: (unit: U) => readonly UiAction[];
+}): Array<{ action: UiAction; unit: U }> {
+  if (workUnitsHaveOwnCards(input.paymentMode)) return [];
+  return input.units.flatMap((unit) =>
+    input.actionsFor(unit).map((action) => ({ action, unit }))
+  );
+}
+
 export function presentType(type: ContractType | "Hourly"): string {
   return paymentModeLabel(type);
 }

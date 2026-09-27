@@ -227,6 +227,62 @@ function logDevSendTiming(payload: Record<string, unknown>): void {
   console.info("[streampay-v2:send-timing]", payload);
 }
 
+/** Public, signature-free view of the exact message handed to the wallet. */
+export type WalletHandoffDescription = {
+  transactionType: "legacy";
+  feePayer: string | null;
+  recentBlockhash: string | null;
+  requiredSignatures: number;
+  accounts: Array<{ pubkey: string; signer: boolean; writable: boolean }>;
+  instructions: Array<{
+    programId: string;
+    accountIndexes: number[];
+    dataLength: number;
+  }>;
+  messageBase64: string;
+};
+
+/**
+ * Compiles a copy of the message; does not touch the transaction's signature
+ * slots, so the wallet receives exactly what it would have without this call.
+ */
+export function describeWalletHandoff(
+  transaction: Transaction
+): WalletHandoffDescription {
+  const message = transaction.compileMessage();
+  return {
+    transactionType: "legacy",
+    feePayer: transaction.feePayer?.toBase58() ?? null,
+    recentBlockhash: transaction.recentBlockhash ?? null,
+    requiredSignatures: message.header.numRequiredSignatures,
+    accounts: message.accountKeys.map((key, index) => ({
+      pubkey: key.toBase58(),
+      signer: message.isAccountSigner(index),
+      writable: message.isAccountWritable(index),
+    })),
+    instructions: message.instructions.map((ix) => ({
+      programId: message.accountKeys[ix.programIdIndex]!.toBase58(),
+      accountIndexes: [...ix.accounts],
+      dataLength: ix.data.length,
+    })),
+    messageBase64: Buffer.from(message.serialize()).toString("base64"),
+  };
+}
+
+function logDevWalletHandoff(
+  transaction: Transaction,
+  latest: LatestBlockhash,
+  blockhashAgeMs: number
+): void {
+  if (process.env.NODE_ENV !== "development") return;
+  console.info("[streampay-v2:wallet-handoff]", {
+    ...describeWalletHandoff(transaction),
+    lastValidBlockHeight: latest.lastValidBlockHeight,
+    blockhashAgeMs,
+    handoffAt: new Date().toISOString(),
+  });
+}
+
 function shouldRefuseExpiredSend(
   isValid: boolean | null,
   remaining: number | null
@@ -279,6 +335,7 @@ export async function sendV2Transaction(
 
   transaction.feePayer = deps.wallet.publicKey;
   const latest = await getLatestBlockhash(V2_SEND_COMMITMENT);
+  const blockhashFetchedAt = nowMs();
   transaction.recentBlockhash = latest.blockhash;
   transaction.lastValidBlockHeight = latest.lastValidBlockHeight;
 
@@ -291,6 +348,7 @@ export async function sendV2Transaction(
     remainingValidBlocks: null,
     isFetchedBlockhashValid: null,
   });
+  logDevWalletHandoff(transaction, latest, Math.max(0, nowMs() - blockhashFetchedAt));
 
   emitSendPipelinePhase("awaiting_wallet");
   const signStartedAt = nowMs();

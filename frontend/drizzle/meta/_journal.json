@@ -29,6 +29,13 @@
       "when": 1790100000000,
       "tag": "0003_contract_attachments",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790373808109,
+      "tag": "0004_notifications",
+      "breakpoints": true
     }
   ]
 }

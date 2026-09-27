@@ -20,6 +20,7 @@ import { BrandMark } from "@/components/brand/BrandMark";
 import { FloatingAssistant } from "@/components/copilot/FloatingAssistant";
 import { ClientOnly } from "./ClientOnly";
 import { NetworkControl } from "./NetworkControl";
+import { NotificationBell } from "./NotificationBell";
 import { SoundPreference } from "./SoundPreference";
 import { WalletControl } from "./WalletControl";
 
@@ -111,12 +112,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <ClientOnly
             fallback={
               <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
+                <div className="size-11 rounded-full border border-line bg-card sm:size-9" />
                 <div className="h-10 w-16 rounded-full border border-line bg-card sm:w-20" />
                 <div className="h-10 w-28 rounded-full border border-line bg-card sm:w-36" />
               </div>
             }
           >
             <div className="flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-2">
+              <NotificationBell />
               <NetworkControl />
               <WalletControl />
             </div>

@@ -4,6 +4,7 @@ import {
   createDrizzleAuthStore,
   createDrizzleCaseStore,
   createDrizzleMessageStore,
+  createDrizzleNotificationStore,
   createDrizzleRateLimitStore,
   createDrizzleSubmissionStore,
 } from "./db/stores";
@@ -14,6 +15,7 @@ import type {
   AuthStore,
   CaseStore,
   MessageStore,
+  NotificationStore,
   RateLimitStore,
   SubmissionStore,
 } from "./stores";
@@ -25,6 +27,7 @@ export type MessagingStores = {
   cases: CaseStore;
   submissions: SubmissionStore;
   attachments: AttachmentStore;
+  notifications: NotificationStore;
 };
 
 export function productionStores(): MessagingStores {
@@ -36,6 +39,7 @@ export function productionStores(): MessagingStores {
     cases: createDrizzleCaseStore(db),
     submissions: createDrizzleSubmissionStore(db),
     attachments: createDrizzleAttachmentStore(db),
+    notifications: createDrizzleNotificationStore(db),
   };
 }
 

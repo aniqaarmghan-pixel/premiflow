@@ -2,6 +2,7 @@
 
 import { MessagesSquare } from "lucide-react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
@@ -67,6 +68,11 @@ import {
   shouldShowComposer,
   type MessagesPanelState,
 } from "@/lib/app/messages-panel";
+import {
+  OPEN_CONTRACT_CHAT_EVENT,
+  consumeOpenContractChat,
+  shouldOpenChatFromSearch,
+} from "@/lib/app/notifications-ui";
 import type { PublicContractMessage } from "@/lib/server/messages/pagination";
 import type { ContractRole, PaymentModeName } from "@/lib/streampay-v2";
 
@@ -87,6 +93,7 @@ export function ContractMessages({
   contractTitle?: string;
 }) {
   const { connected, publicKey, signMessage } = useWallet();
+  const searchParams = useSearchParams();
   const connectedWallet = publicKey?.toBase58() ?? null;
   const participant = isContractMessageParticipant(role);
   const [state, setState] = useState<MessagesPanelState>(() =>
@@ -110,6 +117,28 @@ export function ContractMessages({
   const cursorInitialized = useRef(false);
   const newestIdRef = useRef<string | null>(null);
   const visible = useBrowserVisible();
+
+  useEffect(() => {
+    const fromQuery = shouldOpenChatFromSearch(searchParams.toString());
+    const fromArm = consumeOpenContractChat(contractAddress);
+    if (fromQuery || fromArm) {
+      setChatOpen(true);
+    }
+  }, [contractAddress, searchParams]);
+
+  useEffect(() => {
+    function onOpenChat(event: Event) {
+      const detail = (event as CustomEvent<{ contractAddress?: string | null }>).detail;
+      if (detail?.contractAddress && detail.contractAddress !== contractAddress) {
+        return;
+      }
+      setChatOpen(true);
+    }
+    window.addEventListener(OPEN_CONTRACT_CHAT_EVENT, onOpenChat as EventListener);
+    return () => {
+      window.removeEventListener(OPEN_CONTRACT_CHAT_EVENT, onOpenChat as EventListener);
+    };
+  }, [contractAddress]);
 
   const clearConversation = useCallback(() => {
     setMessages([]);

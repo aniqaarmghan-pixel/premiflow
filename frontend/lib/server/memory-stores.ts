@@ -6,6 +6,9 @@ import type {
   MessageCursor,
   MessageRecord,
   MessageStore,
+  NotificationCursor,
+  NotificationRecord,
+  NotificationStore,
   PartyStatementRecord,
   RateLimitStore,
   ResolutionCaseRecord,
@@ -246,6 +249,84 @@ export function createMemorySubmissionStore(): SubmissionStore {
           return a.id < b.id ? 1 : a.id > b.id ? -1 : 0;
         })
         .map((row) => withLinks(row));
+    },
+  };
+}
+
+function compareNotificationCursor(a: NotificationCursor, b: NotificationCursor): number {
+  if (a.createdAt.getTime() !== b.createdAt.getTime()) {
+    return a.createdAt.getTime() - b.createdAt.getTime();
+  }
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+export function createMemoryNotificationStore(): NotificationStore {
+  const rows: NotificationRecord[] = [];
+
+  return {
+    async insertIdempotent(row) {
+      const existing = rows.find(
+        (item) =>
+          item.recipientWallet === row.recipientWallet && item.uniqueKey === row.uniqueKey
+      );
+      if (existing) {
+        return { row: { ...existing }, created: false };
+      }
+      const saved = {
+        ...row,
+        payload: row.payload ? { ...row.payload } : null,
+      };
+      rows.push(saved);
+      return { row: { ...saved, payload: saved.payload ? { ...saved.payload } : null }, created: true };
+    },
+    async getByIdForWallet(id, recipientWallet) {
+      const row = rows.find(
+        (item) => item.id === id && item.recipientWallet === recipientWallet
+      );
+      return row
+        ? { ...row, payload: row.payload ? { ...row.payload } : null }
+        : null;
+    },
+    async listForWallet(recipientWallet, cursor, limit) {
+      return rows
+        .filter((row) => row.recipientWallet === recipientWallet)
+        .filter((row) =>
+          cursor
+            ? compareNotificationCursor(
+                { createdAt: row.createdAt, id: row.id },
+                cursor
+              ) < 0
+            : true
+        )
+        .sort((a, b) => compareNotificationCursor(b, a))
+        .slice(0, limit)
+        .map((row) => ({
+          ...row,
+          payload: row.payload ? { ...row.payload } : null,
+        }));
+    },
+    async countUnread(recipientWallet) {
+      return rows.filter(
+        (row) => row.recipientWallet === recipientWallet && row.readAt == null
+      ).length;
+    },
+    async markRead(id, recipientWallet, now) {
+      const row = rows.find(
+        (item) => item.id === id && item.recipientWallet === recipientWallet
+      );
+      if (!row) return null;
+      if (!row.readAt) row.readAt = now;
+      return { ...row, payload: row.payload ? { ...row.payload } : null };
+    },
+    async markAllRead(recipientWallet, now) {
+      let marked = 0;
+      for (const row of rows) {
+        if (row.recipientWallet === recipientWallet && row.readAt == null) {
+          row.readAt = now;
+          marked += 1;
+        }
+      }
+      return marked;
     },
   };
 }

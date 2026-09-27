@@ -13,7 +13,12 @@ import {
 import type { StreamPayV2Program } from "./program";
 import { fetchContract, fetchHourlyState, fetchWorkUnit } from "./accounts";
 import { txResult, type TransactionResult } from "./results";
-import { TOKEN_PROGRAM_ID, deriveEmployerSourceAta, deriveFreelancerDestinationAta } from "./tokens";
+import {
+  TOKEN_PROGRAM_ID,
+  deriveEmployerSourceAta,
+  deriveFreelancerDestinationAta,
+  freelancerWithdrawAtaCreateInstruction,
+} from "./tokens";
 import { toHashArray } from "./bytes";
 import { requireU64 } from "./format";
 import { HOURLY_NO_ACTIVE_SESSION } from "./constants";
@@ -682,17 +687,24 @@ export class StreamPayV2Client {
     const freelancerTokenAccount =
       params.freelancerTokenAccount ??
       deriveFreelancerDestinationAta(freelancer, contract.tokenMint);
-    const signature = await sendV2Method(this.program, this.program.methods
-      .withdrawFreelancer()
-      .accountsPartial(
-        withdrawFreelancerAccounts({
-          freelancer,
-          contract: params.contract,
-          tokenMint: contract.tokenMint,
-          contractEscrow: escrow,
-          freelancerTokenAccount,
-        })
-      )
+    const ataCreate = freelancerWithdrawAtaCreateInstruction({
+      payer: freelancer,
+      freelancer,
+      mint: contract.tokenMint,
+      destination: freelancerTokenAccount,
+    });
+    const withdraw = this.program.methods.withdrawFreelancer().accountsPartial(
+      withdrawFreelancerAccounts({
+        freelancer,
+        contract: params.contract,
+        tokenMint: contract.tokenMint,
+        contractEscrow: escrow,
+        freelancerTokenAccount,
+      })
+    );
+    const signature = await sendV2Method(
+      this.program,
+      ataCreate ? withdraw.preInstructions([ataCreate]) : withdraw
     );
     return txResult({
       signature,

@@ -6,6 +6,7 @@ import {
   requireMutatingOrigin,
 } from "@/lib/server/api-guard";
 import { HttpError, readJsonObject } from "@/lib/server/http";
+import { notifyEmployerOfWorkSubmission } from "@/lib/server/notifications/work-submitted";
 import {
   SubmissionAccessError,
   SubmissionValidationError,
@@ -70,6 +71,23 @@ export async function POST(
       parties,
       body,
     });
+    // Submission history is authoritative once persisted. Notification is
+    // best-effort so a Neon inbox write failure never undoes delivery history.
+    // Safe on created:true and idempotent created:false retries (unique_key).
+    try {
+      await notifyEmployerOfWorkSubmission(stores.notifications, {
+        contractAddress: result.submission.contractAddress,
+        parties,
+        submission: result.submission,
+      });
+    } catch (notifyErr) {
+      console.error("[notifications] work submission emit failed", {
+        submissionId: result.submission.id,
+        contractAddress: result.submission.contractAddress,
+        transactionSignature: result.submission.transactionSignature,
+        error: notifyErr instanceof Error ? notifyErr.message : "unknown",
+      });
+    }
     return NextResponse.json(result, { status: result.created ? 201 : 200 });
   } catch (err) {
     return handleRouteError(validationError(err));

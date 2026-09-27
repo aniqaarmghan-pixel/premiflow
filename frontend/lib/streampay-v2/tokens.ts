@@ -1,9 +1,10 @@
 import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
+  createAssociatedTokenAccountIdempotentInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, type TransactionInstruction } from "@solana/web3.js";
 
 import { STREAMPAY_PROGRAM_ID } from "./constants";
 import { deriveContractEscrowPda } from "./pda";
@@ -45,6 +46,29 @@ export function deriveFreelancerDestinationAta(
   mint: PublicKey
 ): PublicKey {
   return deriveAta(freelancer, mint, false);
+}
+
+/**
+ * Idempotent ATA create for the default freelancer withdraw destination.
+ * Returns null when withdraw targets a caller-supplied non-ATA account.
+ * Same instruction is used whether the ATA already exists or not.
+ */
+export function freelancerWithdrawAtaCreateInstruction(input: {
+  payer: PublicKey;
+  freelancer: PublicKey;
+  mint: PublicKey;
+  destination: PublicKey;
+}): TransactionInstruction | null {
+  const ata = deriveFreelancerDestinationAta(input.freelancer, input.mint);
+  if (!ata.equals(input.destination)) return null;
+  return createAssociatedTokenAccountIdempotentInstruction(
+    input.payer,
+    ata,
+    input.freelancer,
+    input.mint,
+    TOKEN_PROGRAM_ID,
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  );
 }
 
 export function deriveEmployerRefundAta(

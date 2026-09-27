@@ -11,6 +11,7 @@ test-ledger
 .env
 .env.*
 !.env.example
+.local/
 
 # Next.js
 .next/
