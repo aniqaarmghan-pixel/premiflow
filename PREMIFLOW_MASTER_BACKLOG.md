@@ -30,14 +30,14 @@ AI principle (binding): "PREMIFLOW AI may explain, organize and summarize. It mu
 
 - MANUAL E2E REQUIRED - `frontend/scripts/n51-runtime-e2e.ts` browser TODO: automated browser run not wired; execute manually.
 - MANUAL E2E REQUIRED - Full per-mode matrix: Fixed / Milestone / Streaming / Hourly x (create, accept, fund, work/submit, approve/revise, collect, end/cancel, dispute, statements, resolve, collect settlement, claim refund).
-- MANUAL E2E REQUIRED - Known results: Hourly normal lifecycle PASSED on Devnet (escrow drained to 0). Streaming dispute IN PROGRESS on live contract 92za...LyTW with resolver BiSD...nKaF (do not approve resolve without user).
-- MANUAL E2E REQUIRED - Resolver Workspace with a real resolver wallet (switching, metrics, readiness, Review dispute deep link).
+- DONE - Known Devnet results: Hourly normal lifecycle PASSED (escrow drained to 0). Streaming dispute lifecycle PASSED on contract 92za...LyTW with resolver BiSD...nKaF: dispute opened, resolver settlement recorded on-chain, freelancer collected the remaining settlement, and employer claimed the remaining refund.
+- DONE - Resolver Workspace manually tested with the real resolver wallet. Resolver discovery/filtering bug found and fixed: merely being designated resolver no longer creates a resolver case; only contracts that actually entered dispute are shown. Real UI count corrected from 15 false cases to 1 genuine resolved case.
 - MANUAL E2E REQUIRED - Outcome notifications (ended / settlement recorded) visible in bell for correct recipients.
 - MANUAL E2E REQUIRED - Rust earned-pay fix after a sanctioned redeploy.
 
 ## IN PROGRESS
 
-- IN PROGRESS - Live Streaming dispute on 92za...LyTW (user-driven; resolver decision pending).
+- DONE - Live Streaming dispute on 92za...LyTW completed on Devnet: ResolveDispute succeeded, freelancer settlement was collected, employer refund was claimed, and the case appears as Resolved in the resolver workspace.
 
 ## P0 SECURITY / PROTOCOL
 
@@ -96,3 +96,42 @@ AI principle (binding): "PREMIFLOW AI may explain, organize and summarize. It mu
 - FUTURE - Security review of session/auth (SIWS), CSRF/origin checks, abuse limits on notification/outcome routes.
 - FUTURE - Legal/terms, fee disclosures, token list (mainnet USDC mint), accessibility audit.
 - FUTURE - Realtime/push/email delivery for notifications.
+
+## ACCOUNT, IDENTITY & MARKETPLACE ROADMAP
+
+### P1 - Account & Identity Foundation
+
+- PLANNED - Email sign-up and sign-in for PREMIFLOW users.
+- PLANNED - Secure authenticated sessions and sign-out.
+- PLANNED - Persistent PREMIFLOW user profile independent of wallet connection.
+- PLANNED - Link one or more Solana wallets to a PREMIFLOW account with wallet-signature ownership verification.
+- PLANNED - Wallet connection remains mandatory for on-chain actions. Email authentication must never authorize, sign, resolve, collect, refund, fund, or otherwise move escrow funds.
+- PLANNED - Account/profile settings and basic account recovery flow.
+- PLANNED - Role is flexible rather than permanent: the same PREMIFLOW account may hire as an employer, work as a freelancer, or hold other authorized roles where appropriate.
+
+### P1 - Marketplace MVP
+
+- PLANNED - Freelancer/talent profiles: display name, headline, bio, skills, portfolio/work samples, availability and relevant work history.
+- PLANNED - Employer/company profiles.
+- PLANNED - Employers can create and manage job posts.
+- PLANNED - Users can browse/search/filter open jobs.
+- PLANNED - Freelancers can submit proposals/applications.
+- PLANNED - Employers can review, accept or decline proposals.
+- PLANNED - Accepting a proposal should lead into the existing PREMIFLOW contract flow with appropriate employer, freelancer and job information prefilled; the on-chain contract remains authoritative for escrow/payment state.
+- PLANNED - Marketplace dashboards for posted jobs, proposals sent/received, hires and active work.
+- PLANNED - Marketplace notifications for relevant job/proposal/hiring events.
+- PLANNED - Reputation/reviews only after the underlying contract relationship can be verified; design anti-abuse rules before implementation.
+
+### FUTURE - Marketplace Expansion
+
+- FUTURE - Advanced talent/job search and discovery.
+- FUTURE - Public portfolio and verified PREMIFLOW contract history controls.
+- FUTURE - Reputation/ratings expansion and anti-manipulation controls.
+- FUTURE - Resolver marketplace / resolver discovery, with security and conflict-of-interest requirements.
+- FUTURE - Marketplace/service fees only after explicit economic and legal design.
+
+### Product Identity Boundary
+
+PREMIFLOW account identity and Solana wallet authority are separate layers.
+
+Email/session authentication may authorize access to off-chain PREMIFLOW data such as profiles, job posts, proposals, messages and preferences. It must never substitute for the wallet signature required by the Solana program for an on-chain action. Existing program authorization remains authoritative for contract funds and dispute settlement.
