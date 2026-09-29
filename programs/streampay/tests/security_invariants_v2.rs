@@ -1211,7 +1211,8 @@ fn terminal_freeze_matrix() {
     assert_rejected(env.approve_work(3, 0), E_INVALID_STATE, "disputed approve");
     assert_rejected(env.cancel(3), E_CONTRACT_TERMINAL, "disputed cancel");
     assert_rejected(env.complete(3), E_CONTRACT_TERMINAL, "disputed complete");
-    assert_rejected(env.withdraw(3), E_CONTRACT_TERMINAL, "disputed withdraw");
+    // Disputed pays only already-released pay; nothing is released here.
+    assert_rejected(env.withdraw(3), E_NOTHING_TO_WITHDRAW, "disputed withdraw");
     env.resolve(3, 0).unwrap();
     assert_rejected(env.complete(3), E_CONTRACT_TERMINAL, "resolved complete");
     assert_rejected(env.open_dispute(3), E_CONTRACT_TERMINAL, "resolved dispute");

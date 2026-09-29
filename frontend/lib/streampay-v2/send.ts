@@ -283,15 +283,20 @@ function logDevWalletHandoff(
   });
 }
 
-function shouldRefuseExpiredSend(
+/**
+ * Refuse to broadcast a signed transaction whose blockhash is dead or nearly dead.
+ * Block-height arithmetic (lastValidBlockHeight - current height) is authoritative
+ * when known: a lone isBlockhashValid=false from a lagging, load-balanced RPC node
+ * must not discard a signature with plenty of validity left (preflight still
+ * rejects a truly dead blockhash, with nothing charged). Only when the height is
+ * unknown does the validity check decide.
+ */
+export function shouldRefuseExpiredSend(
   isValid: boolean | null,
   remaining: number | null
 ): boolean {
-  if (isValid === false) return true;
-  if (remaining != null && remaining <= BLOCKHASH_NEAR_EXPIRY_REMAINING) {
-    return true;
-  }
-  return false;
+  if (remaining != null) return remaining <= BLOCKHASH_NEAR_EXPIRY_REMAINING;
+  return isValid === false;
 }
 
 /**

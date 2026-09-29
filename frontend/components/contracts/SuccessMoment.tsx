@@ -31,7 +31,7 @@ export function SuccessMoment({
             initial={{ scale: 0.96, y: 12, opacity: 0 }}
             animate={{ scale: 1, y: 0, opacity: 1 }}
             exit={{ opacity: 0, y: 8 }}
-            className="relative w-full max-w-md rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,#07111f,#0c1b2e)] p-6 text-center text-white shadow-[var(--shadow)]"
+            className="relative w-full max-w-md rounded-[28px] border border-white/10 bg-[linear-gradient(180deg,#07111f,#0c1b2e)] p-5 text-center text-white shadow-[var(--shadow)] sm:p-6"
           >
             <motion.div
               initial={{ scale: 0.72, opacity: 0 }}
@@ -55,7 +55,7 @@ export function SuccessMoment({
                 />
               </motion.svg>
             </motion.div>
-            <h2 className="mt-4 font-display text-3xl">{title}</h2>
+            <h2 className="mt-4 font-display text-2xl">{title}</h2>
             <p className="mt-2 text-sm text-white/65">{body}</p>
             <div className="mt-4">
               <PaymentFlow compact />

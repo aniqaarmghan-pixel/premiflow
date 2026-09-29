@@ -14,6 +14,11 @@ import {
   STREAMING_RELEASE_HINT,
   STREAMING_RELEASE_LABEL,
   STREAMING_ZERO_AVAILABLE_HINT,
+  STREAMING_CLOCK_NOT_RUNNING,
+  STREAMING_FROZEN_CLOCK_LABELS,
+  streamingEarnedLabel,
+  streamingFrozenNote,
+  streamingTrialIncludedNote,
 } from "@/lib/app/stream-display";
 import { streamingDashboard } from "@/lib/app/view-model";
 import {
@@ -54,6 +59,8 @@ export function StreamShowcase({
 
   const clockNow = live ? Math.floor(nowMs / 1000) : now;
   const dash = streamingDashboard(contract, clockNow);
+  // Non-Active streams show frozen on-chain figures; no ticker runs (see `live`).
+  const frozen = dash.earnedBasis !== "estimate";
   const durationMs = Math.max(1, dash.durationSeconds * 1000);
   const elapsedMs = dash.elapsedSeconds * 1000;
   const pct = contract.startTime === 0 ? 0 : (elapsedMs / durationMs) * 100;
@@ -66,7 +73,7 @@ export function StreamShowcase({
 
   return (
     <div
-      className={`overflow-hidden rounded-[28px] border border-white/10 bg-[linear-gradient(160deg,#06101c,#0d2238_55%,#10263a)] p-5 text-white shadow-[var(--shadow)] sm:p-6 ${
+      className={`@container overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(160deg,#06101c,#0d2238_55%,#10263a)] p-4 text-white shadow-[var(--shadow)] sm:p-5 ${
         live ? "pf-stream-live" : ""
       }`}
     >
@@ -75,7 +82,7 @@ export function StreamShowcase({
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan">
             Streaming salary
           </p>
-          <h3 className="mt-1 font-display text-3xl">Ongoing pay</h3>
+          <h3 className="mt-1 font-display text-2xl">Ongoing pay</h3>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
             {STREAMING_PAY_EXPLAINER}
           </p>
@@ -88,17 +95,32 @@ export function StreamShowcase({
           {live ? "Accruing" : contract.status}
         </span>
       </div>
-      <div className="mt-5 rounded-3xl border border-white/10 bg-white/5">
+      <div className="mt-4 rounded-3xl border border-white/10 bg-white/5">
         <HeroFlow />
       </div>
-      <p className="mt-4 font-display text-5xl tracking-tight tabular-nums pf-live-amount sm:text-6xl">
-        {amount(dash.earnedSoFar)}
+      <p
+        className={`mt-3 break-words font-display text-4xl tracking-tight tabular-nums sm:text-5xl ${
+          live ? "pf-live-amount" : ""
+        }`}
+      >
+        {amount(dash.displayEarned)}
       </p>
       <p className="text-sm text-white/55">
-        {STREAMING_DASHBOARD_LABELS.earnedSoFar} · display estimate matching the
-        on-chain floor formula — not withdrawable until released
+        {frozen ? (
+          streamingFrozenNote(dash.earnedBasis)
+        ) : (
+          <>
+            {STREAMING_DASHBOARD_LABELS.earnedSoFar} · display estimate matching the
+            on-chain floor formula — not withdrawable until released
+          </>
+        )}
       </p>
-      <div className="relative mt-6 h-3 overflow-hidden rounded-full bg-white/10">
+      {dash.trialPaid > 0n ? (
+        <p className="mt-1 text-xs text-white/55">
+          {streamingTrialIncludedNote(amount(dash.trialPaid))}
+        </p>
+      ) : null}
+      <div className="relative mt-4 h-2.5 overflow-hidden rounded-full bg-white/10">
         <motion.div
           className="h-full rounded-full bg-[linear-gradient(90deg,#2ee6d6,#4f8cff,#8b7bff)]"
           animate={{ width: `${pct}%` }}
@@ -106,7 +128,7 @@ export function StreamShowcase({
         />
       </div>
 
-      <section className="mt-5" aria-labelledby="streaming-salary-heading">
+      <section className="mt-4" aria-labelledby="streaming-salary-heading">
         <h4
           id="streaming-salary-heading"
           className="text-sm font-semibold uppercase tracking-[0.14em] text-white/70"
@@ -118,8 +140,8 @@ export function StreamShowcase({
             Salary figures are contract accounting. Collect is a freelancer action.
           </p>
         ) : null}
-        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <Mini label={STREAMING_DASHBOARD_LABELS.earnedSoFar} value={amount(dash.earnedSoFar)} />
+        <div className="mt-2.5 grid gap-2.5 @sm:grid-cols-2 @xl:grid-cols-4">
+          <Mini label={streamingEarnedLabel(dash.earnedBasis)} value={amount(dash.displayEarned)} />
           <Mini label={STREAMING_DASHBOARD_LABELS.alreadyRecorded} value={amount(dash.alreadyRecorded)} />
           <Mini label={STREAMING_DASHBOARD_LABELS.alreadyCollected} value={amount(dash.alreadyCollected)} />
           <Mini
@@ -130,7 +152,7 @@ export function StreamShowcase({
         </div>
       </section>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-3 grid gap-2.5 @sm:grid-cols-2 @xl:grid-cols-3 @4xl:grid-cols-4">
         <Mini label={STREAMING_DASHBOARD_LABELS.totalFundedStream} value={amount(dash.totalFundedStream)} />
         <Mini
           label={STREAMING_DASHBOARD_LABELS.duration}
@@ -147,18 +169,22 @@ export function StreamShowcase({
         <Mini label={STREAMING_DASHBOARD_LABELS.startTime} value={formatUnix(dash.startTime)} />
         <Mini label={STREAMING_DASHBOARD_LABELS.endTime} value={formatUnix(dash.endTime)} />
         <Mini
-          label={STREAMING_DASHBOARD_LABELS.elapsed}
+          label={frozen ? STREAMING_FROZEN_CLOCK_LABELS.elapsed : STREAMING_DASHBOARD_LABELS.elapsed}
           value={formatDuration(dash.elapsedSeconds)}
         />
         <Mini
-          label={STREAMING_DASHBOARD_LABELS.remaining}
-          value={formatDuration(dash.remainingSeconds)}
+          label={frozen ? STREAMING_FROZEN_CLOCK_LABELS.remaining : STREAMING_DASHBOARD_LABELS.remaining}
+          value={
+            frozen && dash.frozenAt === 0
+              ? STREAMING_CLOCK_NOT_RUNNING
+              : formatDuration(dash.remainingSeconds)
+          }
         />
         <Mini label={STREAMING_DASHBOARD_LABELS.remainingEscrow} value={amount(dash.remainingEscrow)} />
       </div>
 
       {(canRelease && onRelease) || (canCollect && onCollect) ? (
-        <div className="mt-5 flex flex-col gap-3">
+        <div className="mt-4 flex flex-col gap-3">
           <div className="flex flex-wrap gap-2">
             {canRelease && onRelease ? (
               <Button onClick={onRelease} disabled={busy} aria-label={STREAMING_RELEASE_LABEL}>
@@ -203,12 +229,12 @@ function Mini({
 }) {
   return (
     <div
-      className={`rounded-2xl px-3 py-3 ${
+      className={`min-w-0 rounded-2xl px-3 py-2.5 ${
         emphasize ? "bg-cyan/10 ring-1 ring-cyan/30" : "bg-white/6"
       }`}
     >
       <p className="text-[11px] uppercase tracking-wide text-white/45">{label}</p>
-      <p className="mt-1 font-medium">{value}</p>
+      <p className="mt-0.5 break-words font-medium tabular-nums">{value}</p>
     </div>
   );
 }

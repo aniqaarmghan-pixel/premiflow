@@ -39,8 +39,8 @@ const MODEL_ORDER: PaymentModeName[] = ["Fixed", "Milestone", "Streaming", "Hour
 export function AboutPage() {
   return (
     <PageFade>
-      <article className="min-w-0 space-y-8">
-        <header className="relative rounded-[32px] border border-line bg-card px-5 py-8 sm:px-8 sm:py-10">
+      <article className="min-w-0 space-y-6">
+        <header className="relative rounded-[32px] border border-line bg-card px-5 py-6 sm:px-7 sm:py-8">
           <div
             className="pointer-events-none absolute inset-0 overflow-hidden rounded-[32px]"
             aria-hidden="true"
@@ -50,10 +50,10 @@ export function AboutPage() {
           <p className="relative text-xs font-semibold uppercase tracking-[0.16em] text-cyan">
             {ABOUT_HERO.eyebrow}
           </p>
-          <h1 className="relative mt-3 max-w-3xl break-words font-display text-3xl tracking-tight sm:text-4xl lg:text-5xl">
+          <h1 className="relative mt-3 max-w-3xl break-words font-display text-2xl tracking-tight sm:text-3xl lg:text-4xl">
             {ABOUT_HERO.heading}
           </h1>
-          <p className="relative mt-4 max-w-2xl font-display text-xl leading-8 text-ink sm:text-2xl">
+          <p className="relative mt-3 max-w-2xl font-display text-lg leading-7 text-ink sm:text-xl">
             {ABOUT_HERO.idea}
           </p>
           <p className="relative mt-4 max-w-2xl text-sm leading-7 text-ink-soft sm:text-base">

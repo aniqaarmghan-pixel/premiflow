@@ -35,9 +35,14 @@ export type { StreamPayV2Program, StreamPayV2Idl } from "./program";
 
 export {
   fetchContract,
+  fetchContractIfExists,
+  fetchIndexedWorkUnits,
+  fetchHourlyStateIfExists,
   fetchWorkUnit,
   fetchContractsForEmployer,
   fetchContractsForFreelancer,
+  fetchContractsForResolver,
+  CONTRACT_RESOLVER_OFFSET,
   fetchWorkUnitsForContract,
   fetchWalletContractSets,
   fetchHourlyState,

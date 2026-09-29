@@ -51,7 +51,7 @@ export function TransactionStatus({ state }: { state: TxState }) {
       ) : null}
       {state.signature ? (
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <Address value={state.signature} label="Signature" />
+          <Address value={state.signature} label="Signature" href={explorerTxUrl(state.signature)} />
           <a
             className="text-xs text-accent underline"
             href={explorerTxUrl(state.signature)}

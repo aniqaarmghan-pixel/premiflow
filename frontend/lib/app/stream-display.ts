@@ -19,9 +19,9 @@ export function estimateStreamAccrualDisplayMs(
 }
 
 export const STREAMING_PAY_EXPLAINER =
-  "Streaming pay accrues automatically with time while the contract is Active. Accrued value is a display estimate. Release accrued pay records newly accrued value as available for collection — it does not transfer tokens. Collect moves already released tokens from escrow to the freelancer wallet and does not end the stream.";
+  "Streaming pay accrues automatically with time while the contract is Active. Accrued value is a display estimate. Update earnings records newly accrued value as available for collection — it does not transfer tokens. Collect moves already released tokens from escrow to the freelancer wallet and does not end the stream.";
 
-export const STREAMING_RELEASE_LABEL = "Release accrued pay";
+export const STREAMING_RELEASE_LABEL = "Update earnings";
 export const STREAMING_RELEASE_HINT =
   "This records newly accrued streaming pay as available for collection. It does not transfer tokens.";
 export const STREAMING_COLLECT_HINT =
@@ -65,3 +65,45 @@ export const STREAMING_DASHBOARD_LABELS = {
   availableToCollect: "Available to collect",
   remainingEscrow: "Remaining escrow",
 } as const;
+
+/**
+ * How the Streaming "earned" figure is derived. Only `estimate` (Active) uses the
+ * live clock; every other status shows a frozen on-chain amount.
+ */
+export type StreamingEarnedBasis = "estimate" | "settled" | "disputed" | "frozen";
+
+export const STREAMING_FROZEN_EARNED_LABELS = {
+  settled: "Final earned (settled on-chain)",
+  disputed: "Earned at dispute (released on-chain)",
+  frozen: "Earned so far (not accruing)",
+} as const;
+
+export const STREAMING_FROZEN_NOTES = {
+  settled:
+    "Final on-chain freelancer settlement (includes any paid trial). The stream stopped when the contract ended and no longer accrues.",
+  disputed:
+    "Frozen at the amount released on-chain when the dispute opened. No further streaming pay accrues while Disputed.",
+  frozen: "Streaming pay is not accruing in this status.",
+} as const;
+
+export const STREAMING_FROZEN_CLOCK_LABELS = {
+  elapsed: "Time elapsed (stopped)",
+  remaining: "Time left when stopped",
+} as const;
+
+export const STREAMING_CLOCK_NOT_RUNNING = "Not running";
+
+export function streamingEarnedLabel(basis: StreamingEarnedBasis): string {
+  return basis === "estimate"
+    ? STREAMING_DASHBOARD_LABELS.earnedSoFar
+    : STREAMING_FROZEN_EARNED_LABELS[basis];
+}
+
+export function streamingFrozenNote(basis: StreamingEarnedBasis): string | null {
+  return basis === "estimate" ? null : STREAMING_FROZEN_NOTES[basis];
+}
+
+/** Streaming with a paid trial: the earned figure includes trial pay already released. */
+export function streamingTrialIncludedNote(trialText: string): string {
+  return `Includes trial pay of ${trialText} already released.`;
+}

@@ -1,5 +1,12 @@
 import { formatUnix } from "@/lib/app/datetime";
+import {
+  SUBMITTED_WORK_LINK_LABEL,
+  TRIAL_WORK_LINK_LABEL,
+  UPLOADED_FILE_LABEL,
+  submittedWorkDisplay,
+} from "@/lib/app/work-delivery";
 import { presentResolver } from "@/lib/app/dispute-ux";
+import { streamingDashboard } from "@/lib/app/view-model";
 import {
   HOURLY_COPY,
   displayHourlyWorkLog,
@@ -8,7 +15,6 @@ import {
 } from "@/lib/app/hourly-ux";
 import { remainingAuthorizedSeconds } from "@/lib/streampay-v2/hourly";
 import {
-  estimatedStreamAccrualForContract,
   paymentModeLabel,
   projectedContestedRemainder,
   workUnitStatusLabel,
@@ -246,7 +252,11 @@ export type EvidenceFact = {
   label: string;
   value: string;
   source: "account";
+  /** Set only for a real https work link. Upload placeholders are never linked. */
+  href?: string;
 };
+
+export const WORK_LOG_FACT_LABEL = "Work log link or note";
 
 export type ResolutionContext = {
   paymentMode: ContractType | "Hourly";
@@ -352,6 +362,13 @@ function accountFact(label: string, value: string): EvidenceFact {
   return { label, value, source: "account" };
 }
 
+function workLinkFact(label: string, raw: string): EvidenceFact {
+  const display = submittedWorkDisplay(raw);
+  if (display.kind === "attachment") return accountFact(label, UPLOADED_FILE_LABEL);
+  if (display.kind === "link") return { ...accountFact(label, display.text), href: display.href };
+  return accountFact(label, display.text);
+}
+
 function contextNotes(contract: ContractView, hourly?: HourlyResolutionInput): string[] {
   const notes: string[] = [];
   if (contract.paymentMode === "Hourly") {
@@ -410,7 +427,7 @@ function typeFacts(
         facts.push(accountFact("Action deadline", formatUnix(deliverable.actionDeadline)));
       }
       if (deliverable.submissionUri) {
-        facts.push(accountFact("Submission reference", deliverable.submissionUri));
+        facts.push(workLinkFact(SUBMITTED_WORK_LINK_LABEL, deliverable.submissionUri));
       }
     }
   }
@@ -452,7 +469,7 @@ function typeFacts(
     }
     const workLog = displayHourlyWorkLog(hourly.hourlySession?.workLogUri);
     if (workLog) {
-      facts.push(accountFact("Work log reference", workLog));
+      facts.push(accountFact(WORK_LOG_FACT_LABEL, workLog));
     }
   }
 
@@ -465,7 +482,7 @@ function typeFacts(
       facts.push(
         accountFact(
           "Display earned so far",
-          formatAmount(estimatedStreamAccrualForContract(contract, now))
+          formatAmount(streamingDashboard(contract, now).earnedSoFar)
         )
       );
     }
@@ -487,7 +504,7 @@ function trialFacts(
   if (trial) {
     facts.push(accountFact("Trial status", workUnitStatusLabel(trial.status)));
     if (trial.submissionUri) {
-      facts.push(accountFact("Trial submission", trial.submissionUri));
+      facts.push(workLinkFact(TRIAL_WORK_LINK_LABEL, trial.submissionUri));
     }
   }
   return facts;

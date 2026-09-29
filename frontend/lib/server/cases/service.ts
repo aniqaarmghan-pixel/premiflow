@@ -111,7 +111,7 @@ export type PublicResolutionCase = {
   updatedAt: string;
   employerStatement: PublicPartyStatement | null;
   freelancerStatement: PublicPartyStatement | null;
-  viewerRole: PartyStatementRole;
+  viewerRole: PartyStatementRole | "resolver";
   payoutState: ChainPayoutState;
 };
 
@@ -204,7 +204,7 @@ function presentCase(
   row: ResolutionCaseRecord,
   facts: ContractCaseFacts,
   statements: PartyStatementRecord[],
-  viewerRole: PartyStatementRole
+  viewerRole: PartyStatementRole | "resolver"
 ): PublicResolutionCase {
   const payoutState = payoutStateFromChain(facts);
   const derivedWorkflow = workflowFromStatements(statements);
@@ -437,11 +437,16 @@ export async function getResolutionCase(
   store: CaseStore,
   reader: ContractFactsReader,
   input: { contractAddress: string; sessionWallet: string },
-  now = new Date()
+  now = new Date(),
+  options: { allowResolver?: boolean } = {}
 ): Promise<PublicResolutionCase> {
   const contractAddress = parseContractAddress(input.contractAddress);
   const facts = await reader.read(contractAddress);
-  const viewerRole = requireParty(input.sessionWallet, facts);
+  // Read-only access for the on-chain resolver when the route allows it.
+  const viewerRole: PartyStatementRole | "resolver" =
+    options.allowResolver && casePartyRoleFromChain(input.sessionWallet, facts) === "resolver"
+      ? "resolver"
+      : requireParty(input.sessionWallet, facts);
   const existing = await store.getCaseByContract(contractAddress);
   if (!existing) {
     throw new CaseStateError("case_not_found", "Resolution Case was not found.");
@@ -449,7 +454,8 @@ export async function getResolutionCase(
   const patch = safeChainPatch(existing, facts, now);
   const keys = Object.keys(patch).filter((key) => key !== "updatedAt");
   let saved = existing;
-  if (keys.length > 0) {
+  // A resolver read never writes; chain facts are presented directly.
+  if (keys.length > 0 && viewerRole !== "resolver") {
     saved = (await store.updateCase(existing.id, patch)) ?? existing;
     await recordEvent(store, {
       caseId: existing.id,

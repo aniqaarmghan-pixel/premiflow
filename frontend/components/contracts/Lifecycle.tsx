@@ -20,7 +20,8 @@ function stageCaption(state: LifecycleStage["state"]): string {
 export function Lifecycle({ contract }: { contract: ContractView }) {
   const stages = lifecycleStages(contract);
   return (
-    <ol className="grid gap-3 sm:grid-cols-4 lg:grid-cols-7">
+    <div className="@container">
+    <ol className="grid grid-cols-2 gap-x-3 gap-y-2.5 @md:grid-cols-4 @3xl:grid-cols-7">
       {stages.map((stage, i) => (
         <li key={stage.id} className="min-w-0">
           <div className="flex items-center gap-2">
@@ -32,5 +33,6 @@ export function Lifecycle({ contract }: { contract: ContractView }) {
         </li>
       ))}
     </ol>
+    </div>
   );
 }

@@ -942,6 +942,54 @@ fn employer_cannot_erase_three_hours_by_disputing_before_stop() {
 }
 
 #[test]
+fn disputed_hourly_recorded_time_is_withdrawable_contested_frozen() {
+    const E_CONTRACT_TERMINAL: u32 = 6113;
+    const E_NOTHING_TO_WITHDRAW: u32 = 6139;
+    let (mut env, contract) = offer_active(1, 14_400, 200_000);
+    // Prior partial withdrawal of a stopped 1h session.
+    env.start(1).expect("start");
+    env.warp(env.now() + 3_600);
+    env.stop(1).expect("stop");
+    env.svm.expire_blockhash();
+    env.withdraw(1).expect("withdraw before dispute");
+    let prior = env.read_contract(&contract).withdrawn_amount;
+    assert_eq!(prior, earned(3_600));
+    // A running 2h session is recorded when the dispute opens.
+    env.svm.expire_blockhash();
+    env.start(1).expect("second start");
+    env.warp(env.now() + 7_200);
+    env.open_dispute(1).expect("dispute running session");
+    let c = env.read_contract(&contract);
+    assert_eq!(c.status, ContractStatus::Disputed);
+    assert_eq!(env.read_hourly_state(&contract).approved_seconds, 10_800);
+    assert!(c.released_amount > prior);
+    assert_eq!(c.contested_amount, c.total_amount - c.released_amount);
+    env.svm.expire_blockhash();
+    assert_rejected(env.refund(1), E_CONTRACT_TERMINAL, "hourly refund while disputed");
+
+    let before = env.token_balance(&env.freelancer_token_account);
+    env.svm.expire_blockhash();
+    env.withdraw(1).expect("withdraw recorded time while disputed");
+    assert_eq!(
+        env.token_balance(&env.freelancer_token_account),
+        before + (c.released_amount - prior)
+    );
+    let after = env.read_contract(&contract);
+    assert_eq!(after.status, ContractStatus::Disputed);
+    assert_eq!(after.withdrawn_amount, after.released_amount);
+    assert_eq!(after.released_amount, c.released_amount);
+    assert_eq!(after.contested_amount, c.contested_amount);
+    assert_eq!(
+        env.token_balance(&env.escrow_pda(&contract)),
+        after.contested_amount
+    );
+    env.svm.expire_blockhash();
+    assert_rejected(env.withdraw(1), E_NOTHING_TO_WITHDRAW, "hourly second withdraw");
+    env.svm.expire_blockhash();
+    assert_rejected(env.refund(1), E_CONTRACT_TERMINAL, "hourly refund after withdraw");
+}
+
+#[test]
 fn dispute_materializes_at_most_eight_hours() {
     let (mut env, contract) = offer_active(1, 100_000, 200_000);
     env.start(1).expect("start");

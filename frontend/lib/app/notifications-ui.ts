@@ -1,5 +1,7 @@
 import type { PublicNotification } from "@/lib/server/notifications/pagination";
 import type { NotificationKind } from "@/lib/server/notifications/kinds";
+import { sessionMatchesConnectedWallet } from "@/lib/app/messages-panel";
+import type { SignMessageFn } from "@/lib/app/messaging-session";
 
 /**
  * Visible-tab unread badge poll interval (N5.1 intelligent polling).
@@ -11,8 +13,18 @@ export const NOTIFICATIONS_PAGE_LIMIT = 20;
 
 export const NOTIFICATIONS_EMPTY_COPY = "No notifications yet";
 
+/** Connected wallet, but no PREMIFLOW session for THAT wallet. */
 export const NOTIFICATIONS_SESSION_COPY =
-  "Verify your wallet to see notifications.";
+  "Your wallet is connected. Verify it with PREMIFLOW to view notifications.";
+export const NOTIFICATIONS_VERIFY_DETAIL = "Verification signs a message \u2014 not a transaction.";
+export const NOTIFICATIONS_VERIFY_BUTTON = "Verify wallet";
+export const NOTIFICATIONS_VERIFY_PENDING = "Waiting for wallet signature\u2026";
+export const NOTIFICATIONS_VERIFY_CANNOT_SIGN =
+  "This wallet can't sign messages, so it can't be verified here. Connect a wallet that supports message signing to view notifications.";
+export const NOTIFICATIONS_VERIFY_FAILED =
+  "Wallet verification did not complete. You can try again.";
+export const NOTIFICATIONS_VERIFY_MISMATCH =
+  "The verified session belongs to a different wallet. Verify again with the connected wallet.";
 
 export type NotificationListItem = PublicNotification;
 
@@ -279,4 +291,95 @@ export function ariaLabelForBell(badge: string | null): string {
   const n = Number(badge);
   if (n === 1) return "Notifications, 1 unread";
   return `Notifications, ${badge} unread`;
+}
+
+export type NotificationsAccess = "connect" | "verify" | "verified";
+
+/**
+ * Bell access state. A session only counts when it belongs to the CONNECTED
+ * wallet (a session for wallet A is never used for wallet B).
+ */
+export function notificationsAccess(input: {
+  connectedWallet: string | null;
+  sessionWallet: string | null;
+  status: NotificationsUiStatus;
+}): NotificationsAccess {
+  if (!input.connectedWallet) return "connect";
+  if (input.status === "unauthenticated") return "verify";
+  if (!sessionMatchesConnectedWallet(input.sessionWallet, input.connectedWallet)) {
+    return "verify";
+  }
+  return "verified";
+}
+
+export type NotificationsVerifyState = "idle" | "pending" | "error";
+
+/** Verify UI state, scoped to the wallet that started it. */
+export type NotificationsVerifyStatus = {
+  wallet: string | null;
+  state: NotificationsVerifyState;
+  error: string | null;
+};
+
+export const NOTIFICATIONS_VERIFY_IDLE: NotificationsVerifyStatus = {
+  wallet: null,
+  state: "idle",
+  error: null,
+};
+
+/** A wallet switch shows a fresh idle state instead of another wallet's pending/error. */
+export function verifyStatusForWallet(
+  status: NotificationsVerifyStatus,
+  connectedWallet: string | null
+): NotificationsVerifyStatus {
+  return status.wallet && status.wallet === connectedWallet
+    ? status
+    : NOTIFICATIONS_VERIFY_IDLE;
+}
+
+export type NotificationsVerifyOutcome =
+  | { ok: true; wallet: string; didSign: boolean }
+  | { ok: false; reason: "cannot_sign" | "mismatch" | "failed"; message: string };
+
+export type NotificationsVerifyDeps = {
+  /** The existing messaging-session flow (challenge, signMessage, /api/auth/verify). */
+  ensureSession: (input: {
+    wallet: string;
+    signMessage: SignMessageFn | undefined;
+  }) => Promise<{ session: { wallet: string }; didSign: boolean }>;
+  errorMessage: (err: unknown) => string;
+};
+
+/** Bell "Verify wallet": message signature only, no new auth protocol. */
+export async function verifyNotificationsWallet(
+  input: { wallet: string; signMessage: SignMessageFn | undefined },
+  deps: NotificationsVerifyDeps
+): Promise<NotificationsVerifyOutcome> {
+  if (!input.signMessage) {
+    return { ok: false, reason: "cannot_sign", message: NOTIFICATIONS_VERIFY_CANNOT_SIGN };
+  }
+  try {
+    const { session, didSign } = await deps.ensureSession({
+      wallet: input.wallet,
+      signMessage: input.signMessage,
+    });
+    if (!sessionMatchesConnectedWallet(session.wallet, input.wallet)) {
+      return { ok: false, reason: "mismatch", message: NOTIFICATIONS_VERIFY_MISMATCH };
+    }
+    return { ok: true, wallet: session.wallet, didSign };
+  } catch (err) {
+    return {
+      ok: false,
+      reason: "failed",
+      message: deps.errorMessage(err) || NOTIFICATIONS_VERIFY_FAILED,
+    };
+  }
+}
+
+/** Drop a verify result if the connected wallet changed while it was in flight. */
+export function shouldApplyNotificationsVerifyResult(input: {
+  requestWallet: string | null;
+  currentWallet: string | null;
+}): boolean {
+  return sessionMatchesConnectedWallet(input.requestWallet, input.currentWallet);
 }

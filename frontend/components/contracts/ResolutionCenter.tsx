@@ -21,13 +21,16 @@ import {
   RESOLVER_EXPLANATION,
   SUPPORT_VS_DISPUTE_COPY,
   type DisputeCategoryId,
+  type EvidenceFact,
   resolutionContext,
   resolutionLifecycleState,
 } from "@/lib/app/resolution-center";
 import {
   CASE_WORKSPACE_RECOVERY_FAILED,
   displayedCaseStatusLabel,
+  caseLoadModeForRole,
   shouldAttemptCaseRecover,
+  shouldLoadCaseAsResolver,
   type ResolutionCaseClientState,
   type ResolutionCaseView,
 } from "@/lib/app/resolution-case";
@@ -43,7 +46,7 @@ import { supportTopicHref } from "@/lib/app/support";
 import { Card } from "@/components/ui/Card";
 import { Address } from "@/components/ui/Address";
 import { Button } from "@/components/ui/Button";
-import { Field, Select, Textarea } from "@/components/ui/Field";
+import { Field, Input, Select, Textarea } from "@/components/ui/Field";
 import type {
   ContractRole,
   ContractView,
@@ -52,6 +55,16 @@ import type {
   WorkUnitView,
 } from "@/lib/streampay-v2";
 import { paymentModeLabel } from "@/lib/streampay-v2";
+import {
+  RESOLVER_UX_COPY,
+  allocationUi,
+  canEditPartyStatementForRole,
+  freelancerAwardFromEmployerInput,
+  parseFreelancerAllocation,
+  postResolutionSummary,
+  resolverSettlementSummary,
+  validateResolverSettlement,
+} from "@/lib/app/resolver-cases";
 
 export function ResolutionCenter({
   contract,
@@ -68,6 +81,10 @@ export function ResolutionCenter({
   hourlySession,
   recoverGeneration = 0,
   openSignature = null,
+  canSettle = false,
+  awardUi = "",
+  onAwardChange,
+  onReviewSettlement,
 }: {
   contract: ContractView;
   units: readonly WorkUnitView[];
@@ -83,6 +100,11 @@ export function ResolutionCenter({
   onDescriptionChange: (value: string) => void;
   recoverGeneration?: number;
   openSignature?: string | null;
+  /** True only for the on-chain resolver of a Disputed contract. */
+  canSettle?: boolean;
+  awardUi?: string;
+  onAwardChange?: (value: string) => void;
+  onReviewSettlement?: () => void;
 }) {
   const resolver = presentResolver(contract.resolver);
   const context = resolutionContext(
@@ -104,13 +126,19 @@ export function ResolutionCenter({
   const [notesBusy, setNotesBusy] = useState(false);
   const [statementBusy, setStatementBusy] = useState(false);
   const [verifyBusy, setVerifyBusy] = useState(false);
+  const [employerDraft, setEmployerDraft] = useState<string | null>(null);
 
   const loadCase = useCallback(
-    async (mode: "get" | "recover") => {
-      if (!shouldAttemptCaseRecover(contract.status, role)) {
+    async (requestedMode: "get" | "recover") => {
+      if (
+        !shouldAttemptCaseRecover(contract.status, role) &&
+        !shouldLoadCaseAsResolver(contract.status, role)
+      ) {
         setCaseState("idle");
         return;
       }
+      // The resolver may only read the case; creation and recovery stay party-only.
+      const mode = caseLoadModeForRole(role, requestedMode);
       setCaseState("loading");
       try {
         const result =
@@ -145,6 +173,10 @@ export function ResolutionCenter({
           return;
         }
         if (api.code === "case_not_found" && mode === "get") {
+          if (role === "resolver") {
+            setCaseState("not_created");
+            return;
+          }
           await loadCase("recover");
           return;
         }
@@ -170,7 +202,12 @@ export function ResolutionCenter({
   );
 
   useEffect(() => {
-    if (!shouldAttemptCaseRecover(contract.status, role)) return;
+    if (
+      !shouldAttemptCaseRecover(contract.status, role) &&
+      !shouldLoadCaseAsResolver(contract.status, role)
+    ) {
+      return;
+    }
     void loadCase(recoverGeneration > 0 ? "recover" : "get");
     // recoverGeneration is the intentional refresh trigger after a confirmed dispute.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -231,22 +268,59 @@ export function ResolutionCenter({
       : caseRecord && role === "freelancer"
         ? caseRecord.freelancerStatement
         : null;
-  const canEditStatement = role === "employer" || role === "freelancer";
+  const canEditStatement = canEditPartyStatementForRole(role);
+  const resolverView = role === "resolver";
+  const shouldLoadCase =
+    shouldAttemptCaseRecover(contract.status, role) ||
+    shouldLoadCaseAsResolver(contract.status, role);
+  const allocation = parseFreelancerAllocation(awardUi, decimals, contract);
+  const settlementCheck =
+    allocation.award != null ? validateResolverSettlement(contract, allocation.award) : null;
+  const employerError =
+    employerDraft != null
+      ? freelancerAwardFromEmployerInput(employerDraft, decimals, contract.contestedAmount).error
+      : undefined;
+  const employerValue =
+    employerDraft != null
+      ? employerDraft
+      : allocation.award != null && decimals != null
+        ? allocationUi(contract.contestedAmount - allocation.award, decimals)
+        : "";
+  const postResolution = postResolutionSummary(contract);
+
+  function onFreelancerAllocationChange(value: string) {
+    setEmployerDraft(null);
+    onAwardChange?.(value);
+  }
+
+  function onEmployerAllocationChange(value: string) {
+    setEmployerDraft(value);
+    const next = freelancerAwardFromEmployerInput(value, decimals, contract.contestedAmount);
+    if (next.award != null && decimals != null) onAwardChange?.(allocationUi(next.award, decimals));
+  }
+
+  function setAllocation(award: bigint) {
+    if (decimals == null) return;
+    setEmployerDraft(null);
+    onAwardChange?.(allocationUi(award, decimals));
+  }
 
   return (
     <div className="space-y-4">
       <Card
         className={
           disputed
-            ? "border-danger/40 bg-[linear-gradient(180deg,rgba(232,93,117,0.10),transparent)] p-5"
-            : "p-5"
+            ? "border-danger/40 bg-[linear-gradient(180deg,rgba(232,93,117,0.10),transparent)] p-4 sm:p-5"
+            : "p-4 sm:p-5"
         }
       >
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-danger">
           {RESOLUTION_CENTER_TITLE}
         </p>
-        <h2 className="mt-1 font-display text-2xl">
-          {disputed
+        <h2 className="mt-1 font-display text-xl">
+          {disputed && resolverView
+            ? RESOLVER_UX_COPY.assignedHeading
+            : disputed
             ? RESOLUTION_CENTER_COPY.heading
             : resolved
               ? RESOLUTION_CENTER_COPY.resolvedHeading
@@ -254,6 +328,11 @@ export function ResolutionCenter({
         </h2>
         {disputed ? (
           <>
+            {resolverView ? (
+              <p className="mt-2 text-sm font-medium leading-6 text-ink">
+                {RESOLVER_UX_COPY.assignedBody}
+              </p>
+            ) : null}
             <p className="mt-2 text-sm leading-6 text-ink-soft">{RESOLUTION_CENTER_COPY.frozen}</p>
             <p className="mt-2 text-sm leading-6 text-ink-soft">
               {RESOLUTION_CENTER_COPY.resolverReviews}
@@ -287,7 +366,7 @@ export function ResolutionCenter({
           </>
         )}
 
-        <ol className="mt-4 grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        <ol className="mt-3 grid gap-2 sm:grid-cols-3 lg:grid-cols-6 xl:grid-cols-3 2xl:grid-cols-6">
           {lifecycle.map((step) => (
             <li key={step.id} className="rounded-2xl bg-paper px-3 py-2">
               <p className="text-[11px] uppercase tracking-wide text-ink-faint">{step.state}</p>
@@ -297,9 +376,129 @@ export function ResolutionCenter({
         </ol>
       </Card>
 
+      {resolverView && (disputed || resolved) ? (
+        <Card className="p-4 sm:p-5">
+          <h3 className="font-display text-lg">{RESOLVER_UX_COPY.accountingHeading}</h3>
+          <dl className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="min-w-0 rounded-2xl bg-paper px-3 py-2">
+              <dt className="text-xs uppercase tracking-wide text-ink-faint">Employer</dt>
+              <dd className="mt-1">
+                <Address value={contract.employer.toBase58()} />
+              </dd>
+            </div>
+            <div className="min-w-0 rounded-2xl bg-paper px-3 py-2">
+              <dt className="text-xs uppercase tracking-wide text-ink-faint">Freelancer</dt>
+              <dd className="mt-1">
+                <Address value={contract.freelancer.toBase58()} />
+              </dd>
+            </div>
+            <Row label="Contract type" value={paymentModeLabel(contract.paymentMode)} />
+            <Row label="Dispute initiator" value={contract.disputeInitiator} />
+            <Row label="Total" value={formatTokenAmount(contract.totalAmount, decimals)} />
+            <Row label="Released" value={formatTokenAmount(contract.releasedAmount, decimals)} />
+            <Row label="Withdrawn" value={formatTokenAmount(contract.withdrawnAmount, decimals)} />
+            <Row label="Refunded" value={formatTokenAmount(contract.refundedAmount, decimals)} />
+            <Row
+              label="Under dispute"
+              value={formatTokenAmount(contract.contestedAmount, decimals)}
+            />
+          </dl>
+          <p className="mt-2 text-xs text-ink-faint">{RESOLVER_UX_COPY.visibilityNote}</p>
+        </Card>
+      ) : null}
+
+      {canSettle && resolverView && disputed ? (
+        <Card className="border-gold/40 p-4 sm:p-5">
+          <h3 className="font-display text-lg">{RESOLVER_UX_COPY.settlementHeading}</h3>
+          <p className="mt-1 text-sm leading-6 text-ink-soft">{RESOLVER_UX_COPY.settlementBody}</p>
+          {decimals == null ? (
+            <p className="mt-2 text-sm text-ink-soft">{RESOLVER_UX_COPY.decimalsLoading}</p>
+          ) : (
+            <div className="mt-3 space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field
+                  label="Freelancer allocation"
+                  hint={RESOLVER_UX_COPY.freelancerHint}
+                  error={awardUi.trim() && employerDraft == null ? allocation.error : undefined}
+                >
+                  <Input
+                    inputMode="decimal"
+                    value={awardUi}
+                    onChange={(e) => onFreelancerAllocationChange(e.target.value)}
+                  />
+                </Field>
+                <Field
+                  label="Employer allocation"
+                  hint={RESOLVER_UX_COPY.employerHint}
+                  error={employerError}
+                >
+                  <Input
+                    inputMode="decimal"
+                    value={employerValue}
+                    onChange={(e) => onEmployerAllocationChange(e.target.value)}
+                  />
+                </Field>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button variant="secondary" onClick={() => setAllocation(contract.contestedAmount)}>
+                  All to freelancer
+                </Button>
+                <Button variant="secondary" onClick={() => setAllocation(0n)}>
+                  All to employer
+                </Button>
+              </div>
+              {settlementCheck?.ok ? (
+                <dl className="grid gap-2 sm:grid-cols-2">
+                  {resolverSettlementSummary(settlementCheck, decimals).map((row) => (
+                    <Row key={row.label} label={row.label} value={row.value} />
+                  ))}
+                </dl>
+              ) : null}
+              <Button
+                disabled={!settlementCheck?.ok || Boolean(employerError) || !onReviewSettlement}
+                onClick={() => onReviewSettlement?.()}
+              >
+                {RESOLVER_UX_COPY.reviewSettlement}
+              </Button>
+              <p className="text-xs text-ink-faint">{RESOLVER_UX_COPY.settlementNoTransfer}</p>
+            </div>
+          )}
+        </Card>
+      ) : null}
+
+      {resolverView && resolved ? (
+        <Card className="p-4 sm:p-5">
+          <h3 className="font-display text-lg">{RESOLVER_UX_COPY.settlementRecorded}</h3>
+          <p className="mt-1 text-sm leading-6 text-ink-soft">
+            {RESOLVER_UX_COPY.settlementRecordedBody}
+          </p>
+          <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+            <Row
+              label="Freelancer settlement"
+              value={formatTokenAmount(postResolution.freelancerSettlement, decimals)}
+            />
+            <Row
+              label="Employer refundable (total)"
+              value={formatTokenAmount(postResolution.employerRefundableTotal, decimals)}
+            />
+            <Row
+              label="Freelancer can still claim"
+              value={formatTokenAmount(postResolution.freelancerClaimable, decimals)}
+            />
+            <Row
+              label="Employer can still refund"
+              value={formatTokenAmount(postResolution.employerRefundable, decimals)}
+            />
+          </dl>
+          <p className="mt-2 text-xs leading-5 text-ink-faint">
+            {RESOLVER_UX_COPY.partyClaimGuidance}
+          </p>
+        </Card>
+      ) : null}
+
       {showOpenGuidance ? (
-        <Card className="p-5">
-          <h3 className="font-display text-2xl">{CASE_PREPARATION_COPY.heading}</h3>
+        <Card className="p-4 sm:p-5">
+          <h3 className="font-display text-xl">{CASE_PREPARATION_COPY.heading}</h3>
           <p className="mt-2 text-sm leading-6 text-ink-soft">{CASE_PREPARATION_COPY.notStored}</p>
           <p className="mt-2 text-sm leading-6 text-ink-soft">{CASE_PREPARATION_COPY.pageOnly}</p>
           <CategoryFields
@@ -312,16 +511,13 @@ export function ResolutionCenter({
       ) : null}
 
       {disputed || resolved ? (
-        <Card className="p-5">
-          <h3 className="font-display text-2xl">{CASE_WORKSPACE_COPY.heading}</h3>
-          {caseState === "loading" || (caseState === "idle" && shouldAttemptCaseRecover(contract.status, role)) ? (
+        <Card className="p-4 sm:p-5">
+          <h3 className="font-display text-xl">{CASE_WORKSPACE_COPY.heading}</h3>
+          {caseState === "loading" || (caseState === "idle" && shouldLoadCase) ? (
             <p className="mt-2 text-sm leading-6 text-ink-soft">{CASE_WORKSPACE_COPY.loading}</p>
           ) : null}
-          {role === "resolver" ? (
-            <p className="mt-2 text-sm leading-6 text-ink-soft">
-              Employer and freelancer use this case workspace. Resolver review is a later Resolution
-              phase. Settlement still uses the on-chain resolve_dispute control.
-            </p>
+          {role === "resolver" && caseState === "not_created" ? (
+            <p className="mt-2 text-sm leading-6 text-ink-soft">{RESOLVER_UX_COPY.noCase}</p>
           ) : null}
           {caseState === "unauthenticated" ? (
             <div className="mt-3 space-y-3">
@@ -415,15 +611,15 @@ export function ResolutionCenter({
         </Card>
       ) : null}
 
-      <Card className="p-5">
-        <h3 className="font-display text-2xl">{EVIDENCE_COPY.heading}</h3>
+      <Card className="p-4 sm:p-5">
+        <h3 className="font-display text-xl">{EVIDENCE_COPY.heading}</h3>
         <p className="mt-1 text-sm text-ink-faint">{EVIDENCE_COPY.noInventedHistory}</p>
         <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-ink-faint">
           {EVIDENCE_COPY.availableNow}
         </p>
         <dl className="mt-3 grid gap-3 sm:grid-cols-2">
           {context.facts.map((fact) => (
-            <Row key={`${fact.label}:${fact.value}`} label={fact.label} value={fact.value} />
+            <Row key={`${fact.label}:${fact.value}`} label={fact.label} value={<FactValue fact={fact} />} />
           ))}
         </dl>
         {context.notes.map((note) => (
@@ -438,7 +634,7 @@ export function ResolutionCenter({
             </p>
             <dl className="mt-3 grid gap-3 sm:grid-cols-2">
               {context.trial.map((fact) => (
-                <Row key={`${fact.label}:${fact.value}`} label={fact.label} value={fact.value} />
+                <Row key={`${fact.label}:${fact.value}`} label={fact.label} value={<FactValue fact={fact} />} />
               ))}
             </dl>
           </>
@@ -458,8 +654,8 @@ export function ResolutionCenter({
       </Card>
 
       {disputed || resolved ? (
-        <Card className="p-5">
-          <h3 className="font-display text-2xl">{PARTY_STATEMENTS_COPY.heading}</h3>
+        <Card className="p-4 sm:p-5">
+          <h3 className="font-display text-xl">{PARTY_STATEMENTS_COPY.heading}</h3>
           <p className="mt-2 text-sm leading-6 text-ink-soft">{PARTY_STATEMENTS_COPY.ready}</p>
           <p className="mt-2 text-sm leading-6 text-ink-soft">{PARTY_STATEMENTS_COPY.ownOnly}</p>
           <p className="mt-2 text-sm leading-6 text-ink-soft">{PARTY_STATEMENTS_COPY.resolverCannot}</p>
@@ -494,11 +690,11 @@ export function ResolutionCenter({
       ) : null}
 
       {disputed || resolved ? (
-        <Card className="p-5">
+        <Card className="p-4 sm:p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-faint">
             {AI_CASE_SUMMARY_COPY.comingLater}
           </p>
-          <h3 className="mt-1 font-display text-2xl">{AI_CASE_SUMMARY_COPY.heading}</h3>
+          <h3 className="mt-1 font-display text-xl">{AI_CASE_SUMMARY_COPY.heading}</h3>
           <p className="mt-2 text-sm leading-6 text-ink-soft">{AI_CASE_SUMMARY_COPY.body}</p>
           <p className="mt-2 text-sm leading-6 text-ink-soft">
             {PREMIFLOW_ASSISTANT.name} will not decide who wins, allocate escrow, replace the
@@ -508,8 +704,8 @@ export function ResolutionCenter({
       ) : null}
 
       {disputed && role === "resolver" ? (
-        <Card className="border-gold/40 bg-[linear-gradient(180deg,rgba(214,176,90,0.10),transparent)] p-5">
-          <h3 className="font-display text-2xl">Decision</h3>
+        <Card className="border-gold/40 bg-[linear-gradient(180deg,rgba(214,176,90,0.10),transparent)] p-4 sm:p-5">
+          <h3 className="font-display text-xl">Decision</h3>
           <p className="mt-2 text-sm leading-6 text-ink-soft">
             You remain the decision-maker. Category and notes do not set a financial split.
           </p>
@@ -517,8 +713,8 @@ export function ResolutionCenter({
         </Card>
       ) : null}
 
-      <Card className="p-5">
-        <h3 className="font-display text-2xl">{RESOLVER_EXPLANATION.title}</h3>
+      <Card className="p-4 sm:p-5">
+        <h3 className="font-display text-xl">{RESOLVER_EXPLANATION.title}</h3>
         <p className="mt-2 text-sm leading-6 text-ink-soft">{RESOLVER_EXPLANATION.definition}</p>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-ink-soft">
           {RESOLVER_EXPLANATION.points.map((line) => (
@@ -588,6 +784,21 @@ function StatementRead({ title, statement }: { title: string; statement: string 
         {statement || CASE_WORKSPACE_COPY.missingStatement}
       </p>
     </div>
+  );
+}
+
+function FactValue({ fact }: { fact: EvidenceFact }) {
+  return fact.href ? (
+    <a
+      href={fact.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="break-all font-medium text-cyan underline-offset-2 hover:underline [overflow-wrap:anywhere]"
+    >
+      {fact.value} ↗
+    </a>
+  ) : (
+    <>{fact.value}</>
   );
 }
 

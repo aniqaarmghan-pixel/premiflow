@@ -228,9 +228,18 @@ export function postResolutionRefundAvailable(contract: ContractView): boolean {
 
 export function contractCardNextHint(
   role: ContractRole,
-  contract: ContractView
+  contract: ContractView,
+  now = Math.floor(Date.now() / 1000)
 ): string {
   const { status, paymentMode } = contract;
+  if (status === "PendingAcceptance" && now >= contract.acceptanceDeadline) {
+    // accept_contract requires now < acceptance_deadline; decline and expire remain.
+    if (role === "freelancer") return "Offer expired: decline to close it";
+    if (role === "employer") return "Offer expired: expire it to reclaim funds";
+  }
+  if (status === "Draft" && role === "employer" && now >= contract.acceptanceDeadline) {
+    return "Setup deadline passed: expire the draft to reclaim funds";
+  }
   if (status === "PendingAcceptance" && role === "freelancer") {
     return "Next: accept or decline";
   }

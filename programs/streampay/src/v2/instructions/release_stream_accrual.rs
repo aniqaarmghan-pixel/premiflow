@@ -48,9 +48,9 @@ pub fn handle_release_stream_accrual(ctx: Context<ReleaseStreamAccrual>) -> Resu
     );
 
     let accrued = contract.stream_accrued_at(now)?;
-    let newly_releasable = accrued
-        .checked_sub(contract.stream_released_amount)
-        .ok_or(StreamPayV2Error::ReleaseAmountExceeded)?;
+    // Saturating: an earlier clock observation than a previous release yields
+    // zero, never a reduction of already released earnings.
+    let newly_releasable = accrued.saturating_sub(contract.stream_released_amount);
 
     // Idempotent no-op: keepers can poll safely. Nothing is mutated.
     if newly_releasable == 0 {

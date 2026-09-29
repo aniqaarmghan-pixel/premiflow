@@ -9,7 +9,8 @@ import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { formatUnix } from "@/lib/app/datetime";
-import { presentStatus, presentType, roleForContract, roleLabel } from "@/lib/app/view-model";
+import { presentType, roleForContract, roleLabel } from "@/lib/app/view-model";
+import { roleAwareStatusLabel } from "@/lib/app/dashboard-offers";
 import { useContracts } from "@/lib/hooks/ContractsProvider";
 
 type Stamp = { at: number; label: string; href: string };
@@ -43,7 +44,7 @@ export function ActivityPage() {
     if (contract.disputedAt) stamps.push({ at: contract.disputedAt, label: `${prefix} disputed`, href });
     stamps.push({
       at: contract.createdAt,
-      label: `${prefix} is ${presentStatus(contract.status)}`,
+      label: `${prefix}: ${roleAwareStatusLabel(publicKey, contract)}`,
       href,
     });
   }
@@ -52,7 +53,7 @@ export function ActivityPage() {
   return (
     <PageFade>
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan">Activity</p>
-      <h1 className="mt-1 font-display text-4xl">Deterministic timeline</h1>
+      <h1 className="mt-1 font-display text-[1.65rem] tracking-tight sm:text-3xl">Deterministic timeline</h1>
       <p className="mt-2 max-w-2xl text-sm text-ink-soft">
         This is not an indexer. It only lists timestamps already stored on loaded contract
         accounts. Program events such as WorkUnitStaleRevisionVoided are not retrieved.
@@ -66,7 +67,7 @@ export function ActivityPage() {
           />
         </div>
       ) : (
-        <ol className="mt-8 space-y-3">
+        <ol className="mt-5 space-y-3">
           {stamps.slice(0, 40).map((stamp, i) => (
             <li key={`${stamp.href}-${stamp.label}-${i}`}>
               <Card className="p-4">

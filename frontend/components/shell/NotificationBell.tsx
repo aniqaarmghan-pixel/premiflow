@@ -17,6 +17,10 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { fetchSession } from "@/lib/app/messages-client";
 import {
+  ensureMessagingSession,
+  messagingSessionErrorMessage,
+} from "@/lib/app/messaging-session";
+import {
   fetchNotifications,
   fetchUnreadNotificationCount,
   isNotificationsAuthError,
@@ -28,6 +32,12 @@ import {
   NOTIFICATIONS_EMPTY_COPY,
   NOTIFICATIONS_PAGE_LIMIT,
   NOTIFICATIONS_SESSION_COPY,
+  NOTIFICATIONS_VERIFY_BUTTON,
+  NOTIFICATIONS_VERIFY_CANNOT_SIGN,
+  NOTIFICATIONS_VERIFY_DETAIL,
+  NOTIFICATIONS_VERIFY_FAILED,
+  NOTIFICATIONS_VERIFY_IDLE,
+  NOTIFICATIONS_VERIFY_PENDING,
   applyMarkAllLocal,
   applyMarkOneLocal,
   ariaLabelForBell,
@@ -40,14 +50,19 @@ import {
   isNotificationUnread,
   mergeNotificationPages,
   notificationTypeLabel,
+  notificationsAccess,
   resolveNotificationClickNavigation,
   shouldAcceptUnreadCountResponse,
+  shouldApplyNotificationsVerifyResult,
   shouldClearNotificationsOnSessionChange,
   shouldPollNotificationBadge,
   shouldRefreshUnreadOnVisibility,
   signalOpenContractChat,
+  verifyNotificationsWallet,
+  verifyStatusForWallet,
   type NotificationListItem,
   type NotificationsUiStatus,
+  type NotificationsVerifyStatus,
 } from "@/lib/app/notifications-ui";
 import { sessionMatchesConnectedWallet } from "@/lib/app/messages-panel";
 
@@ -88,7 +103,7 @@ function TypeIcon({ type }: { type: string }) {
  */
 export function NotificationBell() {
   const router = useRouter();
-  const { publicKey } = useWallet();
+  const { publicKey, signMessage } = useWallet();
   const connectedWallet = publicKey?.toBase58() ?? null;
 
   const rootRef = useRef<HTMLDivElement>(null);
@@ -118,6 +133,7 @@ export function NotificationBell() {
   const [listLoading, setListLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [verify, setVerify] = useState<NotificationsVerifyStatus>(NOTIFICATIONS_VERIFY_IDLE);
 
   connectedWalletRef.current = connectedWallet;
 
@@ -126,6 +142,9 @@ export function NotificationBell() {
       connectedWallet &&
       sessionMatchesConnectedWallet(sessionWallet, connectedWallet)
   );
+  const access = notificationsAccess({ connectedWallet, sessionWallet, status });
+  // Scoped to the wallet that started it: a wallet switch shows a fresh idle state.
+  const verifyView = verifyStatusForWallet(verify, connectedWallet);
 
   const badge = formatUnreadBadge(unreadCount, { countLoaded });
   const ariaLabel = ariaLabelForBell(badge);
@@ -413,6 +432,56 @@ export function NotificationBell() {
     };
   }, [open]);
 
+  /**
+   * "Verify wallet" in the bell. Reuses the existing messaging-session flow
+   * (server challenge, wallet signMessage, server verify). Message signature only.
+   */
+  async function onVerifyWallet() {
+    const wallet = connectedWallet;
+    if (!wallet || verifyView.state === "pending") return;
+    setVerify({ wallet, state: "pending", error: null });
+    const outcome = await verifyNotificationsWallet(
+      { wallet, signMessage },
+      { ensureSession: ensureMessagingSession, errorMessage: messagingSessionErrorMessage }
+    );
+    // Wallet switched while the prompt was open: never apply A's result to B.
+    if (
+      !shouldApplyNotificationsVerifyResult({
+        requestWallet: wallet,
+        currentWallet: connectedWalletRef.current,
+      })
+    ) {
+      return;
+    }
+    if (!outcome.ok) {
+      setVerify({ wallet, state: "error", error: outcome.message });
+      return;
+    }
+    // Re-read /api/auth/me with the same wallet-match checks, then load in place.
+    const verifiedWallet = await refreshSession();
+    if (
+      !shouldApplyNotificationsVerifyResult({
+        requestWallet: wallet,
+        currentWallet: connectedWalletRef.current,
+      })
+    ) {
+      return;
+    }
+    if (
+      !verifiedWallet ||
+      !shouldApplyNotificationsVerifyResult({
+        requestWallet: verifiedWallet,
+        currentWallet: wallet,
+      })
+    ) {
+      setVerify({ wallet, state: "error", error: NOTIFICATIONS_VERIFY_FAILED });
+      return;
+    }
+    setVerify(NOTIFICATIONS_VERIFY_IDLE);
+    setStatus((current) => (current === "unauthenticated" ? "idle" : current));
+    void refreshUnreadCount();
+  }
+
   async function onMarkOne(item: NotificationListItem) {
     const nav = resolveNotificationClickNavigation({ href: item.href });
     if (markingRef.current.has(item.id)) {
@@ -546,10 +615,45 @@ export function NotificationBell() {
               <p className="px-3 py-8 text-center text-sm text-ink-soft">
                 Connect a wallet to use notifications.
               </p>
-            ) : status === "unauthenticated" || !hasSession ? (
-              <p className="px-3 py-8 text-center text-sm text-ink-soft">
-                {NOTIFICATIONS_SESSION_COPY}
-              </p>
+            ) : access === "verify" ? (
+              <div className="px-3 py-6 text-center">
+                <Wallet size={18} className="mx-auto text-ink-faint" aria-hidden />
+                <p className="mt-2 text-sm font-medium text-ink">
+                  {NOTIFICATIONS_SESSION_COPY}
+                </p>
+                <p className="mt-1 text-xs text-ink-soft">{NOTIFICATIONS_VERIFY_DETAIL}</p>
+                {!signMessage ? (
+                  <p className="mt-3 text-xs text-ink-soft" role="status">
+                    {NOTIFICATIONS_VERIFY_CANNOT_SIGN}
+                  </p>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void onVerifyWallet()}
+                    disabled={verifyView.state === "pending"}
+                    aria-busy={verifyView.state === "pending"}
+                    className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-full bg-navy px-3.5 text-xs font-semibold text-cyan disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {verifyView.state === "pending" ? (
+                      <>
+                        <LoaderCircle size={14} className="animate-spin" aria-hidden />
+                        {NOTIFICATIONS_VERIFY_PENDING}
+                      </>
+                    ) : (
+                      NOTIFICATIONS_VERIFY_BUTTON
+                    )}
+                  </button>
+                )}
+                {verifyView.state === "error" && verifyView.error ? (
+                  <p
+                    className="mt-2 flex items-center justify-center gap-1 text-xs text-ink-soft"
+                    role="alert"
+                  >
+                    <CircleAlert size={12} aria-hidden />
+                    {verifyView.error}
+                  </p>
+                ) : null}
+              </div>
             ) : listLoading && !listLoaded ? (
               <div className="flex items-center justify-center gap-2 px-3 py-10 text-sm text-ink-faint">
                 <LoaderCircle size={16} className="animate-spin" aria-hidden />

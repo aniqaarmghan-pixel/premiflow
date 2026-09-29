@@ -923,7 +923,8 @@ fn completed_cancelled_resolved_and_disputed_stay_frozen() {
     assert_rejected(env.timeout(3, 0), E_INVALID_STATE, "disputed timeout");
     assert_rejected(env.cancel(3), E_CONTRACT_TERMINAL, "disputed cancel");
     assert_rejected(env.complete(3), E_CONTRACT_TERMINAL, "disputed complete");
-    assert_rejected(env.withdraw(3), E_CONTRACT_TERMINAL, "disputed withdraw");
+    // Disputed pays only already-released pay; nothing is released here.
+    assert_rejected(env.withdraw(3), E_NOTHING_TO_WITHDRAW, "disputed withdraw");
     assert_rejected(env.refund(3), E_CONTRACT_TERMINAL, "disputed refund");
     assert_rejected(env.open_dispute(3), E_ALREADY_DISPUTED, "second dispute");
     env.resolve(3, 0).unwrap();

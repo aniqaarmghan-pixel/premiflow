@@ -36,9 +36,9 @@ export function PaymentProgress({
   ];
 
   return (
-    <Card className="p-5">
+    <Card className="p-4 sm:p-5">
       <p className="text-xs uppercase tracking-[0.16em] text-ink-faint">Payment</p>
-      <h3 className="mt-1 font-display text-2xl">On-chain balances</h3>
+      <h3 className="mt-1 font-display text-xl">On-chain balances</h3>
       <p className="mt-1 text-xs text-ink-faint">
         Displayed from the contract account. The program remains authoritative.
       </p>
@@ -48,7 +48,7 @@ export function PaymentProgress({
           label={streaming ? "Recorded of total" : "Released of total"}
         />
       </div>
-      <dl className="mt-5 grid gap-3 sm:grid-cols-2">
+      <dl className="mt-4 grid gap-3 sm:grid-cols-2">
         {rows.map((row) => (
           <div key={row.label} className="rounded-2xl bg-paper px-3 py-3">
             <dt className="text-[11px] uppercase tracking-wide text-ink-faint">

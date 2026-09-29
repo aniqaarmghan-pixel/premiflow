@@ -532,8 +532,9 @@ test("official deliverable copy uses contract review terms and does not overclai
   assert.match(liveLike.messagesHint, /belong in Messages/);
   assert.equal(
     liveLike.recordedReference,
-    "The submission reference is recorded with the contract."
+    "Your main work link, or a note that you uploaded a file, is saved with the contract so both sides can see what was submitted."
   );
+  assert.doesNotMatch(liveLike.recordedReference, /on-chain reference|transaction|blockchain proof/i);
   assert.doesNotMatch(liveLike.recordedReference, /cryptographically verified|immutable|proves the exact file/i);
   assert.doesNotMatch(liveLike.fieldHint, /permanently stored|file contents are immutable/i);
 

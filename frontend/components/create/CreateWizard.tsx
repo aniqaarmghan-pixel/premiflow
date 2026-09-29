@@ -2,9 +2,10 @@
 
 import { getAccount } from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { TypeMotif } from "@/components/contracts/TypeMotif";
 import { SuccessMoment } from "@/components/contracts/SuccessMoment";
@@ -13,6 +14,44 @@ import { Card } from "@/components/ui/Card";
 import { Field, Input, Select, Textarea } from "@/components/ui/Field";
 import { TransactionStatus } from "@/components/ui/TransactionStatus";
 import { localMetadataStore } from "@/lib/app/local-metadata";
+import { requestOfferLifecycleNotification } from "@/lib/app/lifecycle-notifications-client";
+import {
+  CREATE_SEND_OFFER_LABEL,
+  OPEN_CONTRACT_LABEL,
+  RESUME_SETUP_LABEL,
+  SETUP_INCOMPLETE_LABEL,
+  bytesToHex,
+  canResumeCreateSetup,
+  clearCreateIntent,
+  createProgressLines,
+  createRunLock,
+  createStepNote,
+  decideDiscard,
+  ensureCreateIntent,
+  isCreateTxInFlight,
+  isRetryableConflict,
+  loadCreateIntent,
+  markCreateAttempted,
+  needsTxResetBeforeResume,
+  planNextCreateStep,
+  runCreateSetup,
+  saveCreateIntent,
+  toCreateContractRequest,
+  toCreateHourlyContractRequest,
+  touchCreateActivity,
+  type CreateIntent,
+  type CreateIntentRequest,
+  type CreateIntentTerms,
+  type CreatePlan,
+  type CreateProgress,
+  type CreateSetupOutcome,
+  type DiscardChainState,
+  type IntentScope,
+  type IntentStorage,
+  type LoadIntentResult,
+  type ObservedCreateState,
+} from "@/lib/app/milestone-create-plan";
+import { releaseUnsentCreateAttempt } from "@/lib/app/create-attempt-recovery";
 import { formatTokenAmount } from "@/lib/app/money";
 import {
   lockedCreatePayment,
@@ -42,7 +81,16 @@ import {
   type MilestoneDraft,
 } from "@/lib/app/validation";
 import { Address } from "@/components/ui/Address";
-import { deriveEmployerSourceAta } from "@/lib/streampay-v2";
+import {
+  STREAMPAY_PROGRAM_ID,
+  deriveContractPda,
+  deriveEmployerSourceAta,
+  deriveHourlyStatePda,
+  fetchContractIfExists,
+  fetchHourlyStateIfExists,
+  fetchIndexedWorkUnits,
+} from "@/lib/streampay-v2";
+import { ACTIVE_CLUSTER_ID } from "@/lib/cluster";
 import { useNow } from "@/lib/hooks/useNow";
 import { useStreamPayClient } from "@/lib/hooks/useStreamPayClient";
 import { useTx } from "@/lib/hooks/useTx";
@@ -54,6 +102,57 @@ import {
   type AuthorizedTimeUnit,
   type PaymentModeName,
 } from "@/lib/streampay-v2";
+
+function intentStorage(): IntentStorage | null {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    // Storage blocked by the browser: saving fails loudly before any send.
+    return null;
+  }
+}
+
+function nowSeconds(): number {
+  return Math.floor(Date.now() / 1000);
+}
+
+/** Saved setups belong to one cluster + program deployment. */
+const INTENT_SCOPE: IntentScope = {
+  cluster: ACTIVE_CLUSTER_ID,
+  programId: STREAMPAY_PROGRAM_ID.toBase58(),
+};
+
+function deriveIntentAddress(employer: string, freelancer: string, contractId: bigint): string {
+  return deriveContractPda(
+    new PublicKey(employer),
+    new PublicKey(freelancer),
+    contractId,
+    STREAMPAY_PROGRAM_ID
+  ).address.toBase58();
+}
+
+/** Never throws: corrupt or foreign data comes back as `{ kind: "corrupt" }`. */
+function loadSavedIntent(employer: string): LoadIntentResult {
+  return loadCreateIntent(intentStorage(), INTENT_SCOPE, employer, deriveIntentAddress);
+}
+
+function tryPublicKey(value: string): PublicKey | null {
+  try {
+    return new PublicKey(value);
+  } catch {
+    return null;
+  }
+}
+
+function errorText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
+}
+
+type SetupConflict = {
+  message: string;
+  /** Resume continues the saved attempt; hidden when it would only re-conflict. */
+  allowResume: boolean;
+};
 
 const STEPS = [
   "Type",
@@ -78,6 +177,26 @@ export function CreateWizard() {
   const [successOpen, setSuccessOpen] = useState(false);
   const [createdAddress, setCreatedAddress] = useState<string | null>(null);
   const [progressNote, setProgressNote] = useState<string | null>(null);
+  const [setupProgress, setSetupProgress] = useState<CreateProgress | null>(null);
+  const [setupConflict, setSetupConflict] = useState<SetupConflict | null>(null);
+  const [setupRunning, setSetupRunning] = useState(false);
+  const [intentVersion, setIntentVersion] = useState(0);
+  const [setupNotice, setSetupNotice] = useState<string | null>(null);
+  // One Create / Resume / Discard at a time; acquired synchronously before any await.
+  const [runLock] = useState(createRunLock);
+  // Latest tx handle: after tx.reset(), the resume path must call the re-rendered run().
+  const txRef = useRef(tx);
+  useEffect(() => {
+    txRef.current = tx;
+  });
+  const employerKey = publicKey?.toBase58() ?? null;
+  // Saved Create & Send Offer attempt for this wallet, cluster and program (survives reload).
+  const savedLoad = useMemo<LoadIntentResult>(() => {
+    void intentVersion;
+    return employerKey ? loadSavedIntent(employerKey) : { kind: "none" };
+  }, [employerKey, intentVersion]);
+  const savedIntent = savedLoad.kind === "ready" ? savedLoad.intent : null;
+  const savedCorruptMessage = savedLoad.kind === "corrupt" ? savedLoad.message : null;
 
   const errors = useMemo(
     () => (publicKey ? validateCreateDraft(publicKey, draft, now) : {}),
@@ -112,6 +231,7 @@ export function CreateWizard() {
 
   function patch(partial: Partial<CreateWizardDraft>) {
     setDraft((prev) => applyCreateDraftPatch(prev, partial));
+    setSetupConflict(null);
   }
 
   useEffect(() => {
@@ -177,82 +297,471 @@ export function CreateWizard() {
         : 0;
     const checkpointInterval =
       draft.paymentMode === "Streaming" ? draft.checkpointInterval : 0;
-    const contractId = BigInt(Date.now());
-
-    const ok = await tx.run(
-      "Create contract",
-      async () => {
-      setProgressNote("Creating contract…");
-      const created =
-        draft.paymentMode === "Hourly"
-          ? await client.createHourlyContract({
-              freelancer,
-              tokenMint: payment.mint,
-              request: {
-                contractId,
-                hourlyRate: uiAmountToBaseUnits(draft.hourlyRateUi, payment.decimals),
-                authorizedSeconds: BigInt(
-                  parseAuthorizedTime(
-                    draft.authorizedTimeValue,
-                    draft.authorizedTimeUnit
-                  ).seconds ?? 0
-                ),
-                acceptanceDeadline,
-                durationSeconds:
-                  parseEngagementDuration(
-                    draft.engagementDurationValue,
-                    draft.engagementDurationUnit
-                  ).seconds ?? 0,
-                reviewDuration: draft.reviewDuration,
-                activationReviewDuration: draft.activationReviewDuration,
-                maxRevisions: draft.maxRevisions,
-                trialAmount,
-                resolver: payment.resolver.address,
-                metadataUri: stored.uri,
-                metadataHash: stored.hash,
-              },
-            })
-          : await client.createContract({
-              freelancer,
-              tokenMint: payment.mint,
-              request: {
-                contractId,
-                paymentMode: draft.paymentMode,
-                startMode: draft.startMode,
-                totalAmount: uiAmountToBaseUnits(draft.totalAmountUi, payment.decimals),
-                acceptanceDeadline,
-                scheduledStartTime,
-                durationSeconds: draft.durationSeconds,
-                checkpointInterval,
-                reviewDuration: draft.reviewDuration,
-                activationReviewDuration: draft.activationReviewDuration,
-                maxRevisions: draft.maxRevisions,
-                trialAmount,
-                resolver: payment.resolver.address,
-                metadataUri: stored.uri,
-                metadataHash: stored.hash,
-              },
-            });
-      if (draft.paymentMode === "Milestone" && created.contract) {
-        for (const [i, milestone] of draft.milestones.entries()) {
-          setProgressNote(`Adding milestone ${i + 1} of ${draft.milestones.length}…`);
-          await client.addMilestone({
-            contract: created.contract,
-            amount: uiAmountToBaseUnits(milestone.amountUi, payment.decimals),
-            dueOffsetSeconds: milestone.dueOffsetSeconds,
-          });
-        }
-        setProgressNote("Locking terms…");
-        await client.finalizeTerms(created.contract);
-      }
-      setCreatedAddress(created.contract?.toBase58() ?? null);
-      return created;
-    },
-      { suppressNotice: true }
-    );
-    setProgressNote(null);
-    if (ok) setSuccessOpen(true);
+    const request: CreateIntentRequest =
+      draft.paymentMode === "Hourly"
+        ? {
+            kind: "hourly",
+            hourlyRate: uiAmountToBaseUnits(draft.hourlyRateUi, payment.decimals).toString(),
+            authorizedSeconds: String(
+              parseAuthorizedTime(
+                draft.authorizedTimeValue,
+                draft.authorizedTimeUnit
+              ).seconds ?? 0
+            ),
+            acceptanceDeadline,
+            durationSeconds:
+              parseEngagementDuration(
+                draft.engagementDurationValue,
+                draft.engagementDurationUnit
+              ).seconds ?? 0,
+            reviewDuration: draft.reviewDuration,
+            activationReviewDuration: draft.activationReviewDuration,
+            maxRevisions: draft.maxRevisions,
+            trialAmount: trialAmount.toString(),
+            resolver: payment.resolver.address.toBase58(),
+            metadataUri: stored.uri,
+            metadataHashHex: bytesToHex(stored.hash),
+          }
+        : {
+            kind: "standard",
+            paymentMode: draft.paymentMode,
+            startMode: draft.startMode,
+            totalAmount: uiAmountToBaseUnits(draft.totalAmountUi, payment.decimals).toString(),
+            acceptanceDeadline,
+            scheduledStartTime,
+            durationSeconds: draft.durationSeconds,
+            checkpointInterval,
+            reviewDuration: draft.reviewDuration,
+            activationReviewDuration: draft.activationReviewDuration,
+            maxRevisions: draft.maxRevisions,
+            trialAmount: trialAmount.toString(),
+            resolver: payment.resolver.address.toBase58(),
+            metadataUri: stored.uri,
+            metadataHashHex: bytesToHex(stored.hash),
+          };
+    const terms: CreateIntentTerms = {
+      employer: publicKey.toBase58(),
+      freelancer: freelancer.toBase58(),
+      tokenMint: payment.mint.toBase58(),
+      paymentMode: draft.paymentMode,
+      // Hourly total is derived on-chain from rate × authorized time.
+      totalAmount: request.kind === "standard" ? request.totalAmount : null,
+      trialAmount: trialAmount.toString(),
+      milestones:
+        draft.paymentMode === "Milestone"
+          ? draft.milestones.map((milestone) => ({
+              amount: uiAmountToBaseUnits(milestone.amountUi, payment.decimals).toString(),
+              dueOffsetSeconds: milestone.dueOffsetSeconds,
+            }))
+          : [],
+      request,
+    };
+    // A saved setup is locked once a create may have been sent.
+    const loaded = loadSavedIntent(terms.employer);
+    if (loaded.kind === "corrupt") {
+      setSetupNotice(null);
+      setSetupConflict({ message: loaded.message, allowResume: false });
+      return;
+    }
+    // One stable contract ID per creation attempt: a retry, failure or unknown
+    // confirmation reuses the saved ID instead of generating a new one.
+    const ensured = ensureCreateIntent({
+      terms,
+      saved: loaded.kind === "ready" ? loaded.intent : null,
+      scope: INTENT_SCOPE,
+      newContractId: () => BigInt(Date.now()),
+      deriveAddress: deriveIntentAddress,
+      now: Date.now(),
+    });
+    if (ensured.kind === "conflict") {
+      // The saved attempt keeps its original terms; Resume setup continues it.
+      setSetupNotice(null);
+      setSetupConflict({ message: ensured.message, allowResume: true });
+      setIntentVersion((v) => v + 1);
+      return;
+    }
+    saveCreateIntent(intentStorage(), ensured.intent);
+    setIntentVersion((v) => v + 1);
+    await runSetup(ensured.intent);
   }
+
+  /**
+   * Reconcile with the chain first (reads only), then send only the missing
+   * steps: create → add missing milestones → send offer (finalize terms).
+   * Every outcome leaves a visible, recoverable state.
+   */
+  async function runSetup(initialIntent: CreateIntent) {
+    if (!publicKey || !client) return;
+    const retryHint = initialIntent.createAttempted
+      ? "Press Resume setup to try again."
+      : `Press ${CREATE_SEND_OFFER_LABEL} to try again.`;
+    if (publicKey.toBase58() !== initialIntent.employer) {
+      setProgressNote("Connect the wallet that started this setup to continue it.");
+      return;
+    }
+    let intent = initialIntent;
+    const program = client.program;
+    const parsedAddress = tryPublicKey(intent.contractAddress);
+    if (!parsedAddress) {
+      setSetupConflict({
+        message:
+          "The saved setup has an unreadable contract address, so nothing was sent. Discard it to start over.",
+        allowResume: false,
+      });
+      return;
+    }
+    const address: PublicKey = parsedAddress;
+
+    const observe = async (): Promise<ObservedCreateState> => {
+      const contract = await fetchContractIfExists(program, address);
+      if (!contract) return { contract: null, workUnits: [], hourly: null };
+      const workUnits =
+        contract.paymentMode === "Milestone"
+          ? await fetchIndexedWorkUnits(program, address, contract.workUnitCount)
+          : [];
+      const hourly =
+        contract.paymentMode === "Hourly"
+          ? await fetchHourlyStateIfExists(
+              program,
+              deriveHourlyStatePda(address, program.programId).address
+            )
+          : null;
+      return { contract, workUnits, hourly };
+    };
+    const onPlan = (plan: CreatePlan) => {
+      setSetupProgress(plan.progress);
+      if (plan.progress.contractExists) {
+        setCreatedAddress(plan.progress.contractAddress);
+      }
+    };
+    // Reads only: after a failure, show the actual chain state (or none).
+    const refreshProgress = async () => {
+      try {
+        setSetupProgress(planNextCreateStep(intent, await observe(), nowSeconds()).progress);
+      } catch {
+        setSetupProgress(null);
+      }
+    };
+
+    setSetupConflict(null);
+    setSetupNotice(null);
+    setSetupRunning(true);
+    setProgressNote("Checking for an existing contract…");
+    try {
+      let initial: CreatePlan;
+      try {
+        initial = planNextCreateStep(intent, await observe(), nowSeconds());
+      } catch (err) {
+        // A failed read is not "absent": never create on an unknown chain state.
+        setSetupProgress(null);
+        setProgressNote(
+          `Could not read the contract from the chain, so nothing was sent. ${errorText(err)} ${retryHint}`
+        );
+        return;
+      }
+      onPlan(initial);
+      if (initial.step.kind === "complete") {
+        finishSetup(intent, initial.progress);
+        return;
+      }
+      if (initial.step.kind === "conflict") {
+        setSetupConflict({
+          message: initial.step.message,
+          allowResume: isRetryableConflict(initial.step.reason),
+        });
+        setProgressNote(null);
+        return;
+      }
+
+      if (txRef.current.busy) {
+        setProgressNote(`A transaction is still in progress, so nothing was sent. ${retryHint}`);
+        return;
+      }
+      const result: { outcome: CreateSetupOutcome | null; started: boolean } = {
+        outcome: null,
+        started: false,
+      };
+      const ok = await txRef.current.run(
+        "Create & send offer",
+        async () => {
+          result.started = true;
+          const outcome = await runCreateSetup(intent, {
+            observe,
+            now: nowSeconds,
+            onPlan,
+            onStep: (step, progress) => setProgressNote(createStepNote(step, progress)),
+            create: async () => {
+              const expected = deriveContractPda(
+                publicKey,
+                new PublicKey(intent.freelancer),
+                BigInt(intent.contractId),
+                program.programId
+              ).address;
+              if (!expected.equals(address)) {
+                throw new Error(
+                  "The saved setup does not match this wallet and program, so nothing was sent."
+                );
+              }
+              // Persist before the wallet prompt: from here on the ID and terms
+              // are locked. If this cannot be saved, nothing is sent.
+              const beforeAttempt = intent;
+              intent = markCreateAttempted(intent, Date.now());
+              saveCreateIntent(intentStorage(), intent);
+              setIntentVersion((v) => v + 1);
+              let sendError: unknown = null;
+              try {
+                return intent.paymentMode === "Hourly"
+                  ? await client.createHourlyContract({
+                      freelancer: new PublicKey(intent.freelancer),
+                      tokenMint: new PublicKey(intent.tokenMint),
+                      request: toCreateHourlyContractRequest(intent),
+                    })
+                  : await client.createContract({
+                      freelancer: new PublicKey(intent.freelancer),
+                      tokenMint: new PublicKey(intent.tokenMint),
+                      request: toCreateContractRequest(intent),
+                    });
+              } catch (err) {
+                sendError = err;
+                throw err;
+              } finally {
+                // The Discard landing window counts from when the send settled.
+                intent = touchCreateActivity(intent, Date.now());
+                // Provably never broadcast (wallet refused, or the signed tx expired
+                // before submit): unlock this fresh attempt so it can be edited or
+                // discarded. Any possibly-sent outcome keeps the lock.
+                const settled = intent;
+                intent = releaseUnsentCreateAttempt(beforeAttempt, settled, sendError, Date.now());
+                try {
+                  saveCreateIntent(intentStorage(), intent);
+                } catch {
+                  // The save above already locked the ID; this only extends the window.
+                }
+                if (intent !== settled) setIntentVersion((v) => v + 1);
+              }
+            },
+            addMilestone: (step) =>
+              client.addMilestone({
+                contract: address,
+                amount: step.amount,
+                dueOffsetSeconds: step.dueOffsetSeconds,
+                expectedIndex: step.index,
+              }),
+            finalize: () => client.finalizeTerms(address),
+          });
+          result.outcome = outcome;
+          // Only a transaction that was actually sent is recorded as a success.
+          return { signature: outcome.lastSignature ?? "" };
+        },
+        { suppressNotice: true }
+      );
+      setProgressNote(null);
+      if (!result.started) {
+        // run() refused (another transaction still counted as busy).
+        setProgressNote(`Another transaction is still in progress, so nothing was sent. ${retryHint}`);
+        return;
+      }
+      const outcome = result.outcome;
+      if (!ok || !outcome) {
+        // Failed or unknown confirmation: the saved intent stays, the panel
+        // shows the actual chain state and offers Resume setup.
+        await refreshProgress();
+        return;
+      }
+      if (outcome.kind === "unverified") {
+        // A confirmed send the chain has not shown yet: not a failure, not done.
+        if (outcome.progress) setSetupProgress(outcome.progress);
+        setSetupNotice(outcome.message);
+        return;
+      }
+      if (outcome.kind === "complete") {
+        // Verified on-chain. If nothing was sent in this run, drop the empty tx success.
+        if (!outcome.lastSignature) tx.reset();
+        finishSetup(intent, outcome.progress);
+        return;
+      }
+      tx.reset();
+      setSetupConflict({
+        message: outcome.message,
+        allowResume: isRetryableConflict(outcome.reason),
+      });
+    } finally {
+      setSetupRunning(false);
+    }
+  }
+
+  function finishSetup(intent: CreateIntent, progress: CreateProgress) {
+    try {
+      clearCreateIntent(
+        intentStorage(),
+        { cluster: intent.cluster, programId: intent.programId },
+        intent.employer
+      );
+    } catch {
+      // Verified complete on-chain; a leftover saved setup would re-verify as complete.
+    }
+    setIntentVersion((v) => v + 1);
+    setCreatedAddress(progress.contractAddress);
+    if (progress.status === "PendingAcceptance") {
+      // Offer is live: notify the freelancer (server re-reads chain state; idempotent key).
+      void requestOfferLifecycleNotification(progress.contractAddress, "contract_offer_received");
+    }
+    setSetupProgress(null);
+    setSetupConflict(null);
+    setSetupNotice(null);
+    setProgressNote(null);
+    setSuccessOpen(true);
+  }
+
+  function reportUnexpected(err: unknown) {
+    setSetupRunning(false);
+    setProgressNote(
+      `Something went wrong: ${errorText(err)}. Nothing further was sent, and any saved setup was kept.`
+    );
+  }
+
+  async function startCreate() {
+    if (!runLock.tryAcquire()) return;
+    try {
+      if (isCreateTxInFlight(tx.state.phase)) return;
+      if (needsTxResetBeforeResume(tx.state.phase)) tx.reset();
+      await submit();
+    } catch (err) {
+      reportUnexpected(err);
+    } finally {
+      runLock.release();
+    }
+  }
+
+  /** Resume the saved attempt: reset a stuck tx state, reconcile, then send. */
+  async function resumeSetup() {
+    if (!runLock.tryAcquire()) return;
+    try {
+      if (!publicKey || !client) return;
+      const phase = tx.state.phase;
+      if (!canResumeCreateSetup(phase)) return;
+      if (needsTxResetBeforeResume(phase)) tx.reset();
+      const loaded = loadSavedIntent(publicKey.toBase58());
+      if (loaded.kind === "corrupt") {
+        setSetupConflict({ message: loaded.message, allowResume: false });
+        return;
+      }
+      if (loaded.kind === "none") {
+        setSetupConflict(null);
+        setSetupNotice(null);
+        setProgressNote("There is no unfinished setup to resume.");
+        return;
+      }
+      await runSetup(loaded.intent);
+    } catch (err) {
+      reportUnexpected(err);
+    } finally {
+      runLock.release();
+    }
+  }
+
+  /** Forget the saved setup only when that cannot lead to a duplicate contract. */
+  async function discardSetup() {
+    if (!runLock.tryAcquire()) return;
+    try {
+      if (!publicKey) return;
+      const employer = publicKey.toBase58();
+      const forget = (note: string | null) => {
+        clearCreateIntent(intentStorage(), INTENT_SCOPE, employer);
+        setIntentVersion((v) => v + 1);
+        setSetupProgress(null);
+        setSetupConflict(null);
+        setSetupNotice(null);
+        setCreatedAddress(null);
+        setProgressNote(note);
+        tx.reset();
+      };
+      if (isCreateTxInFlight(tx.state.phase)) {
+        setProgressNote(
+          "A transaction is still in progress. Wait for it to finish before discarding the setup."
+        );
+        return;
+      }
+      const loaded = loadSavedIntent(employer);
+      if (loaded.kind === "none") {
+        forget(null);
+        return;
+      }
+      if (loaded.kind === "corrupt") {
+        // Unreadable data cannot be reconciled with the chain.
+        forget(
+          "The unreadable saved setup was removed. Check your contracts list for any contract from the earlier attempt."
+        );
+        return;
+      }
+      const intent = loaded.intent;
+      let chain: DiscardChainState = "not_checked";
+      if (intent.createAttempted) {
+        if (!client) {
+          setProgressNote("Connect your wallet so the chain can be checked before discarding.");
+          return;
+        }
+        setProgressNote("Checking the chain before discarding…");
+        try {
+          const onChain = await fetchContractIfExists(
+            client.program,
+            new PublicKey(intent.contractAddress)
+          );
+          chain = onChain ? "exists" : "absent";
+        } catch {
+          chain = "unknown";
+        }
+      }
+      const decision = decideDiscard({
+        intent,
+        txPhase: txRef.current.state.phase,
+        chain,
+        nowMs: Date.now(),
+      });
+      if (!decision.allowed) {
+        setProgressNote(decision.message);
+        return;
+      }
+      forget(
+        decision.contractExists
+          ? `Setup discarded in this browser. The contract already on-chain stays at ${intent.contractAddress}; manage it from your contracts list.`
+          : null
+      );
+    } catch (err) {
+      reportUnexpected(err);
+    } finally {
+      runLock.release();
+    }
+  }
+
+  const setupInFlight = setupRunning || isCreateTxInFlight(tx.state.phase);
+  const unfinishedAttempt = savedIntent?.createAttempted ?? false;
+  // Chain state observed in this session, for the saved setup only.
+  const verifiedProgress =
+    setupProgress && savedIntent && setupProgress.contractAddress === savedIntent.contractAddress
+      ? setupProgress
+      : null;
+  const attentionMessage = setupConflict?.message ?? savedCorruptMessage;
+  const showRecovery =
+    !setupInFlight &&
+    !successOpen &&
+    (attentionMessage != null || setupNotice != null || unfinishedAttempt);
+  // Open contract only once a chain read established that the contract exists.
+  const recoveryAddress = verifiedProgress?.contractExists ? verifiedProgress.contractAddress : null;
+  const recoveryLines = savedCorruptMessage
+    ? []
+    : verifiedProgress
+      ? createProgressLines(verifiedProgress)
+      : unfinishedAttempt
+        ? ["Chain state not checked yet. Resume setup checks it before sending anything."]
+        : [];
+  const canResume =
+    unfinishedAttempt &&
+    savedCorruptMessage == null &&
+    (!setupConflict || setupConflict.allowResume);
+  const canDiscard =
+    savedCorruptMessage != null ||
+    (savedIntent != null && (unfinishedAttempt || setupConflict != null));
 
   const canAdvance = stepReady(step, draft, errors, allocation?.allocated === mainAmount);
 
@@ -627,7 +1136,7 @@ export function CreateWizard() {
               type="button"
               variant="ghost"
               onClick={() => setStep((s) => Math.max(0, s - 1))}
-              disabled={tx.busy}
+              disabled={setupInFlight}
               className="min-h-11 px-4 py-2.5 sm:min-h-0 sm:py-2"
             >
               Back
@@ -645,15 +1154,76 @@ export function CreateWizard() {
           ) : (
             <Button
               type="button"
-              onClick={() => void submit()}
-              disabled={tx.busy || Object.keys(errors).length > 0 || !client}
+              onClick={() => void startCreate()}
+              disabled={setupInFlight || Object.keys(errors).length > 0 || !client}
               className="min-h-11 px-4 py-2.5 sm:min-h-0 sm:py-2"
             >
-              Create contract
+              {CREATE_SEND_OFFER_LABEL}
             </Button>
           )}
         </div>
         {progressNote ? <p className="mt-2 text-sm text-ink-soft">{progressNote}</p> : null}
+        {showRecovery ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className="mt-3 rounded-2xl border border-line bg-paper px-4 py-3 text-sm"
+          >
+            <p className="font-medium text-ink">
+              {attentionMessage ? "Setup needs your attention" : SETUP_INCOMPLETE_LABEL}
+            </p>
+            {recoveryLines.length > 0 ? (
+              <ul className="mt-1 space-y-0.5 text-ink-soft">
+                {recoveryLines.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            ) : null}
+            {attentionMessage ? <p className="mt-1 text-danger">{attentionMessage}</p> : null}
+            {setupNotice ? <p className="mt-1 text-ink-soft">{setupNotice}</p> : null}
+            {canResume && !attentionMessage && !setupNotice ? (
+              <p className="mt-1 text-xs text-ink-faint">
+                Resume setup checks the chain first and only sends the missing steps.
+              </p>
+            ) : null}
+            {recoveryAddress ? (
+              <div className="mt-2">
+                <Address value={recoveryAddress} label="Contract" />
+              </div>
+            ) : null}
+            <div className="mt-3 flex flex-wrap gap-2">
+              {canResume ? (
+                <Button
+                  type="button"
+                  onClick={() => void resumeSetup()}
+                  disabled={!client || !canResumeCreateSetup(tx.state.phase)}
+                >
+                  {RESUME_SETUP_LABEL}
+                </Button>
+              ) : null}
+              {recoveryAddress ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => router.push(`/contracts/${recoveryAddress}`)}
+                >
+                  {OPEN_CONTRACT_LABEL}
+                </Button>
+              ) : null}
+              {canDiscard ? (
+                <Button type="button" variant="ghost" onClick={() => void discardSetup()}>
+                  Discard setup
+                </Button>
+              ) : null}
+            </div>
+            {canDiscard ? (
+              <p className="mt-2 text-xs text-ink-faint">
+                Discard checks the chain first and only forgets this setup in this browser.
+                Anything already on-chain stays and can be managed from the contract page.
+              </p>
+            ) : null}
+          </div>
+        ) : null}
         <div className="mt-3">
           <TransactionStatus state={tx.state} />
         </div>
@@ -709,7 +1279,7 @@ export function CreateWizard() {
 
       <SuccessMoment
         open={successOpen}
-        title="Contract created"
+        title="Offer sent"
         body={
           draft.paymentMode === "Hourly"
             ? "Funded for the authorized budget. Earnings follow recorded work sessions."
@@ -908,10 +1478,13 @@ function ReviewPanel({
       <h2 className="text-sm font-semibold uppercase tracking-[0.14em] text-ink-faint">
         Review
       </h2>
-      <h3 className="mt-1 font-display text-xl">Confirm and create</h3>
+      <h3 className="mt-1 font-display text-xl">Confirm and send offer</h3>
       <p className="mt-1 text-xs text-ink-soft">
-        Creating funds the contract from your wallet
-        {draft.paymentMode === "Milestone" ? ", then locks milestones in follow-up steps" : ""}.
+        Create &amp; Send Offer funds the contract from your wallet
+        {draft.paymentMode === "Milestone"
+          ? ", adds each milestone, then sends the offer. Your wallet asks you to approve each step"
+          : " and sends the offer to the freelancer"}
+        .
       </p>
       {draft.paymentMode === "Hourly" ? (
         <p className="mt-2 text-xs text-ink-soft">{HOURLY_COPY.fundExplain}</p>

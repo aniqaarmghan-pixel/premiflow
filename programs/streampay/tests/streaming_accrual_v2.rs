@@ -452,6 +452,33 @@ fn accrues_half_then_full_and_caps() {
 }
 
 #[test]
+fn backward_clock_after_release_is_noop_then_resumes() {
+    let mut env = setup(TOTAL_AMOUNT);
+    let (id, start) = activate_streaming(&mut env, TOTAL_AMOUNT);
+    let end = start + DURATION;
+    env.warp(start + 40);
+    env.release(id).unwrap();
+    let released = expected_accrued(TOTAL_AMOUNT, start, end, start + 40);
+    let c = env.read_contract(&env.contract_pda(id));
+    assert_eq!(c.stream_released_amount, released);
+
+    env.warp(start + 20);
+    env.release(id).unwrap();
+    let c = env.read_contract(&env.contract_pda(id));
+    assert_eq!(c.stream_released_amount, released, "earlier clock adds nothing");
+    assert_eq!(c.released_amount, released, "earlier clock never reduces earnings");
+    assert_eq!(c.status, ContractStatus::Active);
+
+    env.warp(start + 50);
+    env.release(id).unwrap();
+    let c = env.read_contract(&env.contract_pda(id));
+    let at_50 = expected_accrued(TOTAL_AMOUNT, start, end, start + 50);
+    assert_eq!(c.stream_released_amount, at_50);
+    assert_eq!(c.released_amount, at_50);
+    env.assert_no_token_movement(id, TOTAL_AMOUNT);
+}
+
+#[test]
 fn second_call_at_same_time_is_idempotent() {
     let mut env = setup(TOTAL_AMOUNT);
     let (id, start) = activate_streaming(&mut env, TOTAL_AMOUNT);

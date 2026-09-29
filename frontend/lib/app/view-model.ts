@@ -11,6 +11,7 @@ import {
   contractStatusLabel,
   equivalentHourlyRateDisplayOnly,
   estimatedStreamAccrualForContract,
+  isStreamCurrentlyAccruing,
   mayAttemptCompletion,
   paymentModeLabel,
   remainingEmployerRefund,
@@ -30,15 +31,20 @@ import {
   type WorkUnitView,
 } from "@/lib/streampay-v2";
 
+import { allowsSettlementClaims } from "@/lib/streampay-v2/types";
+import type { StreamingEarnedBasis } from "@/lib/app/stream-display";
+
 export { roleForContract };
 
-export type RoleFilter = "all" | "hiring" | "working";
+export type RoleFilter = "all" | "hiring" | "working" | "resolving";
 export type StatusFilter = "all" | ContractStatus;
 
 export type GroupedContracts = {
   all: ContractView[];
   hiring: ContractView[];
   working: ContractView[];
+  /** Contracts where the wallet is the on-chain resolver (Contracts page only). */
+  resolving?: ContractView[];
 };
 
 export function groupContractsByRole(
@@ -73,7 +79,9 @@ export function filterContracts(
       ? grouped.hiring
       : role === "working"
         ? grouped.working
-        : grouped.all;
+        : role === "resolving"
+          ? (grouped.resolving ?? [])
+          : grouped.all;
   if (status === "all") return base;
   return base.filter((c) => c.status === status);
 }
@@ -284,6 +292,16 @@ export type StreamingDashboard = {
   alreadyCollected: bigint;
   availableToCollect: bigint;
   remainingEscrow: bigint;
+  /** True only while Active and inside start..end (the only case that uses the live clock). */
+  live: boolean;
+  /** How earnedSoFar was derived: live estimate (Active) vs frozen on-chain figure. */
+  earnedBasis: StreamingEarnedBasis;
+  /** Unix time the clock figures are frozen at (0 while Active or when unknown). */
+  frozenAt: number;
+  /** Trial pay already released (releasedAmount minus stream-released), 0 without a trial. */
+  trialPaid: bigint;
+  /** Hero figure: frozen on-chain earned, or trial paid + live stream estimate while Active. */
+  displayEarned: bigint;
 };
 
 /**
@@ -296,23 +314,95 @@ export function streamingDashboard(
 ): StreamingDashboard {
   const durationSeconds = streamDurationSeconds(contract);
   const progress = financialProgress(contract);
+  const frozen = streamFrozenState(contract, durationSeconds);
+  const trialPaid =
+    contract.releasedAmount > contract.streamReleasedAmount
+      ? contract.releasedAmount - contract.streamReleasedAmount
+      : 0n;
   return {
     totalFundedStream: contract.mainAmount,
     durationSeconds,
     startTime: contract.startTime,
     endTime: contract.endTime,
-    elapsedSeconds: streamElapsedSeconds(contract, now),
-    remainingSeconds: streamRemainingSeconds(contract, now),
+    elapsedSeconds: frozen ? frozen.elapsedSeconds : streamElapsedSeconds(contract, now),
+    remainingSeconds: frozen
+      ? frozen.remainingSeconds
+      : streamRemainingSeconds(contract, now),
     equivalentHourlyRate: equivalentHourlyRateDisplayOnly(
       contract.mainAmount,
       durationSeconds
     ),
-    earnedSoFar: estimatedStreamAccrualForContract(contract, now),
+    earnedSoFar: frozen ? frozen.earned : estimatedStreamAccrualForContract(contract, now),
     alreadyRecorded: contract.releasedAmount,
     alreadyCollected: contract.withdrawnAmount,
     availableToCollect: remainingFreelancerClaim(contract),
     remainingEscrow: progress.remainingInEscrow,
+    live: frozen === null && isStreamCurrentlyAccruing(contract, now),
+    earnedBasis: frozen ? frozen.basis : "estimate",
+    frozenAt: frozen ? frozen.at : 0,
+    trialPaid,
+    displayEarned: frozen
+      ? frozen.earned
+      : trialPaid + estimatedStreamAccrualForContract(contract, now),
   };
+}
+
+type StreamFrozenState = {
+  basis: Exclude<StreamingEarnedBasis, "estimate">;
+  earned: bigint;
+  at: number;
+  elapsedSeconds: number;
+  remainingSeconds: number;
+};
+
+/**
+ * Non-Active streams never extrapolate with the browser clock. Settled statuses show
+ * the frozen on-chain freelancer settlement (falls back to released_amount); Disputed
+ * shows released_amount (materialized when the dispute opened). Clock figures freeze
+ * at disputed_at / terminated_at (end_time for Completed). Without a timestamp,
+ * elapsed comes from stream_released / main_amount and no countdown is shown.
+ */
+function streamFrozenState(
+  contract: ContractView,
+  durationSeconds: number
+): StreamFrozenState | null {
+  if (contract.status === "Active") return null;
+  const basis: StreamFrozenState["basis"] =
+    contract.status === "Disputed"
+      ? "disputed"
+      : allowsSettlementClaims(contract.status)
+        ? "settled"
+        : "frozen";
+  const earned =
+    basis === "settled" && contract.freelancerSettlementAmount > 0n
+      ? contract.freelancerSettlementAmount
+      : contract.releasedAmount;
+  const at =
+    contract.disputedAt > 0
+      ? contract.disputedAt
+      : contract.terminatedAt > 0
+        ? contract.terminatedAt
+        : contract.status === "Completed"
+          ? contract.endTime
+          : 0;
+  if (at > 0) {
+    return {
+      basis,
+      earned,
+      at,
+      elapsedSeconds: streamElapsedSeconds(contract, at),
+      remainingSeconds: streamRemainingSeconds(contract, at),
+    };
+  }
+  let elapsedSeconds = 0;
+  if (contract.startTime > 0 && contract.mainAmount > 0n && durationSeconds > 0) {
+    const streamed =
+      contract.streamReleasedAmount < contract.mainAmount
+        ? contract.streamReleasedAmount
+        : contract.mainAmount;
+    elapsedSeconds = Number((BigInt(durationSeconds) * streamed) / contract.mainAmount);
+  }
+  return { basis, earned, at: 0, elapsedSeconds, remainingSeconds: 0 };
 }
 
 export function contractActionVariant(
@@ -559,7 +649,7 @@ export function actionLabel(
     case "finalizeReviewTimeout":
       return "Release after timeout";
     case "releaseStreamAccrual":
-      return "Release accrued pay";
+      return "Update earnings";
     case "cancelActiveContract":
       return "Cancel contract";
     case "withdrawFreelancer":
@@ -755,7 +845,8 @@ export function officialDeliverableCopy(
       "By submitting, you confirm this is the version you want the employer to review.",
     messagesHint:
       "Drafts and progress updates belong in Messages. Use this action only when you are ready to start official review.",
-    recordedReference: "The submission reference is recorded with the contract.",
+    recordedReference:
+      "Your main work link, or a note that you uploaded a file, is saved with the contract so both sides can see what was submitted.",
   };
 }
 

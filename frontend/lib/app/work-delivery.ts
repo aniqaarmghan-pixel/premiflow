@@ -81,6 +81,59 @@ export function attachmentDeliverableUri(attachmentId: string): string {
   return `${ATTACHMENT_DELIVERABLE_URI_PREFIX}${attachmentId}`;
 }
 
+/** True for the internal uploaded-file placeholder. It is never a public link. */
+export function isAttachmentDeliverableUri(value: string | null | undefined): boolean {
+  return typeof value === "string" && value.trim().startsWith(ATTACHMENT_DELIVERABLE_URI_PREFIX);
+}
+
+export const SUBMITTED_WORK_LINK_LABEL = "Submitted work link";
+export const TRIAL_WORK_LINK_LABEL = "Trial work link";
+export const UPLOADED_FILE_LABEL = "Uploaded file";
+
+export type SubmittedWorkDisplay =
+  | { kind: "none"; label: string; text: string }
+  | { kind: "attachment"; label: string; text: string }
+  | { kind: "link"; label: string; text: string; href: string }
+  | { kind: "text"; label: string; text: string };
+
+function safeHttpsHref(value: string): string | null {
+  try {
+    return new URL(value).protocol === "https:" ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Presentation for the work value saved with a work unit (`submission_uri`).
+ * A freelancer-provided https URL becomes a clickable link; the internal
+ * uploaded-file placeholder is described and never linked. This value is not a
+ * transaction and does not prove file contents.
+ */
+export function submittedWorkDisplay(raw: string | null | undefined): SubmittedWorkDisplay {
+  const value = typeof raw === "string" ? raw.trim() : "";
+  if (!value) {
+    return { kind: "none", label: "Submitted work", text: "Not submitted yet" };
+  }
+  if (isAttachmentDeliverableUri(value)) {
+    return { kind: "attachment", label: "Submitted work", text: "Uploaded file (see files below)" };
+  }
+  const href = safeHttpsHref(value);
+  if (href) {
+    return { kind: "link", label: SUBMITTED_WORK_LINK_LABEL, text: value, href };
+  }
+  return { kind: "text", label: SUBMITTED_WORK_LINK_LABEL, text: value };
+}
+
+const TRANSACTION_SIGNATURE_RE = /^[1-9A-HJ-NP-Za-km-z]{64,128}$/;
+
+/** The saved Solana transaction signature, or null when none was saved. Never invents one. */
+export function savedTransactionSignature(value: string | null | undefined): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return TRANSACTION_SIGNATURE_RE.test(trimmed) ? trimmed : null;
+}
+
 export function validateDeliveryNote(raw: unknown): { ok: true; value: string } | { ok: false; error: string } {
   if (typeof raw !== "string") {
     return { ok: false, error: "Delivery note is required." };

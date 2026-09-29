@@ -9,6 +9,7 @@ import {
   canStartHourlyWork,
   canStopHourlyWork,
   displayHourlyWorkLog,
+  employerEndBlockedBySession,
   employerSeesActiveSession,
   formatElapsedClock,
   formatHourlyDuration,
@@ -394,6 +395,46 @@ test("End hourly contract gating and active session blocks End", () => {
   assert.equal(clientMethodForAction("endHourlyContract"), "endHourlyContract");
 });
 
+test("Employer sees session-in-progress info (no End button) while session runs", () => {
+  const idle = makeHourlyState();
+  const open = makeHourlyState({ sessionCount: 1, activeSessionIndex: 0 });
+  const contract = hourlyContract();
+
+  // A: running session → blocked control + copy, no End action, no Stop for employer.
+  const blocked = { role: "employer" as const, contract, hourlyState: open };
+  assert.equal(employerEndBlockedBySession(blocked), true);
+  assert.equal(canEndHourlyContract(blocked), false);
+  assert.equal(canStopHourlyWork(blocked), false);
+  assert.match(HOURLY_COPY.endBlockedBySession, /active work session/);
+  assert.match(HOURLY_COPY.endBlockedBySession, /open a dispute/);
+  const employerOpen = availableActions({
+    wallet: WALLET_A,
+    contract,
+    hourlyState: open,
+    now: contract.startTime + 10,
+  });
+  assert.equal(employerOpen.includes("endHourlyContract"), false);
+  assert.equal(employerOpen.includes("stopHourlySession"), false);
+  const showcase = readFileSync(
+    new URL("../../../components/contracts/HourlyShowcase.tsx", import.meta.url),
+    "utf8"
+  );
+  // Approved UX: an informational status replaces the disabled End button.
+  assert.match(showcase, /endBlocked \? \(\s*<p\s+role="status"/);
+  assert.match(showcase, /HOURLY_COPY\.employerSessionInProgress/);
+  assert.doesNotMatch(showcase, /endBlocked \? \(\s*<Button disabled/);
+
+  // B: no running session → normal enabled End, not blocked.
+  const enabled = { role: "employer" as const, contract, hourlyState: idle };
+  assert.equal(employerEndBlockedBySession(enabled), false);
+  assert.equal(canEndHourlyContract(enabled), true);
+
+  // C: freelancer running session → Stop unchanged, never blocked-End copy.
+  const freelancer = { role: "freelancer" as const, contract, hourlyState: open };
+  assert.equal(canStopHourlyWork(freelancer), true);
+  assert.equal(employerEndBlockedBySession(freelancer), false);
+});
+
 test("trial approval does not imply timer started", () => {
   const copy = hourlyActivationCopy(
     hourlyContract({ trialAmount: 5_000_000n, totalAmount: 85_000_000n })
@@ -501,7 +542,7 @@ test("work-log sentinel is never Resolution Center evidence", () => {
     false
   );
   assert.equal(
-    sentinelContext.facts.some((fact) => fact.label === "Work log reference"),
+    sentinelContext.facts.some((fact) => fact.label === "Work log link or note"),
     false
   );
 
@@ -521,7 +562,7 @@ test("work-log sentinel is never Resolution Center evidence", () => {
   assert.ok(
     realContext.facts.some(
       (fact) =>
-        fact.label === "Work log reference" && fact.value === "https://notes.test/log"
+        fact.label === "Work log link or note" && fact.value === "https://notes.test/log"
     )
   );
 });

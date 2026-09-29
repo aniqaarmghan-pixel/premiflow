@@ -11,6 +11,9 @@ import {
   submissionKindFromWorkUnit,
   validateDeliveryPayload,
   validateDeliveryUrl,
+  attachmentDeliverableUri,
+  savedTransactionSignature,
+  submittedWorkDisplay,
 } from "../work-delivery";
 import { ATTACHMENT_AI_POLICY } from "../attachments-policy";
 import { CONTRACT_MESSAGE_AI_POLICY } from "../contract-messages";
@@ -185,4 +188,80 @@ test("Assistant privacy remains default-off for delivery history", () => {
   assert.doesNotMatch(DETAIL, /\/api\/copilot/);
   assert.doesNotMatch(FORM, /\/api\/copilot/);
   assert.doesNotMatch(HISTORY, /\/api\/copilot/);
+});
+
+const UPLOAD_ID = "123e4567-e89b-12d3-a456-426614174000";
+const SAVED_SIG = "5".repeat(88);
+
+test("submitted work display: https link is clickable, upload placeholder is not", () => {
+  const link = submittedWorkDisplay("https://figma.example/file/1");
+  assert.equal(link.kind, "link");
+  assert.equal(link.label, "Submitted work link");
+  assert.equal(link.kind === "link" && link.href, "https://figma.example/file/1");
+
+  const placeholder = submittedWorkDisplay(attachmentDeliverableUri(UPLOAD_ID));
+  assert.equal(placeholder.kind, "attachment");
+  assert.equal("href" in placeholder, false);
+  assert.match(placeholder.text, /uploaded file/i);
+  assert.doesNotMatch(placeholder.text, /https?:/);
+
+  const empty = submittedWorkDisplay("");
+  assert.equal(empty.kind, "none");
+  assert.equal(empty.text, "Not submitted yet");
+
+  for (const raw of ["ipfs://bafyMainSubmission", "javascript:alert(1)", "http://plain.example/x"]) {
+    const other = submittedWorkDisplay(raw);
+    assert.equal(other.kind, "text");
+    assert.equal("href" in other, false);
+  }
+});
+
+test("submitted work wording never claims a transaction or blockchain proof", () => {
+  for (const raw of ["", "https://figma.example/a", attachmentDeliverableUri(UPLOAD_ID)]) {
+    const display = submittedWorkDisplay(raw);
+    assert.doesNotMatch(
+      `${display.label} ${display.text}`,
+      /transaction|blockchain proof|on-chain reference/i
+    );
+  }
+});
+
+test("saved transaction signature is only returned when a real one was saved", () => {
+  assert.equal(savedTransactionSignature(SAVED_SIG), SAVED_SIG);
+  assert.equal(savedTransactionSignature(` ${SAVED_SIG} `), SAVED_SIG);
+  assert.equal(savedTransactionSignature(null), null);
+  assert.equal(savedTransactionSignature(undefined), null);
+  assert.equal(savedTransactionSignature(""), null);
+  assert.equal(savedTransactionSignature("not-a-signature"), null);
+  assert.equal(savedTransactionSignature("0".repeat(88)), null);
+  assert.equal(savedTransactionSignature("https://figma.example/a"), null);
+});
+
+test("delivery history shows View transaction only for a saved signature via explorerTxUrl", () => {
+  assert.match(HISTORY, /import \{ explorerTxUrl \} from "@\/lib\/network";/);
+  assert.match(HISTORY, /savedTransactionSignature\(submission\.transactionSignature\)/);
+  assert.match(
+    HISTORY,
+    /\{txSignature \? \([\s\S]*?href=\{explorerTxUrl\(txSignature\)\}[\s\S]*?target="_blank"[\s\S]*?rel="noopener noreferrer"[\s\S]*?View transaction \u2197[\s\S]*?\) : null\}/
+  );
+  assert.equal((HISTORY.match(/explorerTxUrl\(/g) ?? []).length, 1);
+});
+
+test("work unit card uses friendly submitted work wording, not on-chain jargon", () => {
+  assert.match(DETAIL, /submittedWorkDisplay\(unit\.submissionUri\)/);
+  assert.match(DETAIL, /Technical details/);
+  assert.match(DETAIL, /Work log link or note \(optional\)/);
+  assert.match(
+    DETAIL,
+    /display\.kind === "link"[\s\S]*?href=\{display\.href\}[\s\S]*?rel="noopener noreferrer"/
+  );
+  assert.match(FORM, /saved with the contract as your submitted work link/);
+  const resolutionUi = readFileSync(
+    new URL("../../../components/contracts/ResolutionCenter.tsx", import.meta.url),
+    "utf8"
+  );
+  for (const source of [DETAIL, FORM, HISTORY, resolutionUi]) {
+    assert.doesNotMatch(source, /on-chain reference/i);
+    assert.doesNotMatch(source, /Submission reference/);
+  }
 });

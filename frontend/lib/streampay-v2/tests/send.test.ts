@@ -21,6 +21,7 @@ import {
   TransactionExpiredBeforeSubmitError,
   formatExpiredBeforeSubmitDevDiagnostic,
   recentBlockhashFromSerialized,
+  shouldRefuseExpiredSend,
   type BlockhashBoundarySnapshot,
   type ExpiredBeforeSubmitDiagnostics,
   type SendPipelinePhase,
@@ -343,6 +344,8 @@ test("already-invalid signed blockhash is not sent", async () => {
           lastValidBlockHeight: 1_150,
         }),
         ...liveHashDeps({
+          // Past lastValidBlockHeight (1_150): the blockhash is truly dead.
+          getBlockHeight: async () => 1_151,
           isBlockhashValid: async () => false,
         }),
         sendRawTransaction: async () => {
@@ -457,6 +460,8 @@ test("BeforeSubmitError proves no sendRawTransaction occurred", async () => {
           lastValidBlockHeight: 1_150,
         }),
         ...liveHashDeps({
+          // Past lastValidBlockHeight (1_150): the blockhash is truly dead.
+          getBlockHeight: async () => 1_151,
           isBlockhashValid: async () => false,
         }),
         sendRawTransaction: async () => {
@@ -862,4 +867,55 @@ test("expired_before_submit diagnostic is development-only in parseClientError",
   } finally {
     env.NODE_ENV = previous;
   }
+});
+
+test("lone isBlockhashValid=false with healthy remaining blocks still broadcasts once", async () => {
+  const payer = Keypair.generate();
+  const tx = unsignedTransfer(payer.publicKey);
+  let sendCalls = 0;
+
+  const signature = await sendV2Transaction(tx, {
+    connection: {} as never,
+    wallet: {
+      publicKey: payer.publicKey,
+      signTransaction: signPayer(payer),
+    },
+    getLatestBlockhash: async () => ({
+      blockhash: FRESH_HASH,
+      lastValidBlockHeight: 1_120,
+    }),
+    ...liveHashDeps({
+      getBlockHeight: async () => 1_000,
+      isBlockhashValid: async () => false,
+    }),
+    sendRawTransaction: async () => {
+      sendCalls += 1;
+      return SIG;
+    },
+    confirmSignature: async () => ({
+      outcome: "confirmed",
+      signature: SIG,
+      confirmationStatus: "confirmed",
+    }),
+  });
+
+  assert.equal(signature, SIG);
+  assert.equal(sendCalls, 1);
+});
+
+test("refusal predicate: known remaining block height is authoritative", () => {
+  assert.equal(shouldRefuseExpiredSend(false, 120), false);
+  assert.equal(shouldRefuseExpiredSend(true, 120), false);
+  assert.equal(shouldRefuseExpiredSend(null, 120), false);
+  assert.equal(shouldRefuseExpiredSend(true, 11), false);
+  assert.equal(shouldRefuseExpiredSend(true, 10), true);
+  assert.equal(shouldRefuseExpiredSend(false, 5), true);
+  assert.equal(shouldRefuseExpiredSend(true, 5), true);
+  assert.equal(shouldRefuseExpiredSend(true, -1), true);
+});
+
+test("refusal predicate: validity decides only when remaining is unknown", () => {
+  assert.equal(shouldRefuseExpiredSend(false, null), true);
+  assert.equal(shouldRefuseExpiredSend(true, null), false);
+  assert.equal(shouldRefuseExpiredSend(null, null), false);
 });

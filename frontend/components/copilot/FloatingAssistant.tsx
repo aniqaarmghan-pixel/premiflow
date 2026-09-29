@@ -16,10 +16,10 @@ import {
 } from "@/lib/app/copilot-live";
 import { useContracts } from "@/lib/hooks/ContractsProvider";
 import {
-  presentStatus,
   presentType,
   roleForContract,
 } from "@/lib/app/view-model";
+import { roleAwareStatusLabel } from "@/lib/app/dashboard-offers";
 
 const ASSISTANT_ICON = "/brand/premiflow-assistant.png";
 const ASSISTANT_INTRINSIC = 256;
@@ -72,7 +72,7 @@ export function FloatingAssistant() {
         contractAddress,
         role: roleLabelForAssistant(role),
         paymentMode: presentType(contract.paymentMode),
-        statusLabel: presentStatus(contract.status),
+        statusLabel: roleAwareStatusLabel(publicKey, contract),
       };
     }
     return {

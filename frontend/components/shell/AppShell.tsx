@@ -1,21 +1,29 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   Activity,
+  ArrowLeftRight,
+  CheckCircle2,
   CircleHelp,
   FilePlus2,
+  Gavel,
+  History,
+  Inbox,
   Info,
   LayoutDashboard,
   Menu,
   ScrollText,
   X,
+  type LucideIcon,
 } from "lucide-react";
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { brand } from "@/lib/brand";
+import { RESOLVER_NAV, isNavActive, type WorkspaceMode } from "@/lib/app/resolver-workspace";
+import { useWorkspace } from "@/lib/hooks/useWorkspace";
 import { BrandMark } from "@/components/brand/BrandMark";
 import { FloatingAssistant } from "@/components/copilot/FloatingAssistant";
 import { ClientOnly } from "./ClientOnly";
@@ -33,19 +41,41 @@ const NAV = [
   { href: "/support", label: "Help & Support", icon: CircleHelp },
 ];
 
+const RESOLVER_ICONS: Record<string, LucideIcon> = {
+  "/resolver": Gavel,
+  "/resolver/assigned": Inbox,
+  "/resolver/resolved": CheckCircle2,
+  "/resolver/activity": History,
+  "/support": CircleHelp,
+};
+
+const RESOLVER_NAV_ITEMS = RESOLVER_NAV.map((item) => ({
+  href: item.href as string,
+  label: item.label as string,
+  icon: RESOLVER_ICONS[item.href] ?? CircleHelp,
+}));
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const workspace = useWorkspace();
+  const nav: ReadonlyArray<{ href: string; label: string; icon: LucideIcon }> =
+    workspace.mode === "resolver" ? RESOLVER_NAV_ITEMS : NAV;
+  const switchWorkspace = () => {
+    const next = workspace.toggle();
+    router.push(next === "resolver" ? "/resolver" : "/");
+  };
 
   return (
-    <div className="min-h-screen min-w-0 lg:grid lg:grid-cols-[248px_minmax(0,1fr)]">
-      <aside className="hidden bg-navy px-4 py-6 text-white lg:flex lg:flex-col">
+    <div className="min-h-screen min-w-0 lg:grid lg:grid-cols-[224px_minmax(0,1fr)] 2xl:grid-cols-[248px_minmax(0,1fr)]">
+      <aside className="hidden bg-navy px-3.5 py-5 text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:self-start lg:overflow-y-auto">
         <Link href="/" className="px-2">
-          <BrandMark light size={56} />
+          <BrandMark light size={44} />
           <p
-            className="mt-4"
+            className="mt-3"
             style={{
-              fontSize: 14.5,
+              fontSize: 13,
               fontWeight: 500,
               lineHeight: 1.45,
               color: "rgba(233, 238, 242, 0.82)",
@@ -54,12 +84,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {brand.tagline}
           </p>
         </Link>
-        <nav className="mt-8 flex flex-1 flex-col gap-1">
-          {NAV.map((item) => {
-            const active =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href);
+        {workspace.canSwitch ? (
+          <WorkspaceSwitch mode={workspace.mode} onToggle={switchWorkspace} />
+        ) : null}
+        <nav className="mt-6 flex flex-1 flex-col gap-1">
+          {nav.map((item) => {
+            const active = isNavActive(item.href, pathname);
             const Icon = item.icon;
             return (
               <Link
@@ -125,7 +155,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </ClientOnly>
         </header>
-        <main className="mx-auto w-full min-w-0 max-w-6xl flex-1 overflow-x-hidden px-3 pb-28 pt-5 sm:px-6 sm:pb-24 sm:pt-6 lg:px-8 lg:pb-10 lg:pt-6">
+        <main className="mx-auto w-full min-w-0 max-w-6xl flex-1 overflow-x-hidden px-3 pb-28 pt-5 sm:px-6 sm:pb-24 sm:pt-6 lg:px-6 lg:pb-10 lg:pt-5 xl:px-8 2xl:max-w-7xl">
           {children}
         </main>
         <ClientOnly>
@@ -159,7 +189,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <X size={18} />
                 </button>
               </div>
-              {NAV.map((item) => (
+              {workspace.canSwitch ? (
+                <WorkspaceSwitch
+                  mode={workspace.mode}
+                  onToggle={() => {
+                    setOpen(false);
+                    switchWorkspace();
+                  }}
+                />
+              ) : null}
+              {nav.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}
@@ -180,5 +219,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         ) : null}
       </AnimatePresence>
     </div>
+  );
+}
+
+function WorkspaceSwitch({ mode, onToggle }: { mode: WorkspaceMode; onToggle: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="mb-2 mt-3 inline-flex w-full items-center gap-2 rounded-xl border border-white/15 px-3 py-1.5 text-xs text-white/75 transition hover:bg-white/10 hover:text-white"
+    >
+      <ArrowLeftRight size={14} />
+      {mode === "resolver" ? "Switch to contracts workspace" : "Switch to resolver workspace"}
+    </button>
   );
 }

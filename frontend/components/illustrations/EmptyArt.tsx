@@ -5,7 +5,7 @@ export function EmptyArt({
 }: {
   kind?: "generic" | "wallet" | "streams" | "contracts" | "reviews" | "activity";
 }) {
-  const frame = "mx-auto h-52 w-full max-w-[440px]";
+  const frame = "mx-auto h-36 w-full max-w-[360px] sm:h-40";
 
   if (kind === "wallet") {
     return (

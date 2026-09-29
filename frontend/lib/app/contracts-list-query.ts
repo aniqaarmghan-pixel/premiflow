@@ -65,7 +65,7 @@ type SearchParamsLike = {
 };
 
 function parseRole(raw: string | null): RoleFilter {
-  if (raw === "hiring" || raw === "working") return raw;
+  if (raw === "hiring" || raw === "working" || raw === "resolving") return raw;
   return "all";
 }
 
@@ -149,6 +149,8 @@ export function filterContractsByListQuery(
   grouped: GroupedContracts,
   query: ContractsListQuery
 ): ContractView[] {
+  // Claim filters are this wallet's party balances; resolver cases have none.
+  if (query.role === "resolving" && query.claim !== "none") return [];
   const statusForRoleFilter: StatusFilter =
     query.status === "review" || query.status === "all" ? "all" : query.status;
   let list = filterContracts(grouped, query.role, statusForRoleFilter);
@@ -209,6 +211,12 @@ export function contractsListEmptyCopy(query: ContractsListQuery): {
     return {
       title: "No active contracts",
       body: "No loaded contracts are currently Active for this filter.",
+    };
+  }
+  if (query.role === "resolving") {
+    return {
+      title: "No assigned disputes",
+      body: "Contracts that name this wallet as the designated resolver appear here.",
     };
   }
   if (query.role === "hiring") {

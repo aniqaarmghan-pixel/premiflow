@@ -456,7 +456,7 @@ export function ContractMessages({
     <>
       <section
         aria-labelledby="contract-messages-heading"
-        className="rounded-[24px] border border-line bg-card p-5"
+        className="rounded-[24px] border border-line bg-card p-4 sm:p-5"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
@@ -465,7 +465,7 @@ export function ContractMessages({
             </p>
             <h2
               id="contract-messages-heading"
-              className="mt-1 flex flex-wrap items-center gap-2 font-display text-2xl"
+              className="mt-1 flex flex-wrap items-center gap-2 font-display text-xl"
             >
               <MessagesSquare size={20} aria-hidden="true" />
               {CONTRACT_MESSAGES_TITLE}

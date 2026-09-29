@@ -1,6 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 
 import { CONTRACT_ACCOUNT, WORK_UNIT_ACCOUNT } from "./constants";
+import { deriveWorkUnitPda } from "./pda";
 import type { StreamPayV2Program } from "./program";
 import {
   bnToBigInt,
@@ -165,6 +166,47 @@ export async function fetchWorkUnit(
   return decodeWorkUnit(address, account);
 }
 
+/**
+ * Like `fetchContract`, but resolves `null` when the account does not exist.
+ * RPC and decode errors still throw — never treat them as "absent".
+ */
+export async function fetchContractIfExists(
+  program: StreamPayV2Program,
+  address: PublicKey
+): Promise<ContractView | null> {
+  const account = await program.account.contract.fetchNullable(address);
+  return account ? decodeContract(address, account) : null;
+}
+
+/**
+ * Indexed work units `[0, count)` of a contract (milestones / fixed unit),
+ * `null` where an account does not exist. RPC errors throw.
+ */
+export async function fetchIndexedWorkUnits(
+  program: StreamPayV2Program,
+  contract: PublicKey,
+  count: number
+): Promise<Array<WorkUnitView | null>> {
+  if (count <= 0) return [];
+  const addresses = Array.from(
+    { length: count },
+    (_, index) => deriveWorkUnitPda(contract, index, program.programId).address
+  );
+  const accounts = await program.account.workUnit.fetchMultiple(addresses);
+  return accounts.map((account, index) =>
+    account ? decodeWorkUnit(addresses[index], account) : null
+  );
+}
+
+/** HourlyState at `address`, or null when the account does not exist (RPC errors throw). */
+export async function fetchHourlyStateIfExists(
+  program: StreamPayV2Program,
+  address: PublicKey
+): Promise<HourlyStateView | null> {
+  const account = await program.account.hourlyState.fetchNullable(address);
+  return account ? decodeHourlyState(address, account) : null;
+}
+
 const HOURLY_SESSION_STATUSES: readonly HourlySessionStatus[] = [
   "Open",
   "Recorded",
@@ -272,6 +314,30 @@ export async function fetchContractsForFreelancer(
       memcmp: {
         offset: CONTRACT_ACCOUNT.freelancerOffset,
         bytes: freelancer.toBase58(),
+      },
+    },
+  ]);
+  return accounts.map((item) => decodeContract(item.publicKey, item.account));
+}
+
+/**
+ * Resolver pubkey offset in the V2 Contract account: 8-byte discriminator +
+ * version(1) + employer(32) + freelancer(32) + token_mint(32) + contract_id(8)
+ * + payment_mode/status/start_mode(3) + ten u64 amount fields (80) = 196.
+ * Matches CONTRACT_CASE_OFFSETS.resolver in the server case-facts decoder.
+ */
+export const CONTRACT_RESOLVER_OFFSET = 196;
+
+/** Contracts naming this wallet as the designated resolver (memcmp at 196). */
+export async function fetchContractsForResolver(
+  program: StreamPayV2Program,
+  resolver: PublicKey
+): Promise<ContractView[]> {
+  const accounts = await program.account.contract.all([
+    {
+      memcmp: {
+        offset: CONTRACT_RESOLVER_OFFSET,
+        bytes: resolver.toBase58(),
       },
     },
   ]);

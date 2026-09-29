@@ -312,3 +312,43 @@ test("Resolution Center UI does not invent AI analysis or attachment storage", (
   assert.match(SUPPORT_PAGE.assistantTagline, /AI guidance throughout PREMIFLOW/i);
   assert.doesNotMatch(SUPPORT_PAGE.intro, /AI assistant yet/i);
 });
+
+test("work link facts: https links are linkable, upload placeholders are not", () => {
+  const contract = makeContract({
+    status: "Active",
+    paymentMode: "Fixed",
+    totalAmount: 15n,
+    trialAmount: 5n,
+    mainAmount: 10n,
+    releasedAmount: 0n,
+    maxRevisions: 2,
+  });
+  const main = makeWorkUnit({
+    kind: "Fixed",
+    status: "Submitted",
+    submissionUri: "https://example.test/work",
+  });
+  const trial = makeWorkUnit({
+    kind: "Trial",
+    status: "Submitted",
+    submissionUri:
+      "https://premiflow.app/deliverable/attachment/123e4567-e89b-12d3-a456-426614174000",
+  });
+  const context = resolutionContext(contract, [trial, main], 1_500);
+  const work = context.facts.find((fact) => fact.label === "Submitted work link");
+  assert.equal(work?.value, "https://example.test/work");
+  assert.equal(work?.href, "https://example.test/work");
+  const trialFact = context.trial?.find((fact) => fact.label === "Trial work link");
+  assert.equal(trialFact?.value, "Uploaded file");
+  assert.equal(trialFact?.href, undefined);
+  assert.ok(
+    ![...context.facts, ...(context.trial ?? [])].some((fact) =>
+      /Submission reference|Trial submission|On-chain reference/i.test(fact.label)
+    )
+  );
+  const ui = readFileSync(
+    new URL("../../../components/contracts/ResolutionCenter.tsx", import.meta.url),
+    "utf8"
+  );
+  assert.match(ui, /fact\.href \?[\s\S]*?href=\{fact\.href\}[\s\S]*?rel="noopener noreferrer"/);
+});

@@ -71,6 +71,10 @@ export const HOURLY_COPY = {
   salarySection: "Salary",
   stopNotWithdraw: "Stopping a session records time. It does not transfer tokens.",
   employerActive: "Freelancer work session is active.",
+  employerSessionInProgress:
+    "Freelancer work session in progress. The contract can be ended after the freelancer stops the current session. Need to end it now? Open a dispute.",
+  endBlockedBySession:
+    "The freelancer currently has an active work session. The contract can be ended after the session is stopped. If you need to end it now, open a dispute.",
   employerSalaryView:
     "Salary figures below are contract accounting. Collect is a freelancer action.",
   endExplain:
@@ -327,6 +331,19 @@ export function employerSeesActiveSession(input: {
   return input.role === "employer" && hasActiveHourlySession(input.hourlyState);
 }
 
+/** Employer End control is shown disabled while the freelancer's session runs. */
+export function employerEndBlockedBySession(input: {
+  role: ContractRole;
+  contract: ContractView;
+  hourlyState: HourlyStateView | null;
+}): boolean {
+  return (
+    input.contract.paymentMode === "Hourly" &&
+    input.contract.status === "Active" &&
+    employerSeesActiveSession(input)
+  );
+}
+
 export function hourlyActivationCopy(contract: ContractView): string | null {
   if (contract.paymentMode !== "Hourly" || contract.status !== "Active") {
     return null;
@@ -369,7 +386,7 @@ export function stopHourlyCopy(): {
       "Collect released pay separately with Collect pay.",
     ],
     workLogHint:
-      "Optional URL or note. PREMIFLOW does not host files. The program requires a non-empty work-log URI, so an empty field sends an internal “no work log” marker. That marker is not an attachment or evidence.",
+      "Optional link or short note about this session. PREMIFLOW does not host files. If you leave it blank, the contract simply records that no work log was added. This is not an attachment or evidence.",
   };
 }
 

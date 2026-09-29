@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import {
   HOURLY_COPY,
+  employerEndBlockedBySession,
   formatElapsedClock,
   formatHourlyDuration,
   formatSessionStartedAt,
@@ -77,6 +78,7 @@ export function HourlyShowcase({
     contract.status === "Active" &&
     !running &&
     Boolean(dash?.authorizedTimeRemaining);
+  const endBlocked = employerEndBlockedBySession({ role, contract, hourlyState });
 
   if (!dash) {
     return (
@@ -96,7 +98,7 @@ export function HourlyShowcase({
 
   return (
     <div
-      className={`rounded-[24px] border p-5 sm:p-6 ${
+      className={`rounded-[24px] border p-4 sm:p-5 ${
         running
           ? "border-cyan/40 bg-[linear-gradient(160deg,#06101c,#0d2238)] text-white"
           : "border-line bg-card"
@@ -111,7 +113,7 @@ export function HourlyShowcase({
           >
             Hourly salary
           </p>
-          <h3 className="mt-1 font-display text-2xl sm:text-3xl">
+          <h3 className="mt-1 font-display text-xl sm:text-2xl">
             {running ? HOURLY_COPY.runningTitle : presentHourlyHeadline(role, idle)}
           </h3>
         </div>
@@ -153,7 +155,7 @@ export function HourlyShowcase({
           <p className="mt-3 text-sm text-white/70">
             Started {formatSessionStartedAt(dash.sessionStartedAt)}
           </p>
-          <p className="mt-2 font-display text-4xl tabular-nums tracking-tight sm:text-5xl">
+          <p className="mt-2 font-display text-3xl tabular-nums tracking-tight sm:text-4xl">
             {formatElapsedClock(dash.displayElapsed)}
           </p>
           <p className="mt-2 text-sm text-white/60">
@@ -234,7 +236,7 @@ export function HourlyShowcase({
         ) : null}
       </section>
 
-      <dl className="mt-5 grid gap-3 sm:grid-cols-2">
+      <dl className="mt-4 grid gap-3 sm:grid-cols-2">
         <Mini running={running} label="Hourly rate" value={`${amount(dash.hourlyRate)} / hour`} />
         <Mini
           running={running}
@@ -277,6 +279,14 @@ export function HourlyShowcase({
           </Button>
         ) : null}
       </div>
+      {endBlocked ? (
+        <p
+          role="status"
+          className={`mt-2 text-sm leading-6 ${running ? "text-white/70" : "text-ink-soft"}`}
+        >
+          {HOURLY_COPY.employerSessionInProgress}
+        </p>
+      ) : null}
     </div>
   );
 }

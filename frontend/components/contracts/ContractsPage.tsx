@@ -6,6 +6,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 
 import { ContractCard } from "@/components/contracts/ContractCard";
+import { ResolverCaseCard } from "@/components/contracts/ResolverCaseCard";
 import { ConnectPrompt } from "@/components/shell/ConnectPrompt";
 import { PageFade } from "@/components/shell/PageFade";
 import { Button } from "@/components/ui/Button";
@@ -21,7 +22,14 @@ import {
   type ContractsListStatusFilter,
 } from "@/lib/app/contracts-list-query";
 import { presentStatus, type RoleFilter } from "@/lib/app/view-model";
+import {
+  RESOLVER_UX_COPY,
+  shouldShowResolvingTab,
+  withResolverCases,
+} from "@/lib/app/resolver-cases";
 import { useContracts } from "@/lib/hooks/ContractsProvider";
+import { useResolverCases } from "@/lib/hooks/useResolverCases";
+import { useUnreadMessageCounts } from "@/lib/hooks/useUnreadMessageCounts";
 import type { ContractStatus } from "@/lib/streampay-v2";
 
 const STATUSES: ContractStatus[] = [
@@ -39,18 +47,25 @@ const STATUSES: ContractStatus[] = [
 ];
 
 export function ContractsPage() {
-  const { connected } = useWallet();
+  const { connected, publicKey } = useWallet();
+  const unreadCounts = useUnreadMessageCounts(publicKey ? publicKey.toBase58() : null);
   const params = useSearchParams();
   const router = useRouter();
   const { status, error, grouped, decimalsByMint, refresh } = useContracts();
   const [lookup, setLookup] = useState("");
+  const resolver = useResolverCases();
 
   const query = useMemo(() => parseContractsListQuery(params), [params]);
 
-  const list = useMemo(
-    () => filterContractsByListQuery(grouped, query),
-    [grouped, query]
+  const groupedWithResolving = useMemo(
+    () => withResolverCases(grouped, resolver.cases),
+    [grouped, resolver.cases]
   );
+  const list = useMemo(
+    () => filterContractsByListQuery(groupedWithResolving, query),
+    [groupedWithResolving, query]
+  );
+  const resolvingView = query.role === "resolving";
 
   function replaceQuery(
     patch: Partial<{
@@ -116,8 +131,11 @@ export function ContractsPage() {
             onChange={(id) => replaceQuery({ role: id as RoleFilter })}
             tabs={[
               { id: "all", label: "All", count: grouped.all.length },
-              { id: "hiring", label: "Hiring", count: grouped.hiring.length },
-              { id: "working", label: "Working", count: grouped.working.length },
+              { id: "hiring", label: "As employer", count: grouped.hiring.length },
+              { id: "working", label: "As freelancer", count: grouped.working.length },
+              ...(shouldShowResolvingTab(resolver.cases.length, query.role)
+                ? [{ id: "resolving", label: RESOLVER_UX_COPY.tab, count: resolver.cases.length }]
+                : []),
             ]}
           />
         </div>
@@ -207,7 +225,11 @@ export function ContractsPage() {
       </form>
 
       <div className="mt-3.5 grid gap-3 md:grid-cols-2">
-        {list.length === 0 ? (
+        {list.length === 0 && resolvingView && resolver.status === "loading" ? (
+          <div className="md:col-span-2">
+            <Skeleton className="h-28" />
+          </div>
+        ) : list.length === 0 ? (
           <div className="md:col-span-2">
             <EmptyState
               kind="contracts"
@@ -217,13 +239,22 @@ export function ContractsPage() {
             />
           </div>
         ) : (
-          list.map((contract) => (
-            <ContractCard
-              key={contract.address.toBase58()}
-              contract={contract}
-              decimals={decimalsByMint[contract.tokenMint.toBase58()]}
-            />
-          ))
+          list.map((contract) =>
+            resolvingView ? (
+              <ResolverCaseCard
+                key={contract.address.toBase58()}
+                contract={contract}
+                decimals={resolver.decimalsByMint[contract.tokenMint.toBase58()]}
+              />
+            ) : (
+              <ContractCard
+                key={contract.address.toBase58()}
+                contract={contract}
+                decimals={decimalsByMint[contract.tokenMint.toBase58()]}
+                unreadMessages={unreadCounts[contract.address.toBase58()] ?? 0}
+              />
+            )
+          )
         )}
       </div>
     </PageFade>

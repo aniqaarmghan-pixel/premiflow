@@ -7,8 +7,11 @@ import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import {
   Briefcase,
+  ClipboardCheck,
   GitPullRequest,
+  Handshake,
   Layers,
+  Send,
   ShieldCheck,
   Timer,
   Wallet,
@@ -26,14 +29,26 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { HeroFlow } from "@/components/illustrations/HeroFlow";
 import { brand } from "@/lib/brand";
 import { OVERVIEW_DASHBOARD_HREFS } from "@/lib/app/contracts-list-query";
+import {
+  ACTION_REQUIRED_COPY,
+  OFFER_SECTIONS_COPY,
+  ROLE_TOTAL_LABELS,
+  actionRequiredItems,
+  liveStreamContracts,
+  offerItemCopy,
+  offerSections,
+  roleAwareStatusLabel,
+  type ActionRequiredItem,
+  type OfferListItem,
+} from "@/lib/app/dashboard-offers";
 import { formatUnix } from "@/lib/app/datetime";
 import { formatTokenAmount } from "@/lib/app/money";
-import {
-  dashboardSummary,
-  presentStatus,
-  presentType,
-} from "@/lib/app/view-model";
+import { dashboardSummary, presentType } from "@/lib/app/view-model";
 import { useContracts } from "@/lib/hooks/ContractsProvider";
+import { useResolverCases } from "@/lib/hooks/useResolverCases";
+import { AssignedDisputesSection } from "@/components/contracts/AssignedDisputesSection";
+import { useNow } from "@/lib/hooks/useNow";
+import { shortenAddress } from "@/lib/network";
 
 const NAV_CARD_FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2";
@@ -41,6 +56,8 @@ const NAV_CARD_FOCUS =
 export function OverviewPage() {
   const { connected, publicKey } = useWallet();
   const { status, error, grouped, decimalsByMint, refresh } = useContracts();
+  const resolverCases = useResolverCases();
+  const { now } = useNow(30_000);
   const router = useRouter();
 
   if (!connected || !publicKey) {
@@ -83,9 +100,11 @@ export function OverviewPage() {
   const sharedDecimals =
     mintKeys.length === 1 ? decimalsByMint[mintKeys[0]] : undefined;
   const mixedMints = mintKeys.length > 1;
-  const streaming = grouped.all.filter(
-    (c) => c.paymentMode === "Streaming" && c.status === "Active"
-  );
+  const streaming = liveStreamContracts(grouped.all);
+  // Direct wallet vs contract.freelancer / contract.employer on each contract;
+  // PendingAcceptance only, all four modes. Freelancer wins when both.
+  const offers = offerSections(publicKey, grouped.all, now);
+  const actionItems = actionRequiredItems(publicKey, grouped.all, now);
   const pending = grouped.all.filter((c) => c.openReviewCount > 0);
   const recent = [...grouped.all]
     .sort((a, b) => b.createdAt - a.createdAt)
@@ -102,7 +121,7 @@ export function OverviewPage() {
             <ShieldCheck size={15} />
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em]">Protected value</p>
           </div>
-          <h2 className="mt-1.5 font-display text-xl sm:text-3xl">Balances that stay in motion</h2>
+          <h2 className="mt-1.5 font-display text-xl sm:text-2xl">Balances that stay in motion</h2>
           <p className="mt-1.5 text-sm text-ink-faint">
             Derived from fetched contract accounts for this wallet. Not a live bank balance.
           </p>
@@ -139,18 +158,18 @@ export function OverviewPage() {
             <h2 className="mt-1.5 font-display text-xl sm:text-2xl">One wallet, both sides</h2>
             <p className="mt-1.5 text-sm leading-5 text-white/65">
               Hiring and working are per contract. You may employ someone and also work for someone
-              else from the same address.
+              else from the same address. {ROLE_TOTAL_LABELS.note}
             </p>
           </div>
           <div className="mt-4 grid grid-cols-2 gap-2.5">
             <Stat
-              label="Hiring"
+              label={ROLE_TOTAL_LABELS.hiring}
               value={String(summary.hiring)}
               href="/contracts?role=hiring"
               dark
             />
             <Stat
-              label="Working"
+              label={ROLE_TOTAL_LABELS.working}
               value={String(summary.working)}
               href="/contracts?role=working"
               dark
@@ -190,6 +209,36 @@ export function OverviewPage() {
           tone="navy"
         />
       </div>
+
+      {actionItems.length > 0 ? <ActionRequiredSection items={actionItems} /> : null}
+
+      {resolverCases.cases.length > 0 ? (
+        <AssignedDisputesSection
+          cases={resolverCases.cases}
+          decimalsByMint={resolverCases.decimalsByMint}
+        />
+      ) : null}
+
+      {offers.awaitingYourResponse.length > 0 ? (
+        <OfferSection
+          title={OFFER_SECTIONS_COPY.awaitingTitle}
+          body={OFFER_SECTIONS_COPY.awaitingBody}
+          icon={<Handshake size={16} className="text-accent" />}
+          items={offers.awaitingYourResponse}
+          decimalsByMint={decimalsByMint}
+          primary
+        />
+      ) : null}
+
+      {offers.waitingForFreelancer.length > 0 ? (
+        <OfferSection
+          title={OFFER_SECTIONS_COPY.waitingTitle}
+          body={OFFER_SECTIONS_COPY.waitingBody}
+          icon={<Send size={16} className="text-accent" />}
+          items={offers.waitingForFreelancer}
+          decimalsByMint={decimalsByMint}
+        />
+      ) : null}
 
       <section className="mt-5">
         <div className="mb-2.5 flex items-center justify-between">
@@ -242,7 +291,7 @@ export function OverviewPage() {
                   >
                     <p className="font-medium">{presentType(c.paymentMode)}</p>
                     <p className="text-xs text-ink-faint">
-                      {presentStatus(c.status)} · {c.openReviewCount} in review
+                      {roleAwareStatusLabel(publicKey, c)} · {c.openReviewCount} in review
                     </p>
                   </Link>
                 </li>
@@ -262,7 +311,7 @@ export function OverviewPage() {
               {recent.map((c) => (
                 <li key={c.address.toBase58()} className="text-sm">
                   <Link href={`/contracts/${c.address.toBase58()}`} className="font-medium">
-                    {presentType(c.paymentMode)} · {presentStatus(c.status)}
+                    {presentType(c.paymentMode)} · {roleAwareStatusLabel(publicKey, c)}
                   </Link>
                   <p className="text-xs text-ink-faint">Created {formatUnix(c.createdAt)}</p>
                 </li>
@@ -272,6 +321,118 @@ export function OverviewPage() {
         </Card>
       </section>
     </PageFade>
+  );
+}
+
+function OfferSection({
+  title,
+  body,
+  icon,
+  items,
+  decimalsByMint,
+  primary = false,
+}: {
+  title: string;
+  body: string;
+  icon: ReactNode;
+  items: OfferListItem[];
+  decimalsByMint: Readonly<Record<string, number | undefined>>;
+  primary?: boolean;
+}) {
+  return (
+    <section className="mt-5" aria-label={title}>
+      <div className="mb-2.5">
+        <h2 className="flex items-center gap-2 font-display text-xl">
+          {icon}
+          {title}
+        </h2>
+        <p className="mt-1 text-sm text-ink-soft">{body}</p>
+      </div>
+      <ul className="grid gap-3 md:grid-cols-2">
+        {items.map((item) => {
+          const copy = offerItemCopy(item);
+          return (
+            <li key={item.address}>
+              <Card className="flex h-full flex-col gap-3 p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-medium">{presentType(item.mode)}</p>
+                  <span
+                    className={`rounded-full px-2.5 py-0.5 text-xs ${
+                      item.deadlinePassed ? "bg-gold-soft font-medium text-gold" : "bg-paper text-ink-soft"
+                    }`}
+                  >
+                    {copy.statusLabel}
+                  </span>
+                </div>
+                <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+                  <dt className="text-ink-faint">{copy.counterpartyLabel}</dt>
+                  <dd className="font-mono text-xs leading-5" title={item.counterpartyAddress}>
+                    {shortenAddress(item.counterpartyAddress)}
+                  </dd>
+                  <dt className="text-ink-faint">{OFFER_SECTIONS_COPY.amountLabel}</dt>
+                  <dd>{formatTokenAmount(item.totalAmount, decimalsByMint[item.tokenMint])}</dd>
+                  <dt className="text-ink-faint">{OFFER_SECTIONS_COPY.deadlineLabel}</dt>
+                  <dd>{copy.deadlineText}</dd>
+                </dl>
+                <p
+                  className={`text-xs ${
+                    item.deadlinePassed ? "font-medium text-ink" : "text-ink-soft"
+                  }`}
+                >
+                  {copy.deadlineNote}
+                </p>
+                <Link
+                  href={item.href}
+                  className={`mt-auto inline-flex min-h-10 items-center justify-center rounded-full px-4 text-sm font-semibold transition ${
+                    primary
+                      ? "bg-accent text-white hover:opacity-90"
+                      : "border border-line text-accent hover:bg-accent-soft"
+                  } ${NAV_CARD_FOCUS}`}
+                >
+                  {copy.actionLabel}
+                </Link>
+              </Card>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+function ActionRequiredSection({ items }: { items: ActionRequiredItem[] }) {
+  return (
+    <section className="mt-5" aria-label={ACTION_REQUIRED_COPY.title}>
+      <div className="mb-2.5">
+        <h2 className="flex items-center gap-2 font-display text-xl">
+          <ClipboardCheck size={16} className="text-accent" />
+          {ACTION_REQUIRED_COPY.title}
+        </h2>
+        <p className="mt-1 text-sm text-ink-soft">{ACTION_REQUIRED_COPY.body}</p>
+      </div>
+      <ul className="grid gap-3 md:grid-cols-2">
+        {items.map((item) => (
+          <li key={item.address}>
+            <Card className="flex h-full flex-col gap-3 p-4">
+              <p className="font-medium">{presentType(item.mode)}</p>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
+                <dt className="text-ink-faint">{OFFER_SECTIONS_COPY.freelancerLabel}</dt>
+                <dd className="font-mono text-xs leading-5" title={item.freelancerAddress}>
+                  {shortenAddress(item.freelancerAddress)}
+                </dd>
+              </dl>
+              <p className="text-sm font-medium text-ink">{item.note}</p>
+              <Link
+                href={item.href}
+                className={`mt-auto inline-flex min-h-10 items-center justify-center rounded-full bg-accent px-4 text-sm font-semibold text-white transition hover:opacity-90 ${NAV_CARD_FOCUS}`}
+              >
+                {item.actionLabel}
+              </Link>
+            </Card>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
@@ -285,7 +446,7 @@ function Hero() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan">
             {brand.eyebrow}
           </p>
-          <h1 className="mt-2 font-display text-[1.4rem] leading-[1.18] text-white sm:mt-2.5 sm:text-[2.35rem] lg:text-[2.75rem]">
+          <h1 className="mt-2 font-display text-[1.4rem] leading-[1.18] text-white sm:mt-2.5 sm:text-[2rem] lg:text-[2.25rem]">
             {brand.tagline}
           </h1>
           <p className="mt-2 max-w-xl text-sm leading-6 text-white/70 sm:mt-2.5 sm:text-[0.95rem]">

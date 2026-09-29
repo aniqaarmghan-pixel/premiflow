@@ -926,20 +926,28 @@ fn phase_eight_claims_after_resolution_are_order_independent() {
 }
 
 #[test]
-fn disputed_blocks_cancel_refund_withdraw_and_lifecycle() {
+fn disputed_blocks_cancel_refund_and_lifecycle_but_not_released_withdraw() {
     let mut env = setup(TOTAL_AMOUNT);
     activate_fixed(&mut env, 1, TOTAL_AMOUNT, 0);
     env.submit_work(1, 0).unwrap();
     env.open_as_employer(1).unwrap();
+    let escrow = env.escrow_amount(1);
     assert_rejected(env.cancel(1), E_CONTRACT_TERMINAL, "cancel while disputed");
     assert_rejected(env.refund(1), E_CONTRACT_TERMINAL, "refund while disputed");
+    // Withdraw is no longer status-blocked while Disputed. Nothing is released
+    // here (the submitted work is contested), so it is NothingToWithdraw.
     assert_rejected(
         env.withdraw(1),
-        E_CONTRACT_TERMINAL,
-        "withdraw while disputed",
+        E_NOTHING_TO_WITHDRAW,
+        "withdraw contested-only while disputed",
     );
     assert_rejected(env.approve_work(1, 0), E_INVALID_STATE, "approve");
     assert_rejected(env.timeout(1, 0), E_INVALID_STATE, "timeout");
+    let c = env.read_contract(&env.contract_pda(1));
+    assert_eq!(c.status, ContractStatus::Disputed);
+    assert_eq!(c.withdrawn_amount, 0);
+    assert_eq!(c.contested_amount, TOTAL_AMOUNT);
+    env.assert_escrow_unchanged(1, escrow);
 }
 
 #[test]
@@ -979,4 +987,209 @@ fn full_claims_after_resolution_reject_doubles() {
     assert_eq!(env.escrow_amount(1), 0);
     assert_rejected(env.withdraw(1), E_NOTHING_TO_WITHDRAW, "double withdraw");
     assert_rejected(env.refund(1), E_NOTHING_TO_REFUND, "double refund");
+}
+
+// ---------------------------------------------------------------------------
+// Withdrawal of already-released (protected) pay while Disputed
+// ---------------------------------------------------------------------------
+
+#[test]
+fn disputed_streaming_withdraws_materialized_earnings_only() {
+    let mut env = setup(10);
+    let start = activate_streaming(&mut env, 1, 10);
+    env.warp(start + 20);
+    env.open_as_employer(1).unwrap();
+    let c = env.read_contract(&env.contract_pda(1));
+    assert_eq!(c.released_amount, 3);
+    assert_eq!(c.contested_amount, 7);
+    assert_eq!(c.withdrawn_amount, 0);
+
+    assert_rejected(env.refund(1), E_CONTRACT_TERMINAL, "refund before withdraw");
+
+    let before = env.token_balance(&env.freelancer_token_account);
+    env.withdraw(1).unwrap();
+    assert_eq!(env.token_balance(&env.freelancer_token_account), before + 3);
+    let c = env.read_contract(&env.contract_pda(1));
+    assert_eq!(c.status, ContractStatus::Disputed);
+    assert_eq!(c.withdrawn_amount, 3);
+    assert_eq!(c.withdrawn_amount, c.released_amount);
+    assert_eq!(c.contested_amount, 7);
+    assert_eq!(env.escrow_amount(1), c.contested_amount);
+
+    assert_rejected(env.withdraw(1), E_NOTHING_TO_WITHDRAW, "second withdraw");
+    // Accrual stays frozen: time passing does not unlock contested funds.
+    env.warp(start + 10_000);
+    assert_rejected(env.withdraw(1), E_NOTHING_TO_WITHDRAW, "late withdraw");
+    assert_rejected(env.refund(1), E_CONTRACT_TERMINAL, "refund after withdraw");
+    assert_eq!(env.token_balance(&env.freelancer_token_account), before + 3);
+    env.assert_escrow_unchanged(1, 7);
+}
+
+#[test]
+fn disputed_streaming_after_partial_withdrawal_pays_only_released_delta() {
+    let mut env = setup(10);
+    let start = activate_streaming(&mut env, 1, 10);
+    env.warp(start + 20);
+    env.release_stream(1).unwrap();
+    env.withdraw(1).unwrap();
+    env.warp(start + 40);
+    env.open_as_freelancer(1).unwrap();
+    let c = env.read_contract(&env.contract_pda(1));
+    assert_eq!(c.released_amount, 6);
+    assert_eq!(c.withdrawn_amount, 3);
+    assert_eq!(c.contested_amount, 4);
+    assert_eq!(env.escrow_amount(1), 7);
+
+    let before = env.token_balance(&env.freelancer_token_account);
+    env.withdraw(1).unwrap();
+    assert_eq!(env.token_balance(&env.freelancer_token_account), before + 3);
+    let c = env.read_contract(&env.contract_pda(1));
+    assert_eq!(c.withdrawn_amount, 6);
+    assert!(c.withdrawn_amount <= c.released_amount);
+    assert_eq!(env.escrow_amount(1), c.contested_amount);
+    assert_rejected(env.withdraw(1), E_NOTHING_TO_WITHDRAW, "nothing more released");
+    assert_rejected(env.refund(1), E_CONTRACT_TERMINAL, "refund while disputed");
+}
+
+#[test]
+fn disputed_fixed_trial_and_milestone_approved_unit_are_withdrawable() {
+    let mut env = setup(TOTAL_AMOUNT * 2);
+    // Fixed: approved trial is released; submitted main work is contested.
+    activate_fixed(&mut env, 1, TOTAL_AMOUNT, TRIAL_AMOUNT);
+    env.submit_work(1, 0).unwrap();
+    env.open_as_employer(1).unwrap();
+    assert_rejected(env.refund(1), E_CONTRACT_TERMINAL, "fixed refund");
+    let before = env.token_balance(&env.freelancer_token_account);
+    env.withdraw(1).unwrap();
+    assert_eq!(
+        env.token_balance(&env.freelancer_token_account),
+        before + TRIAL_AMOUNT
+    );
+    let f = env.read_contract(&env.contract_pda(1));
+    assert_eq!(f.status, ContractStatus::Disputed);
+    assert_eq!(f.withdrawn_amount, TRIAL_AMOUNT);
+    assert_eq!(f.released_amount, TRIAL_AMOUNT);
+    assert_eq!(f.contested_amount, MAIN_AMOUNT);
+    assert_eq!(env.escrow_amount(1), MAIN_AMOUNT);
+    assert_rejected(env.withdraw(1), E_NOTHING_TO_WITHDRAW, "fixed second withdraw");
+    assert_rejected(env.refund(1), E_CONTRACT_TERMINAL, "fixed refund after");
+
+    // Milestone: approved unit 0 is released; submitted unit 1 is contested.
+    activate_milestone(&mut env, 2, &[400_000, 600_000]);
+    env.submit_work(2, 0).unwrap();
+    env.approve_work(2, 0).unwrap();
+    env.submit_work(2, 1).unwrap();
+    env.open_as_freelancer(2).unwrap();
+    assert_rejected(env.refund(2), E_CONTRACT_TERMINAL, "milestone refund");
+    let before = env.token_balance(&env.freelancer_token_account);
+    env.withdraw(2).unwrap();
+    assert_eq!(
+        env.token_balance(&env.freelancer_token_account),
+        before + 400_000
+    );
+    let m = env.read_contract(&env.contract_pda(2));
+    assert_eq!(m.status, ContractStatus::Disputed);
+    assert_eq!(m.withdrawn_amount, 400_000);
+    assert_eq!(m.released_amount, 400_000);
+    assert_eq!(m.contested_amount, 600_000);
+    assert_eq!(env.escrow_amount(2), 600_000);
+    assert_rejected(env.withdraw(2), E_NOTHING_TO_WITHDRAW, "milestone second withdraw");
+    assert_rejected(env.refund(2), E_CONTRACT_TERMINAL, "milestone refund after");
+}
+
+#[test]
+fn resolution_after_disputed_withdrawal_settles_and_conserves() {
+    // Streaming total 10: release + withdraw 3 at start+20, dispute at
+    // start+40 so released = 6 and contested = 4. `full` also withdraws the
+    // remaining released 3 while Disputed; otherwise only 3 of 6 is withdrawn.
+    fn run(full: bool, award: u64) {
+        let what = format!("full={full} award={award}");
+        let mut env = setup(10);
+        let fl_start = env.token_balance(&env.freelancer_token_account);
+        let emp_start = env.token_balance(&env.employer_token_account);
+        let start = activate_streaming(&mut env, 1, 10);
+        env.warp(start + 20);
+        env.release_stream(1).unwrap();
+        env.withdraw(1).unwrap();
+        env.warp(start + 40);
+        env.open_as_employer(1).unwrap();
+        if full {
+            env.withdraw(1).unwrap();
+        }
+        let withdrawn = if full { 6 } else { 3 };
+        let pre = env.read_contract(&env.contract_pda(1));
+        assert_eq!(pre.released_amount, 6, "{what}");
+        assert_eq!(pre.contested_amount, 4, "{what}");
+        assert_eq!(pre.withdrawn_amount, withdrawn, "{what}");
+        assert_eq!(env.escrow_amount(1), 10 - withdrawn, "{what}");
+
+        env.resolve(1, award).unwrap();
+        let r = env.read_contract(&env.contract_pda(1));
+        assert_eq!(r.status, ContractStatus::Resolved, "{what}");
+        assert_eq!(r.freelancer_settlement_amount, 6 + award, "{what}");
+        assert_eq!(r.employer_refundable_amount, 4 - award, "{what}");
+        assert_eq!(
+            r.freelancer_settlement_amount + r.employer_refundable_amount,
+            10,
+            "{what}"
+        );
+        assert_eq!(r.released_amount, r.freelancer_settlement_amount, "{what}");
+        assert_eq!(r.withdrawn_amount, withdrawn, "{what}");
+        assert!(r.withdrawn_amount <= r.freelancer_settlement_amount, "{what}");
+        // Resolution moves zero tokens; escrow covers exactly what is owed.
+        assert_eq!(env.escrow_amount(1), 10 - withdrawn, "{what}");
+        assert_eq!(
+            env.escrow_amount(1),
+            (r.freelancer_settlement_amount - r.withdrawn_amount)
+                + (r.employer_refundable_amount - r.refunded_amount),
+            "{what}"
+        );
+
+        let owed_freelancer = r.freelancer_settlement_amount - r.withdrawn_amount;
+        let owed_employer = r.employer_refundable_amount - r.refunded_amount;
+        let fl_before = env.token_balance(&env.freelancer_token_account);
+        if owed_freelancer > 0 {
+            env.withdraw(1).unwrap();
+        } else {
+            assert_rejected(env.withdraw(1), E_NOTHING_TO_WITHDRAW, &what);
+        }
+        assert_eq!(
+            env.token_balance(&env.freelancer_token_account),
+            fl_before + owed_freelancer,
+            "{what}"
+        );
+        let emp_before = env.token_balance(&env.employer_token_account);
+        if owed_employer > 0 {
+            env.refund(1).unwrap();
+        } else {
+            assert_rejected(env.refund(1), E_NOTHING_TO_REFUND, &what);
+        }
+        assert_eq!(
+            env.token_balance(&env.employer_token_account),
+            emp_before + owed_employer,
+            "{what}"
+        );
+
+        let done = env.read_contract(&env.contract_pda(1));
+        assert_eq!(done.withdrawn_amount, done.freelancer_settlement_amount, "{what}");
+        assert_eq!(done.refunded_amount, done.employer_refundable_amount, "{what}");
+        assert_eq!(env.escrow_amount(1), 0, "{what}");
+        assert_eq!(
+            env.token_balance(&env.freelancer_token_account) - fl_start,
+            6 + award,
+            "{what}"
+        );
+        assert_eq!(
+            env.token_balance(&env.employer_token_account) + 10 - emp_start,
+            4 - award,
+            "{what}"
+        );
+        assert_rejected(env.withdraw(1), E_NOTHING_TO_WITHDRAW, &what);
+        assert_rejected(env.refund(1), E_NOTHING_TO_REFUND, &what);
+    }
+    for full in [false, true] {
+        for award in [0, 2, 4] {
+            run(full, award);
+        }
+    }
 }

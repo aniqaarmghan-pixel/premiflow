@@ -11,6 +11,7 @@ import {
   STREAMING_TRIAL_STARTED_BODY,
   STREAMING_TRIAL_STARTED_HEADLINE,
   STREAMING_ZERO_AVAILABLE_HINT,
+  streamingEarnedLabel,
   streamingTrialStartedCopy,
 } from "../stream-display";
 import {
@@ -23,7 +24,7 @@ import { availableActions } from "../../streampay-v2/actions";
 import { makeContract, WALLET_A, WALLET_B } from "../../streampay-v2/tests/fixtures";
 
 test("Streaming action labels use collect / release / finish wording", () => {
-  assert.equal(actionLabel("releaseStreamAccrual"), "Release accrued pay");
+  assert.equal(actionLabel("releaseStreamAccrual"), "Update earnings");
   assert.equal(actionLabel("withdrawFreelancer"), "Collect pay");
   assert.equal(actionLabel("completeContract"), "Mark contract finished");
   assert.equal(contractActionVariant("completeContract"), "secondary");
@@ -34,7 +35,7 @@ test("Streaming action labels use collect / release / finish wording", () => {
 
 test("Streaming explainer and type blurb distinguish accrue, release, and collect", () => {
   assert.match(STREAMING_PAY_EXPLAINER, /accrues automatically with time/i);
-  assert.match(STREAMING_PAY_EXPLAINER, /Release accrued pay records/i);
+  assert.match(STREAMING_PAY_EXPLAINER, /Update earnings records/i);
   assert.match(STREAMING_PAY_EXPLAINER, /does not transfer tokens/i);
   assert.match(STREAMING_PAY_EXPLAINER, /does not end the stream/i);
   assert.match(typeBlurb("Streaming"), /while the stream is active/i);
@@ -204,7 +205,7 @@ test("Streaming salary workspace distinguishes Release and Collect and keeps Act
   assert.match(source, /STREAMING_ZERO_AVAILABLE_HINT/);
   assert.match(source, /display estimate/);
   assert.doesNotMatch(source, /status\s*=\s*"Completed"/);
-  assert.equal(STREAMING_RELEASE_LABEL, "Release accrued pay");
+  assert.equal(STREAMING_RELEASE_LABEL, "Update earnings");
   assert.match(STREAMING_RELEASE_HINT, /does not transfer tokens/i);
   assert.match(STREAMING_COLLECT_HINT, /does not end the stream/i);
   assert.match(STREAMING_ZERO_AVAILABLE_HINT, /does not mean the stream is complete/i);
@@ -257,4 +258,148 @@ test("Streaming salary workspace distinguishes Release and Collect and keeps Act
   assert.equal(afterCollectZero.availableToCollect, 0n);
   assert.equal(mid.status, "Active");
   assert.match(source, /stillActive && dash\.availableToCollect === 0n/);
+});
+
+test("cancelled stream shows the frozen on-chain settlement, never a clock extrapolation", () => {
+  const contract = makeContract({
+    paymentMode: "Streaming",
+    status: "Cancelled",
+    startTime: 1_000,
+    endTime: 4_600,
+    durationSeconds: 3_600,
+    mainAmount: 1_000_000n,
+    totalAmount: 1_000_000n,
+    releasedAmount: 657_870n,
+    streamReleasedAmount: 657_870n,
+    freelancerSettlementAmount: 657_870n,
+    employerRefundableAmount: 342_130n,
+    terminatedAt: 3_368,
+  });
+  for (const now of [3_368, 3_400, 4_000, 9_999]) {
+    const dash = streamingDashboard(contract, now);
+    assert.equal(dash.earnedSoFar, 657_870n);
+    assert.equal(dash.elapsedSeconds, 2_368);
+    assert.equal(dash.remainingSeconds, 1_232);
+    assert.equal(dash.live, false);
+    assert.equal(dash.earnedBasis, "settled");
+    assert.equal(dash.frozenAt, 3_368);
+  }
+  // Old behaviour would have extrapolated to 833_333 at now=4_000.
+  assert.notEqual(streamingDashboard(contract, 4_000).earnedSoFar, 833_333n);
+  assert.equal(streamingEarnedLabel("settled"), "Final earned (settled on-chain)");
+});
+
+test("cancelled stream without terminated_at freezes elapsed at the settled ratio with no countdown", () => {
+  const contract = makeContract({
+    paymentMode: "Streaming",
+    status: "Cancelled",
+    startTime: 1_000,
+    endTime: 4_600,
+    durationSeconds: 3_600,
+    mainAmount: 1_000_000n,
+    totalAmount: 1_000_000n,
+    releasedAmount: 657_870n,
+    streamReleasedAmount: 657_870n,
+    freelancerSettlementAmount: 657_870n,
+    terminatedAt: 0,
+  });
+  const dash = streamingDashboard(contract, 9_999);
+  assert.equal(dash.earnedSoFar, 657_870n);
+  assert.equal(dash.elapsedSeconds, 2_368);
+  assert.equal(dash.remainingSeconds, 0);
+  assert.equal(dash.frozenAt, 0);
+  assert.equal(dash.live, false);
+});
+
+test("disputed stream shows released_amount frozen at disputed_at", () => {
+  const contract = makeContract({
+    paymentMode: "Streaming",
+    status: "Disputed",
+    startTime: 1_000,
+    endTime: 4_600,
+    durationSeconds: 3_600,
+    mainAmount: 1_000n,
+    totalAmount: 1_000n,
+    releasedAmount: 400n,
+    streamReleasedAmount: 400n,
+    disputedAt: 2_440,
+  });
+  for (const now of [3_000, 8_000]) {
+    const dash = streamingDashboard(contract, now);
+    assert.equal(dash.earnedSoFar, 400n);
+    assert.equal(dash.elapsedSeconds, 1_440);
+    assert.equal(dash.remainingSeconds, 2_160);
+    assert.equal(dash.earnedBasis, "disputed");
+    assert.equal(dash.live, false);
+    assert.equal(dash.frozenAt, 2_440);
+  }
+  assert.equal(streamingEarnedLabel("disputed"), "Earned at dispute (released on-chain)");
+});
+
+test("completed stream shows the final settlement (incl. trial) and a stopped clock", () => {
+  const contract = makeContract({
+    paymentMode: "Streaming",
+    status: "Completed",
+    startTime: 1_000,
+    endTime: 4_600,
+    durationSeconds: 3_600,
+    mainAmount: 360n,
+    trialAmount: 10n,
+    totalAmount: 370n,
+    releasedAmount: 370n,
+    streamReleasedAmount: 360n,
+    freelancerSettlementAmount: 370n,
+    terminatedAt: 5_000,
+  });
+  const dash = streamingDashboard(contract, 9_000);
+  assert.equal(dash.earnedSoFar, 370n);
+  assert.equal(dash.elapsedSeconds, 3_600);
+  assert.equal(dash.remainingSeconds, 0);
+  assert.equal(dash.earnedBasis, "settled");
+  assert.equal(dash.live, false);
+  assert.equal(dash.frozenAt, 5_000);
+});
+
+test("active stream still extrapolates live with the clock and caps at main after end", () => {
+  const contract = makeContract({
+    paymentMode: "Streaming",
+    status: "Active",
+    startTime: 1_000,
+    endTime: 4_600,
+    durationSeconds: 3_600,
+    mainAmount: 1_000_000n,
+    totalAmount: 1_000_000n,
+    releasedAmount: 0n,
+    withdrawnAmount: 0n,
+  });
+  const a = streamingDashboard(contract, 2_800);
+  const b = streamingDashboard(contract, 3_700);
+  assert.equal(a.earnedSoFar, 500_000n);
+  assert.equal(b.earnedSoFar, 750_000n);
+  assert.equal(a.live, true);
+  assert.equal(a.earnedBasis, "estimate");
+  assert.equal(a.frozenAt, 0);
+  const after = streamingDashboard(contract, 5_000);
+  assert.equal(after.earnedSoFar, 1_000_000n);
+  assert.equal(after.live, false);
+  assert.equal(after.earnedBasis, "estimate");
+});
+
+test("streaming release shows only in the freelancer panel, not the generic Actions card", () => {
+  const showcase = readFileSync(
+    new URL("../../../components/contracts/StreamShowcase.tsx", import.meta.url),
+    "utf8"
+  );
+  const detail = readFileSync(
+    new URL("../../../components/contracts/ContractDetail.tsx", import.meta.url),
+    "utf8"
+  );
+  assert.match(detail, /\.filter\(\(a\) => a !== "releaseStreamAccrual"\)/);
+  assert.match(
+    detail,
+    /canRelease=\{role === "freelancer" && actions\.includes\("releaseStreamAccrual"\)\}/
+  );
+  assert.match(detail, /canCollect=\{actions\.includes\("withdrawFreelancer"\)\}/);
+  assert.match(showcase, /if \(!live\) return;/);
+  assert.match(showcase, /streamingEarnedLabel\(dash\.earnedBasis\)/);
 });

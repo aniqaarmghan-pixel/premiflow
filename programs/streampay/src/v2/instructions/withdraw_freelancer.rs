@@ -1,8 +1,10 @@
 //! `withdraw_freelancer`: move currently available freelancer entitlement.
 //!
 //! Withdraw-all-available. No caller-specified amount. Active contracts pay
-//! `released_amount - withdrawn_amount`. Cancelled contracts pay the remaining
-//! Phase 7 freeze. Does not materialize streaming accrual.
+//! `released_amount - withdrawn_amount`. Disputed contracts pay the same
+//! already-released amount only; contested funds stay in escrow until
+//! resolution. Cancelled / Resolved / Completed contracts pay the remaining
+//! frozen settlement. Does not materialize streaming accrual.
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{transfer_checked, Mint, Token, TokenAccount, TransferChecked};
@@ -57,27 +59,45 @@ pub struct WithdrawFreelancer<'info> {
 }
 
 pub fn handle_withdraw_freelancer(ctx: Context<WithdrawFreelancer>) -> Result<()> {
-    let contract = &ctx.accounts.contract;
+    let escrow_amount = ctx.accounts.contract_escrow.amount;
+    let decimals = ctx.accounts.token_mint.decimals;
 
+    let contract = &mut ctx.accounts.contract;
     let available = contract.available_to_withdraw()?;
     require!(available > 0, StreamPayV2Error::NothingToWithdraw);
     require!(
-        ctx.accounts.contract_escrow.amount >= available,
+        escrow_amount >= available,
         StreamPayV2Error::InsufficientEscrowBalance
     );
 
     let cap = contract.freelancer_withdraw_cap()?;
+    let new_withdrawn = contract
+        .withdrawn_amount
+        .checked_add(available)
+        .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+    require!(
+        new_withdrawn <= cap,
+        StreamPayV2Error::ReleaseAmountExceeded
+    );
+    require!(
+        new_withdrawn <= contract.released_amount,
+        StreamPayV2Error::ReleaseAmountExceeded
+    );
+    let remaining = cap
+        .checked_sub(new_withdrawn)
+        .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+
+    // Accounting before the CPI. A failed transfer aborts the whole
+    // transaction, so this update cannot persist without tokens leaving escrow.
+    contract.withdrawn_amount = new_withdrawn;
+
     let employer = contract.employer;
     let freelancer = contract.freelancer;
     let contract_id = contract.contract_id.to_le_bytes();
     let bump = [contract.bump];
-    let decimals = ctx.accounts.token_mint.decimals;
     let mint = contract.token_mint;
     let contract_key = contract.key();
 
-    // Checks done. CPI next; accounting is updated only after a successful
-    // transfer. A failed CPI aborts the transaction, so withdrawn_amount
-    // cannot advance without tokens leaving escrow.
     let signer_seeds: &[&[u8]] = &[
         CONTRACT_SEED,
         employer.as_ref(),
@@ -100,24 +120,6 @@ pub fn handle_withdraw_freelancer(ctx: Context<WithdrawFreelancer>) -> Result<()
         available,
         decimals,
     )?;
-
-    let contract = &mut ctx.accounts.contract;
-    let new_withdrawn = contract
-        .withdrawn_amount
-        .checked_add(available)
-        .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
-    require!(
-        new_withdrawn <= cap,
-        StreamPayV2Error::ReleaseAmountExceeded
-    );
-    require!(
-        new_withdrawn <= contract.released_amount,
-        StreamPayV2Error::ReleaseAmountExceeded
-    );
-    contract.withdrawn_amount = new_withdrawn;
-    let remaining = cap
-        .checked_sub(new_withdrawn)
-        .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
 
     emit!(FreelancerWithdrawal {
         contract: contract_key,

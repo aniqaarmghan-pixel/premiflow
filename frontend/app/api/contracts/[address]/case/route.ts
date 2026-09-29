@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import {
   handleRouteError,
   requireCaseParty,
+  requireCaseViewer,
   requireMutatingOrigin,
 } from "@/lib/server/api-guard";
 import {
@@ -22,11 +23,14 @@ export async function GET(
 ) {
   try {
     const { address } = await context.params;
-    const { stores, session, env } = await requireCaseParty(request, address);
-    const result = await getResolutionCase(stores.cases, connectionCaseFactsReader(env.solanaRpcUrl), {
-      contractAddress: address,
-      sessionWallet: session.walletAddress,
-    });
+    const { stores, session, env, viewerRole } = await requireCaseViewer(request, address);
+    const result = await getResolutionCase(
+      stores.cases,
+      connectionCaseFactsReader(env.solanaRpcUrl),
+      { contractAddress: address, sessionWallet: session.walletAddress },
+      new Date(),
+      { allowResolver: viewerRole === "resolver" }
+    );
     return NextResponse.json({ case: result });
   } catch (err) {
     return handleRouteError(err);

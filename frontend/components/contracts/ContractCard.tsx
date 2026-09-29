@@ -8,12 +8,17 @@ import { Card } from "@/components/ui/Card";
 import { Identicon } from "@/components/ui/Identicon";
 import { Progress } from "@/components/ui/Progress";
 import { StatusBadge } from "./StatusBadge";
+import { unreadMessageAriaLabel, unreadMessageBadgeLabel } from "@/lib/app/contract-unread";
 import { formatTokenAmount } from "@/lib/app/money";
+import {
+  BOTH_PARTIES_CARD_LABEL,
+  roleAwareStatusLabel,
+  viewerPartyRole,
+} from "@/lib/app/dashboard-offers";
 import { contractCardNextHint } from "@/lib/app/dispute-ux";
 import {
   counterparty,
   financialProgress,
-  presentStatus,
   presentType,
   roleForContract,
   roleLabel,
@@ -23,14 +28,17 @@ import type { ContractView } from "@/lib/streampay-v2";
 export function ContractCard({
   contract,
   decimals,
+  unreadMessages = 0,
 }: {
   contract: ContractView;
   decimals?: number;
+  unreadMessages?: number;
 }) {
   const { publicKey } = useWallet();
   if (!publicKey) return null;
   const role = roleForContract(publicKey, contract);
   const other = counterparty(publicKey, contract);
+  const partyRole = viewerPartyRole(publicKey, contract);
   const progress = financialProgress(contract);
 
   return (
@@ -55,15 +63,28 @@ export function ContractCard({
                 {other.label} {other.address.toBase58().slice(0, 6)}…
               </p>
               <p className="text-[11px] leading-4 text-ink-faint">
-                {roleLabel(role)} on this contract
+                {partyRole === "both"
+                  ? BOTH_PARTIES_CARD_LABEL
+                  : `${roleLabel(role)} on this contract`}
               </p>
             </div>
           </div>
-          <StatusBadge
-            status={contract.status}
-            label={presentStatus(contract.status)}
-            compact
-          />
+          <div className="flex shrink-0 items-center gap-1.5">
+            {unreadMessages > 0 ? (
+              <span
+                className="inline-flex min-w-5 items-center justify-center rounded-full bg-accent px-1.5 text-[11px] font-semibold leading-5 text-white"
+                aria-label={unreadMessageAriaLabel(unreadMessages)}
+                title={unreadMessageAriaLabel(unreadMessages)}
+              >
+                {unreadMessageBadgeLabel(unreadMessages)}
+              </span>
+            ) : null}
+            <StatusBadge
+              status={contract.status}
+              label={roleAwareStatusLabel(publicKey, contract)}
+              compact
+            />
+          </div>
         </div>
         <div className="mt-2.5 flex items-end justify-between gap-2">
           <div className="min-w-0">
@@ -93,7 +114,12 @@ export function ContractCard({
           <Progress dense value={progress.releasedPct} label="Released of funded total" />
         </div>
         <p className="mt-1.5 text-xs font-medium leading-4 text-accent">
-          {contractCardNextHint(role, contract)}
+          {contractCardNextHint(
+            partyRole === "both" && contract.status === "PendingAcceptance"
+              ? "freelancer"
+              : role,
+            contract
+          )}
         </p>
       </Card>
     </Link>

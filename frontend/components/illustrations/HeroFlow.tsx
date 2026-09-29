@@ -34,8 +34,8 @@ export function HeroFlow({
   const heightClass = compact
     ? "h-28"
     : dense
-      ? "min-h-[140px] sm:min-h-[175px] lg:min-h-[220px]"
-      : "min-h-[180px] sm:min-h-[220px] lg:min-h-[280px]";
+      ? "min-h-[140px] sm:min-h-[160px] lg:min-h-[180px]"
+      : "h-[150px] sm:h-[170px] lg:h-[190px]";
 
   return (
     <div

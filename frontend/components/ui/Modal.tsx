@@ -49,10 +49,10 @@ export function Modal({
             initial={{ y: 24, opacity: 0, scale: 0.98 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 16, opacity: 0 }}
-            className="relative z-10 w-full max-w-lg max-h-[86vh] overflow-auto rounded-[28px] border border-line bg-card p-5 shadow-[var(--shadow)]"
+            className="relative z-10 w-full max-w-lg max-h-[86vh] overflow-auto rounded-[24px] border border-line bg-card p-4 shadow-[var(--shadow)] sm:p-5"
           >
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <h2 id="modal-title" className="font-display text-2xl text-ink">
+            <div className="mb-3 flex items-start justify-between gap-4">
+              <h2 id="modal-title" className="font-display text-xl text-ink">
                 {title}
               </h2>
               <Button variant="ghost" onClick={onClose} aria-label="Close">
@@ -60,7 +60,7 @@ export function Modal({
               </Button>
             </div>
             <div className="text-sm text-ink-soft">{children}</div>
-            {footer ? <div className="mt-6 flex flex-wrap justify-end gap-2">{footer}</div> : null}
+            {footer ? <div className="mt-5 flex flex-wrap justify-end gap-2">{footer}</div> : null}
           </motion.div>
         </motion.div>
       ) : null}

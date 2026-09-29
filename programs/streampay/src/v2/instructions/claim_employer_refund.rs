@@ -54,25 +54,41 @@ pub struct ClaimEmployerRefund<'info> {
 }
 
 pub fn handle_claim_employer_refund(ctx: Context<ClaimEmployerRefund>) -> Result<()> {
-    let contract = &ctx.accounts.contract;
+    let escrow_amount = ctx.accounts.contract_escrow.amount;
+    let decimals = ctx.accounts.token_mint.decimals;
 
+    let contract = &mut ctx.accounts.contract;
     let available = contract.available_to_refund()?;
     require!(available > 0, StreamPayV2Error::NothingToRefund);
     require!(
-        ctx.accounts.contract_escrow.amount >= available,
+        escrow_amount >= available,
         StreamPayV2Error::InsufficientEscrowBalance
     );
 
     let refundable = contract.employer_refundable_amount;
+    let new_refunded = contract
+        .refunded_amount
+        .checked_add(available)
+        .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+    require!(
+        new_refunded <= refundable,
+        StreamPayV2Error::ReleaseAmountExceeded
+    );
+    let remaining = refundable
+        .checked_sub(new_refunded)
+        .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+
+    // Accounting before the CPI. A failed transfer aborts the whole
+    // transaction, so this update cannot persist without tokens leaving escrow.
+    contract.refunded_amount = new_refunded;
+
     let employer = contract.employer;
     let freelancer = contract.freelancer;
     let contract_id = contract.contract_id.to_le_bytes();
     let bump = [contract.bump];
-    let decimals = ctx.accounts.token_mint.decimals;
     let mint = contract.token_mint;
     let contract_key = contract.key();
 
-    // Checks done. CPI next; refunded_amount advances only after success.
     let signer_seeds: &[&[u8]] = &[
         CONTRACT_SEED,
         employer.as_ref(),
@@ -95,20 +111,6 @@ pub fn handle_claim_employer_refund(ctx: Context<ClaimEmployerRefund>) -> Result
         available,
         decimals,
     )?;
-
-    let contract = &mut ctx.accounts.contract;
-    let new_refunded = contract
-        .refunded_amount
-        .checked_add(available)
-        .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
-    require!(
-        new_refunded <= refundable,
-        StreamPayV2Error::ReleaseAmountExceeded
-    );
-    contract.refunded_amount = new_refunded;
-    let remaining = refundable
-        .checked_sub(new_refunded)
-        .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
 
     emit!(EmployerRefundClaimed {
         contract: contract_key,

@@ -146,8 +146,8 @@ export function SubmitWorkForm({
       <div className="space-y-3">
         <p className="text-sm font-medium text-ink">Work links</p>
         <p className="text-xs text-ink-faint">
-          Add at least one https:// link or upload a file. When a link is present, the first
-          link is recorded on-chain as the submission reference (max 200 characters).
+          Add at least one https:// link or upload a file. Your first link (max 200
+          characters) is saved with the contract as your submitted work link.
         </p>
         {draft.links.map((link, index) => (
           <div

@@ -1,14 +1,35 @@
 "use client";
 
+import {
+  lifecycleNotificationForAction,
+  requestOfferLifecycleNotification,
+} from "@/lib/app/lifecycle-notifications-client";
+import { withSameWalletOfferActions } from "@/lib/app/dashboard-offers";
+
 import { getMint } from "@solana/spl-token";
 import { useAnchorWallet, useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { Suspense, useCallback, useEffect, useMemo, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import Link from "next/link";
 
 import { Lifecycle } from "@/components/contracts/Lifecycle";
 import { PaymentProgress } from "@/components/contracts/PaymentProgress";
 import { ResolutionCenter } from "@/components/contracts/ResolutionCenter";
+import { requestDisputeAssignedNotification } from "@/lib/app/dispute-assigned-client";
+import {
+  markOutcomeSync,
+  outcomeNotificationKindForStatus,
+  outcomeSyncKey,
+  requestContractOutcomeNotification,
+} from "@/lib/app/outcome-notifications-client";
+import {
+  assertResolverPrecheck,
+  canShowResolverSettlementControls,
+  contractRolesForWallet,
+  parseFreelancerAllocation,
+  resolverSettlementSummary,
+  validateResolverSettlement,
+} from "@/lib/app/resolver-cases";
 import { StatusBadge } from "@/components/contracts/StatusBadge";
 import { ContractMessages } from "@/components/contracts/ContractMessages";
 import { HourlyShowcase } from "@/components/contracts/HourlyShowcase";
@@ -101,7 +122,9 @@ import {
   deliverableContextTitle,
   revisionLabel,
   submissionKindFromWorkUnit,
+  submittedWorkDisplay,
   validateDeliveryPayload,
+  type SubmittedWorkDisplay,
 } from "@/lib/app/work-delivery";
 import {
   actionLabel,
@@ -273,6 +296,29 @@ export function ContractDetail({ address }: { address: string }) {
     return () => window.clearTimeout(timer);
   }, [load]);
 
+  // Confirmed-outcome inbox sync. Settlement: any party/resolver on load
+  // (server dedupes per recipient). Ended/cancelled: only when this page saw
+  // the transition, i.e. right after the viewer's own confirmed action.
+  const outcomeStatusRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!contract || !publicKey) return;
+    const address58 = contract.address.toBase58();
+    const current = `${address58}:${contract.status}`;
+    const previous = outcomeStatusRef.current;
+    outcomeStatusRef.current = current;
+    const kind = outcomeNotificationKindForStatus(contract.status);
+    if (!kind) return;
+    const roles = contractRolesForWallet(publicKey, contract);
+    if (kind === "settlement_recorded") {
+      if (!roles.isEmployer && !roles.isFreelancer && !roles.isResolver) return;
+    } else {
+      if (!roles.isEmployer && !roles.isFreelancer) return;
+      if (!previous || !previous.startsWith(`${address58}:`) || previous === current) return;
+    }
+    const key = outcomeSyncKey(address58, kind, publicKey.toBase58());
+    if (markOutcomeSync(key)) void requestContractOutcomeNotification(address58, kind);
+  }, [contract, publicKey]);
+
   useEffect(() => {
     if (status !== "ready" || !contract) return;
     let cancelled = false;
@@ -330,13 +376,18 @@ export function ContractDetail({ address }: { address: string }) {
   const actions = useMemo(() => {
     if (!publicKey || !contract) return [];
     const trialUnit = units.find((u) => u.kind === "Trial") ?? null;
-    return availableActions({
-      wallet: publicKey,
+    return withSameWalletOfferActions(
+      availableActions({
+        wallet: publicKey,
+        contract,
+        trialUnit,
+        hourlyState,
+        now,
+      }),
+      publicKey,
       contract,
-      trialUnit,
-      hourlyState,
-      now,
-    });
+      now
+    );
   }, [contract, hourlyState, now, publicKey, units]);
 
   if (!connected) return <ConnectPrompt />;
@@ -359,6 +410,10 @@ export function ContractDetail({ address }: { address: string }) {
   }
 
   const role = roleForContract(publicKey, contract);
+  // isEmployer / isFreelancer / isResolver from the confirmed on-chain account.
+  const walletRoles = contractRolesForWallet(publicKey, contract);
+  const canSettleDispute =
+    walletRoles.isResolver && canShowResolverSettlementControls(publicKey, contract);
   const other = counterparty(publicKey, contract);
   const settlement = settlementView(contract);
   const trialStarted = streamingTrialStartedCopy(contract);
@@ -394,7 +449,10 @@ export function ContractDetail({ address }: { address: string }) {
     confirm?.action === "openDispute"
       ? !openPresentation.canSubmit
       : confirm?.action === "resolveDispute"
-        ? decimals == null || Boolean(resolveParsed.error) || !resolvePreview.valid
+        ? decimals == null ||
+          Boolean(resolveParsed.error) ||
+          !resolvePreview.valid ||
+          Boolean(parseFreelancerAllocation(awardUi, decimals, contract).error)
         : confirm?.action === "submitWorkUnit" || confirm?.action === "submitTrialWork"
           ? !deliveryValidation.ok ||
             !deliveryAttachmentsReady ||
@@ -682,21 +740,33 @@ export function ContractDetail({ address }: { address: string }) {
         case "cancelActiveContract":
           return client.cancelActiveContract(contract.address);
         case "withdrawFreelancer":
-          return client.withdrawFreelancer({ contract: contract.address });
+          return client.withdrawFreelancer({
+            contract: contract.address,
+            // One-click Collect: materialize stream accrual in the same tx while Active.
+            releaseAccrualFirst:
+              contract.paymentMode === "Streaming" &&
+              contract.status === "Active" &&
+              actions.includes("releaseStreamAccrual"),
+          });
         case "claimEmployerRefund":
           return client.claimEmployerRefund({ contract: contract.address });
         case "openDispute":
           return client.openDispute(contract.address);
         case "resolveDispute": {
           if (decimals == null) throw new Error("Mint decimals are required for an exact award.");
-          const parsed = parseDisputeAwardInput(
-            awardUi,
-            decimals,
-            contract.contestedAmount
+          if (!wallet) throw new Error("Connect the designated resolver wallet.");
+          // Pre-check a fresh on-chain read before building the transaction. The
+          // program's has_one = resolver constraint remains authoritative.
+          const onChain = await fetchContract(
+            getStreamPayV2Program(connection, wallet),
+            contract.address
           );
-          if (parsed.error || parsed.amount == null) {
-            throw new Error(parsed.error ?? "Invalid award");
+          assertResolverPrecheck(publicKey, onChain);
+          const allocation = parseFreelancerAllocation(awardUi, decimals, onChain);
+          if (allocation.error || allocation.award == null) {
+            throw new Error(allocation.error ?? "Invalid allocation");
           }
+          const parsed = { amount: allocation.award };
           return client.resolveDispute({
             contract: contract.address,
             freelancerContestedAward: parsed.amount,
@@ -754,6 +824,16 @@ export function ContractDetail({ address }: { address: string }) {
     );
     setConfirm(null);
     if (ok) {
+      // Best-effort inbox notification after a confirmed accept/activation. The
+      // server re-reads on-chain status and dedupes per contract+recipient+kind.
+      const lifecycleKind = lifecycleNotificationForAction(action);
+      if (lifecycleKind) {
+        void requestOfferLifecycleNotification(contract.address.toBase58(), lifecycleKind);
+      }
+      if (action === "openDispute") {
+        // Best-effort resolver inbox notification; the server re-reads chain facts and dedupes.
+        void requestDisputeAssignedNotification(contract.address.toBase58());
+      }
       const latest = await load();
       await refreshList();
       if (
@@ -816,6 +896,8 @@ export function ContractDetail({ address }: { address: string }) {
   const contractButtons = actions
     .filter((a) => !UNIT_ACTIONS.includes(a) && !TRIAL_ACTIONS.includes(a))
     .filter((a) => !hourlyPrimary.includes(a))
+    // Streaming release lives in the Ongoing pay panel (freelancer only); no duplicate here.
+    .filter((a) => a !== "releaseStreamAccrual")
     .filter((a) => {
       if (
         a === "rejectActivation" &&
@@ -863,13 +945,13 @@ export function ContractDetail({ address }: { address: string }) {
 
   return (
     <PageFade>
-      <div className="space-y-5 sm:space-y-6">
+      <div className="space-y-4 sm:space-y-5">
         <header className="flex min-w-0 flex-wrap items-start justify-between gap-3 sm:gap-4">
           <div className="min-w-0 flex-1">
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan">
               {presentType(contract.paymentMode)} · {roleLabel(role)}
             </p>
-            <h1 className="mt-1 break-words font-display text-[1.75rem] tracking-tight sm:text-4xl">
+            <h1 className="mt-1 break-words font-display text-[1.75rem] tracking-tight sm:text-3xl">
               {metadata?.title || "Protected contract"}
             </h1>
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink-soft">
@@ -897,6 +979,8 @@ export function ContractDetail({ address }: { address: string }) {
           <StatusBadge status={contract.status} label={presentStatus(contract.status)} />
         </header>
 
+        <div className="grid min-w-0 gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start 2xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <div className="min-w-0 space-y-4 sm:space-y-5">
         {disputeActive ? (
           <div id="resolution">
             <ResolutionCenter
@@ -905,6 +989,10 @@ export function ContractDetail({ address }: { address: string }) {
               now={now}
               decimals={decimals}
               role={role}
+              canSettle={canSettleDispute}
+              awardUi={awardUi}
+              onAwardChange={setAwardUi}
+              onReviewSettlement={() => requestAction("resolveDispute")}
               hourlyState={hourlyState}
               hourlySession={hourlySession}
               showOpenGuidance={openDisputeShown}
@@ -922,7 +1010,7 @@ export function ContractDetail({ address }: { address: string }) {
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan">
             Next step
           </p>
-          <h2 className="mt-1 font-display text-2xl">Actions</h2>
+          <h2 className="mt-1 font-display text-xl">Actions</h2>
           <p className="mt-1 text-sm text-ink-soft">
             {actionsSectionGuidance({
               status: contract.status,
@@ -989,7 +1077,7 @@ export function ContractDetail({ address }: { address: string }) {
           contract.status
         ) ? (
           <Card className="p-4 sm:p-5">
-            <h2 className="font-display text-2xl">Settlement</h2>
+            <h2 className="font-display text-xl">Settlement</h2>
             <p className="mt-1 text-sm text-ink-soft">
               {contract.status === "Resolved"
                 ? "The resolver recorded settlement accounting. Tokens move only when Collect pay or Claim refund is sent."
@@ -1071,7 +1159,7 @@ export function ContractDetail({ address }: { address: string }) {
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan">
                   Paid trial
                 </p>
-                <h2 className="mt-1 font-display text-2xl">{trialStarted.headline}</h2>
+                <h2 className="mt-1 font-display text-xl">{trialStarted.headline}</h2>
                 <p className="mt-2 text-sm leading-6 text-ink-soft">{trialStarted.body}</p>
               </Card>
             ) : null}
@@ -1080,7 +1168,7 @@ export function ContractDetail({ address }: { address: string }) {
               now={now}
               decimals={decimals}
               role={role}
-              canRelease={actions.includes("releaseStreamAccrual")}
+              canRelease={role === "freelancer" && actions.includes("releaseStreamAccrual")}
               canCollect={actions.includes("withdrawFreelancer")}
               busy={tx.busy}
               onRelease={() => requestAction("releaseStreamAccrual")}
@@ -1092,7 +1180,7 @@ export function ContractDetail({ address }: { address: string }) {
         <div id="work" className="scroll-mt-20 space-y-4">
         {contract.trialAmount > 0n ? (
           <Card className="p-4 sm:p-5">
-            <h2 className="font-display text-2xl">Paid trial</h2>
+            <h2 className="font-display text-xl">Paid trial</h2>
             <p className="mt-1 text-sm text-ink-soft">
               The trial is funded and reviewed before the main contract activates. Approving it
               does not rewrite the main amount.
@@ -1144,7 +1232,7 @@ export function ContractDetail({ address }: { address: string }) {
 
         {workUnitsHaveOwnCards(contract.paymentMode) ? (
           <Card className="p-4 sm:p-5">
-            <h2 className="font-display text-2xl">
+            <h2 className="font-display text-xl">
               {contract.paymentMode === "Milestone" ? "Milestones" : "Deliverable"}
             </h2>
             <p className="mt-1 text-sm text-ink-soft">
@@ -1213,9 +1301,12 @@ export function ContractDetail({ address }: { address: string }) {
           </Suspense>
         </div>
 
+        </div>
+
+        <div className="min-w-0 space-y-4 sm:space-y-5">
         <Card id="overview" className="scroll-mt-20 p-4 sm:p-5">
           <p className="text-xs uppercase tracking-[0.16em] text-ink-faint">Overview</p>
-          <h2 className="mt-1 font-display text-2xl">Contract details</h2>
+          <h2 className="mt-1 font-display text-xl">Contract details</h2>
           {metadata?.description ? (
             <p className="mt-3 text-sm leading-6 text-ink-soft">{metadata.description}</p>
           ) : (
@@ -1330,6 +1421,8 @@ export function ContractDetail({ address }: { address: string }) {
             <Row label="Open reviews" value={String(contract.openReviewCount)} />
           </div>
         </details>
+        </div>
+        </div>
       </div>
 
       <Modal
@@ -1435,6 +1528,7 @@ function WorkUnitPanel({
       : null;
   const voidCopy = voidDeliverableCopy({ contract, unit, now });
   const kind = submissionKindFromWorkUnit(unit.kind);
+  const submitted = submittedWorkDisplay(unit.submissionUri);
 
   return (
     <div className="rounded-2xl border border-line bg-paper p-4">
@@ -1479,11 +1573,15 @@ function WorkUnitPanel({
           label="Revisions used"
           value={revisionsUsedLabel(unit.revisionCount, contract.maxRevisions)}
         />
-        <Row
-          label="On-chain reference"
-          value={unit.submissionUri || "None"}
-        />
+        <Row label={submitted.label} value={<SubmittedWorkValue display={submitted} />} />
       </dl>
+      {submitted.kind !== "none" ? (
+        <details className="mt-2 text-xs text-ink-faint">
+          <summary className="cursor-pointer select-none">Technical details</summary>
+          <p className="mt-1">Value saved with the contract:</p>
+          <p className="mt-1 break-all font-mono [overflow-wrap:anywhere]">{unit.submissionUri}</p>
+        </details>
+      ) : null}
 
       <WorkDeliveryHistory
         submissions={submissions}
@@ -1748,7 +1846,7 @@ function ConfirmBody({
         </ul>
         <p>{HOURLY_COPY.stopNotWithdraw}</p>
         <p>{HOURLY_COPY.shortSession} {HOURLY_COPY.shortRemainder}</p>
-        <Field label="Work log reference (optional)" hint={copy.workLogHint}>
+        <Field label="Work log link or note (optional)" hint={copy.workLogHint}>
           <Input
             value={uri}
             onChange={(e) => setUri(e.target.value)}
@@ -1825,6 +1923,8 @@ function ConfirmBody({
         ? parseDisputeAwardInput(awardUi, decimals, contract.contestedAmount)
         : { error: "Mint decimals are required for an exact award." };
     const preview = resolutionPreview(contract, parsed.amount ?? 0n);
+    const settlementCheck =
+      parsed.amount != null ? validateResolverSettlement(contract, parsed.amount) : null;
     return (
       <div className="space-y-3 text-sm leading-6 text-ink-soft">
         <p>{RESOLVE_DISPUTE_COPY.youAre}</p>
@@ -1833,24 +1933,18 @@ function ConfirmBody({
         <Field
           label={RESOLVE_DISPUTE_COPY.inputLabel}
           hint={RESOLVE_DISPUTE_COPY.inputHint}
-          error={parsed.error}
+          error={
+            parsed.error ??
+            (settlementCheck && !settlementCheck.ok ? settlementCheck.error : undefined)
+          }
         >
           <Input value={awardUi} onChange={(e) => setAwardUi(e.target.value)} />
         </Field>
-        {parsed.amount != null && preview.valid ? (
+        {parsed.amount != null && preview.valid && settlementCheck?.ok ? (
           <dl className="grid gap-2 sm:grid-cols-2">
-            <Row
-              label="Disputed amount"
-              value={formatTokenAmount(preview.contestedAmount, decimals)}
-            />
-            <Row
-              label="Freelancer receives from dispute"
-              value={formatTokenAmount(preview.freelancerFromDispute, decimals)}
-            />
-            <Row
-              label="Employer refundable from dispute"
-              value={formatTokenAmount(preview.employerFromDispute, decimals)}
-            />
+            {resolverSettlementSummary(settlementCheck, decimals).map((row) => (
+              <Row key={row.label} label={row.label} value={row.value} />
+            ))}
             <Row
               label="Freelancer then collects"
               value={formatTokenAmount(preview.freelancerStillToCollect, decimals)}
@@ -1964,7 +2058,7 @@ function ConfirmBody({
     return (
       <div className="space-y-3 text-sm leading-6 text-ink-soft">
         <p>
-          Release accrued pay writes the program&apos;s newly accrued amount into
+          Update earnings writes the program&apos;s newly accrued amount into
           released accounting. It does not transfer tokens. The freelancer collects
           available pay separately. Collect does not end the stream.
         </p>
@@ -1976,6 +2070,25 @@ function ConfirmBody({
     );
   }
   return <p>This action will be sent to your wallet for approval.</p>;
+}
+
+function SubmittedWorkValue({ display }: { display: SubmittedWorkDisplay }) {
+  if (display.kind === "link") {
+    return (
+      <a
+        href={display.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="break-all font-medium text-cyan underline-offset-2 hover:underline [overflow-wrap:anywhere]"
+      >
+        {display.text} ↗
+      </a>
+    );
+  }
+  if (display.kind === "text") {
+    return <span className="break-all [overflow-wrap:anywhere]">{display.text}</span>;
+  }
+  return <span>{display.text}</span>;
 }
 
 function Row({ label, value }: { label: string; value: ReactNode }) {

@@ -216,6 +216,32 @@ export async function requireCaseParty(
   return { env, stores, session, facts, partyRole: role };
 }
 
+/**
+ * Read-only Resolution Case access (GET) for the employer, the freelancer, or
+ * the on-chain designated resolver. Mutating case routes keep
+ * requireCaseParty, so the resolver can never write participant-owned data.
+ */
+export async function requireCaseViewer(
+  request: Request,
+  contractAddress: string
+): Promise<{
+  env: ServerEnv;
+  stores: MessagingStores;
+  session: SessionRecord;
+  facts: ContractCaseFacts;
+  viewerRole: PartyStatementRole | "resolver";
+}> {
+  const env = getServerEnv();
+  const stores = productionStores();
+  const session = await requireSession(request, stores, env);
+  const facts = await connectionCaseFactsReader(env.solanaRpcUrl).read(contractAddress);
+  const role = casePartyRoleFromChain(session.walletAddress, facts);
+  if (role === null) {
+    throw new HttpError(403, "forbidden", "Not a party or the resolver on this contract.");
+  }
+  return { env, stores, session, facts, viewerRole: role };
+}
+
 export function requireMutatingOrigin(request: Request, env = getServerEnv()): ServerEnv {
   assertOrigin(request, env.appOrigin);
   return env;

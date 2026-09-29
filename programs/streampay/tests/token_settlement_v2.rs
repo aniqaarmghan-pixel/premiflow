@@ -512,6 +512,13 @@ impl Env {
         }
     }
 
+    /// SPL token account `state` byte: 1 = Initialized, 2 = Frozen.
+    fn set_token_account_frozen(&mut self, account: Address, frozen: bool) {
+        let mut acc = self.svm.get_account(&account).expect("token account missing");
+        acc.data[108] = if frozen { 2 } else { 1 };
+        self.svm.set_account(account, acc).expect("set token account");
+    }
+
     fn corrupt_escrow_amount(&mut self, contract_id: u64, amount: u64) {
         let escrow = self.escrow_pda(&self.contract_pda(contract_id));
         let mut acc = self.svm.get_account(&escrow).expect("escrow missing");
@@ -840,6 +847,72 @@ fn cancelled_streaming_withdraw_and_no_post_cancel_accrual() {
     );
 }
 
+/// SPL Token `TokenError::AccountFrozen`.
+const E_SPL_ACCOUNT_FROZEN: u32 = 17;
+
+#[test]
+fn failed_withdraw_transfer_persists_no_accounting() {
+    let mut env = setup(10);
+    let start = activate_streaming(&mut env, 1, 10);
+    env.warp(start + 20);
+    env.release_stream(1).unwrap();
+    let before = env.snapshot(1);
+    assert_eq!(before.0, 0);
+
+    let dest = env.freelancer_token_account;
+    env.set_token_account_frozen(dest, true);
+    assert_rejected(env.withdraw(1), E_SPL_ACCOUNT_FROZEN, "withdraw into frozen account");
+    assert_eq!(env.snapshot(1), before, "failed CPI must not advance withdrawn_amount");
+
+    env.set_token_account_frozen(dest, false);
+    env.withdraw(1).unwrap();
+    assert_withdraw_moved(&env, 1, 3, 3, 7, 3);
+    env.assert_conservation(1, 10);
+}
+
+#[test]
+fn failed_refund_transfer_persists_no_accounting() {
+    let mut env = setup(10);
+    let start = activate_streaming(&mut env, 1, 10);
+    env.warp(start + 20);
+    env.cancel(1).unwrap();
+    let c = env.read_contract(&env.contract_pda(1));
+    assert_eq!(c.employer_refundable_amount, 7);
+    let before = env.snapshot(1);
+
+    let dest = env.employer_token_account;
+    env.set_token_account_frozen(dest, true);
+    assert_rejected(env.refund(1), E_SPL_ACCOUNT_FROZEN, "refund into frozen account");
+    assert_eq!(env.snapshot(1), before, "failed CPI must not advance refunded_amount");
+
+    env.set_token_account_frozen(dest, false);
+    env.refund(1).unwrap();
+    let (withdrawn, refunded, escrow, _, employer_balance) = env.snapshot(1);
+    assert_eq!((withdrawn, refunded, escrow), (0, 7, 3));
+    assert_eq!(employer_balance, before.4 + 7);
+    env.assert_conservation(1, 10);
+}
+
+#[test]
+fn cancellation_with_earlier_clock_keeps_released_amount() {
+    let mut env = setup(10);
+    let start = activate_streaming(&mut env, 1, 10);
+    env.warp(start + 40);
+    env.release_stream(1).unwrap();
+    assert_eq!(env.read_contract(&env.contract_pda(1)).released_amount, 6);
+
+    env.warp(start + 20);
+    env.cancel(1).unwrap();
+    let c = env.read_contract(&env.contract_pda(1));
+    assert_eq!(c.status, ContractStatus::Cancelled);
+    assert_eq!(c.stream_released_amount, 6);
+    assert_eq!(c.released_amount, 6);
+    assert_eq!(c.freelancer_settlement_amount, 6);
+    assert_eq!(c.employer_refundable_amount, 4);
+    assert_eq!(env.escrow_amount(1), 10);
+    env.assert_conservation(1, 10);
+}
+
 #[test]
 fn trial_plus_stream_settlement_withdraw_exact() {
     let mut env = setup(TOTAL_AMOUNT);
@@ -1112,7 +1185,8 @@ fn pre_active_and_disputed_withdrawals_rejected() {
         env.read_contract(&env.contract_pda(3)).status,
         ContractStatus::Disputed
     );
-    assert_rejected(env.withdraw(3), E_CONTRACT_TERMINAL, "disputed withdraw");
+    // Disputed pays only already-released pay; nothing is released here.
+    assert_rejected(env.withdraw(3), E_NOTHING_TO_WITHDRAW, "disputed withdraw");
 }
 
 #[test]

@@ -362,10 +362,24 @@ export class StreamPayV2Client {
     contract: PublicKey;
     amount: bigint;
     dueOffsetSeconds: number;
+    /**
+     * Index the caller reconciled against. When set, refuse to send if the
+     * chain's `work_unit_count` moved, so a stale plan cannot append the wrong
+     * milestone.
+     */
+    expectedIndex?: number;
   }): Promise<TransactionResult> {
     const employer = connectedWallet(this.program);
     requireU64(params.amount, "amount");
     const contract = await fetchContract(this.program, params.contract);
+    if (
+      params.expectedIndex !== undefined &&
+      contract.workUnitCount !== params.expectedIndex
+    ) {
+      throw new Error(
+        `Milestone ${params.expectedIndex + 1} was not sent: the contract now has ${contract.workUnitCount} milestones. Resume setup to re-check.`
+      );
+    }
     const workUnit = deriveWorkUnitPda(
       params.contract,
       contract.workUnitCount,
@@ -677,6 +691,8 @@ export class StreamPayV2Client {
   async withdrawFreelancer(params: {
     contract: PublicKey;
     freelancerTokenAccount?: PublicKey;
+    /** Active Streaming: release accrued pay in the same transaction first. */
+    releaseAccrualFirst?: boolean;
   }): Promise<TransactionResult> {
     const freelancer = connectedWallet(this.program);
     const contract = await fetchContract(this.program, params.contract);
@@ -702,9 +718,18 @@ export class StreamPayV2Client {
         freelancerTokenAccount,
       })
     );
+    // One-click Collect (Active Streaming): materialize accrual first, same tx.
+    const base = params.releaseAccrualFirst
+      ? withdraw.preInstructions([
+          await this.program.methods
+            .releaseStreamAccrual()
+            .accountsPartial({ caller: freelancer, contract: params.contract })
+            .instruction(),
+        ])
+      : withdraw;
     const signature = await sendV2Method(
       this.program,
-      ataCreate ? withdraw.preInstructions([ataCreate]) : withdraw
+      ataCreate ? base.preInstructions([ataCreate]) : base
     );
     return txResult({
       signature,

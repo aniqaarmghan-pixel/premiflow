@@ -29,6 +29,21 @@ export function shouldAttemptCaseRecover(
   );
 }
 
+/** The designated resolver may read (never create or recover) a case workspace. */
+export function shouldLoadCaseAsResolver(
+  chainStatus: ContractStatus,
+  role: "employer" | "freelancer" | "resolver" | "none"
+): boolean {
+  return (chainStatus === "Disputed" || chainStatus === "Resolved") && role === "resolver";
+}
+
+export function caseLoadModeForRole(
+  role: "employer" | "freelancer" | "resolver" | "none",
+  requested: "get" | "recover"
+): "get" | "recover" {
+  return role === "resolver" ? "get" : requested;
+}
+
 export function shouldRecoverAfterAction(
   action: UiAction,
   chainStatus: ContractStatus
@@ -66,6 +81,7 @@ export type ResolutionCaseClientState =
   | "unauthenticated"
   | "forbidden"
   | "recovery_failed"
-  | "unavailable";
+  | "unavailable"
+  | "not_created";
 
 export type ResolutionCaseView = PublicResolutionCase;

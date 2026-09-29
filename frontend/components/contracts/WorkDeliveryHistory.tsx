@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/Button";
 import {
   formatSubmissionTimestamp,
   revisionLabel,
+  savedTransactionSignature,
   type SubmissionKind,
 } from "@/lib/app/work-delivery";
 import type { PublicWorkSubmission } from "@/lib/app/submissions-client";
+import { explorerTxUrl } from "@/lib/network";
 
 function kindMatchesUnit(
   submission: PublicWorkSubmission,
@@ -146,6 +148,7 @@ function SubmissionCard({
   expanded?: boolean;
   compact?: boolean;
 }) {
+  const txSignature = savedTransactionSignature(submission.transactionSignature);
   return (
     <div
       className={
@@ -206,6 +209,18 @@ function SubmissionCard({
                   </li>
                 ))}
               </ul>
+            </div>
+          ) : null}
+          {txSignature ? (
+            <div>
+              <a
+                href={explorerTxUrl(txSignature)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs font-medium text-cyan underline-offset-2 hover:underline"
+              >
+                View transaction ↗
+              </a>
             </div>
           ) : null}
         </>

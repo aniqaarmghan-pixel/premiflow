@@ -632,11 +632,12 @@ impl Contract {
 
     /// Materialize canonical stream accrual into released accounting.
     /// Used by Phase 7 cancel and Phase 9 dispute freeze. Status is unchanged.
+    ///
+    /// Saturating: a clock observation earlier than a previous release yields
+    /// zero new accrual; released accounting never decreases.
     pub fn materialize_stream_at(&mut self, now: i64) -> Result<()> {
         let accrued = self.stream_accrued_at(now)?;
-        let delta = accrued
-            .checked_sub(self.stream_released_amount)
-            .ok_or(StreamPayV2Error::ReleaseAmountExceeded)?;
+        let delta = accrued.saturating_sub(self.stream_released_amount);
         if delta > 0 {
             self.stream_released_amount = accrued;
             self.released_amount = self
@@ -894,12 +895,18 @@ impl Contract {
 
     /// Cap on freelancer SPL that may ever leave escrow in the current status.
     ///
-    /// Active: currently released accounting. Cancelled / Resolved / Completed:
-    /// frozen settlement, already reconciled with `released_amount`. Other
-    /// statuses cannot withdraw.
+    /// Active: currently released accounting. Disputed: only the protected pay
+    /// already in `released_amount` (Streaming accrual is materialized when the
+    /// dispute opens); `contested_amount` stays frozen in escrow until
+    /// `resolve_dispute`, and employer refunds stay blocked. Cancelled /
+    /// Resolved / Completed: frozen settlement, already reconciled with
+    /// `released_amount`. Other statuses cannot withdraw.
     pub fn freelancer_withdraw_cap(&self) -> Result<u64> {
         match self.status {
             ContractStatus::Active => Ok(self.released_amount),
+            // Must precede the terminal arm: Disputed is terminal for lifecycle
+            // and refunds, but already-released pay is never contested.
+            ContractStatus::Disputed => Ok(self.released_amount),
             status if status.allows_settlement_claims() => {
                 require!(
                     self.freelancer_settlement_amount == self.released_amount,
