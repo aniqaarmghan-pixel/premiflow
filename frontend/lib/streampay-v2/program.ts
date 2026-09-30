@@ -1,4 +1,4 @@
-import { AnchorProvider, Program } from "@coral-xyz/anchor";
+import { AnchorProvider, Program, type Provider } from "@coral-xyz/anchor";
 import type { AnchorWallet } from "@solana/wallet-adapter-react";
 import {
   Transaction,
@@ -73,6 +73,26 @@ export function getStreamPayV2Program(
   return getStreamPayV2ProgramFromProvider(
     getStreamPayV2Provider(connection, wallet)
   );
+}
+
+/**
+ * Read-only PREMIFLOW program client.
+ *
+ * This client deliberately has no wallet and no transaction-sending methods.
+ * It is safe for account discovery such as loading contracts for a verified
+ * linked wallet while Phantom is disconnected.
+ */
+export function getStreamPayV2ReadOnlyProgram(
+  connection: Connection
+): StreamPayV2Program {
+  const provider: Provider = { connection };
+  const program = new Program(
+    streampayIdl,
+    provider
+  ) as StreamPayV2Program;
+
+  assertProgramId(program.programId);
+  return program;
 }
 
 export function getStreamPayV2ProgramFromProvider(

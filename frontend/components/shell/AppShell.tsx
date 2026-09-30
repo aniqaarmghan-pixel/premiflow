@@ -26,6 +26,7 @@ import { RESOLVER_NAV, isNavActive, type WorkspaceMode } from "@/lib/app/resolve
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
 import { BrandMark } from "@/components/brand/BrandMark";
 import { FloatingAssistant } from "@/components/copilot/FloatingAssistant";
+import { AccountControl } from "./AccountControl";
 import { ClientOnly } from "./ClientOnly";
 import { NetworkControl } from "./NetworkControl";
 import { NotificationBell } from "./NotificationBell";
@@ -151,6 +152,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-2">
               <NotificationBell />
               <NetworkControl />
+              <AccountControl />
               <WalletControl />
             </div>
           </ClientOnly>

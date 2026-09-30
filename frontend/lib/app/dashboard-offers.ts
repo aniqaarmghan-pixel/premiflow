@@ -2,6 +2,7 @@ import type { UiAction } from "@/lib/streampay-v2/actions";
 import type { PublicKey } from "@solana/web3.js";
 
 import { formatUnix } from "@/lib/app/datetime";
+import { walletSetIncludesParty } from "@/lib/app/account-wallet-identity";
 import { presentStatus } from "@/lib/app/view-model";
 import type { ContractView, PaymentModeName } from "@/lib/streampay-v2";
 
@@ -155,6 +156,40 @@ export function offerSections(
   return { awaitingYourResponse, waitingForFreelancer };
 }
 
+/**
+ * Account-level PendingAcceptance sections across all verified linked wallets.
+ *
+ * Freelancer ownership is checked first so an actionable response is not hidden
+ * when another wallet belonging to the same PREMIFLOW account is the employer.
+ */
+export function offerSectionsForWallets(
+  wallets: readonly PublicKey[],
+  contracts: readonly ContractView[],
+  now: number
+): OfferSections {
+  const awaitingYourResponse: OfferListItem[] = [];
+  const waitingForFreelancer: OfferListItem[] = [];
+
+  for (const contract of contracts) {
+    if (!isPendingOffer(contract)) continue;
+
+    if (walletSetIncludesParty(wallets, contract.freelancer)) {
+      awaitingYourResponse.push(
+        toOfferItem(contract, "employer", now)
+      );
+    } else if (walletSetIncludesParty(wallets, contract.employer)) {
+      waitingForFreelancer.push(
+        toOfferItem(contract, "freelancer", now)
+      );
+    }
+  }
+
+  awaitingYourResponse.sort(byDeadline);
+  waitingForFreelancer.sort(byDeadline);
+
+  return { awaitingYourResponse, waitingForFreelancer };
+}
+
 export function offerItemCopy(
   item: OfferListItem,
   formatTime: (seconds: number) => string = formatUnix
@@ -210,6 +245,26 @@ export function roleAwareStatusLabel(
  * and PendingEmployerApproval always offers the employer an activation decision.
  * Links go to the detail page; no action or transaction logic lives here.
  */
+/**
+ * Account-facing status wording across all verified linked wallets.
+ */
+export function roleAwareStatusLabelForWallets(
+  wallets: readonly PublicKey[],
+  contract: Pick<ContractView, "status" | "employer" | "freelancer">
+): string {
+  if (contract.status === "PendingAcceptance") {
+    if (walletSetIncludesParty(wallets, contract.freelancer)) {
+      return ROLE_AWARE_STATUS_COPY.freelancerOffer;
+    }
+
+    if (walletSetIncludesParty(wallets, contract.employer)) {
+      return ROLE_AWARE_STATUS_COPY.employerOffer;
+    }
+  }
+
+  return presentStatus(contract.status);
+}
+
 export function actionRequiredItems(
   wallet: PublicKey | null,
   contracts: readonly ContractView[],
@@ -245,6 +300,57 @@ export function actionRequiredItems(
       actionLabel: ACTION_REQUIRED_COPY.action,
     });
   }
+  return items;
+}
+
+/**
+ * Employer next steps across all verified wallets linked to the account.
+ *
+ * This only discovers/display actions. Executing an action still requires
+ * the specific connected signing wallet with on-chain authority.
+ */
+export function actionRequiredItemsForWallets(
+  wallets: readonly PublicKey[],
+  contracts: readonly ContractView[],
+  now: number
+): ActionRequiredItem[] {
+  const items: ActionRequiredItem[] = [];
+
+  for (const contract of contracts) {
+    if (!walletSetIncludesParty(wallets, contract.employer)) continue;
+
+    let kind: ActionRequiredItem["kind"] | null = null;
+
+    if (
+      contract.status === "Draft" &&
+      contract.paymentMode === "Milestone" &&
+      now < contract.acceptanceDeadline
+    ) {
+      kind = "finishSetup";
+    } else if (contract.status === "PendingEmployerApproval") {
+      kind = "reviewActivation";
+    } else if (
+      contract.status === "Draft" &&
+      now >= contract.acceptanceDeadline
+    ) {
+      kind = "expiredDraft";
+    }
+
+    if (!kind) continue;
+
+    const address = contract.address.toBase58();
+
+    items.push({
+      address,
+      href: contractHref(address),
+      mode: contract.paymentMode,
+      kind,
+      freelancerAddress: contract.freelancer.toBase58(),
+      note: ACTION_REQUIRED_COPY[kind],
+      actionLabel: ACTION_REQUIRED_COPY.action,
+    });
+  }
+
   return items;
 }
 

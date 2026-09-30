@@ -9,7 +9,6 @@ import {
   isDefinitelyUnsentError,
   releaseUnsentCreateAttempt,
 } from "../create-attempt-recovery";
-import { createPageView, nextWizardOwner } from "../create-page-gate";
 import {
   decideDiscard,
   ensureCreateIntent,
@@ -251,44 +250,47 @@ test("a released intent round-trips through storage as unlocked", () => {
   }
 });
 
-test("create page gate keeps a started wizard mounted but hidden while disconnected", () => {
-  assert.deepEqual(createPageView({ connected: false, wizardStarted: false }), {
-    mountWizard: false,
-    showWizard: false,
-    showConnectPrompt: true,
-  });
-  assert.deepEqual(createPageView({ connected: true, wizardStarted: true }), {
-    mountWizard: true,
-    showWizard: true,
-    showConnectPrompt: false,
-  });
-  assert.deepEqual(createPageView({ connected: false, wizardStarted: true }), {
-    mountWizard: true,
-    showWizard: false,
-    showConnectPrompt: true,
-  });
-});
-
-test("wizard owner follows the connected wallet and survives a disconnect", () => {
-  const A = WALLET_A.toBase58();
-  const B = WALLET_B.toBase58();
-  assert.equal(nextWizardOwner(null, false, null), null);
-  assert.equal(nextWizardOwner(null, true, A), A);
-  assert.equal(nextWizardOwner(A, false, null), A);
-  assert.equal(nextWizardOwner(A, true, null), A);
-  assert.equal(nextWizardOwner(A, true, A), A);
-  assert.equal(nextWizardOwner(A, true, B), B);
-});
-
-test("create page and wizard are wired to the gate and the release helper", () => {
+test("create page is account-first instead of wallet-gated", () => {
   const page = readFileSync(join(process.cwd(), "app/create/page.tsx"), "utf8");
-  assert.equal(page.includes("connected ? <CreateWizard /> : <ConnectPrompt />"), false);
-  assert.match(page, /createPageView\(/);
-  assert.match(page, /nextWizardOwner\(/);
-  assert.match(page, /hidden=\{!view\.showWizard\}/);
-  assert.match(page, /<CreateWizard key=\{owner\} \/>/);
-  const wizard = readFileSync(join(process.cwd(), "components/create/CreateWizard.tsx"), "utf8");
-  assert.match(wizard, /const beforeAttempt = intent;\n\s+intent = markCreateAttempted\(intent, Date\.now\(\)\);/);
+
+  assert.match(page, /useSession\(\)/);
+  assert.match(page, /<CreateWizard \/>/);
+
+  assert.doesNotMatch(page, /ConnectPrompt/);
+  assert.doesNotMatch(page, /createPageView\(/);
+  assert.doesNotMatch(page, /nextWizardOwner\(/);
+  assert.doesNotMatch(page, /hidden=\{!view\.showWizard\}/);
+
+  assert.match(page, /href="\/sign-in"/);
+  assert.match(page, /href="\/sign-up"/);
+});
+
+test("CreateWizard asks for a wallet only when starting the on-chain create flow", () => {
+  const wizard = readFileSync(
+    join(process.cwd(), "components/create/CreateWizard.tsx"),
+    "utf8"
+  );
+
+  assert.match(wizard, /validateCreateDraftBase/);
+  assert.match(wizard, /if \(!publicKey\) \{/);
+  assert.match(wizard, /setWalletModalVisible\(true\)/);
+  assert.match(wizard, /connectForCreateRef/);
+
+  const startCreate = wizard.slice(
+    wizard.indexOf("async function startCreate"),
+    wizard.indexOf("async function resumeSetup")
+  );
+
+  assert.match(startCreate, /if \(!publicKey\) \{/);
+  assert.match(startCreate, /return;/);
+
+  assert.match(
+    wizard,
+    /const beforeAttempt = intent;\n\s+intent = markCreateAttempted\(intent, Date\.now\(\)\);/
+  );
   assert.match(wizard, /sendError = err;\n\s+throw err;/);
-  assert.match(wizard, /releaseUnsentCreateAttempt\(beforeAttempt, settled, sendError, Date\.now\(\)\)/);
+  assert.match(
+    wizard,
+    /releaseUnsentCreateAttempt\(beforeAttempt, settled, sendError, Date\.now\(\)\)/
+  );
 });

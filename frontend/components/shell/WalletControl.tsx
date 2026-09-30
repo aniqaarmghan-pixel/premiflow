@@ -12,11 +12,12 @@ import {
 } from "@/lib/network";
 
 export function WalletControl() {
-  const { connected, connecting, publicKey, disconnect, wallet } = useWallet();
+  const { connected, connecting, publicKey, connect, disconnect, wallet } = useWallet();
   const { setVisible } = useWalletModal();
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
+  const connectRequestedRef = useRef(false);
   const menuId = useId();
 
   const pubkey = publicKey?.toBase58() ?? null;
@@ -32,6 +33,25 @@ export function WalletControl() {
   useEffect(() => {
     if (!uiConnected) setMenuOpen(false);
   }, [uiConnected, pubkey]);
+
+  useEffect(() => {
+    if (
+      !connectRequestedRef.current ||
+      !wallet ||
+      connected ||
+      connecting
+    ) {
+      return;
+    }
+
+    void connect()
+      .catch(() => {
+        // Wallet adapter surfaces connection errors through its own state/UI.
+      })
+      .finally(() => {
+        connectRequestedRef.current = false;
+      });
+  }, [wallet, connected, connecting, connect]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -74,10 +94,21 @@ export function WalletControl() {
 
   function onPrimaryClick() {
     if (connecting) return;
+
     if (!uiConnected) {
-      setVisible(true);
+      connectRequestedRef.current = true;
+
+      if (wallet) {
+        void connect().catch(() => {
+          connectRequestedRef.current = false;
+        });
+      } else {
+        setVisible(true);
+      }
+
       return;
     }
+
     setMenuOpen((value) => !value);
   }
 

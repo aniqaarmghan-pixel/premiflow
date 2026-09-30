@@ -1,25 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useWallet } from "@solana/wallet-adapter-react";
-
-import { ConnectPrompt } from "@/components/shell/ConnectPrompt";
 import { PageFade } from "@/components/shell/PageFade";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { formatUnix } from "@/lib/app/datetime";
-import { presentType, roleForContract, roleLabel } from "@/lib/app/view-model";
-import { roleAwareStatusLabel } from "@/lib/app/dashboard-offers";
+import { presentType, roleLabel } from "@/lib/app/view-model";
+import { accountRoleForContract } from "@/lib/app/account-wallet-identity";
+import { roleAwareStatusLabelForWallets } from "@/lib/app/dashboard-offers";
 import { useContracts } from "@/lib/hooks/ContractsProvider";
 
 type Stamp = { at: number; label: string; href: string };
 
 export function ActivityPage() {
-  const { connected, publicKey } = useWallet();
-  const { status, grouped, refresh } = useContracts();
-
-  if (!connected || !publicKey) return <ConnectPrompt />;
+  const { status, grouped, accountWallets, refresh } = useContracts();
   if (status === "loading" || status === "idle") return <Skeleton className="h-64 w-full" />;
   if (status === "error") {
     return (
@@ -34,7 +29,11 @@ export function ActivityPage() {
   const stamps: Stamp[] = [];
   for (const contract of grouped.all) {
     const href = `/contracts/${contract.address.toBase58()}`;
-    const role = roleLabel(roleForContract(publicKey, contract));
+    const accountRole = accountRoleForContract(accountWallets, contract);
+    const role =
+      accountRole === "both"
+        ? "Hiring & Working"
+        : roleLabel(accountRole);
     const prefix = `${presentType(contract.paymentMode)} · ${role}`;
     if (contract.createdAt) stamps.push({ at: contract.createdAt, label: `${prefix} created`, href });
     if (contract.acceptedAt) stamps.push({ at: contract.acceptedAt, label: `${prefix} accepted`, href });
@@ -44,7 +43,7 @@ export function ActivityPage() {
     if (contract.disputedAt) stamps.push({ at: contract.disputedAt, label: `${prefix} disputed`, href });
     stamps.push({
       at: contract.createdAt,
-      label: `${prefix}: ${roleAwareStatusLabel(publicKey, contract)}`,
+      label: `${prefix}: ${roleAwareStatusLabelForWallets(accountWallets, contract)}`,
       href,
     });
   }

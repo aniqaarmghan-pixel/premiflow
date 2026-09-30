@@ -140,25 +140,54 @@ export function tryParsePubkey(raw: string): PublicKey | null {
   }
 }
 
-export function validateParties(
-  employer: PublicKey,
+/**
+ * Party validation that does not require an employer wallet yet.
+ * Used while an authenticated PREMIFLOW user is drafting a contract.
+ */
+export function validateDraftParties(
   freelancerRaw: string,
   resolverRaw: string
 ): FieldErrors {
   const errors: FieldErrors = {};
   const freelancer = tryParsePubkey(freelancerRaw);
   const resolver = tryParsePubkey(resolverRaw);
-  if (!freelancer) errors.freelancer = "Enter a valid freelancer wallet.";
-  else if (freelancer.equals(employer)) {
+
+  if (!freelancer) {
+    errors.freelancer = "Enter a valid freelancer wallet.";
+  }
+
+  if (!resolver) {
+    errors.resolver = "A PREMIFLOW resolver is not configured.";
+  } else if (!findResolver(resolver)) {
+    errors.resolver = "Choose a supported PREMIFLOW resolver.";
+  } else if (freelancer && resolver.equals(freelancer)) {
+    errors.resolver = "Resolver must be different from the freelancer.";
+  }
+
+  return errors;
+}
+
+/**
+ * Full on-chain party validation once the employer wallet is known.
+ */
+export function validateParties(
+  employer: PublicKey,
+  freelancerRaw: string,
+  resolverRaw: string
+): FieldErrors {
+  const errors = validateDraftParties(freelancerRaw, resolverRaw);
+  const freelancer = tryParsePubkey(freelancerRaw);
+  const resolver = tryParsePubkey(resolverRaw);
+
+  if (freelancer && freelancer.equals(employer)) {
     errors.freelancer = "Freelancer must be different from the connected wallet.";
   }
-  if (!resolver) errors.resolver = "A PREMIFLOW resolver is not configured.";
-  else if (!findResolver(resolver)) {
-    errors.resolver = "Choose a supported PREMIFLOW resolver.";
-  } else {
+
+  if (resolver && findResolver(resolver)) {
     const distinct = assertResolverDistinct(resolver, employer, freelancer);
     if (distinct) errors.resolver = distinct;
   }
+
   return errors;
 }
 
@@ -288,12 +317,11 @@ export function parseDisputeAwardInput(
   }
 }
 
-export function validateCreateDraft(
-  employer: PublicKey,
+function validateCreateDraftWithPartyErrors(
+  errors: FieldErrors,
   draft: CreateWizardDraft,
   nowSeconds: number
 ): FieldErrors {
-  const errors = validateParties(employer, draft.freelancer, draft.resolver);
   try {
     const locked = lockedCreatePayment();
     if (draft.mint !== locked.mint.toBase58()) {
@@ -449,6 +477,37 @@ export function validateCreateDraft(
   }
 
   return errors;
+}
+
+/**
+ * Validate a contract draft before an employer wallet has been connected.
+ * This keeps normal drafting/review validation active without granting any
+ * on-chain authority.
+ */
+export function validateCreateDraftBase(
+  draft: CreateWizardDraft,
+  nowSeconds: number
+): FieldErrors {
+  return validateCreateDraftWithPartyErrors(
+    validateDraftParties(draft.freelancer, draft.resolver),
+    draft,
+    nowSeconds
+  );
+}
+
+/**
+ * Full create validation used once the employer wallet is known.
+ */
+export function validateCreateDraft(
+  employer: PublicKey,
+  draft: CreateWizardDraft,
+  nowSeconds: number
+): FieldErrors {
+  return validateCreateDraftWithPartyErrors(
+    validateParties(employer, draft.freelancer, draft.resolver),
+    draft,
+    nowSeconds
+  );
 }
 
 export function employerRemainder(

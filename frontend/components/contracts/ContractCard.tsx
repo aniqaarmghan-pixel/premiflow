@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useWallet } from "@solana/wallet-adapter-react";
 import { Flag, Layers, Timer, Waves } from "lucide-react";
 
 import { Card } from "@/components/ui/Card";
@@ -12,18 +11,17 @@ import { unreadMessageAriaLabel, unreadMessageBadgeLabel } from "@/lib/app/contr
 import { formatTokenAmount } from "@/lib/app/money";
 import {
   BOTH_PARTIES_CARD_LABEL,
-  roleAwareStatusLabel,
-  viewerPartyRole,
+  roleAwareStatusLabelForWallets,
 } from "@/lib/app/dashboard-offers";
 import { contractCardNextHint } from "@/lib/app/dispute-ux";
 import {
-  counterparty,
   financialProgress,
   presentType,
-  roleForContract,
   roleLabel,
 } from "@/lib/app/view-model";
 import type { ContractView } from "@/lib/streampay-v2";
+import { accountRoleForContract } from "@/lib/app/account-wallet-identity";
+import { useContracts } from "@/lib/hooks/ContractsProvider";
 
 export function ContractCard({
   contract,
@@ -34,11 +32,21 @@ export function ContractCard({
   decimals?: number;
   unreadMessages?: number;
 }) {
-  const { publicKey } = useWallet();
-  if (!publicKey) return null;
-  const role = roleForContract(publicKey, contract);
-  const other = counterparty(publicKey, contract);
-  const partyRole = viewerPartyRole(publicKey, contract);
+  const { accountWallets } = useContracts();
+  const partyRole = accountRoleForContract(accountWallets, contract);
+
+  if (partyRole === "none") return null;
+
+  const role =
+    partyRole === "both"
+      ? "employer"
+      : partyRole;
+
+  const other =
+    partyRole === "freelancer" || partyRole === "resolver"
+      ? { label: "Employer", address: contract.employer }
+      : { label: "Freelancer", address: contract.freelancer };
+
   const progress = financialProgress(contract);
 
   return (
@@ -81,7 +89,7 @@ export function ContractCard({
             ) : null}
             <StatusBadge
               status={contract.status}
-              label={roleAwareStatusLabel(publicKey, contract)}
+              label={roleAwareStatusLabelForWallets(accountWallets, contract)}
               compact
             />
           </div>

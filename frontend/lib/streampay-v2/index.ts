@@ -25,6 +25,7 @@ export type { Pda } from "./pda";
 
 export {
   getStreamPayV2Program,
+  getStreamPayV2ReadOnlyProgram,
   getStreamPayV2ProgramFromProvider,
   getStreamPayV2Provider,
   bindHttpSendAndConfirm,

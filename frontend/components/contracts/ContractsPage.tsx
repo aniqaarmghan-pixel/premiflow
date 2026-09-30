@@ -7,7 +7,6 @@ import { PublicKey } from "@solana/web3.js";
 
 import { ContractCard } from "@/components/contracts/ContractCard";
 import { ResolverCaseCard } from "@/components/contracts/ResolverCaseCard";
-import { ConnectPrompt } from "@/components/shell/ConnectPrompt";
 import { PageFade } from "@/components/shell/PageFade";
 import { Button } from "@/components/ui/Button";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -47,7 +46,7 @@ const STATUSES: ContractStatus[] = [
 ];
 
 export function ContractsPage() {
-  const { connected, publicKey } = useWallet();
+  const { publicKey } = useWallet();
   const unreadCounts = useUnreadMessageCounts(publicKey ? publicKey.toBase58() : null);
   const params = useSearchParams();
   const router = useRouter();
@@ -79,8 +78,6 @@ export function ContractsPage() {
       scroll: false,
     });
   }
-
-  if (!connected) return <ConnectPrompt />;
 
   if (status === "loading" || status === "idle") {
     return (

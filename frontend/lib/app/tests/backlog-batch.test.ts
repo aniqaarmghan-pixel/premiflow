@@ -123,6 +123,10 @@ test("ContractDetail triggers lifecycle notifications only after confirmed tx, n
   assert.doesNotMatch(src, /contract_offer_received/);
   assert.match(src, /withSameWalletOfferActions\(/);
   const card = read("components/contracts/ContractCard.tsx");
-  assert.match(card, /viewerPartyRole\(publicKey, contract\)/);
+  assert.match(
+    card,
+    /roleAwareStatusLabelForWallets\(accountWallets, contract\)/
+  );
+  assert.doesNotMatch(card, /if \(!publicKey\) return null;/);
   assert.match(card, /BOTH_PARTIES_CARD_LABEL/);
 });

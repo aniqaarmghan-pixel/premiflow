@@ -1,6 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 
 import { CONTRACT_TYPE_GUIDES } from "@/lib/app/contract-type-guide";
+import { walletSetIncludesParty } from "@/lib/app/account-wallet-identity";
 import {
   formatReviewPeriod,
   formatRevisionRemaining,
@@ -66,6 +67,41 @@ export function groupContractsByRole(
     if (role === "employer") hiring.push(contract);
     if (role === "freelancer") working.push(contract);
   }
+  return { all, hiring, working };
+}
+
+/**
+ * Groups contracts across every verified wallet linked to one PREMIFLOW account.
+ *
+ * A contract may appear in both Hiring and Working when different linked
+ * wallets belonging to the same account occupy both roles.
+ */
+export function groupContractsByWallets(
+  wallets: readonly PublicKey[],
+  contracts: ContractView[]
+): GroupedContracts {
+  const hiring: ContractView[] = [];
+  const working: ContractView[] = [];
+  const seen = new Set<string>();
+  const all: ContractView[] = [];
+
+  for (const contract of contracts) {
+    const key = contract.address.toBase58();
+
+    if (!seen.has(key)) {
+      seen.add(key);
+      all.push(contract);
+    }
+
+    if (walletSetIncludesParty(wallets, contract.employer)) {
+      hiring.push(contract);
+    }
+
+    if (walletSetIncludesParty(wallets, contract.freelancer)) {
+      working.push(contract);
+    }
+  }
+
   return { all, hiring, working };
 }
 
@@ -464,6 +500,52 @@ export function dashboardSummary(
       availableRefund += remainingEmployerRefund(contract);
     }
     if (contract.paymentMode === "Streaming" && contract.status === "Active") {
+      streamingActive += 1;
+    }
+  }
+
+  return {
+    active,
+    hiring: grouped.hiring.length,
+    working: grouped.working.length,
+    pendingReviews,
+    availableToWithdraw,
+    availableRefund,
+    streamingActive,
+  };
+}
+
+/**
+ * Dashboard summary across all verified wallets linked to the account.
+ * This is read-only identity logic; transaction authority is unchanged.
+ */
+export function dashboardSummaryForWallets(
+  wallets: readonly PublicKey[],
+  grouped: GroupedContracts
+): DashboardSummary {
+  let pendingReviews = 0;
+  let availableToWithdraw = 0n;
+  let availableRefund = 0n;
+  let streamingActive = 0;
+  let active = 0;
+
+  for (const contract of grouped.all) {
+    if (contract.status === "Active") active += 1;
+
+    pendingReviews += contract.openReviewCount;
+
+    if (walletSetIncludesParty(wallets, contract.freelancer)) {
+      availableToWithdraw += remainingFreelancerClaim(contract);
+    }
+
+    if (walletSetIncludesParty(wallets, contract.employer)) {
+      availableRefund += remainingEmployerRefund(contract);
+    }
+
+    if (
+      contract.paymentMode === "Streaming" &&
+      contract.status === "Active"
+    ) {
       streamingActive += 1;
     }
   }

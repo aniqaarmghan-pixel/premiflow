@@ -68,11 +68,13 @@ test("missing publicKey while connected still shows Connect wallet", () => {
   assert.equal(isWalletUiConnected({ connected: true, publicKeyBase58: null }), false);
 });
 
-test("WalletControl uses adapter connect state and real disconnect", () => {
+test("WalletControl uses explicit adapter connect and real disconnect", () => {
   assert.match(WALLET_UI, /useWallet\(/);
   assert.match(WALLET_UI, /connected/);
   assert.match(WALLET_UI, /publicKey/);
+  assert.match(WALLET_UI, /connect/);
   assert.match(WALLET_UI, /disconnect/);
+  assert.match(WALLET_UI, /connectRequestedRef/);
   assert.match(WALLET_UI, /setVisible\(true\)/);
   assert.match(WALLET_UI, /Connect wallet/);
   assert.match(WALLET_UI, /Copy address/);
@@ -80,7 +82,9 @@ test("WalletControl uses adapter connect state and real disconnect", () => {
   assert.match(WALLET_UI, /Disconnect/);
   assert.doesNotMatch(WALLET_UI, /WalletMultiButton/);
   assert.match(WALLET_UI, /isWalletUiConnected/);
-  assert.match(PROVIDERS, /autoConnect/);
+
+  // Account sign-in must not silently reconnect a previously used wallet.
+  assert.doesNotMatch(PROVIDERS, /\bautoConnect\b/);
 });
 
 test("account-change source of truth remains wallet-adapter publicKey", () => {

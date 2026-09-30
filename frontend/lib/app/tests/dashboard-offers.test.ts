@@ -312,7 +312,10 @@ test("Action required: employer Milestone Draft setup and activation review only
   assert.deepEqual(actionRequiredItems(WALLET_C, [draft, approval], BEFORE_DEADLINE), []);
   assert.deepEqual(actionRequiredItems(null, [draft, approval], BEFORE_DEADLINE), []);
   assert.deepEqual(actionRequiredItems(WALLET_A, [pendingOffer({ address: ADDR_3 })], BEFORE_DEADLINE), []);
-  assert.match(OVERVIEW, /actionRequiredItems\(publicKey, grouped\.all, now\)/);
+  assert.match(
+    OVERVIEW,
+    /actionRequiredItemsForWallets\(accountWallets, grouped\.all, now\)/
+  );
   assert.match(OVERVIEW, /ACTION_REQUIRED_COPY\.title/);
   assert.match(OVERVIEW, /\{item\.note\}/);
 });
@@ -345,14 +348,23 @@ test("role-aware PendingAcceptance wording leaves presentStatus unchanged", () =
     assert.equal(roleAwareStatusLabel(WALLET_A, contract), presentStatus(status), status);
     assert.equal(roleAwareStatusLabel(WALLET_B, contract), presentStatus(status), status);
   }
-  assert.match(CONTRACT_CARD, /label=\{roleAwareStatusLabel\(publicKey, contract\)\}/);
+  assert.match(
+    CONTRACT_CARD,
+    /label=\{roleAwareStatusLabelForWallets\(accountWallets, contract\)\}/
+  );
   assert.doesNotMatch(CONTRACT_CARD, /presentStatus/);
-  assert.match(OVERVIEW, /roleAwareStatusLabel\(publicKey, c\)/);
+  assert.match(
+    OVERVIEW,
+    /roleAwareStatusLabelForWallets\(accountWallets, c\)/
+  );
   assert.doesNotMatch(OVERVIEW, /presentStatus/);
 });
 
 test("home page renders action and offer sections with every item field", () => {
-  assert.match(OVERVIEW, /offerSections\(publicKey, grouped\.all, now\)/);
+  assert.match(
+    OVERVIEW,
+    /offerSectionsForWallets\(accountWallets, grouped\.all, now\)/
+  );
   assert.match(OVERVIEW, /shortenAddress\(item\.counterpartyAddress\)/);
   assert.match(OVERVIEW, /shortenAddress\(item\.freelancerAddress\)/);
   assert.match(OVERVIEW, /formatTokenAmount\(item\.totalAmount/);

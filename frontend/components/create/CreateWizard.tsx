@@ -2,6 +2,7 @@
 
 import { getAccount } from "@solana/spl-token";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { PublicKey } from "@solana/web3.js";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
@@ -76,6 +77,7 @@ import {
   defaultCreateDraft,
   parsePubkey,
   validateCreateDraft,
+  validateCreateDraftBase,
   validateMilestoneAllocation,
   type CreateWizardDraft,
   type MilestoneDraft,
@@ -166,7 +168,8 @@ const STEPS = [
 
 export function CreateWizard() {
   const router = useRouter();
-  const { publicKey } = useWallet();
+  const { publicKey, wallet, connecting, connect } = useWallet();
+  const { setVisible: setWalletModalVisible } = useWalletModal();
   const { connection } = useConnection();
   const client = useStreamPayClient();
   const { now } = useNow(30_000);
@@ -186,9 +189,41 @@ export function CreateWizard() {
   const [runLock] = useState(createRunLock);
   // Latest tx handle: after tx.reset(), the resume path must call the re-rendered run().
   const txRef = useRef(tx);
+  const connectForCreateRef = useRef(false);
+
   useEffect(() => {
     txRef.current = tx;
   });
+
+  useEffect(() => {
+    if (
+      !connectForCreateRef.current ||
+      publicKey ||
+      !wallet ||
+      connecting
+    ) {
+      return;
+    }
+
+    void connect().catch((err) => {
+      connectForCreateRef.current = false;
+      setProgressNote(
+        err instanceof Error
+          ? `Wallet connection failed: ${err.message}`
+          : "Wallet connection failed. Try again."
+      );
+    });
+  }, [wallet, publicKey, connecting, connect]);
+
+  useEffect(() => {
+    if (!connectForCreateRef.current || !publicKey) return;
+
+    connectForCreateRef.current = false;
+    setProgressNote(
+      "Wallet connected. Review the contract, then press Create & Send Offer to approve the on-chain funding."
+    );
+  }, [publicKey]);
+
   const employerKey = publicKey?.toBase58() ?? null;
   // Saved Create & Send Offer attempt for this wallet, cluster and program (survives reload).
   const savedLoad = useMemo<LoadIntentResult>(() => {
@@ -199,7 +234,10 @@ export function CreateWizard() {
   const savedCorruptMessage = savedLoad.kind === "corrupt" ? savedLoad.message : null;
 
   const errors = useMemo(
-    () => (publicKey ? validateCreateDraft(publicKey, draft, now) : {}),
+    () =>
+      publicKey
+        ? validateCreateDraft(publicKey, draft, now)
+        : validateCreateDraftBase(draft, now),
     [draft, now, publicKey]
   );
 
@@ -622,9 +660,42 @@ export function CreateWizard() {
 
   async function startCreate() {
     if (!runLock.tryAcquire()) return;
+
     try {
+      if (!publicKey) {
+        connectForCreateRef.current = true;
+        setProgressNote(
+          "Connect a wallet to create and fund this contract. Connecting the wallet alone does not send a payment."
+        );
+
+        if (wallet) {
+          try {
+            await connect();
+          } catch (err) {
+            connectForCreateRef.current = false;
+            setProgressNote(
+              err instanceof Error
+                ? `Wallet connection failed: ${err.message}`
+                : "Wallet connection failed. Try again."
+            );
+          }
+        } else {
+          setWalletModalVisible(true);
+        }
+
+        return;
+      }
+
+      if (!client) {
+        setProgressNote(
+          "Your wallet is connected, but PREMIFLOW is still preparing the blockchain connection. Try again in a moment."
+        );
+        return;
+      }
+
       if (isCreateTxInFlight(tx.state.phase)) return;
       if (needsTxResetBeforeResume(tx.state.phase)) tx.reset();
+
       await submit();
     } catch (err) {
       reportUnexpected(err);

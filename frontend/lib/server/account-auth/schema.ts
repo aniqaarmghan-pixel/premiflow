@@ -1,8 +1,10 @@
 import {
   boolean,
+  index,
   pgSchema,
   text,
   timestamp,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 export const accountAuthSchema = pgSchema("account_auth");
@@ -81,6 +83,37 @@ export const account = accountAuthSchema.table("account", {
     .notNull()
     .defaultNow(),
 });
+
+
+
+/**
+ * Solana wallets whose ownership has been verified and linked to a
+ * PREMIFLOW website account.
+ *
+ * Wallet authority remains separate from account authentication:
+ * this table lets PREMIFLOW remember which on-chain identities belong
+ * to the account for read-only discovery after the wallet disconnects.
+ */
+export const walletLink = accountAuthSchema.table(
+  "wallet_link",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => user.id, { onDelete: "cascade" }),
+    walletAddress: text("wallet_address").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    verifiedAt: timestamp("verified_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex("wallet_link_wallet_unique").on(table.walletAddress),
+    index("wallet_link_user_idx").on(table.userId),
+  ]
+);
 
 /**
  * Temporary verification/reset records used by Better Auth.

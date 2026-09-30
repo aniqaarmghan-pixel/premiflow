@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useWallet } from "@solana/wallet-adapter-react";
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import {
@@ -20,7 +19,6 @@ import {
 
 import { ContractCard } from "@/components/contracts/ContractCard";
 import { WhyPremiflowTeaser } from "@/components/about/AboutPage";
-import { ConnectPrompt } from "@/components/shell/ConnectPrompt";
 import { PageFade } from "@/components/shell/PageFade";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -33,17 +31,17 @@ import {
   ACTION_REQUIRED_COPY,
   OFFER_SECTIONS_COPY,
   ROLE_TOTAL_LABELS,
-  actionRequiredItems,
+  actionRequiredItemsForWallets,
   liveStreamContracts,
   offerItemCopy,
-  offerSections,
-  roleAwareStatusLabel,
+  offerSectionsForWallets,
+  roleAwareStatusLabelForWallets,
   type ActionRequiredItem,
   type OfferListItem,
 } from "@/lib/app/dashboard-offers";
 import { formatUnix } from "@/lib/app/datetime";
 import { formatTokenAmount } from "@/lib/app/money";
-import { dashboardSummary, presentType } from "@/lib/app/view-model";
+import { dashboardSummaryForWallets, presentType } from "@/lib/app/view-model";
 import { useContracts } from "@/lib/hooks/ContractsProvider";
 import { useResolverCases } from "@/lib/hooks/useResolverCases";
 import { AssignedDisputesSection } from "@/components/contracts/AssignedDisputesSection";
@@ -54,23 +52,17 @@ const NAV_CARD_FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2";
 
 export function OverviewPage() {
-  const { connected, publicKey } = useWallet();
-  const { status, error, grouped, decimalsByMint, refresh } = useContracts();
+  const {
+    status,
+    error,
+    grouped,
+    decimalsByMint,
+    accountWallets,
+    refresh,
+  } = useContracts();
   const resolverCases = useResolverCases();
   const { now } = useNow(30_000);
   const router = useRouter();
-
-  if (!connected || !publicKey) {
-    return (
-      <PageFade>
-        <Hero />
-        <WhyPremiflowTeaser />
-        <div className="mt-6">
-          <ConnectPrompt />
-        </div>
-      </PageFade>
-    );
-  }
 
   if (status === "loading" || status === "idle") {
     return (
@@ -95,7 +87,7 @@ export function OverviewPage() {
     );
   }
 
-  const summary = dashboardSummary(publicKey, grouped);
+  const summary = dashboardSummaryForWallets(accountWallets, grouped);
   const mintKeys = [...new Set(grouped.all.map((c) => c.tokenMint.toBase58()))];
   const sharedDecimals =
     mintKeys.length === 1 ? decimalsByMint[mintKeys[0]] : undefined;
@@ -103,8 +95,8 @@ export function OverviewPage() {
   const streaming = liveStreamContracts(grouped.all);
   // Direct wallet vs contract.freelancer / contract.employer on each contract;
   // PendingAcceptance only, all four modes. Freelancer wins when both.
-  const offers = offerSections(publicKey, grouped.all, now);
-  const actionItems = actionRequiredItems(publicKey, grouped.all, now);
+  const offers = offerSectionsForWallets(accountWallets, grouped.all, now);
+  const actionItems = actionRequiredItemsForWallets(accountWallets, grouped.all, now);
   const pending = grouped.all.filter((c) => c.openReviewCount > 0);
   const recent = [...grouped.all]
     .sort((a, b) => b.createdAt - a.createdAt)
@@ -291,7 +283,7 @@ export function OverviewPage() {
                   >
                     <p className="font-medium">{presentType(c.paymentMode)}</p>
                     <p className="text-xs text-ink-faint">
-                      {roleAwareStatusLabel(publicKey, c)} · {c.openReviewCount} in review
+                      {roleAwareStatusLabelForWallets(accountWallets, c)} · {c.openReviewCount} in review
                     </p>
                   </Link>
                 </li>
@@ -311,7 +303,7 @@ export function OverviewPage() {
               {recent.map((c) => (
                 <li key={c.address.toBase58()} className="text-sm">
                   <Link href={`/contracts/${c.address.toBase58()}`} className="font-medium">
-                    {presentType(c.paymentMode)} · {roleAwareStatusLabel(publicKey, c)}
+                    {presentType(c.paymentMode)} · {roleAwareStatusLabelForWallets(accountWallets, c)}
                   </Link>
                   <p className="text-xs text-ink-faint">Created {formatUnix(c.createdAt)}</p>
                 </li>

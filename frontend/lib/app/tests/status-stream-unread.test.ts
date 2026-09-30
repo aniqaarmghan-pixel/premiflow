@@ -34,12 +34,23 @@ test("role-aware status: offer wording per party, status values unchanged", () =
   assert.equal(roleAwareStatusLabel(WALLET_B, active), presentStatus("Active"));
 });
 
-test("Activity page and assistant use roleAwareStatusLabel", () => {
+test("Activity uses account wallet-set status while assistant keeps connected-wallet status", () => {
   const activity = read("components/activity/ActivityPage.tsx");
-  assert.match(activity, /roleAwareStatusLabel\(publicKey, contract\)/);
+  assert.match(
+    activity,
+    /roleAwareStatusLabelForWallets\(accountWallets, contract\)/
+  );
+  assert.match(
+    activity,
+    /accountRoleForContract\(accountWallets, contract\)/
+  );
   assert.doesNotMatch(activity, /presentStatus\(/);
+
   const assistant = read("components/copilot/FloatingAssistant.tsx");
-  assert.match(assistant, /statusLabel: roleAwareStatusLabel\(publicKey, contract\)/);
+  assert.match(
+    assistant,
+    /statusLabel: roleAwareStatusLabel\(publicKey, contract\)/
+  );
   assert.doesNotMatch(assistant, /presentStatus\(contract\.status\)/);
 });
 
@@ -139,7 +150,10 @@ test("/contracts list passes unread counts to ContractCard badge", () => {
   assert.match(card, /unreadMessages > 0 \?/);
   assert.match(card, /unreadMessageBadgeLabel\(unreadMessages\)/);
   assert.match(card, /aria-label=\{unreadMessageAriaLabel\(unreadMessages\)\}/);
-  assert.match(card, /label=\{roleAwareStatusLabel\(publicKey, contract\)\}/);
+  assert.match(
+    card,
+    /label=\{roleAwareStatusLabelForWallets\(accountWallets, contract\)\}/
+  );
   const hook = read("lib/hooks/useUnreadMessageCounts.ts");
   assert.match(hook, /fetchNotifications\(\{ limit: 50 \}\)/);
   assert.match(hook, /\.catch\(/);

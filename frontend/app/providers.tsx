@@ -23,7 +23,7 @@ export default function Providers({ children }: { children: ReactNode }) {
   return (
     <MotionConfig reducedMotion="user">
       <ConnectionProvider endpoint={endpoint} config={RPC_CONNECTION_CONFIG}>
-        <WalletProvider wallets={wallets} autoConnect>
+        <WalletProvider wallets={wallets}>
           <WalletModalProvider>
             <ContractsProvider>
               <NoticeProvider>
