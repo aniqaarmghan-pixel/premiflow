@@ -1,5 +1,5 @@
 import { createOpenAI } from "@ai-sdk/openai";
-import { generateObject } from "ai";
+import { generateObject, generateText } from "ai";
 
 import {
   copilotCreateProposalSchema,
@@ -34,21 +34,45 @@ export async function generateCreateProposal(
   if (!copilotCanCallModel(env) || !env.apiKey) {
     throw new CopilotProviderError("Copilot model is not configured.");
   }
-  if (env.provider !== "openai") {
-    throw new CopilotProviderError("Unsupported Copilot provider.");
-  }
-
   let object: unknown;
   try {
-    const openai = createOpenAI({ apiKey: env.apiKey });
+    const openai = createOpenAI({
+      apiKey: env.apiKey,
+      ...(env.provider === "groq"
+        ? { baseURL: "https://api.groq.com/openai/v1" }
+        : {}),
+    });
+
+    // Groq exposes an OpenAI-compatible Chat Completions endpoint.
+    // AI SDK's OpenAI provider otherwise defaults to the Responses API.
+    const model =
+      env.provider === "groq"
+        ? openai.chat(env.model)
+        : openai(env.model);
+
     const result = await generateObject({
-      model: openai(env.model),
+      model,
       schema: copilotCreateProposalSchema,
       schemaName: "CopilotCreateProposal",
       schemaDescription:
         "PREMIFLOW create-wizard draft proposal. Never include mint, resolver, program ID, PDAs, or awards.",
       system: input.system,
       prompt: input.user,
+
+      // Groq strict JSON Schema requires every property to be required.
+      // PREMIFLOW intentionally has optional narrative/proposal fields,
+      // so use Groq's best-effort structured output and keep our own
+      // Zod validation after generation.
+      ...(env.provider === "groq"
+        ? {
+            providerOptions: {
+              openai: {
+                strictJsonSchema: false,
+              },
+            },
+          }
+        : {}),
+
       maxOutputTokens: env.maxOutputTokens,
     });
     object = result.object;
@@ -64,6 +88,58 @@ export async function generateCreateProposal(
   }
 }
 
+export type GenerateGuidanceTextInput = {
+  system: string;
+  user: string;
+};
+
+/**
+ * Plain-text PREMIFLOW guidance for normal product questions.
+ * Structured JSON remains reserved for proposal/live contract flows.
+ */
+export async function generateGuidanceText(
+  input: GenerateGuidanceTextInput,
+  env: CopilotEnv = getCopilotEnv()
+): Promise<string> {
+  if (!copilotCanCallModel(env) || !env.apiKey) {
+    throw new CopilotProviderError("Copilot model is not configured.");
+  }
+
+  try {
+    const openai = createOpenAI({
+      apiKey: env.apiKey,
+      ...(env.provider === "groq"
+        ? { baseURL: "https://api.groq.com/openai/v1" }
+        : {}),
+    });
+
+    const model =
+      env.provider === "groq"
+        ? openai.chat(env.model)
+        : openai(env.model);
+
+    const result = await generateText({
+      model,
+      system: input.system,
+      prompt: input.user,
+      maxOutputTokens: env.maxOutputTokens,
+    });
+
+    const text = result.text.trim();
+
+    if (!text) {
+      throw new CopilotProviderError(
+        "Provider returned an empty guidance response."
+      );
+    }
+
+    return text.slice(0, 4000);
+  } catch (err) {
+    if (err instanceof CopilotProviderError) throw err;
+    throw new CopilotProviderError();
+  }
+}
+
 export type GenerateLiveNarrativeInput = {
   system: string;
   user: string;
@@ -76,21 +152,45 @@ export async function generateLiveNarrative(
   if (!copilotCanCallModel(env) || !env.apiKey) {
     throw new CopilotProviderError("Copilot model is not configured.");
   }
-  if (env.provider !== "openai") {
-    throw new CopilotProviderError("Unsupported Copilot provider.");
-  }
-
   let object: unknown;
   try {
-    const openai = createOpenAI({ apiKey: env.apiKey });
+    const openai = createOpenAI({
+      apiKey: env.apiKey,
+      ...(env.provider === "groq"
+        ? { baseURL: "https://api.groq.com/openai/v1" }
+        : {}),
+    });
+
+    // Groq exposes an OpenAI-compatible Chat Completions endpoint.
+    // AI SDK's OpenAI provider otherwise defaults to the Responses API.
+    const model =
+      env.provider === "groq"
+        ? openai.chat(env.model)
+        : openai(env.model);
+
     const result = await generateObject({
-      model: openai(env.model),
+      model,
       schema: copilotNarrativeSchema,
       schemaName: "CopilotNarrative",
       schemaDescription:
         "PREMIFLOW Assistant narrative only. Do not include mint, resolver, program ID, awards, winner, or action lists.",
       system: input.system,
       prompt: input.user,
+
+      // Groq strict JSON Schema requires every property to be required.
+      // PREMIFLOW intentionally has optional narrative/proposal fields,
+      // so use Groq's best-effort structured output and keep our own
+      // Zod validation after generation.
+      ...(env.provider === "groq"
+        ? {
+            providerOptions: {
+              openai: {
+                strictJsonSchema: false,
+              },
+            },
+          }
+        : {}),
+
       maxOutputTokens: env.maxOutputTokens,
     });
     object = result.object;

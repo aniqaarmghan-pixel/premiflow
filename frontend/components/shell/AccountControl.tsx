@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useWallet } from "@solana/wallet-adapter-react";
 import {
   ChevronDown,
+  Link2,
+  LoaderCircle,
   LogIn,
   LogOut,
   UserRound,
@@ -14,12 +17,20 @@ import {
   signOut,
   useSession,
 } from "@/lib/account-auth/client";
+import {
+  ensureMessagingSession,
+  messagingSessionErrorMessage,
+} from "@/lib/app/messaging-session";
+import { logoutSession } from "@/lib/app/messages-client";
 
 export function AccountControl() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
+  const { publicKey, signMessage } = useWallet();
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const [linkingWallet, setLinkingWallet] = useState(false);
+  const [walletLinkError, setWalletLinkError] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
 
@@ -50,6 +61,71 @@ export function AccountControl() {
       document.removeEventListener("keydown", onKey);
     };
   }, [menuOpen]);
+
+  async function handleLinkConnectedWallet() {
+    setWalletLinkError(null);
+
+    const walletAddress = publicKey?.toBase58();
+    if (!walletAddress) {
+      setWalletLinkError(
+        "Connect the Solana wallet you want to use with this PREMIFLOW account first."
+      );
+      return;
+    }
+
+    setLinkingWallet(true);
+
+    try {
+      // Account ↔ wallet linking requires fresh proof of wallet ownership.
+      // Clear any stale wallet-auth cookie so Phantom must sign a new challenge.
+      await logoutSession().catch(() => undefined);
+
+      await ensureMessagingSession({
+        wallet: walletAddress,
+        signMessage,
+      });
+
+      // The server obtains the wallet address from the verified wallet
+      // session. We deliberately do not send an address in the request body.
+      const response = await fetch("/api/account-wallets", {
+        method: "POST",
+        credentials: "same-origin",
+      });
+
+      const payload = (await response.json().catch(() => null)) as
+        | {
+            error?: string;
+            message?: string;
+            wallet?: { address?: string };
+          }
+        | null;
+
+      if (!response.ok) {
+        if (response.status === 409) {
+          throw new Error(
+            payload?.message ??
+              "This wallet is already linked to another PREMIFLOW account."
+          );
+        }
+
+        throw new Error(
+          payload?.message ?? "PREMIFLOW could not link this wallet."
+        );
+      }
+
+      // Reload so ContractsProvider immediately rebuilds the account's
+      // contract history from the newly linked wallet.
+      window.location.reload();
+    } catch (err) {
+      setWalletLinkError(
+        err instanceof Error
+          ? err.message
+          : messagingSessionErrorMessage(err)
+      );
+    } finally {
+      setLinkingWallet(false);
+    }
+  }
 
   async function handleSignOut() {
     setMenuOpen(false);
@@ -124,6 +200,39 @@ export function AccountControl() {
           </div>
 
           <div className="p-1.5">
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => void handleLinkConnectedWallet()}
+              disabled={linkingWallet}
+              className="flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-sm text-ink hover:bg-paper-2 disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-10"
+            >
+              {linkingWallet ? (
+                <LoaderCircle size={16} className="animate-spin" />
+              ) : (
+                <Link2 size={16} className="text-cyan" />
+              )}
+              {linkingWallet ? "Linking wallet…" : "Link connected wallet"}
+            </button>
+
+            {publicKey ? (
+              <p className="px-3 pb-2 text-[11px] text-ink-faint">
+                Connected: {publicKey.toBase58().slice(0, 4)}…
+                {publicKey.toBase58().slice(-4)}
+              </p>
+            ) : null}
+
+            {walletLinkError ? (
+              <p
+                role="alert"
+                className="mx-2 mb-2 rounded-xl border border-danger/20 bg-danger/5 px-3 py-2 text-xs leading-5 text-danger"
+              >
+                {walletLinkError}
+              </p>
+            ) : null}
+
+            <div className="my-1 border-t border-line" />
+
             <button
               type="button"
               role="menuitem"

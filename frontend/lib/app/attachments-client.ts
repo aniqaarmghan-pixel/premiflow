@@ -33,13 +33,17 @@ export function uploadContractAttachment(
   address: string,
   file: File,
   context: AttachmentContext,
-  onProgress?: (ratio: number) => void
+  onProgress?: (ratio: number) => void,
+  participantWallet: string | null = null
 ): Promise<{ attachment: PublicAttachment }> {
   // XMLHttpRequest provides upload progress; fetch does not for FormData reliably.
   return new Promise((resolve, reject) => {
     const form = new FormData();
     form.append("file", file);
     form.append("context", context);
+    if (participantWallet) {
+      form.append("participantWallet", participantWallet);
+    }
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `/api/contracts/${address}/attachments`);
     xhr.withCredentials = true;
@@ -79,9 +83,21 @@ export function uploadContractAttachment(
   });
 }
 
-export function discardPendingAttachment(address: string, attachmentId: string) {
+export function discardPendingAttachment(
+  address: string,
+  attachmentId: string,
+  participantWallet: string | null = null
+) {
+  const params = new URLSearchParams();
+
+  if (participantWallet) {
+    params.set("participantWallet", participantWallet);
+  }
+
+  const suffix = params.size ? `?${params}` : "";
+
   return requestJson<{ ok: true }>(
-    `/api/contracts/${address}/attachments/${attachmentId}`,
+    `/api/contracts/${address}/attachments/${attachmentId}${suffix}`,
     { method: "DELETE" }
   );
 }

@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { requireAccountContractParticipant } from "@/lib/server/account-auth/contract-participant";
+
 import {
   handleRouteError,
   requireMessageParticipant,
@@ -34,7 +36,10 @@ export async function GET(
 ) {
   try {
     const { address } = await context.params;
-    const { stores } = await requireMessageParticipant(request, address);
+    const { stores } = await requireAccountContractParticipant(
+        request,
+        address
+      );
     const result = await listWorkSubmissions(
       stores.submissions,
       {

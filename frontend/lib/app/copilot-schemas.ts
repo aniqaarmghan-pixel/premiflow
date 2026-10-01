@@ -64,6 +64,7 @@ export const COPILOT_FORBIDDEN_FIELDS = [
   "rpcUrl",
   "SOLANA_RPC_URL",
   "OPENAI_API_KEY",
+  "GROQ_API_KEY",
   "freelancerContestedAward",
   "award",
   "settlementAward",

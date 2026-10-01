@@ -8,9 +8,9 @@ import {
 } from "@/lib/server/attachments/service";
 import {
   handleRouteError,
-  requireMessageParticipant,
   requireMutatingOrigin,
 } from "@/lib/server/api-guard";
+import { requireAccountContractParticipant } from "@/lib/server/account-auth/contract-participant";
 import { productionBlobStorage } from "@/lib/server/compose";
 import { BlobConfigError } from "@/lib/server/blob/env";
 import { HttpError } from "@/lib/server/http";
@@ -47,14 +47,38 @@ export async function POST(
     requireMutatingOrigin(request);
     const { address } = await context.params;
     const authStartedAt = Date.now();
-    const { stores, session, parties } = await requireMessageParticipant(
-      request,
-      address
-    );
-    const authMs = Date.now() - authStartedAt;
     const form = await request.formData();
     const file = form.get("file");
     const contextField = form.get("context");
+
+    const participantWalletField = form.get("participantWallet");
+    const requestedWallet =
+      typeof participantWalletField === "string" &&
+      participantWalletField.length > 0
+        ? participantWalletField
+        : null;
+
+    const {
+      stores,
+      parties,
+      participantWallets,
+      participantWallet,
+    } = await requireAccountContractParticipant(
+      request,
+      address,
+      requestedWallet
+    );
+
+    // Work-submission files always belong to the freelancer side.
+    // Message files use the requested verified participant, or the
+    // account-first default when no side was explicitly requested.
+    const actingWallet =
+      contextField === "work_submission" &&
+      participantWallets.includes(parties.freelancer)
+        ? parties.freelancer
+        : participantWallet;
+
+    const authMs = Date.now() - authStartedAt;
     if (!(file instanceof File)) {
       throw new AttachmentValidationError("A file is required.");
     }
@@ -63,7 +87,7 @@ export async function POST(
       productionBlobStorage(),
       {
         contractAddress: address,
-        sessionWallet: session.walletAddress,
+        sessionWallet: actingWallet,
         parties,
         context: contextField,
         filename: file.name,

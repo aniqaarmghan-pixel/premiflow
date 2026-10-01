@@ -195,17 +195,28 @@ test("Submit Work reuses shared session helper and gates the file picker", () =>
   assert.match(DETAIL, /if \(deliverySession\.status !== "ready"\) return;/);
 });
 
-test("attachment route still requires message participant session (not public)", () => {
-  assert.match(ATTACHMENTS_ROUTE, /requireMessageParticipant/);
+test("attachment route requires account-linked contract participant", () => {
+  assert.match(
+    ATTACHMENTS_ROUTE,
+    /requireAccountContractParticipant/
+  );
   assert.match(ATTACHMENTS_ROUTE, /requireMutatingOrigin/);
-  assert.doesNotMatch(ATTACHMENTS_ROUTE, /tryOptionalSession/);
+  assert.doesNotMatch(
+    ATTACHMENTS_ROUTE,
+    /requireMessageParticipant|tryOptionalSession/
+  );
 });
 
-test("Messages and Resolution still use the shared verification helper", () => {
-  assert.match(MESSAGES, /ensureMessagingSession/);
-  assert.match(MESSAGES, /ChatVerifyGate/);
-  assert.match(MESSAGES, /onVerify=\{\(\) => void onVerifyWallet\(\)\}/);
+test("Messages are account-first while Resolution keeps wallet verification", () => {
+  assert.doesNotMatch(
+    MESSAGES,
+    /ensureMessagingSession|ChatVerifyGate|onVerifyWallet/
+  );
+  assert.match(MESSAGES, /participantWallet/);
+  assert.match(MESSAGES, /fetchContractMessages/);
+
   assert.match(RESOLUTION, /ensureMessagingSession/);
+
   assert.doesNotMatch(MESSAGES, /createChallenge\(/);
   assert.doesNotMatch(RESOLUTION, /createChallenge\(/);
 });

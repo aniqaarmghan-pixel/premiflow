@@ -265,12 +265,15 @@ test("messages POST route emits best-effort notification after persist", () => {
     join(ROOT, "app/api/contracts/[address]/messages/route.ts"),
     "utf8"
   );
+
+  assert.match(route, /requireAccountContractParticipant/);
   assert.match(route, /notifyOtherPartyOfMessage/);
   assert.match(route, /stores\.notifications/);
   assert.match(route, /parties/);
-  assert.match(route, /session\.walletAddress/);
+  assert.match(route, /senderWallet:\s*participantWallet/);
+  assert.match(route, /wallet:\s*participantWallet/);
   assert.match(route, /createContractMessage/);
   assert.match(route, /message_received emit failed/);
-  // Recipient must not come from the request body.
+
   assert.doesNotMatch(route, /body\.recipient|body\.wallet/);
 });

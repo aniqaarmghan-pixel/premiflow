@@ -642,7 +642,7 @@ test("migration 0003 is additive with expected tables and constraints; prior mig
   assert.match(journal, /0003_contract_attachments/);
 });
 
-test("attachment routes enforce origin/session participant guards in source", () => {
+test("attachment routes enforce account-participant guards in source", () => {
   const upload = readFileSync(
     join(ROOT, "app/api/contracts/[address]/attachments/route.ts"),
     "utf8"
@@ -655,11 +655,19 @@ test("attachment routes enforce origin/session participant guards in source", ()
     join(ROOT, "app/api/contracts/[address]/attachments/[id]/route.ts"),
     "utf8"
   );
+
   assert.match(upload, /requireMutatingOrigin/);
-  assert.match(upload, /requireMessageParticipant/);
-  assert.match(download, /requireMessageParticipant/);
+  assert.match(upload, /requireAccountContractParticipant/);
+  assert.match(download, /requireAccountContractParticipant/);
+
   assert.match(discard, /requireMutatingOrigin/);
+  assert.match(discard, /requireAccountContractParticipant/);
   assert.match(discard, /deletePendingAttachment/);
+
+  assert.doesNotMatch(upload, /requireMessageParticipant/);
+  assert.doesNotMatch(download, /requireMessageParticipant/);
+  assert.doesNotMatch(discard, /requireMessageParticipant/);
+
   assert.doesNotMatch(upload, /BLOB_READ_WRITE_TOKEN/);
   assert.doesNotMatch(download, /BLOB_READ_WRITE_TOKEN/);
 });

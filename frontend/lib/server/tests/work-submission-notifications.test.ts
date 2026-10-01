@@ -166,7 +166,7 @@ test("B. revisionNumber >= 1 → revised_work_submitted → employer", async () 
   );
 });
 
-test("C. trial submission → NO notification", async () => {
+test("C. trial submission → employer notification", async () => {
   const notes = createMemoryNotificationStore();
   const db = submissionStores();
   const { submission } = await persistConfirmedWorkSubmission(db, {
@@ -185,17 +185,21 @@ test("C. trial submission → NO notification", async () => {
     parties: PARTIES,
     submission,
   });
-  assert.equal(emit.created, false);
-  assert.equal(emit.skipped, "trial");
-  assert.equal(
-    (
-      await listNotifications(notes, {
-        recipientWallet: EMPLOYER,
-        cursor: null,
-        limit: "10",
-      })
-    ).notifications.length,
-    0
+
+  assert.equal(emit.created, true);
+
+  const employerInbox = await listNotifications(notes, {
+    recipientWallet: EMPLOYER,
+    cursor: null,
+    limit: "10",
+  });
+
+  assert.equal(employerInbox.notifications.length, 1);
+  assert.equal(employerInbox.notifications[0]!.type, "work_submitted");
+  assert.equal(employerInbox.notifications[0]!.title, "Paid trial submitted");
+  assert.match(
+    employerInbox.notifications[0]!.body,
+    /paid-trial work for your review/i
   );
 });
 

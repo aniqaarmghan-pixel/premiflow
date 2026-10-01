@@ -2,6 +2,8 @@ export type AccountAuthEnv = {
   databaseUrl: string;
   appOrigin: string;
   authSecret: string;
+  googleClientId: string | null;
+  googleClientSecret: string | null;
 };
 
 export class AccountAuthConfigError extends Error {
@@ -33,6 +35,8 @@ function readEnv(): AccountAuthEnv {
   const databaseUrl = process.env.DATABASE_URL?.trim();
   const appOriginRaw = process.env.APP_ORIGIN?.trim();
   const authSecret = process.env.ACCOUNT_AUTH_SECRET?.trim();
+  const googleClientId = process.env.GOOGLE_CLIENT_ID?.trim() || null;
+  const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET?.trim() || null;
 
   if (!databaseUrl || !appOriginRaw || !authSecret) {
     throw new AccountAuthConfigError(
@@ -46,10 +50,18 @@ function readEnv(): AccountAuthEnv {
     );
   }
 
+  if (Boolean(googleClientId) !== Boolean(googleClientSecret)) {
+    throw new AccountAuthConfigError(
+      "GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET must be configured together."
+    );
+  }
+
   return {
     databaseUrl,
     appOrigin: normalizeOrigin(appOriginRaw),
     authSecret,
+    googleClientId,
+    googleClientSecret,
   };
 }
 

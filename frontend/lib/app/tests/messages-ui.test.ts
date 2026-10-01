@@ -9,8 +9,6 @@ import {
   VERIFY_WALLET_EXPLAIN,
   mergeMessagesById,
   resolveInitialPanelState,
-  sessionMatchesConnectedWallet,
-  shouldClearConversationOnWalletChange,
   shouldPollMessages,
   shouldRevokeSessionOnWalletChange,
   shouldShowComposer,
@@ -66,12 +64,14 @@ test("chat dialog closes from Close and overlay, and uses a bounded history scro
   assert.match(DIALOG, /shrink-0 border-t/);
 });
 
-test("Verify wallet is never started automatically", () => {
-  assert.match(PANEL, /onVerify=\{\(\) => void onVerifyWallet\(\)\}/);
-  assert.doesNotMatch(PANEL, /useEffect\([\s\S]{0,200}onVerifyWallet/);
-  assert.doesNotMatch(PANEL, /useEffect\([\s\S]{0,400}signMessage/);
-  assert.match(PANEL, /unverified/);
-  assert.match(PANEL, /ensureMessagingSession/);
+test("Messages use PREMIFLOW account identity without wallet verification", () => {
+  assert.doesNotMatch(
+    PANEL,
+    /onVerifyWallet|ensureMessagingSession|ChatVerifyGate|useWallet/
+  );
+  assert.match(PANEL, /participantWallet/);
+  assert.match(PANEL, /fetchContractMessages\(contractAddress/);
+  assert.match(PANEL, /participant \? "loading" : "unauthorized"/);
 });
 
 test("Verify wallet copy is shown in the chat dialog", () => {
@@ -126,17 +126,18 @@ test("current user and other participant bubbles are distinguished by side and t
   assert.doesNotMatch(DIALOG, /Delivered|Read receipt|Seen/);
 });
 
-test("wallet change hides the prior conversation and revokes the old session", () => {
-  assert.equal(shouldClearConversationOnWalletChange("A", "B"), true);
-  assert.equal(shouldClearConversationOnWalletChange("A", null), true);
-  assert.equal(shouldClearConversationOnWalletChange(null, "A"), true);
-  assert.equal(shouldRevokeSessionOnWalletChange("A", "B"), true);
-  assert.equal(shouldRevokeSessionOnWalletChange("A", null), true);
-  assert.equal(shouldRevokeSessionOnWalletChange(null, "A"), false);
-  assert.equal(sessionMatchesConnectedWallet("A", "B"), false);
-  assert.match(PANEL, /shouldRevokeSessionOnWalletChange/);
+test("participant identity change clears the prior conversation before reload", () => {
+  assert.match(PANEL, /lastParticipantWallet/);
+  assert.match(
+    PANEL,
+    /lastParticipantWallet\.current === participantWallet/
+  );
   assert.match(PANEL, /clearConversation\(\)/);
-  assert.match(PANEL, /setChatOpen\(false\)/);
+  assert.match(PANEL, /setDraft\(""\)/);
+  assert.doesNotMatch(
+    PANEL,
+    /shouldRevokeSessionOnWalletChange|logoutSession/
+  );
 });
 
 test("all four payment modes retain Messages", () => {

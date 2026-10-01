@@ -18,10 +18,11 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { brand } from "@/lib/brand";
+import { useSession } from "@/lib/account-auth/client";
 import { RESOLVER_NAV, isNavActive, type WorkspaceMode } from "@/lib/app/resolver-workspace";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
 import { BrandMark } from "@/components/brand/BrandMark";
@@ -60,7 +61,69 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  const { data: session, isPending } = useSession();
   const workspace = useWorkspace();
+
+  const user = session?.user ?? null;
+  const isPublicAuthPage =
+    pathname === "/sign-in" ||
+    pathname === "/sign-up" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password";
+
+  useEffect(() => {
+    if (isPending || isPublicAuthPage || user) return;
+
+    router.replace("/sign-in");
+  }, [isPending, isPublicAuthPage, router, user]);
+
+  // Authentication and password-recovery pages are intentionally outside the authenticated
+  // application shell. Visitors should not see workspace navigation,
+  // notifications or wallet controls before entering PREMIFLOW.
+  if (isPublicAuthPage) {
+    return (
+      <div className="min-h-screen bg-paper">
+        <header className="border-b border-line/80 bg-card/80 px-5 py-4 backdrop-blur-md sm:px-8">
+          <div className="mx-auto flex w-full max-w-6xl items-center">
+            <BrandMark size={34} />
+          </div>
+        </header>
+
+        <main className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
+          {children}
+        </main>
+      </div>
+    );
+  }
+
+  // While Better Auth checks the existing PREMIFLOW session, show an
+  // intentional entry state instead of rendering an empty dashboard.
+  if (isPending || !user) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-paper px-6">
+        <div className="text-center">
+          <div className="flex justify-center">
+            <BrandMark size={48} />
+          </div>
+
+          <p className="mt-5 text-sm font-semibold text-ink">
+            Opening PREMIFLOW…
+          </p>
+
+          <p className="mt-2 text-sm text-ink-soft">
+            Checking your account session.
+          </p>
+
+          <div
+            className="mx-auto mt-5 h-1.5 w-40 overflow-hidden rounded-full bg-paper-2"
+            aria-hidden="true"
+          >
+            <div className="h-full w-1/2 animate-pulse rounded-full bg-cyan" />
+          </div>
+        </div>
+      </div>
+    );
+  }
   const nav: ReadonlyArray<{ href: string; label: string; icon: LucideIcon }> =
     workspace.mode === "resolver" ? RESOLVER_NAV_ITEMS : NAV;
   const switchWorkspace = () => {

@@ -550,21 +550,36 @@ test("raw contract account decoding reads post-freeze Hourly and Streaming amoun
   assert.equal(hourly.owner, CANONICAL_PROGRAM_ID);
 });
 
-test("case routes do not query contract_messages and message participant checks stay party-only", () => {
+test("case routes stay separate while Messages use account-linked authorization", () => {
   const caseRoute = readFileSync(
     new URL("../../../app/api/contracts/[address]/case/route.ts", import.meta.url),
     "utf8"
   );
   const statementRoute = readFileSync(
-    new URL("../../../app/api/contracts/[address]/case/statement/route.ts", import.meta.url),
+    new URL(
+      "../../../app/api/contracts/[address]/case/statement/route.ts",
+      import.meta.url
+    ),
     "utf8"
   );
   const messagesRoute = readFileSync(
-    new URL("../../../app/api/contracts/[address]/messages/route.ts", import.meta.url),
+    new URL(
+      "../../../app/api/contracts/[address]/messages/route.ts",
+      import.meta.url
+    ),
     "utf8"
   );
-  assert.doesNotMatch(caseRoute, /contract_messages|listContractMessages|requireMessageParticipant/);
-  assert.doesNotMatch(statementRoute, /contract_messages|listContractMessages/);
-  assert.match(messagesRoute, /requireMessageParticipant/);
+
+  assert.doesNotMatch(
+    caseRoute,
+    /contract_messages|listContractMessages|requireMessageParticipant/
+  );
+  assert.doesNotMatch(
+    statementRoute,
+    /contract_messages|listContractMessages/
+  );
+
+  assert.match(messagesRoute, /requireAccountContractParticipant/);
+  assert.doesNotMatch(messagesRoute, /requireMessageParticipant/);
   assert.doesNotMatch(messagesRoute, /requireCaseParty/);
 });

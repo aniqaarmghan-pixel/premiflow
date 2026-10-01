@@ -1,6 +1,5 @@
 "use client";
 
-import { useWallet } from "@solana/wallet-adapter-react";
 import {
   Bell,
   CheckCheck,
@@ -13,13 +12,9 @@ import {
   Wallet,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useSession } from "@/lib/account-auth/client";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
-import { fetchSession } from "@/lib/app/messages-client";
-import {
-  ensureMessagingSession,
-  messagingSessionErrorMessage,
-} from "@/lib/app/messaging-session";
 import {
   fetchNotifications,
   fetchUnreadNotificationCount,
@@ -31,13 +26,6 @@ import {
   NOTIFICATIONS_BADGE_POLL_MS,
   NOTIFICATIONS_EMPTY_COPY,
   NOTIFICATIONS_PAGE_LIMIT,
-  NOTIFICATIONS_SESSION_COPY,
-  NOTIFICATIONS_VERIFY_BUTTON,
-  NOTIFICATIONS_VERIFY_CANNOT_SIGN,
-  NOTIFICATIONS_VERIFY_DETAIL,
-  NOTIFICATIONS_VERIFY_FAILED,
-  NOTIFICATIONS_VERIFY_IDLE,
-  NOTIFICATIONS_VERIFY_PENDING,
   applyMarkAllLocal,
   applyMarkOneLocal,
   ariaLabelForBell,
@@ -50,21 +38,13 @@ import {
   isNotificationUnread,
   mergeNotificationPages,
   notificationTypeLabel,
-  notificationsAccess,
   resolveNotificationClickNavigation,
-  shouldAcceptUnreadCountResponse,
-  shouldApplyNotificationsVerifyResult,
-  shouldClearNotificationsOnSessionChange,
   shouldPollNotificationBadge,
   shouldRefreshUnreadOnVisibility,
   signalOpenContractChat,
-  verifyNotificationsWallet,
-  verifyStatusForWallet,
   type NotificationListItem,
   type NotificationsUiStatus,
-  type NotificationsVerifyStatus,
 } from "@/lib/app/notifications-ui";
-import { sessionMatchesConnectedWallet } from "@/lib/app/messages-panel";
 
 function TypeIcon({ type }: { type: string }) {
   const className = "size-3.5 shrink-0 opacity-80";
@@ -103,28 +83,32 @@ function TypeIcon({ type }: { type: string }) {
  */
 export function NotificationBell() {
   const router = useRouter();
-  const { publicKey, signMessage } = useWallet();
-  const connectedWallet = publicKey?.toBase58() ?? null;
+  const { data: accountSession, isPending: accountPending } = useSession();
+
+  const accountId = accountSession?.user?.id ?? null;
+  const hasSession = Boolean(accountId) && !accountPending;
 
   const rootRef = useRef<HTMLDivElement>(null);
   const panelId = useId();
   const markingRef = useRef<Set<string>>(new Set());
   const markAllInFlight = useRef(false);
-  const sessionWalletRef = useRef<string | null>(null);
-  const connectedWalletRef = useRef<string | null>(connectedWallet);
+  const accountIdRef = useRef<string | null>(accountId);
   const unreadGenerationRef = useRef(0);
   const unreadInFlightRef = useRef(false);
   const unreadQueuedRef = useRef(false);
   const wasVisibleRef = useRef(
-    typeof document !== "undefined" ? document.visibilityState === "visible" : true
+    typeof document !== "undefined"
+      ? document.visibilityState === "visible"
+      : true
   );
 
   const [open, setOpen] = useState(false);
   const [visible, setVisible] = useState(
-    typeof document !== "undefined" ? document.visibilityState === "visible" : true
+    typeof document !== "undefined"
+      ? document.visibilityState === "visible"
+      : true
   );
-  const [sessionWallet, setSessionWallet] = useState<string | null>(null);
-  const [status, setStatus] = useState<NotificationsUiStatus>("idle");
+  const [, setStatus] = useState<NotificationsUiStatus>("idle");
   const [countLoaded, setCountLoaded] = useState(false);
   const [unreadCount, setUnreadCount] = useState<number | null>(null);
   const [items, setItems] = useState<NotificationListItem[]>([]);
@@ -133,18 +117,8 @@ export function NotificationBell() {
   const [listLoading, setListLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [verify, setVerify] = useState<NotificationsVerifyStatus>(NOTIFICATIONS_VERIFY_IDLE);
 
-  connectedWalletRef.current = connectedWallet;
-
-  const hasSession = Boolean(
-    sessionWallet &&
-      connectedWallet &&
-      sessionMatchesConnectedWallet(sessionWallet, connectedWallet)
-  );
-  const access = notificationsAccess({ connectedWallet, sessionWallet, status });
-  // Scoped to the wallet that started it: a wallet switch shows a fresh idle state.
-  const verifyView = verifyStatusForWallet(verify, connectedWallet);
+  accountIdRef.current = accountId;
 
   const badge = formatUnreadBadge(unreadCount, { countLoaded });
   const ariaLabel = ariaLabelForBell(badge);
@@ -167,83 +141,20 @@ export function NotificationBell() {
     setErrorMessage(null);
   }, [invalidateUnreadRequests]);
 
-  /** Session bootstrap only — not on every unread poll tick (N5.1). */
-  const refreshSession = useCallback(async () => {
-    if (!connectedWallet) {
-      sessionWalletRef.current = null;
-      setSessionWallet(null);
-      resetInbox();
-      return null;
-    }
-    try {
-      const me = await fetchSession();
-      if (!sessionMatchesConnectedWallet(me.wallet, connectedWallet)) {
-        if (
-          shouldClearNotificationsOnSessionChange({
-            previousSessionWallet: sessionWalletRef.current,
-            nextSessionWallet: null,
-          })
-        ) {
-          resetInbox();
-        }
-        sessionWalletRef.current = null;
-        setSessionWallet(null);
-        setStatus("unauthenticated");
-        setCountLoaded(true);
-        setUnreadCount(0);
-        return null;
-      }
-      if (
-        shouldClearNotificationsOnSessionChange({
-          previousSessionWallet: sessionWalletRef.current,
-          nextSessionWallet: me.wallet,
-        })
-      ) {
-        resetInbox();
-      }
-      sessionWalletRef.current = me.wallet;
-      setSessionWallet(me.wallet);
-      return me.wallet;
-    } catch (err) {
-      if (isNotificationsAuthError(err)) {
-        if (
-          shouldClearNotificationsOnSessionChange({
-            previousSessionWallet: sessionWalletRef.current,
-            nextSessionWallet: null,
-          })
-        ) {
-          resetInbox();
-        }
-        sessionWalletRef.current = null;
-        setSessionWallet(null);
-        setStatus("unauthenticated");
-        setCountLoaded(true);
-        setUnreadCount(0);
-        return null;
-      }
-      setStatus("error");
-      setCountLoaded(true);
-      return sessionWalletRef.current;
-    }
-  }, [connectedWallet, resetInbox]);
-
   /**
-   * Unread-count only. Uses known session identity — does not call /api/auth/me.
-   * Single-flight + generation guards prevent overlap and stale overwrites.
+   * Unread badge for the signed-in PREMIFLOW account.
+   * Server authorization resolves all verified linked wallets.
    */
   const refreshUnreadCount = useCallback(async () => {
-    const session = sessionWalletRef.current;
-    const connected = connectedWalletRef.current;
-    const hasAuth =
-      Boolean(session) &&
-      Boolean(connected) &&
-      sessionMatchesConnectedWallet(session, connected);
+    const requestAccountId = accountIdRef.current;
 
     const decision = decideUnreadRefresh({
-      hasSession: hasAuth,
+      hasSession: Boolean(requestAccountId),
       inFlight: unreadInFlightRef.current,
     });
+
     if (decision === "skip") return;
+
     if (decision === "queue") {
       unreadQueuedRef.current = true;
       return;
@@ -251,47 +162,31 @@ export function NotificationBell() {
 
     unreadInFlightRef.current = true;
     const requestGeneration = unreadGenerationRef.current;
-    const requestSessionWallet = session;
 
     try {
       const result = await fetchUnreadNotificationCount();
+
       if (
-        !shouldAcceptUnreadCountResponse({
-          requestGeneration,
-          currentGeneration: unreadGenerationRef.current,
-          requestSessionWallet,
-          currentSessionWallet: sessionWalletRef.current,
-        })
+        requestGeneration !== unreadGenerationRef.current ||
+        requestAccountId !== accountIdRef.current
       ) {
         return;
       }
-      if (
-        !sessionMatchesConnectedWallet(
-          sessionWalletRef.current,
-          connectedWalletRef.current
-        )
-      ) {
-        return;
-      }
+
       setUnreadCount(result.unreadCount);
       setCountLoaded(true);
       setStatus("ready");
       setErrorMessage(null);
     } catch (err) {
       if (
-        !shouldAcceptUnreadCountResponse({
-          requestGeneration,
-          currentGeneration: unreadGenerationRef.current,
-          requestSessionWallet,
-          currentSessionWallet: sessionWalletRef.current,
-        })
+        requestGeneration !== unreadGenerationRef.current ||
+        requestAccountId !== accountIdRef.current
       ) {
         return;
       }
+
       if (isNotificationsAuthError(err)) {
         invalidateUnreadRequests();
-        sessionWalletRef.current = null;
-        setSessionWallet(null);
         setStatus("unauthenticated");
         setUnreadCount(0);
         setCountLoaded(true);
@@ -299,11 +194,12 @@ export function NotificationBell() {
         setListLoaded(false);
         return;
       }
-      // Non-fatal: keep existing badge/list; later polls may recover.
-      setStatus((current) => (current === "unauthenticated" ? current : "error"));
+
+      setStatus("error");
       setCountLoaded(true);
     } finally {
       unreadInFlightRef.current = false;
+
       if (unreadQueuedRef.current) {
         unreadQueuedRef.current = false;
         void refreshUnreadCount();
@@ -337,8 +233,6 @@ export function NotificationBell() {
       } catch (err) {
         if (isNotificationsAuthError(err)) {
           invalidateUnreadRequests();
-          sessionWalletRef.current = null;
-          setSessionWallet(null);
           setStatus("unauthenticated");
           setItems([]);
           setUnreadCount(0);
@@ -382,21 +276,34 @@ export function NotificationBell() {
     };
   }, [invalidateUnreadRequests, refreshUnreadCount]);
 
-  // Wallet change: bootstrap session once, then immediate unread fetch.
+  // PREMIFLOW account change: reset stale notification state and load
+  // notifications for every verified wallet linked to this account.
   useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const wallet = await refreshSession();
-      if (cancelled) return;
-      if (wallet) {
-        void refreshUnreadCount();
-      }
-    })();
+    accountIdRef.current = accountId;
+    resetInbox();
+
+    if (accountPending) return;
+
+    if (!accountId) {
+      setStatus("unauthenticated");
+      setUnreadCount(0);
+      setCountLoaded(true);
+      return;
+    }
+
+    setStatus("idle");
+    void refreshUnreadCount();
+
     return () => {
-      cancelled = true;
       invalidateUnreadRequests();
     };
-  }, [connectedWallet, invalidateUnreadRequests, refreshSession, refreshUnreadCount]);
+  }, [
+    accountId,
+    accountPending,
+    invalidateUnreadRequests,
+    refreshUnreadCount,
+    resetInbox,
+  ]);
 
   // Periodic unread poll while visible + authenticated (list is NOT polled).
   useEffect(() => {
@@ -412,7 +319,7 @@ export function NotificationBell() {
     if (!open) return;
     void loadList("replace");
     void refreshUnreadCount();
-  }, [open, sessionWallet, connectedWallet]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: reload when panel opens / session identity changes
+  }, [open, accountId]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: reload when panel opens / account identity changes
 
   useEffect(() => {
     if (!open) return;
@@ -431,56 +338,6 @@ export function NotificationBell() {
       document.removeEventListener("keydown", onKey);
     };
   }, [open]);
-
-  /**
-   * "Verify wallet" in the bell. Reuses the existing messaging-session flow
-   * (server challenge, wallet signMessage, server verify). Message signature only.
-   */
-  async function onVerifyWallet() {
-    const wallet = connectedWallet;
-    if (!wallet || verifyView.state === "pending") return;
-    setVerify({ wallet, state: "pending", error: null });
-    const outcome = await verifyNotificationsWallet(
-      { wallet, signMessage },
-      { ensureSession: ensureMessagingSession, errorMessage: messagingSessionErrorMessage }
-    );
-    // Wallet switched while the prompt was open: never apply A's result to B.
-    if (
-      !shouldApplyNotificationsVerifyResult({
-        requestWallet: wallet,
-        currentWallet: connectedWalletRef.current,
-      })
-    ) {
-      return;
-    }
-    if (!outcome.ok) {
-      setVerify({ wallet, state: "error", error: outcome.message });
-      return;
-    }
-    // Re-read /api/auth/me with the same wallet-match checks, then load in place.
-    const verifiedWallet = await refreshSession();
-    if (
-      !shouldApplyNotificationsVerifyResult({
-        requestWallet: wallet,
-        currentWallet: connectedWalletRef.current,
-      })
-    ) {
-      return;
-    }
-    if (
-      !verifiedWallet ||
-      !shouldApplyNotificationsVerifyResult({
-        requestWallet: verifiedWallet,
-        currentWallet: wallet,
-      })
-    ) {
-      setVerify({ wallet, state: "error", error: NOTIFICATIONS_VERIFY_FAILED });
-      return;
-    }
-    setVerify(NOTIFICATIONS_VERIFY_IDLE);
-    setStatus((current) => (current === "unauthenticated" ? "idle" : current));
-    void refreshUnreadCount();
-  }
 
   async function onMarkOne(item: NotificationListItem) {
     const nav = resolveNotificationClickNavigation({ href: item.href });
@@ -611,49 +468,10 @@ export function NotificationBell() {
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto p-1.5">
-            {!connectedWallet ? (
+            {!hasSession ? (
               <p className="px-3 py-8 text-center text-sm text-ink-soft">
-                Connect a wallet to use notifications.
+                Sign in to your PREMIFLOW account to view notifications.
               </p>
-            ) : access === "verify" ? (
-              <div className="px-3 py-6 text-center">
-                <Wallet size={18} className="mx-auto text-ink-faint" aria-hidden />
-                <p className="mt-2 text-sm font-medium text-ink">
-                  {NOTIFICATIONS_SESSION_COPY}
-                </p>
-                <p className="mt-1 text-xs text-ink-soft">{NOTIFICATIONS_VERIFY_DETAIL}</p>
-                {!signMessage ? (
-                  <p className="mt-3 text-xs text-ink-soft" role="status">
-                    {NOTIFICATIONS_VERIFY_CANNOT_SIGN}
-                  </p>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => void onVerifyWallet()}
-                    disabled={verifyView.state === "pending"}
-                    aria-busy={verifyView.state === "pending"}
-                    className="mt-3 inline-flex min-h-9 items-center gap-1.5 rounded-full bg-navy px-3.5 text-xs font-semibold text-cyan disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {verifyView.state === "pending" ? (
-                      <>
-                        <LoaderCircle size={14} className="animate-spin" aria-hidden />
-                        {NOTIFICATIONS_VERIFY_PENDING}
-                      </>
-                    ) : (
-                      NOTIFICATIONS_VERIFY_BUTTON
-                    )}
-                  </button>
-                )}
-                {verifyView.state === "error" && verifyView.error ? (
-                  <p
-                    className="mt-2 flex items-center justify-center gap-1 text-xs text-ink-soft"
-                    role="alert"
-                  >
-                    <CircleAlert size={12} aria-hidden />
-                    {verifyView.error}
-                  </p>
-                ) : null}
-              </div>
             ) : listLoading && !listLoaded ? (
               <div className="flex items-center justify-center gap-2 px-3 py-10 text-sm text-ink-faint">
                 <LoaderCircle size={16} className="animate-spin" aria-hidden />

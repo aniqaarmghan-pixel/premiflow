@@ -371,7 +371,7 @@ test("session wallet is the only ownership source for notification APIs", async 
   assert.notEqual(session.walletAddress, spoofedWallet);
 });
 
-test("notification routes enforce session auth and never trust client wallet params", () => {
+test("notification routes use account-linked wallets and never trust client wallet params", () => {
   const listRoute = readFileSync(join(ROOT, "app/api/notifications/route.ts"), "utf8");
   const unreadRoute = readFileSync(
     join(ROOT, "app/api/notifications/unread-count/route.ts"),
@@ -385,14 +385,34 @@ test("notification routes enforce session auth and never trust client wallet par
     join(ROOT, "app/api/notifications/read-all/route.ts"),
     "utf8"
   );
+  const accountWalletAuth = readFileSync(
+    join(ROOT, "lib/server/account-auth/notification-wallets.ts"),
+    "utf8"
+  );
 
-    for (const source of [listRoute, unreadRoute, markOne, markAll]) {
-    assert.match(source, /requireSession/);
-    assert.match(source, /session\.walletAddress/);
+  for (const source of [listRoute, unreadRoute, markOne, markAll]) {
+    // Notification ownership comes from the authenticated PREMIFLOW
+    // account's verified wallet links — never from browser input.
+    assert.match(source, /requireAccountNotificationWallets/);
+    assert.doesNotMatch(source, /session\.walletAddress/);
     assert.doesNotMatch(source, /searchParams\.get\(["']wallet/);
     assert.doesNotMatch(source, /body\.wallet/);
     assert.doesNotMatch(source, /publicKey/);
   }
+
+  // The shared auth helper must derive wallets from the authenticated
+  // account and the server-side verified wallet-link table.
+  assert.match(accountWalletAuth, /requireAccountSession\(request\)/);
+  assert.match(
+    accountWalletAuth,
+    /listAccountWalletLinks\(session\.user\.id\)/
+  );
+  assert.match(accountWalletAuth, /item\.walletAddress/);
+  assert.doesNotMatch(accountWalletAuth, /searchParams\.get\(["']wallet/);
+  assert.doesNotMatch(accountWalletAuth, /body\.wallet/);
+  assert.doesNotMatch(accountWalletAuth, /publicKey/);
+
+  // Mutating notification routes retain same-origin protection.
   assert.match(markOne, /requireMutatingOrigin/);
   assert.match(markAll, /requireMutatingOrigin/);
 });

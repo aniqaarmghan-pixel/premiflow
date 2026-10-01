@@ -6,14 +6,6 @@ import {
   NOTIFICATIONS_BADGE_POLL_MS,
   NOTIFICATIONS_EMPTY_COPY,
   NOTIFICATIONS_PAGE_LIMIT,
-  NOTIFICATIONS_SESSION_COPY,
-  NOTIFICATIONS_VERIFY_BUTTON,
-  NOTIFICATIONS_VERIFY_CANNOT_SIGN,
-  NOTIFICATIONS_VERIFY_DETAIL,
-  NOTIFICATIONS_VERIFY_FAILED,
-  NOTIFICATIONS_VERIFY_IDLE,
-  NOTIFICATIONS_VERIFY_MISMATCH,
-  NOTIFICATIONS_VERIFY_PENDING,
   OPEN_CONTRACT_CHAT_EVENT,
   applyMarkAllLocal,
   applyMarkOneLocal,
@@ -29,11 +21,9 @@ import {
   notificationHrefPath,
   resolveNotificationClickNavigation,
   shouldAcceptUnreadCountResponse,
-  shouldClearNotificationsOnSessionChange,
   shouldOpenChatFromSearch,
   shouldPollNotificationBadge,
   shouldRefreshUnreadOnVisibility,
-  notificationsAccess,
   shouldApplyNotificationsVerifyResult,
   verifyNotificationsWallet,
   verifyStatusForWallet,
@@ -150,43 +140,69 @@ test("pagination / load more", () => {
   assert.match(CLIENT, /limit/);
 });
 
-test("401 / session failure handled gracefully", () => {
-  assert.equal(
-    NOTIFICATIONS_SESSION_COPY,
-    "Your wallet is connected. Verify it with PREMIFLOW to view notifications."
+test("notification bell authorization comes from the PREMIFLOW account session", () => {
+  assert.match(BELL, /useSession\(\)/);
+  assert.match(BELL, /accountSession\?\.user\?\.id/);
+  assert.match(
+    BELL,
+    /const hasSession = Boolean\(accountId\) && !accountPending/
   );
-  assert.match(BELL, /isNotificationsAuthError/);
-  assert.match(BELL, /unauthenticated/);
-  assert.match(BELL, /NOTIFICATIONS_SESSION_COPY/);
-  assert.match(CLIENT, /status === 401/);
+
+  assert.doesNotMatch(BELL, /useWallet\(\)/);
+  assert.doesNotMatch(BELL, /async function onVerifyWallet/);
 });
 
-test("wallet/session change clears stale notification data", () => {
-  assert.equal(
-    shouldClearNotificationsOnSessionChange({
-      previousSessionWallet: "WalletA",
-      nextSessionWallet: "WalletB",
-    }),
-    true
+test("notification auth failure clears protected account notification state", () => {
+  assert.match(
+    BELL,
+    /if \(isNotificationsAuthError\(err\)\) \{[\s\S]*setStatus\("unauthenticated"\)[\s\S]*setUnreadCount\(0\)[\s\S]*setItems\(\[\]\)/
   );
-  assert.equal(
-    shouldClearNotificationsOnSessionChange({
-      previousSessionWallet: "WalletA",
-      nextSessionWallet: "WalletA",
-    }),
-    false
-  );
-  assert.equal(
-    shouldClearNotificationsOnSessionChange({
-      previousSessionWallet: "WalletA",
-      nextSessionWallet: null,
-    }),
-    true
-  );
-  assert.match(BELL, /shouldClearNotificationsOnSessionChange/);
-  assert.match(BELL, /resetInbox/);
-  assert.match(BELL, /sessionMatchesConnectedWallet/);
 });
+
+test("account change clears stale notifications before loading the new account", () => {
+  assert.match(
+    BELL,
+    /accountIdRef\.current = accountId;[\s\S]*resetInbox\(\);[\s\S]*if \(accountPending\) return;[\s\S]*if \(!accountId\)/
+  );
+
+  assert.match(BELL, /\[open, accountId\]/);
+  assert.match(BELL, /void loadList\("replace"\)/);
+  assert.match(BELL, /void refreshUnreadCount\(\)/);
+});
+
+test("account notification polling remains visible-session scoped", () => {
+  assert.match(
+    BELL,
+    /shouldPollNotificationBadge\(\{ visible, hasSession \}\)/
+  );
+  assert.match(BELL, /window\.setInterval/);
+  assert.match(BELL, /NOTIFICATIONS_BADGE_POLL_MS/);
+
+  assert.doesNotMatch(BELL, /new WebSocket/);
+  assert.doesNotMatch(BELL, /new EventSource/);
+});
+
+test("stale unread responses cannot cross PREMIFLOW account identities", () => {
+  assert.match(
+    BELL,
+    /requestGeneration !== unreadGenerationRef\.current/
+  );
+  assert.match(
+    BELL,
+    /requestAccountId !== accountIdRef\.current/
+  );
+  assert.match(BELL, /invalidateUnreadRequests\(\)/);
+});
+
+test("obsolete wallet-verification notification flow stays removed", () => {
+  assert.doesNotMatch(BELL, /verifyStatusForWallet/);
+  assert.doesNotMatch(BELL, /verifyNotificationsWallet/);
+  assert.doesNotMatch(BELL, /shouldApplyNotificationsVerifyResult/);
+  assert.doesNotMatch(BELL, /const me = await fetchSession\(\)/);
+});
+
+
+
 
 test("href navigation behavior stays same-origin path only", () => {
   assert.equal(notificationHrefPath("/contracts/abc"), "/contracts/abc");
@@ -294,48 +310,6 @@ test("notification APIs never send a wallet address", () => {
   assert.match(CLIENT, /\/api\/notifications\/read-all/);
 });
 
-test("N5.1 intelligent badge polling — 15s, no websocket/sse, list not polled", () => {
-  assert.equal(NOTIFICATIONS_BADGE_POLL_MS, 15_000);
-  assert.equal(shouldPollNotificationBadge({ visible: true, hasSession: true }), true);
-  assert.equal(shouldPollNotificationBadge({ visible: false, hasSession: true }), false);
-  assert.equal(shouldPollNotificationBadge({ visible: true, hasSession: false }), false);
-  assert.equal(
-    shouldRefreshUnreadOnVisibility({ wasVisible: false, isVisible: true }),
-    true
-  );
-  assert.equal(
-    shouldRefreshUnreadOnVisibility({ wasVisible: true, isVisible: true }),
-    false
-  );
-  assert.equal(
-    shouldRefreshUnreadOnVisibility({ wasVisible: true, isVisible: false }),
-    false
-  );
-  assert.match(BELL, /NOTIFICATIONS_BADGE_POLL_MS/);
-  assert.match(BELL, /visibilitychange/);
-  assert.match(BELL, /shouldRefreshUnreadOnVisibility/);
-  assert.match(BELL, /refreshUnreadCount/);
-  assert.match(BELL, /invalidateUnreadRequests/);
-  assert.match(BELL, /decideUnreadRefresh/);
-  assert.match(BELL, /shouldAcceptUnreadCountResponse/);
-  // Periodic tick must not re-hit /api/auth/me (session bootstrap is separate).
-  assert.match(BELL, /does not call \/api\/auth\/me/);
-  assert.match(BELL, /refreshSession/);
-  assert.match(BELL, /setInterval/);
-  assert.match(BELL, /List loads on bell open only/);
-  assert.doesNotMatch(BELL, /WebSocket/);
-  assert.doesNotMatch(BELL, /EventSource/);
-  assert.doesNotMatch(BELL, /new EventSource/);
-  assert.doesNotMatch(SHELL, /NoticeProvider/);
-  // List fetch is open-driven; unread poll must not call fetchNotifications in the interval path.
-  const intervalBlock = BELL.slice(
-    BELL.indexOf("Periodic unread poll"),
-    BELL.indexOf("Bell open:")
-  );
-  assert.ok(intervalBlock.length > 0);
-  assert.doesNotMatch(intervalBlock, /fetchNotifications|loadList/);
-  assert.match(intervalBlock, /refreshUnreadCount/);
-});
 
 test("N5.1 unread single-flight and stale response guards", () => {
   assert.equal(decideUnreadRefresh({ hasSession: false, inFlight: false }), "skip");
@@ -388,20 +362,6 @@ test("N5.1 unread single-flight and stale response guards", () => {
   assert.match(BELL, /void refreshUnreadCount\(\);/);
 });
 
-test("N5.1 session bootstrap vs periodic unread separation", () => {
-  // Wallet/session bootstrap still uses fetchSession once.
-  assert.match(BELL, /const me = await fetchSession\(\)/);
-  // refreshUnreadCount body must fetch unread count, not fetchSession.
-  const unreadFnStart = BELL.indexOf("const refreshUnreadCount = useCallback");
-  const unreadFnEnd = BELL.indexOf("const loadList = useCallback");
-  assert.ok(unreadFnStart >= 0 && unreadFnEnd > unreadFnStart);
-  const unreadFn = BELL.slice(unreadFnStart, unreadFnEnd);
-  assert.match(unreadFn, /fetchUnreadNotificationCount/);
-  assert.doesNotMatch(unreadFn, /fetchSession/);
-  // Unmount / session replacement invalidates in-flight unread work.
-  assert.match(BELL, /invalidateUnreadRequests\(\);/);
-  assert.match(BELL, /return \(\) => \{\s*cancelled = true;\s*invalidateUnreadRequests/s);
-});
 
 test("relative timestamp formatting", () => {
   const now = Date.parse("2026-09-26T12:00:00.000Z");
@@ -419,171 +379,3 @@ const MESSAGING_SESSION = readFileSync(
   new URL("../messaging-session.ts", import.meta.url),
   "utf8"
 );
-
-test("connected but unverified wallet shows the verify state and copy", () => {
-  assert.equal(
-    notificationsAccess({ connectedWallet: null, sessionWallet: null, status: "idle" }),
-    "connect"
-  );
-  assert.equal(
-    notificationsAccess({ connectedWallet: "WalletA", sessionWallet: null, status: "unauthenticated" }),
-    "verify"
-  );
-  assert.equal(
-    notificationsAccess({ connectedWallet: "WalletA", sessionWallet: null, status: "idle" }),
-    "verify"
-  );
-  assert.match(NOTIFICATIONS_SESSION_COPY, /wallet is connected/i);
-  assert.match(NOTIFICATIONS_SESSION_COPY, /PREMIFLOW/);
-  assert.match(NOTIFICATIONS_SESSION_COPY, /view notifications/);
-  assert.equal(NOTIFICATIONS_VERIFY_DETAIL, "Verification signs a message \u2014 not a transaction.");
-  assert.equal(NOTIFICATIONS_VERIFY_BUTTON, "Verify wallet");
-  assert.match(NOTIFICATIONS_VERIFY_PENDING, /signature/);
-  assert.match(NOTIFICATIONS_VERIFY_CANNOT_SIGN, /can't sign messages/);
-  assert.match(BELL, /access === "verify"/);
-  assert.match(BELL, /NOTIFICATIONS_VERIFY_DETAIL/);
-  assert.match(BELL, /NOTIFICATIONS_VERIFY_BUTTON/);
-  assert.match(BELL, /NOTIFICATIONS_VERIFY_PENDING/);
-  assert.match(BELL, /!signMessage \?/);
-  assert.match(BELL, /NOTIFICATIONS_VERIFY_CANNOT_SIGN/);
-  assert.match(BELL, /role="alert"/);
-});
-
-test("Verify wallet reuses the existing sign-message session flow", async () => {
-  assert.match(BELL, /const \{ publicKey, signMessage \} = useWallet\(\)/);
-  assert.match(BELL, /ensureSession: ensureMessagingSession/);
-  assert.match(BELL, /from "@\/lib\/app\/messaging-session"/);
-  assert.doesNotMatch(BELL, /createChallenge|verifyChallenge|\/api\/auth\/verify/);
-  assert.match(MESSAGING_SESSION, /deps\.createChallenge\(input\.wallet\)/);
-  assert.match(MESSAGING_SESSION, /input\.signMessage\(/);
-  assert.match(MESSAGING_SESSION, /deps\.verifyChallenge\(/);
-
-  const signMessage = async (message: Uint8Array) => message;
-  const calls: Array<{ wallet: string; signMessage: unknown }> = [];
-  const ok = await verifyNotificationsWallet(
-    { wallet: "WalletA", signMessage },
-    {
-      ensureSession: async (input) => {
-        calls.push(input);
-        return { session: { wallet: input.wallet }, didSign: true };
-      },
-      errorMessage: () => "unused",
-    }
-  );
-  assert.deepEqual(ok, { ok: true, wallet: "WalletA", didSign: true });
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0].wallet, "WalletA");
-  assert.equal(calls[0].signMessage, signMessage);
-
-  let called = false;
-  const cannot = await verifyNotificationsWallet(
-    { wallet: "WalletA", signMessage: undefined },
-    {
-      ensureSession: async () => {
-        called = true;
-        return { session: { wallet: "WalletA" }, didSign: false };
-      },
-      errorMessage: () => "unused",
-    }
-  );
-  assert.equal(called, false);
-  assert.deepEqual(cannot, {
-    ok: false,
-    reason: "cannot_sign",
-    message: NOTIFICATIONS_VERIFY_CANNOT_SIGN,
-  });
-
-  const failed = await verifyNotificationsWallet(
-    { wallet: "WalletA", signMessage },
-    {
-      ensureSession: async () => {
-        throw new Error("User rejected the request.");
-      },
-      errorMessage: (err) => (err as Error).message,
-    }
-  );
-  assert.deepEqual(failed, { ok: false, reason: "failed", message: "User rejected the request." });
-  const failedNoMessage = await verifyNotificationsWallet(
-    { wallet: "WalletA", signMessage },
-    {
-      ensureSession: async () => {
-        throw new Error("x");
-      },
-      errorMessage: () => "",
-    }
-  );
-  assert.equal(failedNoMessage.ok ? "" : failedNoMessage.message, NOTIFICATIONS_VERIFY_FAILED);
-});
-
-test("verified wallet loads notifications in place", () => {
-  assert.equal(
-    notificationsAccess({ connectedWallet: "WalletA", sessionWallet: "WalletA", status: "idle" }),
-    "verified"
-  );
-  assert.equal(
-    notificationsAccess({ connectedWallet: "WalletA", sessionWallet: "WalletA", status: "ready" }),
-    "verified"
-  );
-  assert.match(BELL, /async function onVerifyWallet\(\)[\s\S]*await refreshSession\(\)[\s\S]*void refreshUnreadCount\(\)/);
-  assert.match(BELL, /\[open, sessionWallet, connectedWallet\]/);
-  assert.match(BELL, /void loadList\("replace"\)/);
-});
-
-test("wallet switch never reuses another wallet's verification", async () => {
-  assert.equal(
-    notificationsAccess({ connectedWallet: "WalletB", sessionWallet: "WalletA", status: "ready" }),
-    "verify"
-  );
-  const mismatch = await verifyNotificationsWallet(
-    { wallet: "WalletB", signMessage: async (m: Uint8Array) => m },
-    {
-      ensureSession: async () => ({ session: { wallet: "WalletA" }, didSign: false }),
-      errorMessage: () => "unused",
-    }
-  );
-  assert.deepEqual(mismatch, {
-    ok: false,
-    reason: "mismatch",
-    message: NOTIFICATIONS_VERIFY_MISMATCH,
-  });
-  assert.equal(
-    shouldApplyNotificationsVerifyResult({ requestWallet: "WalletA", currentWallet: "WalletB" }),
-    false
-  );
-  assert.equal(
-    shouldApplyNotificationsVerifyResult({ requestWallet: "WalletA", currentWallet: null }),
-    false
-  );
-  assert.equal(
-    shouldApplyNotificationsVerifyResult({ requestWallet: "WalletA", currentWallet: "WalletA" }),
-    true
-  );
-  const pendingForA = { wallet: "WalletA", state: "pending" as const, error: null };
-  assert.equal(verifyStatusForWallet(pendingForA, "WalletA"), pendingForA);
-  assert.deepEqual(verifyStatusForWallet(pendingForA, "WalletB"), NOTIFICATIONS_VERIFY_IDLE);
-  assert.deepEqual(verifyStatusForWallet(pendingForA, null), NOTIFICATIONS_VERIFY_IDLE);
-  assert.match(BELL, /verifyStatusForWallet\(verify, connectedWallet\)/);
-  assert.match(BELL, /shouldApplyNotificationsVerifyResult\(\{/);
-  assert.match(BELL, /sessionMatchesConnectedWallet\(sessionWallet, connectedWallet\)/);
-});
-
-test("successful verify refreshes the notification state in place", () => {
-  const start = BELL.indexOf("async function onVerifyWallet()");
-  assert.ok(start > 0);
-  const rest = BELL.slice(start);
-  const fn = rest.slice(0, rest.indexOf("\n  }\n") + 4);
-  assert.match(fn, /if \(!outcome\.ok\) \{[\s\S]*?return;\s*\}/);
-  const afterOk = fn.slice(fn.indexOf("if (!outcome.ok)"));
-  let last = -1;
-  for (const marker of [
-    "await refreshSession()",
-    "setVerify(NOTIFICATIONS_VERIFY_IDLE)",
-    'current === "unauthenticated" ? "idle" : current',
-    "void refreshUnreadCount()",
-  ]) {
-    const at = afterOk.indexOf(marker);
-    assert.ok(at > last, marker);
-    last = at;
-  }
-  assert.doesNotMatch(fn, /window\.location|router\.(push|refresh|replace)/);
-});

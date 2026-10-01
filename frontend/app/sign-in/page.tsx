@@ -15,6 +15,30 @@ export default function SignInPage() {
 
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [googleSubmitting, setGoogleSubmitting] = useState(false);
+
+  async function handleGoogleSignIn() {
+    setError(null);
+    setGoogleSubmitting(true);
+
+    try {
+      const result = await signIn.social({
+        provider: "google",
+        callbackURL: "/",
+      });
+
+      if (result?.error) {
+        setError(
+          result.error.message ??
+            "We could not continue with Google. Please try again."
+        );
+      }
+    } catch {
+      setError("We could not continue with Google. Please try again.");
+    } finally {
+      setGoogleSubmitting(false);
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -97,7 +121,32 @@ export default function SignInPage() {
           </p>
         </div>
 
-        <form className="mt-6 space-y-4" onSubmit={handleSubmit}>
+        <div className="mt-6">
+          <button
+            type="button"
+            onClick={() => void handleGoogleSignIn()}
+            disabled={googleSubmitting || submitting}
+            className="inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-full border border-line bg-white px-5 text-sm font-semibold text-ink transition hover:bg-paper-2 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <span
+              aria-hidden="true"
+              className="inline-flex size-6 items-center justify-center rounded-full border border-line bg-white text-sm font-bold"
+            >
+              G
+            </span>
+            {googleSubmitting ? "Connecting to Google…" : "Continue with Google"}
+          </button>
+
+          <div className="my-5 flex items-center gap-3">
+            <div className="h-px flex-1 bg-line" />
+            <span className="text-xs font-medium uppercase tracking-[0.14em] text-ink-faint">
+              or
+            </span>
+            <div className="h-px flex-1 bg-line" />
+          </div>
+        </div>
+
+        <form className="space-y-4" onSubmit={handleSubmit}>
           <label className="block">
             <span className="mb-1.5 block text-sm font-semibold text-ink">
               Email
@@ -132,6 +181,16 @@ export default function SignInPage() {
             </div>
           </label>
 
+            <div className="mt-2 flex justify-end">
+              <Link
+                href="/forgot-password"
+                className="text-sm font-semibold text-cyan hover:underline"
+              >
+                Forgot password?
+              </Link>
+            </div>
+
+
           {error ? (
             <div
               role="alert"
@@ -143,7 +202,7 @@ export default function SignInPage() {
 
           <button
             type="submit"
-            disabled={submitting}
+            disabled={submitting || googleSubmitting}
             className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-full bg-ink px-5 text-sm font-semibold text-white transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
           >
             {submitting ? "Signing in…" : "Sign in"}

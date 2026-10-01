@@ -176,6 +176,144 @@ export async function listNotifications(
   };
 }
 
+
+function normalizedWalletSet(wallets: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const raw of wallets) {
+    const wallet = parseWallet(raw);
+    if (seen.has(wallet)) continue;
+    seen.add(wallet);
+    result.push(wallet);
+  }
+
+  return result;
+}
+
+function notificationRecordNewestFirst(
+  a: NotificationRecord,
+  b: NotificationRecord
+): number {
+  const time = b.createdAt.getTime() - a.createdAt.getTime();
+  if (time !== 0) return time;
+  return b.id.localeCompare(a.id);
+}
+
+export async function listNotificationsForWallets(
+  store: NotificationStore,
+  input: {
+    recipientWallets: readonly string[];
+    cursor: string | null;
+    limit: string | null;
+  }
+): Promise<{
+  notifications: PublicNotification[];
+  nextCursor: string | null;
+}> {
+  const wallets = normalizedWalletSet(input.recipientWallets);
+  const limit = normalizeNotificationLimit(input.limit);
+  const cursor = decodeNotificationCursor(input.cursor);
+
+  if (input.cursor && !cursor) {
+    throw new NotificationValidationError("Cursor is invalid.");
+  }
+
+  if (wallets.length === 0) {
+    return { notifications: [], nextCursor: null };
+  }
+
+  const pages = await Promise.all(
+    wallets.map((wallet) =>
+      store.listForWallet(wallet, cursor, limit + 1)
+    )
+  );
+
+  const merged = pages
+    .flat()
+    .sort(notificationRecordNewestFirst);
+
+  const hasMore = merged.length > limit;
+  const items = hasMore ? merged.slice(0, limit) : merged;
+
+  const nextCursor =
+    hasMore && items.length > 0
+      ? encodeNotificationCursor({
+          createdAt: items[items.length - 1].createdAt,
+          id: items[items.length - 1].id,
+        })
+      : null;
+
+  return {
+    notifications: items.map(toPublicNotification),
+    nextCursor,
+  };
+}
+
+export async function unreadNotificationCountForWallets(
+  store: NotificationStore,
+  recipientWallets: readonly string[]
+): Promise<{ unreadCount: number }> {
+  const wallets = normalizedWalletSet(recipientWallets);
+
+  const counts = await Promise.all(
+    wallets.map((wallet) => store.countUnread(wallet))
+  );
+
+  return {
+    unreadCount: counts.reduce((total, value) => total + value, 0),
+  };
+}
+
+export async function markNotificationReadForWallets(
+  store: NotificationStore,
+  input: {
+    id: string;
+    recipientWallets: readonly string[];
+  },
+  now = new Date()
+): Promise<{ notification: PublicNotification }> {
+  if (!input.id || typeof input.id !== "string") {
+    throw new NotificationValidationError("Notification id is invalid.");
+  }
+
+  const wallets = normalizedWalletSet(input.recipientWallets);
+
+  for (const wallet of wallets) {
+    const existing = await store.getByIdForWallet(input.id, wallet);
+    if (!existing) continue;
+
+    if (existing.readAt) {
+      return { notification: toPublicNotification(existing) };
+    }
+
+    const updated = await store.markRead(input.id, wallet, now);
+    if (!updated) {
+      throw new NotificationAccessError("Notification was not found.");
+    }
+
+    return { notification: toPublicNotification(updated) };
+  }
+
+  throw new NotificationAccessError("Notification was not found.");
+}
+
+export async function markAllNotificationsReadForWallets(
+  store: NotificationStore,
+  recipientWallets: readonly string[],
+  now = new Date()
+): Promise<{ markedCount: number }> {
+  const wallets = normalizedWalletSet(recipientWallets);
+
+  const counts = await Promise.all(
+    wallets.map((wallet) => store.markAllRead(wallet, now))
+  );
+
+  return {
+    markedCount: counts.reduce((total, value) => total + value, 0),
+  };
+}
+
 export async function unreadNotificationCount(
   store: NotificationStore,
   recipientWallet: string

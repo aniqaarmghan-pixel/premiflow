@@ -3,10 +3,8 @@ import {
   AttachmentValidationError,
   authorizeAttachmentDownload,
 } from "@/lib/server/attachments/service";
-import {
-  handleRouteError,
-  requireMessageParticipant,
-} from "@/lib/server/api-guard";
+import { handleRouteError } from "@/lib/server/api-guard";
+import { requireAccountContractParticipant } from "@/lib/server/account-auth/contract-participant";
 import { productionBlobStorage } from "@/lib/server/compose";
 import { BlobConfigError } from "@/lib/server/blob/env";
 import { HttpError } from "@/lib/server/http";
@@ -33,16 +31,29 @@ export async function GET(
 ) {
   try {
     const { address, id } = await context.params;
-    const { stores, session, parties } = await requireMessageParticipant(
-      request,
-      address
-    );
+
+    const {
+      stores,
+      parties,
+      participantWallets,
+      participantWallet,
+    } = await requireAccountContractParticipant(request, address);
+
+    const row = await stores.attachments.getById(id);
+
+    // Pending uploads remain private to their uploader. For active
+    // attachments, any authorized contract participant may read them.
+    const actingWallet =
+      row && participantWallets.includes(row.uploaderWallet)
+        ? row.uploaderWallet
+        : participantWallet;
+
     const result = await authorizeAttachmentDownload(
       stores,
       productionBlobStorage(),
       {
         contractAddress: address,
-        sessionWallet: session.walletAddress,
+        sessionWallet: actingWallet,
         parties,
         attachmentId: id,
       }

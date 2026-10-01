@@ -16,7 +16,6 @@ import {
   classifyCreateAssistantIntent,
   deterministicGuideAnswer,
   fallbackGuideAnswer,
-  formatNarrativeGuideText,
   GUIDE_ANSWER_ASSUMPTION,
 } from "@/lib/app/copilot-assistant-voice";
 import {
@@ -34,6 +33,7 @@ import { loadLiveAssistantContext } from "./context";
 import { copilotCanCallModel, getCopilotEnv } from "./env";
 import {
   generateCreateProposal,
+  generateGuidanceText,
   generateLiveNarrative,
   CopilotProviderError,
 } from "./provider";
@@ -139,7 +139,28 @@ export async function runCreateAssistant(
   }
 
   const intent = classifyCreateAssistantIntent(sanitized.text);
-  const isGuidance = intent === "explain" || intent === "howto";
+
+  // Natural PREMIFLOW questions should use the Q&A assistant.
+  // Only explicit contract-type recommendation requests should stay
+  // in the Create-proposal path.
+  const normalizedQuestion = sanitized.text.trim();
+
+  const looksLikeQuestion =
+    normalizedQuestion.endsWith("?") ||
+    /^(what|why|how|when|where|who|can|could|would|should|is|are|does|do|did|will|if)\b/i.test(
+      normalizedQuestion
+    );
+
+  const explicitlyAsksForContractRecommendation =
+    /\bwhich\s+contract\b/i.test(normalizedQuestion) ||
+    /\bwhat\s+contract\s+(type|model)\b/i.test(normalizedQuestion) ||
+    /\bwhich\s+(payment|contract)\s+(type|model)\b/i.test(normalizedQuestion) ||
+    /\bwhat\s+(payment|contract)\s+(type|model)\b/i.test(normalizedQuestion);
+
+  const isGuidance =
+    intent === "explain" ||
+    intent === "howto" ||
+    (looksLikeQuestion && !explicitlyAsksForContractRecommendation);
 
   const env = getCopilotEnv();
   // Guidance Q&A may use the model without a verified session; job proposals still require it.
@@ -162,16 +183,11 @@ export async function runCreateAssistant(
 
     if (canGuideModel) {
       try {
-        const narrative = await generateLiveNarrative({
+        const rationale = await generateGuidanceText({
           system: createSystemContext(),
           user: wrapUntrusted("guide_prompt", sanitized.text),
         });
-        const rationale = formatNarrativeGuideText({
-          summary: narrative.summary,
-          explanation: narrative.explanation,
-          nextExpectedStep: narrative.nextExpectedStep,
-          consequence: narrative.consequence,
-        });
+
         if (rationale.trim()) {
           return guideCreateResult(rationale, "model", extra, sanitized.flagged);
         }

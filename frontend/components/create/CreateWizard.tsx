@@ -1226,10 +1226,15 @@ export function CreateWizard() {
             <Button
               type="button"
               onClick={() => void startCreate()}
-              disabled={setupInFlight || Object.keys(errors).length > 0 || !client}
+              disabled={
+                setupInFlight ||
+                connecting ||
+                Object.keys(errors).length > 0 ||
+                Boolean(publicKey && !client)
+              }
               className="min-h-11 px-4 py-2.5 sm:min-h-0 sm:py-2"
             >
-              {CREATE_SEND_OFFER_LABEL}
+              {publicKey ? CREATE_SEND_OFFER_LABEL : "Connect wallet to continue"}
             </Button>
           )}
         </div>

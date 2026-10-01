@@ -7,9 +7,9 @@ import {
 } from "@/lib/server/attachments/service";
 import {
   handleRouteError,
-  requireMessageParticipant,
   requireMutatingOrigin,
 } from "@/lib/server/api-guard";
+import { requireAccountContractParticipant } from "@/lib/server/account-auth/contract-participant";
 import { productionBlobStorage } from "@/lib/server/compose";
 import { BlobConfigError } from "@/lib/server/blob/env";
 import { HttpError } from "@/lib/server/http";
@@ -37,13 +37,29 @@ export async function DELETE(
   try {
     requireMutatingOrigin(request);
     const { address, id } = await context.params;
-    const { stores, session } = await requireMessageParticipant(request, address);
+
+    const {
+      stores,
+      participantWallets,
+      participantWallet,
+    } = await requireAccountContractParticipant(request, address);
+
+    const row = await stores.attachments.getById(id);
+
+    // Pending attachments can still only be deleted by their uploader.
+    // The uploader identity must also be a verified linked participant
+    // of the signed-in PREMIFLOW account.
+    const actingWallet =
+      row && participantWallets.includes(row.uploaderWallet)
+        ? row.uploaderWallet
+        : participantWallet;
+
     const result = await deletePendingAttachment(
       stores,
       productionBlobStorage(),
       {
         contractAddress: address,
-        sessionWallet: session.walletAddress,
+        sessionWallet: actingWallet,
         attachmentId: id,
       }
     );

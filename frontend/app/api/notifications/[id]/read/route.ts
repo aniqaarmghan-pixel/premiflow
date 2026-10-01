@@ -1,8 +1,15 @@
 import { NextResponse } from "next/server";
 
-import { handleRouteError, requireMutatingOrigin, requireSession } from "@/lib/server/api-guard";
+import {
+  handleRouteError,
+  requireMutatingOrigin,
+} from "@/lib/server/api-guard";
+import {
+  accountNotificationAuthError,
+  requireAccountNotificationWallets,
+} from "@/lib/server/account-auth/notification-wallets";
 import { productionStores } from "@/lib/server/compose";
-import { markNotificationRead } from "@/lib/server/notifications/service";
+import { markNotificationReadForWallets } from "@/lib/server/notifications/service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,16 +19,21 @@ export async function POST(
   context: { params: Promise<{ id: string }> }
 ) {
   try {
-    const env = requireMutatingOrigin(request);
-    const stores = productionStores();
-    const session = await requireSession(request, stores, env);
+    requireMutatingOrigin(request);
+
+    const wallets = await requireAccountNotificationWallets(request);
     const { id } = await context.params;
-    const result = await markNotificationRead(stores.notifications, {
-      id,
-      recipientWallet: session.walletAddress,
-    });
+
+    const result = await markNotificationReadForWallets(
+      productionStores().notifications,
+      {
+        id,
+        recipientWallets: wallets,
+      }
+    );
+
     return NextResponse.json(result);
   } catch (err) {
-    return handleRouteError(err);
+    return accountNotificationAuthError(err) ?? handleRouteError(err);
   }
 }

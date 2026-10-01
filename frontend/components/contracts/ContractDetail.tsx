@@ -56,7 +56,6 @@ import {
   messagingSessionErrorMessage,
   readExistingMessagingSession,
 } from "@/lib/app/messaging-session";
-import { ConnectPrompt } from "@/components/shell/ConnectPrompt";
 import { PageFade } from "@/components/shell/PageFade";
 import { Address } from "@/components/ui/Address";
 import { Button } from "@/components/ui/Button";
@@ -166,6 +165,7 @@ import {
   fetchHourlyState,
   fetchWorkUnitsForContract,
   getStreamPayV2Program,
+  getStreamPayV2ReadOnlyProgram,
   hashBytes,
   remainingEmployerRefund,
   remainingFreelancerClaim,
@@ -198,11 +198,11 @@ const TRIAL_ACTIONS: UiAction[] = [
 ];
 
 export function ContractDetail({ address }: { address: string }) {
-  const { connected, publicKey, signMessage } = useWallet();
+  const { publicKey, signMessage } = useWallet();
   const wallet = useAnchorWallet();
   const { connection } = useConnection();
   const client = useStreamPayClient();
-  const { refresh: refreshList } = useContracts();
+  const { refresh: refreshList, accountWallets } = useContracts();
   const { now } = useNow(1000);
   const tx = useTx();
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
@@ -238,12 +238,11 @@ export function ContractDetail({ address }: { address: string }) {
   const [caseOpenSignature, setCaseOpenSignature] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    if (!wallet) return;
     setStatus("loading");
     setError(null);
     try {
       const pk = new PublicKey(address);
-      const program = getStreamPayV2Program(connection, wallet);
+      const program = getStreamPayV2ReadOnlyProgram(connection);
       const fetched = await fetchContract(program, pk);
       const work = await fetchWorkUnitsForContract(program, pk);
       setContract(fetched);
@@ -287,7 +286,7 @@ export function ContractDetail({ address }: { address: string }) {
       setError(err instanceof Error ? err.message : "Could not load this contract.");
       return null;
     }
-  }, [address, connection, wallet]);
+  }, [address, connection]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -327,7 +326,7 @@ export function ContractDetail({ address }: { address: string }) {
         const page = await fetchContractSubmissions(contract.address.toBase58());
         if (!cancelled) setSubmissions(page.submissions);
       } catch {
-        // History is optional until the wallet session is verified.
+        // Submission history is account-authorized; failure here is non-fatal.
       }
     })();
     return () => {
@@ -373,24 +372,51 @@ export function ContractDetail({ address }: { address: string }) {
 
   const { trial, main } = splitTrialUnits(units);
 
+  // Account identity decides which actions may be PRESENTED while the wallet
+  // is disconnected. The connected wallet is still required to EXECUTE them.
+  const actionPresentationWallet = useMemo(() => {
+    if (!contract) return null;
+
+    if (
+      publicKey &&
+      (publicKey.equals(contract.employer) ||
+        publicKey.equals(contract.freelancer))
+    ) {
+      return publicKey;
+    }
+
+    return (
+      accountWallets.find((candidate) => candidate.equals(contract.employer)) ??
+      accountWallets.find((candidate) => candidate.equals(contract.freelancer)) ??
+      null
+    );
+  }, [accountWallets, contract, publicKey]);
+
   const actions = useMemo(() => {
-    if (!publicKey || !contract) return [];
+    if (!actionPresentationWallet || !contract) return [];
+
     const trialUnit = units.find((u) => u.kind === "Trial") ?? null;
+
     return withSameWalletOfferActions(
       availableActions({
-        wallet: publicKey,
+        wallet: actionPresentationWallet,
         contract,
         trialUnit,
         hourlyState,
         now,
       }),
-      publicKey,
+      actionPresentationWallet,
       contract,
       now
     );
-  }, [contract, hourlyState, now, publicKey, units]);
+  }, [
+    actionPresentationWallet,
+    contract,
+    hourlyState,
+    now,
+    units,
+  ]);
 
-  if (!connected) return <ConnectPrompt />;
   if (status === "loading" && !contract) {
     return (
       <div className="space-y-4">
@@ -399,22 +425,50 @@ export function ContractDetail({ address }: { address: string }) {
       </div>
     );
   }
-  if (status === "error" || !contract || !publicKey) {
+  if (status === "error" || !contract) {
     return (
       <EmptyState
         title="Contract unavailable"
-        body={error ?? "Connect a wallet and confirm the address is a V2 contract."}
+        body={error ?? "Confirm the address is a V2 contract and try again."}
         action={{ label: "Retry", onClick: () => void load() }}
       />
     );
   }
 
-  const role = roleForContract(publicKey, contract);
-  // isEmployer / isFreelancer / isResolver from the confirmed on-chain account.
-  const walletRoles = contractRolesForWallet(publicKey, contract);
+  // Pick one concrete employer/freelancer wallet for read-only presentation.
+  // Prefer the currently connected party wallet, otherwise fall back to a
+  // persistently linked account wallet.
+  const connectedPartyWallet =
+    publicKey &&
+    (publicKey.equals(contract.employer) || publicKey.equals(contract.freelancer))
+      ? publicKey
+      : null;
+
+  const displayPartyWallet =
+    connectedPartyWallet ??
+    accountWallets.find((candidate) => candidate.equals(contract.employer)) ??
+    accountWallets.find((candidate) => candidate.equals(contract.freelancer)) ??
+    null;
+
+  // Existing detail components require one ContractRole rather than the
+  // account-level "both" role. Transaction authority does NOT use this value.
+  const role = displayPartyWallet
+    ? roleForContract(displayPartyWallet, contract)
+    : "none";
+
+  const other = displayPartyWallet
+    ? counterparty(displayPartyWallet, contract)
+    : {
+        label: "Freelancer",
+        address: contract.freelancer,
+      };
+
+  // Resolver settlement controls are deliberately based ONLY on the
+  // currently connected signing wallet, never merely on account identity.
   const canSettleDispute =
-    walletRoles.isResolver && canShowResolverSettlementControls(publicKey, contract);
-  const other = counterparty(publicKey, contract);
+    publicKey != null &&
+    contractRolesForWallet(publicKey, contract).isResolver &&
+    canShowResolverSettlementControls(publicKey, contract);
   const settlement = settlementView(contract);
   const trialStarted = streamingTrialStartedCopy(contract);
   const resolver = presentResolver(contract.resolver);
@@ -761,6 +815,9 @@ export function ContractDetail({ address }: { address: string }) {
             getStreamPayV2Program(connection, wallet),
             contract.address
           );
+          if (!publicKey) {
+            throw new Error("Connect the designated resolver wallet.");
+          }
           assertResolverPrecheck(publicKey, onChain);
           const allocation = parseFreelancerAllocation(awardUi, decimals, onChain);
           if (allocation.error || allocation.award == null) {
@@ -895,7 +952,11 @@ export function ContractDetail({ address }: { address: string }) {
   ];
   const contractButtons = actions
     .filter((a) => !UNIT_ACTIONS.includes(a) && !TRIAL_ACTIONS.includes(a))
-    .filter((a) => !hourlyPrimary.includes(a))
+    .filter(
+      (a) =>
+        contract.paymentMode !== "Hourly" ||
+        (!hourlyPrimary.includes(a) && a !== "withdrawFreelancer")
+    )
     // Streaming release lives in the Ongoing pay panel (freelancer only); no duplicate here.
     .filter((a) => a !== "releaseStreamAccrual")
     .filter((a) => {
@@ -934,13 +995,15 @@ export function ContractDetail({ address }: { address: string }) {
     paymentMode: contract.paymentMode,
     units: main,
     actionsFor: (unit) =>
-      availableActions({
-        wallet: publicKey,
-        contract,
-        workUnit: unit,
-        trialUnit: trial,
-        now,
-      }).filter((a) => UNIT_ACTIONS.includes(a)),
+      actionPresentationWallet
+        ? availableActions({
+            wallet: actionPresentationWallet,
+            contract,
+            workUnit: unit,
+            trialUnit: trial,
+            now,
+          }).filter((a) => UNIT_ACTIONS.includes(a))
+        : [],
   });
 
   return (
@@ -1031,6 +1094,26 @@ export function ContractDetail({ address }: { address: string }) {
               <TransactionStatus state={tx.state} />
             </div>
           ) : null}
+
+          {!publicKey &&
+          actionPresentationWallet &&
+          (contractButtons.length > 0 || primaryUnitButtons.length > 0) ? (
+            <div className="mt-4 rounded-xl border border-line bg-paper-2 px-4 py-3">
+              <p className="text-sm font-medium text-ink">
+                Connect the required wallet to continue
+              </p>
+              <p className="mt-1 text-xs leading-5 text-ink-soft">
+                Connect{" "}
+                <span className="font-mono font-medium text-ink">
+                  {actionPresentationWallet.toBase58().slice(0, 4)}…
+                  {actionPresentationWallet.toBase58().slice(-4)}
+                </span>{" "}
+                using the Connect wallet button above. No blockchain action is
+                sent until you reconnect and confirm it.
+              </p>
+            </div>
+          ) : null}
+
           {contractButtons.length > 0 || primaryUnitButtons.length > 0 ? (
             <div className="mt-4 flex flex-wrap gap-2">
               {primaryUnitButtons.map(({ action, unit }) => (
@@ -1192,17 +1275,21 @@ export function ContractDetail({ address }: { address: string }) {
                 decimals={decimals}
                 role={role}
                 now={now}
-                actions={availableActions({
-                  wallet: publicKey,
-                  contract,
-                  trialUnit: trial,
-                  now,
-                }).filter(
-                  (a) =>
-                    TRIAL_ACTIONS.includes(a) ||
-                    (a === "rejectActivation" &&
-                      (trial.status === "Submitted" || trial.status === "Revising"))
-                )}
+                actions={
+                    actionPresentationWallet
+                      ? availableActions({
+                          wallet: actionPresentationWallet,
+                          contract,
+                          trialUnit: trial,
+                          now,
+                        }).filter(
+                        (a) =>
+                          TRIAL_ACTIONS.includes(a) ||
+                          (a === "rejectActivation" &&
+                            (trial.status === "Submitted" || trial.status === "Revising"))
+                      )
+                    : []
+                }
                 busy={tx.busy}
                 submissions={submissions}
                 historySyncWarning={
@@ -1251,13 +1338,17 @@ export function ContractDetail({ address }: { address: string }) {
                     decimals={decimals}
                     role={role}
                     now={now}
-                    actions={availableActions({
-                      wallet: publicKey,
-                      contract,
-                      workUnit: unit,
-                      trialUnit: trial,
-                      now,
-                    }).filter((a) => UNIT_ACTIONS.includes(a))}
+                    actions={
+                        actionPresentationWallet
+                          ? availableActions({
+                              wallet: actionPresentationWallet,
+                              contract,
+                              workUnit: unit,
+                              trialUnit: trial,
+                              now,
+                            }).filter((a) => UNIT_ACTIONS.includes(a))
+                        : []
+                    }
                     busy={tx.busy}
                     submissions={submissions}
                     historySyncWarning={
@@ -1293,6 +1384,7 @@ export function ContractDetail({ address }: { address: string }) {
         <div id="messages" className="scroll-mt-20">
           <Suspense fallback={null}>
             <ContractMessages
+              participantWallet={displayPartyWallet?.toBase58() ?? null}
               role={role}
               paymentMode={contract.paymentMode}
               contractAddress={contract.address.toBase58()}

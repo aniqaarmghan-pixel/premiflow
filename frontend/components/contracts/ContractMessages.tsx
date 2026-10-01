@@ -1,7 +1,6 @@
 "use client";
 
 import { MessagesSquare } from "lucide-react";
-import { useWallet } from "@solana/wallet-adapter-react";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -9,7 +8,6 @@ import { Button } from "@/components/ui/Button";
 import {
   ChatComposer,
   ChatHistory,
-  ChatVerifyGate,
   ContractChatDialog,
 } from "@/components/contracts/ContractChatDialog";
 import {
@@ -36,16 +34,10 @@ import {
 } from "@/lib/app/messages-history";
 import {
   fetchContractMessages,
-  fetchSession,
-  logoutSession,
   markContractMessagesRead,
   sendContractMessage,
   type ApiError,
 } from "@/lib/app/messages-client";
-import {
-  ensureMessagingSession,
-  messagingSessionErrorMessage,
-} from "@/lib/app/messaging-session";
 import {
   discardPendingAttachment,
   uploadContractAttachment,
@@ -60,11 +52,7 @@ import {
   MESSAGES_POLL_MS,
   mergeMessagesById,
   panelStateFromApiError,
-  resolveInitialPanelState,
-  sessionMatchesConnectedWallet,
-  shouldClearConversationOnWalletChange,
   shouldPollMessages,
-  shouldRevokeSessionOnWalletChange,
   shouldShowComposer,
   type MessagesPanelState,
 } from "@/lib/app/messages-panel";
@@ -86,18 +74,18 @@ export function ContractMessages({
   paymentMode,
   contractAddress,
   contractTitle,
+  participantWallet,
 }: {
   role: ContractRole;
   paymentMode: PaymentModeName;
   contractAddress: string;
   contractTitle?: string;
+  participantWallet?: string | null;
 }) {
-  const { connected, publicKey, signMessage } = useWallet();
   const searchParams = useSearchParams();
-  const connectedWallet = publicKey?.toBase58() ?? null;
   const participant = isContractMessageParticipant(role);
   const [state, setState] = useState<MessagesPanelState>(() =>
-    resolveInitialPanelState({ connected, role })
+    participant ? "loading" : "unauthorized"
   );
   const [messages, setMessages] = useState<PublicContractMessage[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -108,12 +96,13 @@ export function ContractMessages({
   );
   const [sending, setSending] = useState(false);
   const [sendFailed, setSendFailed] = useState(false);
-  const [verifyError, setVerifyError] = useState<string | null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [followNewest, setFollowNewest] = useState(true);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
   const [newActivity, setNewActivity] = useState(false);
-  const lastWallet = useRef<string | null>(connectedWallet);
+  const lastParticipantWallet = useRef<string | null | undefined>(
+    participantWallet
+  );
   const cursorInitialized = useRef(false);
   const newestIdRef = useRef<string | null>(null);
   const visible = useBrowserVisible();
@@ -154,13 +143,25 @@ export function ContractMessages({
 
   const applyApiError = useCallback((err: unknown) => {
     const api = err as ApiError;
+
+    if (
+      api.code === "account_unauthenticated" ||
+      api.status === 401 ||
+      api.status === 403
+    ) {
+      setState("unauthorized");
+      return api;
+    }
+
     const next = panelStateFromApiError(api.status, api.code);
-    if (next) setState(next);
+    setState(next ?? "backend_unavailable");
     return api;
   }, []);
 
   const loadConversation = useCallback(async () => {
-    const page = await fetchContractMessages(contractAddress);
+    const page = await fetchContractMessages(contractAddress, {
+      participantWallet,
+    });
     setMessages((current) => {
       const merged = mergeMessagesById(current, page.messages);
       const previousNewest = newestIdRef.current;
@@ -185,27 +186,48 @@ export function ContractMessages({
     if (page.messages.length > 0) {
       const last = page.messages[page.messages.length - 1];
       try {
-        const read = await markContractMessagesRead(contractAddress, last.id);
+        const read = await markContractMessagesRead(
+          contractAddress,
+          last.id,
+          page.participantWallet
+        );
         setUnreadCount(read.unreadCount);
       } catch {
         // Read receipts are best-effort; the thread still loads.
       }
     }
     setState("ready");
-  }, [contractAddress, followNewest]);
+  }, [contractAddress, followNewest, participantWallet]);
 
   useEffect(() => {
-    if (shouldClearConversationOnWalletChange(lastWallet.current, connectedWallet)) {
-      clearConversation();
-      setDraft("");
-      setChatOpen(false);
-      if (shouldRevokeSessionOnWalletChange(lastWallet.current, connectedWallet)) {
-        void logoutSession().catch(() => undefined);
-      }
-      setState(resolveInitialPanelState({ connected, role }));
+    if (lastParticipantWallet.current === participantWallet) return;
+
+    lastParticipantWallet.current = participantWallet;
+    clearConversation();
+    setDraft("");
+    setState(participant ? "loading" : "unauthorized");
+  }, [clearConversation, participant, participantWallet]);
+
+  useEffect(() => {
+    if (!participant) {
+      setState("unauthorized");
+      return;
     }
-    lastWallet.current = connectedWallet;
-  }, [clearConversation, connected, connectedWallet, role]);
+
+    if (state !== "loading") return;
+
+    let cancelled = false;
+
+    void loadConversation().catch((err) => {
+      if (!cancelled) {
+        applyApiError(err);
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [applyApiError, loadConversation, participant, state]);
 
   useEffect(() => {
     if (!shouldPollMessages(state, visible)) return;
@@ -217,58 +239,6 @@ export function ContractMessages({
     return () => window.clearInterval(id);
   }, [applyApiError, loadConversation, state, visible]);
 
-  async function onVerifyWallet() {
-    if (!connectedWallet) return;
-    setVerifyError(null);
-    setState("verifying");
-    try {
-      const { session } = await ensureMessagingSession({
-        wallet: connectedWallet,
-        signMessage,
-      });
-      if (!sessionMatchesConnectedWallet(session.wallet, connectedWallet)) {
-        setState("session_mismatch");
-        return;
-      }
-      setState("loading");
-      setFollowNewest(true);
-      setNewActivity(false);
-      await loadConversation();
-    } catch (err) {
-      const api = err as ApiError;
-      setVerifyError(messagingSessionErrorMessage(err));
-      if (api.code === "session_mismatch") {
-        setState("session_mismatch");
-        return;
-      }
-      setState(panelStateFromApiError(api.status, api.code) ?? "verify_failed");
-    }
-  }
-
-  useEffect(() => {
-    if (!connectedWallet || !participant) return;
-    if (state !== "unverified") return;
-    let cancelled = false;
-    void (async () => {
-      try {
-        const me = await fetchSession();
-        if (cancelled) return;
-        if (!sessionMatchesConnectedWallet(me.wallet, connectedWallet)) {
-          setState("session_mismatch");
-          return;
-        }
-        setState("loading");
-        await loadConversation();
-      } catch (err) {
-        if (cancelled) return;
-        const api = err as ApiError;
-        setState(panelStateFromApiError(api.status, api.code) ?? "unverified");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [connectedWallet, loadConversation, participant, state]);
 
   async function uploadOne(localId: string, file: File) {
     setPendingAttachments((current) =>
@@ -289,7 +259,8 @@ export function ContractMessages({
               item.localId === localId ? { ...item, progress: ratio } : item
             )
           );
-        }
+        },
+        participantWallet
       );
       setPendingAttachments((current) =>
         current.map((item) =>
@@ -364,7 +335,11 @@ export function ContractMessages({
     setPendingAttachments((current) => current.filter((item) => item.localId !== localId));
     if (target?.attachmentId) {
       try {
-        await discardPendingAttachment(contractAddress, target.attachmentId);
+        await discardPendingAttachment(
+          contractAddress,
+          target.attachmentId,
+          participantWallet
+        );
       } catch {
         // Best-effort orphan cleanup; send will only bind uploaded ids that remain.
       }
@@ -390,7 +365,12 @@ export function ContractMessages({
     setSending(true);
     setSendFailed(false);
     try {
-      const result = await sendContractMessage(contractAddress, draft, attachmentIds);
+      const result = await sendContractMessage(
+        contractAddress,
+        draft,
+        attachmentIds,
+        participantWallet
+      );
       setFollowNewest(true);
       setNewActivity(false);
       setMessages((current) => {
@@ -412,7 +392,10 @@ export function ContractMessages({
     setFollowNewest(false);
     setLoadingEarlier(true);
     try {
-      const page = await fetchContractMessages(contractAddress, { cursor: nextCursor });
+      const page = await fetchContractMessages(contractAddress, {
+        cursor: nextCursor,
+        participantWallet,
+      });
       setMessages((current) => mergeMessagesById(current, page.messages));
       setNextCursor(page.nextCursor);
     } catch (err) {
@@ -445,12 +428,6 @@ export function ContractMessages({
     !pendingAttachments.some((item) => item.status === "failed");
   const preview = state === "ready" ? latestMessagePreview(messages) : null;
   const unreadLabel = formatUnreadBadge(unreadCount);
-  const needsVerify =
-    state === "unverified" ||
-    state === "verifying" ||
-    state === "verify_failed" ||
-    state === "expired" ||
-    state === "session_mismatch";
 
   return (
     <>
@@ -509,14 +486,6 @@ export function ContractMessages({
         unreadLabel={unreadLabel}
         onClose={() => setChatOpen(false)}
       >
-        {needsVerify ? (
-          <ChatVerifyGate
-            disabled={!connectedWallet}
-            verifying={state === "verifying"}
-            error={verifyError}
-            onVerify={() => void onVerifyWallet()}
-          />
-        ) : null}
 
         {state === "disconnected" ||
         state === "unauthorized" ||
@@ -536,7 +505,7 @@ export function ContractMessages({
         {state === "ready" ? (
           <ChatHistory
             messages={messages}
-            connectedWallet={connectedWallet}
+            connectedWallet={participantWallet ?? null}
             otherLabel={otherParticipantLabel(role)}
             empty={CONTRACT_MESSAGES_TARGET_UX.empty}
             nextCursor={nextCursor}

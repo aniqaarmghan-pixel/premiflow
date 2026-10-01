@@ -38,7 +38,7 @@ export function workSubmissionUniqueKey(
  * Creates a wallet-scoped work submission notification for the employer.
  * Call only after the submission row is persisted (created or idempotent retry).
  * Failures should be swallowed by the caller so delivery history is never rolled back.
- * Skips trial submissions entirely.
+ * Paid-trial submissions notify the employer using the existing work-submission kinds.
  */
 export async function notifyEmployerOfWorkSubmission(
   store: NotificationStore,
@@ -55,10 +55,6 @@ export async function notifyEmployerOfWorkSubmission(
   },
   now = new Date()
 ): Promise<{ created: boolean; skipped?: string }> {
-  if (input.submission.submissionKind === "trial") {
-    return { created: false, skipped: "trial" };
-  }
-
   const recipientWallet = input.parties.employer;
   if (!recipientWallet) {
     return { created: false, skipped: "no_employer" };
@@ -73,12 +69,21 @@ export async function notifyEmployerOfWorkSubmission(
   }
 
   const kind = workSubmissionNotificationKind(input.submission.revisionNumber);
-  const title =
-    kind === "revised_work_submitted"
+  const isTrial = input.submission.submissionKind === "trial";
+
+  const title = isTrial
+    ? kind === "revised_work_submitted"
+      ? "Revised paid trial submitted"
+      : "Paid trial submitted"
+    : kind === "revised_work_submitted"
       ? REVISED_WORK_SUBMITTED_TITLE
       : WORK_SUBMITTED_TITLE;
-  const body =
-    kind === "revised_work_submitted"
+
+  const body = isTrial
+    ? kind === "revised_work_submitted"
+      ? "The freelancer resubmitted revised paid-trial work for your review."
+      : "The freelancer submitted paid-trial work for your review."
+    : kind === "revised_work_submitted"
       ? REVISED_WORK_SUBMITTED_BODY
       : WORK_SUBMITTED_BODY;
 
