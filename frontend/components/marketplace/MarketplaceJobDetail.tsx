@@ -33,6 +33,7 @@ import { STREAMPAY_PROGRAM_ID } from "@/lib/streampay-v2/constants";
 import { PublicKey } from "@solana/web3.js";
 
 import { JobTags, MarketplaceHeader, ProfileLink, StatusPill } from "./MarketplaceParts";
+import { MarketplaceSaveToggle } from "./MarketplaceSaveToggle";
 
 const CREATE_SCOPE: IntentScope = {
   cluster: ACTIVE_CLUSTER_ID,
@@ -131,6 +132,7 @@ export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
   return (
     <div className="min-w-0 space-y-4">
       <MarketplaceHeader title={job.title} />
+      <MarketplaceSaveToggle type="job" id={job.id} />
       <Card className="min-w-0 space-y-2 p-4">
         <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-ink-faint">
           <StatusPill>{JOB_STATUS_LABELS[job.status]}</StatusPill>

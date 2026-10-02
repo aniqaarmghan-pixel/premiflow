@@ -3,6 +3,7 @@
  * moves funds. Identity always comes from the signed wallet session, never
  * from the request body. There are deliberately no ratings or reputation.
  */
+import type { MarketplaceCategorySlug } from "@/lib/app/marketplace-categories";
 import { randomId } from "../crypto";
 import { HttpError } from "../http";
 import {
@@ -18,6 +19,7 @@ import {
   type CreateHandoff,
   type PublicJob,
 } from "./service";
+import { PACKAGE_TIERS, type GigPackage, type PackageTier } from "./store";
 import type {
   GigStatus,
   JobPaymentMode,
@@ -59,6 +61,12 @@ export type PublicGig = {
   status: GigStatus;
   createdAt: string;
   updatedAt: string;
+  category: MarketplaceCategorySlug | null;
+  coverUrl: string | null;
+  media: string[];
+  videoUrl: string | null;
+  deliveryDays: number | null;
+  packages: GigPackage[];
 };
 
 export type GigDetail = {
@@ -105,6 +113,12 @@ export function toPublicGig(row: MarketplaceGigRecord): PublicGig {
     status: row.status,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    category: row.category ?? null,
+    coverUrl: row.coverUrl ?? null,
+    media: [...(row.media ?? [])],
+    videoUrl: row.videoUrl ?? null,
+    deliveryDays: row.deliveryDays ?? null,
+    packages: (row.packages ?? []).map((p) => ({ ...p })),
   };
 }
 
@@ -187,7 +201,7 @@ function toSummary(row: MarketplaceProfileRecord): ProfileSummary {
   };
 }
 
-async function withSellers(store: MarketplaceStore, rows: MarketplaceGigRecord[]): Promise<GigCard[]> {
+export async function withSellers(store: MarketplaceStore, rows: MarketplaceGigRecord[]): Promise<GigCard[]> {
   const wallets = [...new Set(rows.map((row) => row.freelancerWallet))];
   const profiles = wallets.length ? await store.getProfilesByWallets(wallets) : [];
   const byWallet = new Map(profiles.map((p) => [p.wallet, toSummary(p)]));
@@ -403,7 +417,7 @@ export async function getGigDetail(
  */
 export async function getGigHandoff(
   store: MarketplaceStore,
-  input: { sessionWallet: string | null; gigId: unknown }
+  input: { sessionWallet: string | null; gigId: unknown; tier?: unknown }
 ): Promise<CreateHandoff> {
   const wallet = requireMarketplaceWallet(input.sessionWallet);
   const gig = await store.getGig(parseGigId(input.gigId));
@@ -412,7 +426,7 @@ export async function getGigHandoff(
     throw new HttpError(403, "own_gig", "You cannot hire your own gig.");
   }
   if (gig.status !== "active") throw gigNotFound();
-  return {
+  const base: CreateHandoff = {
     source: "gig",
     gigId: gig.id,
     jobId: "",
@@ -423,4 +437,30 @@ export async function getGigHandoff(
     amount: gig.priceAmount,
     freelancerWallet: gig.freelancerWallet,
   };
+  const packages = gig.packages ?? [];
+  const tierRaw = input.tier === undefined || input.tier === null || input.tier === "" ? null : input.tier;
+  if (packages.length === 0) {
+    if (tierRaw !== null) {
+      throw new HttpError(400, "invalid_marketplace_input", "This gig has no packages.");
+    }
+    return base;
+  }
+  if (tierRaw !== null && (typeof tierRaw !== "string" || !(PACKAGE_TIERS as readonly string[]).includes(tierRaw))) {
+    throw new HttpError(400, "invalid_marketplace_input", "Package tier must be basic, standard or premium.");
+  }
+  const pkg = tierRaw === null ? packages[0] : packages.find((p) => p.tier === tierRaw);
+  if (!pkg) throw new HttpError(404, "package_not_found", "That package is not offered on this gig.");
+  const label = packageLabel(pkg.tier);
+  const revisions = `${pkg.revisions} revision${pkg.revisions === 1 ? "" : "s"}`;
+  return {
+    ...base,
+    packageTier: pkg.tier,
+    title: `${gig.title} - ${label} package`,
+    description: `${gig.description}\n\n${label} package${pkg.title ? ` (${pkg.title})` : ""}: ${pkg.description}\nDelivery: ${pkg.deliveryDays} day${pkg.deliveryDays === 1 ? "" : "s"}. ${revisions}.`,
+    amount: pkg.priceAmount,
+  };
+}
+
+export function packageLabel(tier: PackageTier): string {
+  return tier === "basic" ? "Basic" : tier === "standard" ? "Standard" : "Premium";
 }

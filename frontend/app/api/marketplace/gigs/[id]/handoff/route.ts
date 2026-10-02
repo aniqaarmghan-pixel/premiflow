@@ -14,7 +14,11 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const ctx = marketplaceContext();
     const wallet = await marketplaceSessionWallet(request, ctx);
     return NextResponse.json({
-      handoff: await getGigHandoff(ctx.market, { sessionWallet: wallet, gigId: id }),
+      handoff: await getGigHandoff(ctx.market, {
+        sessionWallet: wallet,
+        gigId: id,
+        tier: new URL(request.url).searchParams.get("tier"),
+      }),
     });
   } catch (err) {
     return handleRouteError(err);

@@ -10,8 +10,12 @@ import {
   GIG_COPY,
   GIG_STATUS_LABELS,
   MARKETPLACE_COPY,
+  PACKAGE_TIER_LABELS,
   amountLabel,
+  categoryLabelOf,
   formatMarketplaceAmount,
+  gigCategory,
+  gigDeliveryLabel,
   marketplaceErrorMessage,
 } from "@/lib/app/marketplace";
 import {
@@ -22,8 +26,11 @@ import {
 } from "@/lib/app/marketplace-client";
 import { stashCreateHandoff } from "@/lib/app/marketplace-create-handoff";
 import { useMarketplaceQuery, useMarketplaceSession } from "@/lib/hooks/useMarketplace";
+import type { PackageTier } from "@/lib/server/marketplace/store";
 
+import { MarketplaceGigMedia } from "./MarketplaceGigMedia";
 import { Avatar, MarketplaceHeader, ProfileLink, SkillList, StatusPill } from "./MarketplaceParts";
+import { MarketplaceSaveToggle } from "./MarketplaceSaveToggle";
 
 export function MarketplaceGigDetail({ gigId }: { gigId: string }) {
   const router = useRouter();
@@ -31,6 +38,7 @@ export function MarketplaceGigDetail({ gigId }: { gigId: string }) {
   const query = useMarketplaceQuery(`gig:${gigId}:${session.wallet ?? ""}`, () => fetchGigDetail(gigId));
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [tier, setTier] = useState<PackageTier | null>(null);
 
   async function run(action: () => Promise<unknown>, after?: () => void) {
     setBusy(true);
@@ -47,12 +55,13 @@ export function MarketplaceGigDetail({ gigId }: { gigId: string }) {
     }
   }
 
-  async function hire() {
+  async function hire(selected: PackageTier | undefined) {
     setBusy(true);
     setNotice(null);
     try {
       const wallet = await session.ensure();
-      const { handoff } = await fetchGigHandoff(gigId);
+      // Amount comes from the server-side package (or legacy price), never the client.
+      const { handoff } = await fetchGigHandoff(gigId, selected);
       // Never overwrites a create in progress; Create applies the terms only on
       // the employer's explicit choice and never sends on its own.
       const result = stashCreateHandoff(wallet, handoff);
@@ -91,10 +100,22 @@ export function MarketplaceGigDetail({ gigId }: { gigId: string }) {
   const { gig, viewerRole, owner } = query.data;
   const isOwner = viewerRole === "owner";
   const looksLikeOwner = !isOwner && session.wallet === gig.freelancerWallet;
+  const packages = gig.packages ?? [];
+  const selectedTier: PackageTier | undefined =
+    packages.length === 0 ? undefined : (packages.find((p) => p.tier === tier) ?? packages[0]).tier;
+  const category = gigCategory(gig);
+  const delivery = gigDeliveryLabel(gig.deliveryDays);
 
   return (
     <div className="min-w-0 space-y-4">
       <MarketplaceHeader title={gig.title} />
+      <MarketplaceSaveToggle type="gig" id={gig.id} />
+      <MarketplaceGigMedia
+        title={gig.title}
+        coverUrl={gig.coverUrl ?? null}
+        media={gig.media ?? []}
+        videoUrl={gig.videoUrl ?? null}
+      />
       <Card className="min-w-0 space-y-3 p-4">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
           <Avatar url={owner?.avatarUrl ?? null} size={40} />
@@ -111,13 +132,53 @@ export function MarketplaceGigDetail({ gigId }: { gigId: string }) {
         </p>
         <SkillList skills={gig.skills} />
         <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-faint">
+          {category ? <span>{categoryLabelOf(category)}</span> : null}
           <span>{gig.paymentMode}</span>
           <span>
-            {amountLabel(gig.paymentMode)}: {formatMarketplaceAmount(gig.priceAmount)}
+            {packages.length > 1 ? "From" : `${amountLabel(gig.paymentMode)}:`} {formatMarketplaceAmount(gig.priceAmount)}
           </span>
+          {delivery ? <span>{delivery}</span> : null}
           <span>Updated {new Date(gig.updatedAt).toLocaleDateString()}</span>
         </p>
       </Card>
+
+      {packages.length > 0 ? (
+        <Card className="min-w-0 space-y-3 p-4">
+          <h2 className="text-sm font-semibold text-ink">Packages</h2>
+          <div role="radiogroup" aria-label="Packages" className="grid min-w-0 gap-3 md:grid-cols-3">
+            {packages.map((p) => {
+              const active = p.tier === selectedTier;
+              return (
+                <label
+                  key={p.tier}
+                  className={`flex min-w-0 cursor-pointer flex-col gap-1 rounded-[var(--radius)] border p-3 text-sm ${
+                    active ? "border-accent ring-2 ring-accent/30" : "border-line"
+                  }`}
+                >
+                  <span className="flex items-center gap-2 font-semibold text-ink">
+                    <input
+                      type="radio"
+                      name="gig-package"
+                      value={p.tier}
+                      checked={active}
+                      onChange={() => setTier(p.tier)}
+                    />
+                    {PACKAGE_TIER_LABELS[p.tier]}
+                    {p.title ? <span className="font-normal text-ink-soft">- {p.title}</span> : null}
+                  </span>
+                  <span className="text-base font-semibold text-ink">{formatMarketplaceAmount(p.priceAmount)}</span>
+                  <span className="whitespace-pre-wrap break-words text-ink-soft [overflow-wrap:anywhere]">
+                    {p.description}
+                  </span>
+                  <span className="text-xs text-ink-faint">
+                    {p.deliveryDays}-day delivery, {p.revisions} revision{p.revisions === 1 ? "" : "s"}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </Card>
+      ) : null}
 
       {isOwner ? (
         <Card className="min-w-0 space-y-3 p-4">
@@ -158,8 +219,8 @@ export function MarketplaceGigDetail({ gigId }: { gigId: string }) {
       ) : gig.status === "active" ? (
         <Card className="min-w-0 space-y-3 p-4">
           <p className="text-sm text-ink-soft">{GIG_COPY.hireNote}</p>
-          <Button disabled={busy || !session.wallet} onClick={() => void hire()}>
-            Hire via Create contract
+          <Button disabled={busy || !session.wallet} onClick={() => void hire(selectedTier)}>
+            {selectedTier ? `Hire ${PACKAGE_TIER_LABELS[selectedTier]} via Create contract` : "Hire via Create contract"}
           </Button>
           {!session.wallet ? (
             <p className="text-xs text-ink-faint">{MARKETPLACE_COPY.connectWallet}</p>

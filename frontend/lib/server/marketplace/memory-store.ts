@@ -5,6 +5,7 @@ import {
   type MarketplaceGigRecord,
   type MarketplaceJobRecord,
   type MarketplaceProfileRecord,
+  type MarketplaceFavoriteRecord,
   type MarketplaceProposalRecord,
   type MarketplaceStore,
 } from "./store";
@@ -25,7 +26,10 @@ export function createMemoryMarketplaceStore(): MarketplaceStore {
   const cloneGig = (row: MarketplaceGigRecord): MarketplaceGigRecord => ({
     ...row,
     skills: [...row.skills],
+    media: [...(row.media ?? [])],
+    packages: (row.packages ?? []).map((p) => ({ ...p })),
   });
+  const favorites: MarketplaceFavoriteRecord[] = [];
   return {
     async searchOpenJobs(filter) {
       return jobs
@@ -76,7 +80,8 @@ export function createMemoryMarketplaceStore(): MarketplaceStore {
       return gigs
         .filter(
           (row) =>
-            row.status === "active" && matchesSearch({ ...row, amount: row.priceAmount }, filter)
+            row.status === "active" &&
+            matchesSearch({ ...row, amount: row.priceAmount, skillFallback: true }, filter)
         )
         .sort(compareForSort(filter.sort, (row) => row.priceAmount))
         .slice(0, filter.limit)
@@ -91,6 +96,32 @@ export function createMemoryMarketplaceStore(): MarketplaceStore {
         .sort(compareForSort<Keyed>(filter.sort, (k) => k.rate))
         .slice(0, filter.limit)
         .map((k) => cloneProfile(k.row));
+    },
+    async addFavorite(row) {
+      const existing = favorites.find(
+        (f) => f.wallet === row.wallet && f.targetType === row.targetType && f.targetId === row.targetId
+      );
+      if (existing) return { record: { ...existing }, created: false };
+      favorites.push({ ...row });
+      return { record: { ...row }, created: true };
+    },
+    async removeFavorite(wallet, targetType, targetId) {
+      const index = favorites.findIndex(
+        (f) => f.wallet === wallet && f.targetType === targetType && f.targetId === targetId
+      );
+      if (index < 0) return false;
+      favorites.splice(index, 1);
+      return true;
+    },
+    async listFavorites(wallet, limit) {
+      return favorites
+        .filter((f) => f.wallet === wallet)
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+        .slice(0, limit)
+        .map((f) => ({ ...f }));
+    },
+    async countFavorites(wallet) {
+      return favorites.filter((f) => f.wallet === wallet).length;
     },
     async getProfilesByWallets(wallets) {
       return wallets

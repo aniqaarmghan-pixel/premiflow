@@ -15,6 +15,7 @@ import {
 
 import type { MessagingDatabase } from "./client";
 import {
+  marketplaceFavorites,
   marketplaceGigs,
   marketplaceJobs,
   marketplaceProfiles,
@@ -29,7 +30,10 @@ import {
   type GigStatus,
   type JobStatus,
   type MarketplaceGigRecord,
+  type GigPackage,
+  type FavoriteTarget,
   type MarketplaceProfileRecord,
+  type MarketplaceFavoriteRecord,
   type MarketplaceSearchFilter,
   type ProfileAvailability,
   type MarketplaceJobRecord,
@@ -46,6 +50,10 @@ function asJob(row: typeof marketplaceJobs.$inferSelect): MarketplaceJobRecord {
     skills: Array.isArray(row.skills) ? row.skills : [],
     category: isCategorySlug(row.category) ? row.category : null,
   };
+}
+
+function asFavorite(row: typeof marketplaceFavorites.$inferSelect): MarketplaceFavoriteRecord {
+  return { ...row, targetType: row.targetType as FavoriteTarget };
 }
 
 function asProposal(row: typeof marketplaceProposals.$inferSelect): MarketplaceProposalRecord {
@@ -67,6 +75,9 @@ function asGig(row: typeof marketplaceGigs.$inferSelect): MarketplaceGigRecord {
     skills: Array.isArray(row.skills) ? row.skills : [],
     paymentMode: row.paymentMode as JobPaymentMode,
     status: row.status as GigStatus,
+    category: isCategorySlug(row.category) ? row.category : null,
+    media: Array.isArray(row.media) ? row.media : [],
+    packages: Array.isArray(row.packages) ? (row.packages as GigPackage[]) : [],
   };
 }
 
@@ -82,8 +93,8 @@ function searchConditions(
     paymentMode: typeof marketplaceJobs.paymentMode | typeof marketplaceGigs.paymentMode;
     amount: typeof marketplaceJobs.budgetAmount | typeof marketplaceGigs.priceAmount;
     skills: typeof marketplaceGigs.skills | typeof marketplaceJobs.skills | null;
-    /** Jobs: explicit category column, keyword derivation when NULL. */
-    category?: typeof marketplaceJobs.category;
+    /** Explicit category column, keyword derivation when NULL. */
+    category?: typeof marketplaceJobs.category | typeof marketplaceGigs.category;
     /** Jobs: rows with no skills (pre-0010) match skills by keyword. */
     skillFallback?: boolean;
   }
@@ -262,6 +273,8 @@ export function createDrizzleMarketplaceStore(db: MessagingDatabase): Marketplac
               paymentMode: marketplaceGigs.paymentMode,
               amount: marketplaceGigs.priceAmount,
               skills: marketplaceGigs.skills,
+              category: marketplaceGigs.category,
+              skillFallback: true,
             })
           )
         )
@@ -286,6 +299,56 @@ export function createDrizzleMarketplaceStore(db: MessagingDatabase): Marketplac
         )
         .limit(filter.limit);
       return rows.map(asProfile);
+    },
+    async addFavorite(row) {
+      const inserted = await db
+        .insert(marketplaceFavorites)
+        .values(row)
+        .onConflictDoNothing({
+          target: [marketplaceFavorites.wallet, marketplaceFavorites.targetType, marketplaceFavorites.targetId],
+        })
+        .returning();
+      if (inserted.length > 0) return { record: asFavorite(inserted[0]), created: true };
+      const [existing] = await db
+        .select()
+        .from(marketplaceFavorites)
+        .where(
+          and(
+            eq(marketplaceFavorites.wallet, row.wallet),
+            eq(marketplaceFavorites.targetType, row.targetType),
+            eq(marketplaceFavorites.targetId, row.targetId)
+          )
+        );
+      return { record: existing ? asFavorite(existing) : row, created: false };
+    },
+    async removeFavorite(wallet, targetType, targetId) {
+      const rows = await db
+        .delete(marketplaceFavorites)
+        .where(
+          and(
+            eq(marketplaceFavorites.wallet, wallet),
+            eq(marketplaceFavorites.targetType, targetType),
+            eq(marketplaceFavorites.targetId, targetId)
+          )
+        )
+        .returning({ id: marketplaceFavorites.targetId });
+      return rows.length > 0;
+    },
+    async listFavorites(wallet, limit) {
+      const rows = await db
+        .select()
+        .from(marketplaceFavorites)
+        .where(eq(marketplaceFavorites.wallet, wallet))
+        .orderBy(desc(marketplaceFavorites.createdAt))
+        .limit(limit);
+      return rows.map(asFavorite);
+    },
+    async countFavorites(wallet) {
+      const [row] = await db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(marketplaceFavorites)
+        .where(eq(marketplaceFavorites.wallet, wallet));
+      return Number(row?.n ?? 0);
     },
     async getProfilesByWallets(wallets) {
       const unique = [...new Set(wallets)].slice(0, 50);

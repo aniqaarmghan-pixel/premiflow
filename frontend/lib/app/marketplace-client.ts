@@ -1,3 +1,5 @@
+import type { SavedItem } from "@/lib/server/marketplace/favorites-service";
+import type { FavoriteTarget, GigPackage } from "@/lib/server/marketplace/store";
 import type {
   FreelancerCard,
   GigCard,
@@ -126,7 +128,14 @@ export type GigInput = {
   description: string;
   skills: string[];
   paymentMode: PublicGig["paymentMode"];
+  /** Legacy single price (base units); ignored server-side when packages are given. */
   priceAmount: string;
+  category?: PublicGig["category"];
+  coverUrl?: string;
+  media?: string[];
+  videoUrl?: string;
+  deliveryDays?: number | null;
+  packages?: PublicGig["packages"];
 };
 
 export function createGig(input: GigInput) {
@@ -164,9 +173,28 @@ export function fetchGigDetail(gigId: string) {
   return request<GigDetail>(`/api/marketplace/gigs/${encodeURIComponent(gigId)}`);
 }
 
-export function fetchGigHandoff(gigId: string) {
+export function fetchGigHandoff(gigId: string, tier?: GigPackage["tier"]) {
+  const qs = tier ? `?tier=${encodeURIComponent(tier)}` : "";
   return request<{ handoff: CreateHandoff }>(
-    `/api/marketplace/gigs/${encodeURIComponent(gigId)}/handoff`
+    `/api/marketplace/gigs/${encodeURIComponent(gigId)}/handoff${qs}`
+  );
+}
+
+export function fetchSaved() {
+  return request<{ items: SavedItem[] }>("/api/marketplace/saved");
+}
+
+export function saveListing(type: FavoriteTarget, id: string) {
+  return request<{ saved: true; created: boolean }>("/api/marketplace/saved", {
+    method: "POST",
+    body: JSON.stringify({ type, id }),
+  });
+}
+
+export function unsaveListing(type: FavoriteTarget, id: string) {
+  return request<{ saved: false; removed: boolean }>(
+    `/api/marketplace/saved?type=${encodeURIComponent(type)}&id=${encodeURIComponent(id)}`,
+    { method: "DELETE" }
   );
 }
 

@@ -14,6 +14,8 @@ import { HttpError } from "../http";
 import {
   JOB_PAYMENT_MODES,
   MARKETPLACE_SORTS,
+  PACKAGE_TIERS,
+  type GigPackage,
   type MarketplaceProfileRecord,
   type MarketplaceSort,
   PROFILE_AVAILABILITY,
@@ -39,6 +41,86 @@ export const GIG_LIMITS = { title: 120, description: 4_000, skills: 10, perFreel
 export const SEARCH_LIMITS = { text: 80, skills: 5, maxLimit: 50 } as const;
 
 export const JOB_SKILLS_MAX = 10;
+
+export const GIG_MEDIA_LIMITS = {
+  images: 6,
+  deliveryDaysMax: 365,
+  revisionsMax: 20,
+  packages: 3,
+  packageTitle: 60,
+  packageScope: 300,
+} as const;
+
+const VIDEO_EXT = /\.(mp4|webm|ogg|ogv|mov|m4v)$/i;
+
+function boundedInt(value: unknown, field: string, min: number, max: number): number {
+  const n = typeof value === "number" ? value : typeof value === "string" && /^\d{1,4}$/.test(value.trim()) ? Number(value.trim()) : NaN;
+  if (!Number.isInteger(n) || n < min || n > max) {
+    throw invalid(`${field} must be a whole number from ${min} to ${max}.`);
+  }
+  return n;
+}
+
+export function parseDeliveryDays(value: unknown, field = "Delivery days"): number | null {
+  if (value === undefined || value === null || value === "") return null;
+  return boundedInt(value, field, 1, GIG_MEDIA_LIMITS.deliveryDaysMax);
+}
+
+/** Gallery images: https URLs only (validated, never fetched or proxied), deduped, bounded. */
+export function parseGigMedia(value: unknown): string[] {
+  if (value === undefined || value === null || value === "") return [];
+  if (!Array.isArray(value)) throw invalid("Gallery must be a list of image URLs.");
+  const out: string[] = [];
+  for (const entry of value) {
+    if (typeof entry === "string" && entry.trim() === "") continue;
+    const url = validateHttpsUrl(entry, "Gallery image", { required: true }) as string;
+    if (!out.includes(url)) out.push(url);
+  }
+  if (out.length > GIG_MEDIA_LIMITS.images) throw invalid(`Add at most ${GIG_MEDIA_LIMITS.images} gallery images.`);
+  return out;
+}
+
+/** Direct https video file you host (mp4/webm/ogg/mov); page links are rejected. */
+export function parseVideoUrl(value: unknown): string | null {
+  const url = validateHttpsUrl(value, "Video URL");
+  if (url === null) return null;
+  if (!VIDEO_EXT.test(new URL(url).pathname)) {
+    throw invalid("Video URL must link directly to an .mp4, .webm, .ogg or .mov file.");
+  }
+  return url;
+}
+
+/** 0-3 packages, one per tier, returned in Basic, Standard, Premium order. */
+export function parsePackages(value: unknown): GigPackage[] {
+  if (value === undefined || value === null || value === "") return [];
+  if (!Array.isArray(value)) throw invalid("Packages must be a list.");
+  if (value.length > GIG_MEDIA_LIMITS.packages) throw invalid("Add at most three packages.");
+  const out: GigPackage[] = [];
+  for (const raw of value) {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) throw invalid("Each package must be an object.");
+    const p = raw as Record<string, unknown>;
+    if (typeof p.tier !== "string" || !(PACKAGE_TIERS as readonly string[]).includes(p.tier)) {
+      throw invalid("Package tier must be basic, standard or premium.");
+    }
+    const tier = p.tier as GigPackage["tier"];
+    if (out.some((x) => x.tier === tier)) throw invalid("Each package tier can be used once.");
+    out.push({
+      tier,
+      title: cleanText(p.title, "Package title", GIG_MEDIA_LIMITS.packageTitle),
+      description: cleanText(p.description, "Package scope", GIG_MEDIA_LIMITS.packageScope, {
+        required: true,
+        multiline: true,
+      }),
+      priceAmount: requiredBaseUnits(p.priceAmount, "Package price"),
+      deliveryDays: boundedInt(p.deliveryDays, "Package delivery days", 1, GIG_MEDIA_LIMITS.deliveryDaysMax),
+      revisions:
+        p.revisions === undefined || p.revisions === null || p.revisions === ""
+          ? 0
+          : boundedInt(p.revisions, "Package revisions", 0, GIG_MEDIA_LIMITS.revisionsMax),
+    });
+  }
+  return out.sort((a, b) => PACKAGE_TIERS.indexOf(a.tier) - PACKAGE_TIERS.indexOf(b.tier));
+}
 
 /** Optional listing category: empty/null means "derive from keywords". */
 export function parseCategory(value: unknown): MarketplaceCategorySlug | null {
@@ -223,9 +305,25 @@ export type GigInput = {
   skills: string[];
   paymentMode: JobPaymentMode;
   priceAmount: string;
+  category: MarketplaceCategorySlug | null;
+  coverUrl: string | null;
+  media: string[];
+  videoUrl: string | null;
+  deliveryDays: number | null;
+  packages: GigPackage[];
 };
 
+/**
+ * Either packages (the listing price becomes the lowest package price) or the
+ * legacy single price is required.
+ */
 export function validateGigInput(body: Record<string, unknown>): GigInput {
+  const packages = parsePackages(body.packages);
+  const lowest = packages.reduce<GigPackage | null>(
+    (min, p) => (!min || BigInt(p.priceAmount) < BigInt(min.priceAmount) ? p : min),
+    null
+  );
+  const fastest = packages.reduce<number | null>((min, p) => (min === null || p.deliveryDays < min ? p.deliveryDays : min), null);
   return {
     title: cleanText(body.title, "Title", GIG_LIMITS.title, { required: true }),
     description: cleanText(body.description, "Description", GIG_LIMITS.description, {
@@ -234,7 +332,13 @@ export function validateGigInput(body: Record<string, unknown>): GigInput {
     }),
     skills: parseSkills(body.skills, GIG_LIMITS.skills),
     paymentMode: parsePaymentMode(body.paymentMode),
-    priceAmount: requiredBaseUnits(body.priceAmount, "Price"),
+    priceAmount: lowest ? lowest.priceAmount : requiredBaseUnits(body.priceAmount, "Price"),
+    category: parseCategory(body.category),
+    coverUrl: validateHttpsUrl(body.coverUrl, "Cover image"),
+    media: parseGigMedia(body.media),
+    videoUrl: parseVideoUrl(body.videoUrl),
+    deliveryDays: parseDeliveryDays(body.deliveryDays) ?? fastest,
+    packages,
   };
 }
 

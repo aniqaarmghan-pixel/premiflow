@@ -668,6 +668,13 @@ export const marketplaceGigs = pgTable(
     status: text("status").notNull().default("active"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+    // 0011: additive, nullable/defaulted; earlier gigs keep NULL / [].
+    category: text("category"),
+    coverUrl: text("cover_url"),
+    media: jsonb("media").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    videoUrl: text("video_url"),
+    deliveryDays: integer("delivery_days"),
+    packages: jsonb("packages").$type<unknown[]>().notNull().default(sql`'[]'::jsonb`),
   },
   (table) => [
     index("marketplace_gigs_status_created_idx").on(table.status, table.createdAt, table.id),
@@ -687,5 +694,45 @@ export const marketplaceGigs = pgTable(
       "marketplace_gigs_skills_array",
       sql`jsonb_typeof(${table.skills}) = 'array' AND jsonb_array_length(${table.skills}) <= 10`
     ),
+    check(
+      "marketplace_gigs_category_enum",
+      sql`${table.category} IS NULL OR ${table.category} in ('development', 'web3', 'design', 'ai', 'video', 'marketing', 'writing', 'business')`
+    ),
+    check(
+      "marketplace_gigs_cover_https",
+      sql`${table.coverUrl} IS NULL OR (${table.coverUrl} LIKE 'https://%' AND char_length(${table.coverUrl}) <= 500)`
+    ),
+    check(
+      "marketplace_gigs_video_https",
+      sql`${table.videoUrl} IS NULL OR (${table.videoUrl} LIKE 'https://%' AND char_length(${table.videoUrl}) <= 500)`
+    ),
+    check(
+      "marketplace_gigs_media_array",
+      sql`jsonb_typeof(${table.media}) = 'array' AND jsonb_array_length(${table.media}) <= 6`
+    ),
+    check(
+      "marketplace_gigs_packages_array",
+      sql`jsonb_typeof(${table.packages}) = 'array' AND jsonb_array_length(${table.packages}) <= 3`
+    ),
+    check(
+      "marketplace_gigs_delivery_days_range",
+      sql`${table.deliveryDays} IS NULL OR ${table.deliveryDays} BETWEEN 1 AND 365`
+    ),
+  ]
+);
+
+/** Saved jobs and gigs per signed-in wallet (off-chain bookmarks). */
+export const marketplaceFavorites = pgTable(
+  "marketplace_favorites",
+  {
+    wallet: text("wallet").notNull(),
+    targetType: text("target_type").notNull(),
+    targetId: uuid("target_id").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.wallet, table.targetType, table.targetId], name: "marketplace_favorites_pk" }),
+    index("marketplace_favorites_wallet_created_idx").on(table.wallet, table.createdAt),
+    check("marketplace_favorites_target_enum", sql`${table.targetType} in ('job', 'gig')`),
   ]
 );

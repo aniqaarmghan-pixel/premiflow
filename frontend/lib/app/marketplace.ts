@@ -15,7 +15,7 @@ import {
   type MarketplaceCategorySlug,
 } from "@/lib/app/marketplace-categories";
 import type { PublicGig, PublicProfile } from "@/lib/server/marketplace/catalog-service";
-import type { MarketplaceSort } from "@/lib/server/marketplace/store";
+import type { GigPackage, MarketplaceSort } from "@/lib/server/marketplace/store";
 import type { CreateHandoff, PublicJob, PublicProposal } from "@/lib/server/marketplace/service";
 
 /** Public discovery sections. */
@@ -34,6 +34,7 @@ export const MARKETPLACE_MANAGE_NAV = [
   { href: "/marketplace/my-proposals", label: "My proposals" },
   { href: "/marketplace/my-gigs", label: "My gigs" },
   { href: "/marketplace/profile", label: "My profile" },
+  { href: "/marketplace/saved", label: "Saved" },
 ] as const;
 
 export const MARKETPLACE_NAV = [...MARKETPLACE_DISCOVER_NAV, ...MARKETPLACE_MANAGE_NAV] as const;
@@ -332,4 +333,38 @@ export function jobCategory(
 
 export function categoryLabelOf(slug: MarketplaceCategorySlug): string {
   return MARKETPLACE_CATEGORIES.find((c) => c.slug === slug)?.label ?? slug;
+}
+
+export const PACKAGE_TIER_LABELS: Record<GigPackage["tier"], string> = {
+  basic: "Basic",
+  standard: "Standard",
+  premium: "Premium",
+};
+
+export function gigDeliveryLabel(days: number | null | undefined): string | null {
+  return typeof days === "number" && days > 0 ? `${days}-day delivery` : null;
+}
+
+/** Card price: "From X" when several packages exist, else the single price. */
+export function gigPriceLabel(gig: Pick<PublicGig, "paymentMode" | "priceAmount" | "packages">): string {
+  const packages = gig.packages ?? [];
+  const amount = formatMarketplaceAmount(gig.priceAmount);
+  return packages.length > 1 ? `From ${amount}` : `${amountLabel(gig.paymentMode)} ${amount}`;
+}
+
+/** Explicit gig category, else keyword derivation (legacy gigs). */
+export function gigCategory(
+  gig: Pick<PublicGig, "title" | "description" | "skills"> & { category?: MarketplaceCategorySlug | null }
+): MarketplaceCategorySlug | null {
+  if (gig.category) return gig.category;
+  const derived = categorizeText(`${gig.title} ${gig.description} ${gig.skills.join(" ")}`);
+  return derived.length > 0 ? derived[0] : null;
+}
+
+/** Gallery textarea: one https URL per line, blank lines dropped. */
+export function splitLines(text: string): string[] {
+  return text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line !== "");
 }

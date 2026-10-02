@@ -70,6 +70,8 @@ export type CreateHandoff = {
   source?: "job" | "gig";
   /** Gig handoffs only. */
   gigId?: string;
+  /** Gig handoffs with packages: the chosen tier (amount = that package price). */
+  packageTier?: "basic" | "standard" | "premium";
   /** Job handoffs: job id. Gig handoffs: empty string. */
   jobId: string;
   /** Job handoffs: selected proposal id. Gig handoffs: empty string. */

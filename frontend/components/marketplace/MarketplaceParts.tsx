@@ -22,6 +22,9 @@ import {
   amountLabel,
   formatMarketplaceAmount,
   gigHref,
+  gigCategory,
+  gigDeliveryLabel,
+  gigPriceLabel,
   profileHref,
   shortWallet,
   type SearchFormState,
@@ -30,7 +33,6 @@ import type { MarketplaceApiError } from "@/lib/app/marketplace-client";
 import { Field, Input, Select } from "@/components/ui/Field";
 import {
   MARKETPLACE_CATEGORIES,
-  categorizeText,
   type MarketplaceCategorySlug,
 } from "@/lib/app/marketplace-categories";
 import type {
@@ -276,9 +278,10 @@ export function GigSummaryCard({
   gig: PublicGig & { seller?: ProfileSummary | null };
   footer?: ReactNode;
 }) {
-  const categories = categorizeText(`${gig.title} ${gig.description} ${gig.skills.join(" ")}`);
-  const primary: MarketplaceCategorySlug | "none" = categories.length > 0 ? categories[0] : "none";
+  const primary: MarketplaceCategorySlug | "none" = gigCategory(gig) ?? "none";
   const seller = gig.seller ?? null;
+  const cover = gig.coverUrl ?? null;
+  const delivery = gigDeliveryLabel(gig.deliveryDays);
   return (
     <article className="pf-lift flex min-w-0 flex-col overflow-hidden rounded-[var(--radius)] border border-line bg-card shadow-[var(--shadow)]">
       <Link
@@ -286,7 +289,17 @@ export function GigSummaryCard({
         aria-label={gig.title}
         className={`relative flex aspect-[16/9] items-center justify-center ${COVER_GRADIENTS[primary]}`}
       >
-        {seller?.avatarUrl ? (
+        {cover ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={cover}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            referrerPolicy="no-referrer"
+            className="absolute inset-0 h-full w-full object-cover"
+          />
+        ) : seller?.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
             src={seller.avatarUrl}
@@ -323,11 +336,15 @@ export function GigSummaryCard({
           {gig.title}
         </Link>
         <SkillList skills={gig.skills.slice(0, 4)} />
-        <p className="text-xs text-ink-faint">{DELIVERY_TERMS[gig.paymentMode]}</p>
+        <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-faint">
+          <span>{DELIVERY_TERMS[gig.paymentMode]}</span>
+          {delivery ? <span>{delivery}</span> : null}
+          {(gig.packages ?? []).length > 0 ? <span>{gig.packages.length} packages</span> : null}
+        </p>
         <div className="mt-auto flex min-w-0 flex-wrap items-baseline justify-between gap-2 border-t border-line pt-2">
           <span className="text-xs text-ink-faint">{gig.paymentMode}</span>
           <span className="text-sm font-semibold text-ink">
-            {amountLabel(gig.paymentMode)} {formatMarketplaceAmount(gig.priceAmount)}
+            {gigPriceLabel(gig)}
           </span>
         </div>
         {footer}

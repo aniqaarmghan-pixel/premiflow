@@ -94,8 +94,8 @@ test("migration 0010: additive job columns, journaled, not applied", () => {
   const statements = sql.replace(/^--.*$/gm, "");
   assert.doesNotMatch(statements, /\b(DROP|TRUNCATE|DELETE|UPDATE|RENAME)\b|ALTER COLUMN|ALTER TABLE "(?!marketplace_jobs")/i);
   const journal = JSON.parse(read("drizzle/meta/_journal.json")) as { entries: { idx: number; tag: string }[] };
-  assert.deepEqual(journal.entries.map((e) => e.idx).slice(-2), [9, 10]);
-  assert.equal(journal.entries.at(-1)?.tag, "0010_marketplace_job_skills_category");
+  assert.equal(journal.entries.find((e) => e.idx === 10)?.tag, "0010_marketplace_job_skills_category");
+  assert.equal(journal.entries.find((e) => e.idx === 9)?.tag, "0009_marketplace_profiles_gigs");
   const schema = read("lib/server/db/schema.ts");
   assert.match(schema, /skills: jsonb\("skills"\)\.\$type<string\[\]>\(\)\.notNull\(\)\.default\(sql`'\[\]'::jsonb`\)/);
   assert.match(schema, /category: text\("category"\),/);

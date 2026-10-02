@@ -121,6 +121,19 @@ export type MarketplaceProfileRecord = {
   updatedAt: Date;
 };
 
+export const PACKAGE_TIERS = ["basic", "standard", "premium"] as const;
+export type PackageTier = (typeof PACKAGE_TIERS)[number];
+
+export type GigPackage = {
+  tier: PackageTier;
+  title: string;
+  /** Scope of the package. */
+  description: string;
+  priceAmount: string;
+  deliveryDays: number;
+  revisions: number;
+};
+
 export type MarketplaceGigRecord = {
   id: string;
   freelancerWallet: string;
@@ -128,19 +141,49 @@ export type MarketplaceGigRecord = {
   description: string;
   skills: string[];
   paymentMode: JobPaymentMode;
+  /** Listing price; the lowest package price when packages exist. */
   priceAmount: string;
   tokenMint: string;
   status: GigStatus;
   createdAt: Date;
   updatedAt: Date;
+  /** 0011 columns: nullable/defaulted so gigs created earlier stay valid. */
+  category: MarketplaceCategorySlug | null;
+  coverUrl: string | null;
+  media: string[];
+  videoUrl: string | null;
+  deliveryDays: number | null;
+  packages: GigPackage[];
 };
 
 export type MarketplaceGigPatch = Partial<
   Pick<
     MarketplaceGigRecord,
-    "title" | "description" | "skills" | "paymentMode" | "priceAmount" | "status" | "updatedAt"
+    | "title"
+    | "description"
+    | "skills"
+    | "paymentMode"
+    | "priceAmount"
+    | "status"
+    | "updatedAt"
+    | "category"
+    | "coverUrl"
+    | "media"
+    | "videoUrl"
+    | "deliveryDays"
+    | "packages"
   >
 >;
+
+export const FAVORITE_TARGETS = ["job", "gig"] as const;
+export type FavoriteTarget = (typeof FAVORITE_TARGETS)[number];
+
+export type MarketplaceFavoriteRecord = {
+  wallet: string;
+  targetType: FavoriteTarget;
+  targetId: string;
+  createdAt: Date;
+};
 
 /** Already validated and bounded by parseSearchParams. */
 export const MARKETPLACE_SORTS = ["newest", "amount_asc", "amount_desc"] as const;
@@ -186,4 +229,10 @@ export interface MarketplaceCatalogStore {
   ): Promise<MarketplaceProfileRecord[]>;
   /** Bounded batch lookup (callers pass at most SEARCH_LIMITS.maxLimit wallets). */
   getProfilesByWallets(wallets: string[]): Promise<MarketplaceProfileRecord[]>;
+  /** Idempotent: unique (wallet, targetType, targetId); created=false when already saved. */
+  addFavorite(row: MarketplaceFavoriteRecord): Promise<{ record: MarketplaceFavoriteRecord; created: boolean }>;
+  removeFavorite(wallet: string, targetType: FavoriteTarget, targetId: string): Promise<boolean>;
+  /** Newest first, bounded. */
+  listFavorites(wallet: string, limit: number): Promise<MarketplaceFavoriteRecord[]>;
+  countFavorites(wallet: string): Promise<number>;
 }

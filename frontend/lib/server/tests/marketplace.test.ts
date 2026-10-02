@@ -311,7 +311,7 @@ function walk(dir: string): string[] {
 
 test("marketplace routes: wallet only from the signed session, origin-checked writes", () => {
   const routes = walk("app/api/marketplace").filter((f) => f.endsWith("route.ts"));
-  assert.equal(routes.length, 16);
+  assert.equal(routes.length, 17);
   for (const file of routes) {
     const source = readFileSync(file, "utf8");
     assert.doesNotMatch(source, /body\.(employerWallet|freelancerWallet|wallet|sessionWallet|tokenMint)/, file);
@@ -343,7 +343,7 @@ test("marketplace migration: additive, journaled, constrained, not applied by te
   const jobsEntry = journal.entries.find((e) => e.idx === 8);
   assert.equal(jobsEntry?.tag, "0008_marketplace_jobs");
   const last = journal.entries[journal.entries.length - 1];
-  assert.deepEqual([last.idx, last.tag], [10, "0010_marketplace_job_skills_category"]);
+  assert.deepEqual([last.idx, last.tag], [11, "0011_marketplace_rich_listings"]);
   const schema = readFileSync("lib/server/db/schema.ts", "utf8");
   assert.match(schema, /pgTable\(\s*"marketplace_jobs"/);
   assert.match(schema, /pgTable\(\s*"marketplace_proposals"/);

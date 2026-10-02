@@ -52,8 +52,11 @@ function nonEmpty(value: unknown): value is string {
 export function isCreateHandoff(value: unknown): value is CreateHandoff {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
+  const tierOk =
+    v.packageTier === undefined ||
+    (v.source === "gig" && (v.packageTier === "basic" || v.packageTier === "standard" || v.packageTier === "premium"));
   const source =
-    v.source === "gig"
+    tierOk && v.source === "gig"
       ? nonEmpty(v.gigId) && v.jobId === "" && v.proposalId === ""
       : (v.source === undefined || v.source === "job") &&
         nonEmpty(v.jobId) &&
@@ -75,6 +78,7 @@ export function isCreateHandoff(value: unknown): value is CreateHandoff {
 function pickHandoff(h: CreateHandoff): CreateHandoff {
   return {
     ...(h.source === "gig" ? { source: "gig" as const, gigId: h.gigId } : {}),
+    ...(h.source === "gig" && h.packageTier ? { packageTier: h.packageTier } : {}),
     jobId: h.jobId,
     proposalId: h.proposalId,
     title: h.title,
