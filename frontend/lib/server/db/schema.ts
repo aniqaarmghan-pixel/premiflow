@@ -517,3 +517,79 @@ export const notifications = pgTable(
     ),
   ]
 );
+
+/**
+ * Off-chain marketplace: job posts and proposals. Escrow still happens only
+ * through the existing on-chain Create flow after the employer selects a proposal.
+ */
+export const marketplaceJobs = pgTable(
+  "marketplace_jobs",
+  {
+    id: uuid("id").primaryKey(),
+    employerWallet: text("employer_wallet").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull(),
+    paymentMode: text("payment_mode").notNull(),
+    budgetAmount: text("budget_amount").notNull(),
+    tokenMint: text("token_mint").notNull(),
+    status: text("status").notNull().default("open"),
+    selectedProposalId: uuid("selected_proposal_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+    closedAt: timestamp("closed_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("marketplace_jobs_status_created_idx").on(table.status, table.createdAt, table.id),
+    index("marketplace_jobs_employer_created_idx").on(table.employerWallet, table.createdAt),
+    check(
+      "marketplace_jobs_payment_mode_enum",
+      sql`${table.paymentMode} in ('Fixed', 'Milestone', 'Streaming', 'Hourly')`
+    ),
+    check("marketplace_jobs_status_enum", sql`${table.status} in ('open', 'closed', 'filled')`),
+    check("marketplace_jobs_title_len", sql`char_length(${table.title}) between 1 and 120`),
+    check(
+      "marketplace_jobs_description_len",
+      sql`char_length(${table.description}) between 1 and 4000`
+    ),
+    check("marketplace_jobs_budget_digits", sql`${table.budgetAmount} ~ '^[0-9]{1,20}$'`),
+    check(
+      "marketplace_jobs_filled_selection",
+      sql`${table.status} <> 'filled' OR ${table.selectedProposalId} IS NOT NULL`
+    ),
+  ]
+);
+
+export const marketplaceProposals = pgTable(
+  "marketplace_proposals",
+  {
+    id: uuid("id").primaryKey(),
+    jobId: uuid("job_id")
+      .notNull()
+      .references(() => marketplaceJobs.id, { onDelete: "cascade" }),
+    freelancerWallet: text("freelancer_wallet").notNull(),
+    message: text("message").notNull(),
+    proposedAmount: text("proposed_amount").notNull(),
+    status: text("status").notNull().default("submitted"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketplace_proposals_job_freelancer_active_uidx")
+      .on(table.jobId, table.freelancerWallet)
+      .where(sql`${table.status} in ('submitted', 'selected')`),
+    index("marketplace_proposals_job_created_idx").on(table.jobId, table.createdAt),
+    index("marketplace_proposals_freelancer_created_idx").on(
+      table.freelancerWallet,
+      table.createdAt
+    ),
+    check(
+      "marketplace_proposals_status_enum",
+      sql`${table.status} in ('submitted', 'withdrawn', 'selected', 'rejected')`
+    ),
+    check(
+      "marketplace_proposals_message_len",
+      sql`char_length(${table.message}) between 1 and 2000`
+    ),
+    check("marketplace_proposals_amount_digits", sql`${table.proposedAmount} ~ '^[0-9]{1,20}$'`),
+  ]
+);

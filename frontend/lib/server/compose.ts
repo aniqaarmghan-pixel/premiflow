@@ -1,4 +1,6 @@
 import { getDb } from "./db/client";
+import { createDrizzleMarketplaceStore } from "./db/marketplace-store";
+import type { MarketplaceStore } from "./marketplace/store";
 import { createDrizzleAttachmentStore } from "./db/attachment-store";
 import {
   createDrizzleAuthStore,
@@ -41,6 +43,11 @@ export function productionStores(): MessagingStores {
     attachments: createDrizzleAttachmentStore(db),
     notifications: createDrizzleNotificationStore(db),
   };
+}
+
+/** Off-chain marketplace store (separate from MessagingStores; additive). */
+export function productionMarketplaceStore(): MarketplaceStore {
+  return createDrizzleMarketplaceStore(getDb());
 }
 
 export function productionBlobStorage(): BlobStorage {
