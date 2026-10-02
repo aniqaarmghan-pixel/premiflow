@@ -64,6 +64,13 @@
       "when": 1791057600000,
       "tag": "0008_marketplace_jobs",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1791144000000,
+      "tag": "0009_marketplace_profiles_gigs",
+      "breakpoints": true
     }
   ]
 }

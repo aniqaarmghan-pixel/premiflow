@@ -62,7 +62,13 @@ export type MyProposalItem = { proposal: PublicProposal; job: PublicJob | null }
 
 /** Everything the Create wizard may prefill; never mint, resolver or decimals. */
 export type CreateHandoff = {
+  /** Absent on job handoffs (older records); "gig" when an employer hires a gig. */
+  source?: "job" | "gig";
+  /** Gig handoffs only. */
+  gigId?: string;
+  /** Job handoffs: job id. Gig handoffs: empty string. */
   jobId: string;
+  /** Job handoffs: selected proposal id. Gig handoffs: empty string. */
   proposalId: string;
   title: string;
   description: string;
@@ -71,7 +77,7 @@ export type CreateHandoff = {
   freelancerWallet: string;
 };
 
-function toPublicJob(row: MarketplaceJobRecord): PublicJob {
+export function toPublicJob(row: MarketplaceJobRecord): PublicJob {
   return {
     ...row,
     createdAt: row.createdAt.toISOString(),

@@ -311,11 +311,11 @@ function walk(dir: string): string[] {
 
 test("marketplace routes: wallet only from the signed session, origin-checked writes", () => {
   const routes = walk("app/api/marketplace").filter((f) => f.endsWith("route.ts"));
-  assert.equal(routes.length, 8);
+  assert.equal(routes.length, 14);
   for (const file of routes) {
     const source = readFileSync(file, "utf8");
     assert.doesNotMatch(source, /body\.(employerWallet|freelancerWallet|wallet|sessionWallet|tokenMint)/, file);
-    const writeAt = source.search(/export async function (POST|PATCH)/);
+    const writeAt = source.search(/export async function (POST|PATCH|PUT|DELETE)/);
     if (writeAt >= 0) {
       const writer = source.slice(writeAt);
       assert.match(writer, /requireMutatingOrigin\(request\)/, file);
@@ -340,8 +340,10 @@ test("marketplace migration: additive, journaled, constrained, not applied by te
   const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8")) as {
     entries: { idx: number; tag: string }[];
   };
+  const jobsEntry = journal.entries.find((e) => e.idx === 8);
+  assert.equal(jobsEntry?.tag, "0008_marketplace_jobs");
   const last = journal.entries[journal.entries.length - 1];
-  assert.deepEqual([last.idx, last.tag], [8, "0008_marketplace_jobs"]);
+  assert.deepEqual([last.idx, last.tag], [9, "0009_marketplace_profiles_gigs"]);
   const schema = readFileSync("lib/server/db/schema.ts", "utf8");
   assert.match(schema, /pgTable\(\s*"marketplace_jobs"/);
   assert.match(schema, /pgTable\(\s*"marketplace_proposals"/);

@@ -593,3 +593,88 @@ export const marketplaceProposals = pgTable(
     check("marketplace_proposals_amount_digits", sql`${table.proposedAmount} ~ '^[0-9]{1,20}$'`),
   ]
 );
+
+/**
+ * Marketplace Phase 2 (off-chain): one public profile per wallet and
+ * freelancer gigs. No ratings or reputation columns by design.
+ */
+export const marketplaceProfiles = pgTable(
+  "marketplace_profiles",
+  {
+    wallet: text("wallet").primaryKey(),
+    displayName: text("display_name").notNull().default(""),
+    avatarUrl: text("avatar_url"),
+    headline: text("headline").notNull().default(""),
+    bio: text("bio").notNull().default(""),
+    skills: jsonb("skills").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    rateAmount: text("rate_amount"),
+    availability: text("availability").notNull().default("available"),
+    portfolio: jsonb("portfolio")
+      .$type<{ title: string; url: string; description: string }[]>()
+      .notNull()
+      .default(sql`'[]'::jsonb`),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    check(
+      "marketplace_profiles_availability_enum",
+      sql`${table.availability} in ('available', 'limited', 'unavailable')`
+    ),
+    check("marketplace_profiles_display_name_len", sql`char_length(${table.displayName}) <= 60`),
+    check("marketplace_profiles_headline_len", sql`char_length(${table.headline}) <= 120`),
+    check("marketplace_profiles_bio_len", sql`char_length(${table.bio}) <= 2000`),
+    check(
+      "marketplace_profiles_avatar_https",
+      sql`${table.avatarUrl} IS NULL OR (${table.avatarUrl} LIKE 'https://%' AND char_length(${table.avatarUrl}) <= 500)`
+    ),
+    check(
+      "marketplace_profiles_rate_digits",
+      sql`${table.rateAmount} IS NULL OR ${table.rateAmount} ~ '^[0-9]{1,20}$'`
+    ),
+    check(
+      "marketplace_profiles_skills_array",
+      sql`jsonb_typeof(${table.skills}) = 'array' AND jsonb_array_length(${table.skills}) <= 15`
+    ),
+    check(
+      "marketplace_profiles_portfolio_array",
+      sql`jsonb_typeof(${table.portfolio}) = 'array' AND jsonb_array_length(${table.portfolio}) <= 6`
+    ),
+  ]
+);
+
+export const marketplaceGigs = pgTable(
+  "marketplace_gigs",
+  {
+    id: uuid("id").primaryKey(),
+    freelancerWallet: text("freelancer_wallet").notNull(),
+    title: text("title").notNull(),
+    description: text("description").notNull(),
+    skills: jsonb("skills").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    paymentMode: text("payment_mode").notNull(),
+    priceAmount: text("price_amount").notNull(),
+    tokenMint: text("token_mint").notNull(),
+    status: text("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index("marketplace_gigs_status_created_idx").on(table.status, table.createdAt, table.id),
+    index("marketplace_gigs_freelancer_created_idx").on(table.freelancerWallet, table.createdAt),
+    check(
+      "marketplace_gigs_payment_mode_enum",
+      sql`${table.paymentMode} in ('Fixed', 'Milestone', 'Streaming', 'Hourly')`
+    ),
+    check("marketplace_gigs_status_enum", sql`${table.status} in ('active', 'paused')`),
+    check("marketplace_gigs_title_len", sql`char_length(${table.title}) between 1 and 120`),
+    check(
+      "marketplace_gigs_description_len",
+      sql`char_length(${table.description}) between 1 and 4000`
+    ),
+    check("marketplace_gigs_price_digits", sql`${table.priceAmount} ~ '^[0-9]{1,20}$'`),
+    check(
+      "marketplace_gigs_skills_array",
+      sql`jsonb_typeof(${table.skills}) = 'array' AND jsonb_array_length(${table.skills}) <= 10`
+    ),
+  ]
+);

@@ -61,7 +61,7 @@ export class DuplicateProposalError extends Error {
   }
 }
 
-export interface MarketplaceStore {
+export interface MarketplaceStore extends MarketplaceCatalogStore {
   insertJob(row: MarketplaceJobRecord): Promise<MarketplaceJobRecord>;
   getJob(id: string): Promise<MarketplaceJobRecord | null>;
   /** Conditional write: applies only while the job is still in `expected` status. */
@@ -85,4 +85,80 @@ export interface MarketplaceStore {
   rejectOtherSubmitted(jobId: string, keepProposalId: string, now: Date): Promise<number>;
   listProposalsForJob(jobId: string): Promise<MarketplaceProposalRecord[]>;
   listProposalsByFreelancer(wallet: string): Promise<MarketplaceProposalRecord[]>;
+}
+
+/* ---------- Phase 2: profiles + gigs (off-chain only; no ratings) ---------- */
+
+export const GIG_STATUSES = ["active", "paused"] as const;
+export type GigStatus = (typeof GIG_STATUSES)[number];
+
+export const PROFILE_AVAILABILITY = ["available", "limited", "unavailable"] as const;
+export type ProfileAvailability = (typeof PROFILE_AVAILABILITY)[number];
+
+export type PortfolioItem = { title: string; url: string; description: string };
+
+/** One public profile per wallet (employer and/or freelancer). */
+export type MarketplaceProfileRecord = {
+  wallet: string;
+  displayName: string;
+  avatarUrl: string | null;
+  headline: string;
+  bio: string;
+  skills: string[];
+  /** Hourly rate in locked-token base units, or null when not offered. */
+  rateAmount: string | null;
+  availability: ProfileAvailability;
+  portfolio: PortfolioItem[];
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type MarketplaceGigRecord = {
+  id: string;
+  freelancerWallet: string;
+  title: string;
+  description: string;
+  skills: string[];
+  paymentMode: JobPaymentMode;
+  priceAmount: string;
+  tokenMint: string;
+  status: GigStatus;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export type MarketplaceGigPatch = Partial<
+  Pick<
+    MarketplaceGigRecord,
+    "title" | "description" | "skills" | "paymentMode" | "priceAmount" | "status" | "updatedAt"
+  >
+>;
+
+/** Already validated and bounded by parseSearchParams. */
+export type MarketplaceSearchFilter = {
+  text: string | null;
+  skills: string[];
+  paymentMode: JobPaymentMode | null;
+  minAmount: string | null;
+  maxAmount: string | null;
+  limit: number;
+};
+
+export interface MarketplaceCatalogStore {
+  /** Open jobs only, newest first. Jobs have no skills column: skills match title/description. */
+  searchOpenJobs(filter: MarketplaceSearchFilter): Promise<MarketplaceJobRecord[]>;
+  getProfile(wallet: string): Promise<MarketplaceProfileRecord | null>;
+  upsertProfile(row: MarketplaceProfileRecord): Promise<MarketplaceProfileRecord>;
+  insertGig(row: MarketplaceGigRecord): Promise<MarketplaceGigRecord>;
+  getGig(id: string): Promise<MarketplaceGigRecord | null>;
+  /** Conditional write: applies only when the gig belongs to `owner`. */
+  updateGigForOwner(
+    id: string,
+    owner: string,
+    patch: MarketplaceGigPatch
+  ): Promise<MarketplaceGigRecord | null>;
+  deleteGigForOwner(id: string, owner: string): Promise<boolean>;
+  listGigsByFreelancer(wallet: string): Promise<MarketplaceGigRecord[]>;
+  /** Active gigs only, newest first. */
+  searchActiveGigs(filter: MarketplaceSearchFilter): Promise<MarketplaceGigRecord[]>;
 }

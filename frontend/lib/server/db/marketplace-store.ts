@@ -1,12 +1,23 @@
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, ne, or, sql, type SQL } from "drizzle-orm";
 
 import type { MessagingDatabase } from "./client";
-import { marketplaceJobs, marketplaceProposals } from "./schema";
+import {
+  marketplaceGigs,
+  marketplaceJobs,
+  marketplaceProfiles,
+  marketplaceProposals,
+} from "./schema";
+import { escapeLike } from "../marketplace/catalog-validation";
 import {
   ACTIVE_PROPOSAL_STATUSES,
   DuplicateProposalError,
   type JobPaymentMode,
+  type GigStatus,
   type JobStatus,
+  type MarketplaceGigRecord,
+  type MarketplaceProfileRecord,
+  type MarketplaceSearchFilter,
+  type ProfileAvailability,
   type MarketplaceJobRecord,
   type MarketplaceProposalRecord,
   type MarketplaceStore,
@@ -25,6 +36,55 @@ function asProposal(row: typeof marketplaceProposals.$inferSelect): MarketplaceP
   return { ...row, status: row.status as ProposalStatus };
 }
 
+function asProfile(row: typeof marketplaceProfiles.$inferSelect): MarketplaceProfileRecord {
+  return {
+    ...row,
+    skills: Array.isArray(row.skills) ? row.skills : [],
+    portfolio: Array.isArray(row.portfolio) ? row.portfolio : [],
+    availability: row.availability as ProfileAvailability,
+  };
+}
+
+function asGig(row: typeof marketplaceGigs.$inferSelect): MarketplaceGigRecord {
+  return {
+    ...row,
+    skills: Array.isArray(row.skills) ? row.skills : [],
+    paymentMode: row.paymentMode as JobPaymentMode,
+    status: row.status as GigStatus,
+  };
+}
+
+/**
+ * Shared search conditions. Every user value is a bound parameter; LIKE
+ * wildcards are escaped. `skillColumn` null means skills match title/description.
+ */
+function searchConditions(
+  filter: MarketplaceSearchFilter,
+  cols: {
+    title: typeof marketplaceJobs.title | typeof marketplaceGigs.title;
+    description: typeof marketplaceJobs.description | typeof marketplaceGigs.description;
+    paymentMode: typeof marketplaceJobs.paymentMode | typeof marketplaceGigs.paymentMode;
+    amount: typeof marketplaceJobs.budgetAmount | typeof marketplaceGigs.priceAmount;
+    skills: typeof marketplaceGigs.skills | null;
+  }
+): SQL[] {
+  const conditions: SQL[] = [];
+  const textMatch = (value: string) => {
+    const pattern = `%${escapeLike(value)}%`;
+    return or(ilike(cols.title, pattern), ilike(cols.description, pattern)) as SQL;
+  };
+  if (filter.text) conditions.push(textMatch(filter.text));
+  for (const skill of filter.skills) {
+    conditions.push(
+      cols.skills ? sql`${cols.skills} @> ${JSON.stringify([skill])}::jsonb` : textMatch(skill)
+    );
+  }
+  if (filter.paymentMode) conditions.push(eq(cols.paymentMode, filter.paymentMode));
+  if (filter.minAmount) conditions.push(sql`(${cols.amount})::numeric >= ${filter.minAmount}::numeric`);
+  if (filter.maxAmount) conditions.push(sql`(${cols.amount})::numeric <= ${filter.maxAmount}::numeric`);
+  return conditions;
+}
+
 function isUniqueViolation(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
   const code = (err as { code?: string }).code;
@@ -34,6 +94,95 @@ function isUniqueViolation(err: unknown): boolean {
 
 export function createDrizzleMarketplaceStore(db: MessagingDatabase): MarketplaceStore {
   return {
+    async searchOpenJobs(filter) {
+      const rows = await db
+        .select()
+        .from(marketplaceJobs)
+        .where(
+          and(
+            eq(marketplaceJobs.status, "open"),
+            ...searchConditions(filter, {
+              title: marketplaceJobs.title,
+              description: marketplaceJobs.description,
+              paymentMode: marketplaceJobs.paymentMode,
+              amount: marketplaceJobs.budgetAmount,
+              skills: null,
+            })
+          )
+        )
+        .orderBy(desc(marketplaceJobs.createdAt), desc(marketplaceJobs.id))
+        .limit(filter.limit);
+      return rows.map(asJob);
+    },
+    async getProfile(wallet) {
+      const [row] = await db
+        .select()
+        .from(marketplaceProfiles)
+        .where(eq(marketplaceProfiles.wallet, wallet));
+      return row ? asProfile(row) : null;
+    },
+    async upsertProfile(row) {
+      const { wallet, createdAt, ...rest } = row;
+      const [saved] = await db
+        .insert(marketplaceProfiles)
+        .values(row)
+        .onConflictDoUpdate({ target: marketplaceProfiles.wallet, set: rest })
+        .returning();
+      void wallet;
+      void createdAt;
+      return asProfile(saved);
+    },
+    async insertGig(row) {
+      const [saved] = await db.insert(marketplaceGigs).values(row).returning();
+      return asGig(saved);
+    },
+    async getGig(id) {
+      const [row] = await db.select().from(marketplaceGigs).where(eq(marketplaceGigs.id, id));
+      return row ? asGig(row) : null;
+    },
+    async updateGigForOwner(id, owner, patch) {
+      const [row] = await db
+        .update(marketplaceGigs)
+        .set(patch)
+        .where(and(eq(marketplaceGigs.id, id), eq(marketplaceGigs.freelancerWallet, owner)))
+        .returning();
+      return row ? asGig(row) : null;
+    },
+    async deleteGigForOwner(id, owner) {
+      const rows = await db
+        .delete(marketplaceGigs)
+        .where(and(eq(marketplaceGigs.id, id), eq(marketplaceGigs.freelancerWallet, owner)))
+        .returning({ id: marketplaceGigs.id });
+      return rows.length > 0;
+    },
+    async listGigsByFreelancer(wallet) {
+      const rows = await db
+        .select()
+        .from(marketplaceGigs)
+        .where(eq(marketplaceGigs.freelancerWallet, wallet))
+        .orderBy(desc(marketplaceGigs.createdAt));
+      return rows.map(asGig);
+    },
+    async searchActiveGigs(filter) {
+      const rows = await db
+        .select()
+        .from(marketplaceGigs)
+        .where(
+          and(
+            eq(marketplaceGigs.status, "active"),
+            ...searchConditions(filter, {
+              title: marketplaceGigs.title,
+              description: marketplaceGigs.description,
+              paymentMode: marketplaceGigs.paymentMode,
+              amount: marketplaceGigs.priceAmount,
+              skills: marketplaceGigs.skills,
+            })
+          )
+        )
+        .orderBy(desc(marketplaceGigs.createdAt), desc(marketplaceGigs.id))
+        .limit(filter.limit);
+      return rows.map(asGig);
+    },
     async insertJob(row) {
       const [saved] = await db.insert(marketplaceJobs).values(row).returning();
       return asJob(saved);

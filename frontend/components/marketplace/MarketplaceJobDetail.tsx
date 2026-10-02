@@ -15,7 +15,6 @@ import {
   amountLabel,
   formatMarketplaceAmount,
   marketplaceErrorMessage,
-  shortWallet,
 } from "@/lib/app/marketplace";
 import {
   closeJob,
@@ -33,7 +32,7 @@ import { deriveContractPda, uiAmountToBaseUnits } from "@/lib/streampay-v2";
 import { STREAMPAY_PROGRAM_ID } from "@/lib/streampay-v2/constants";
 import { PublicKey } from "@solana/web3.js";
 
-import { MarketplaceHeader, StatusPill } from "./MarketplaceParts";
+import { MarketplaceHeader, ProfileLink, StatusPill } from "./MarketplaceParts";
 
 const CREATE_SCOPE: IntentScope = {
   cluster: ACTIVE_CLUSTER_ID,
@@ -139,7 +138,7 @@ export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
           <span>
             {amountLabel(job.paymentMode)}: {formatMarketplaceAmount(job.budgetAmount)}
           </span>
-          <span>Employer {shortWallet(job.employerWallet)}</span>
+          <ProfileLink wallet={job.employerWallet} prefix="Employer" />
           <span>Posted {new Date(job.createdAt).toLocaleDateString()}</span>
         </div>
         <p className="whitespace-pre-wrap break-words text-sm leading-6 text-ink [overflow-wrap:anywhere]">
@@ -198,7 +197,7 @@ export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
               {proposals.map((p) => (
                 <li key={p.id} className="flex min-w-0 flex-col gap-2 py-3">
                   <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-xs text-ink-faint">
-                    <span className="min-w-0 break-all">Freelancer {p.freelancerWallet}</span>
+                    <ProfileLink wallet={p.freelancerWallet} prefix="Freelancer" label={p.freelancerWallet} />
                     <StatusPill>{PROPOSAL_STATUS_LABELS[p.status]}</StatusPill>
                   </div>
                   <p className="text-xs text-ink-soft">

@@ -3,18 +3,24 @@
  * on-chain Create flow, signed by the employer; nothing here sends a transaction.
  */
 import { lockedCreatePayment } from "@/lib/app/premiflow";
+import { uiAmountToBaseUnits } from "@/lib/streampay-v2";
 import {
   applyCreateDraftPatch,
   defaultCreateDraft,
   type CreateWizardDraft,
 } from "@/lib/app/validation";
+import type { PublicGig, PublicProfile } from "@/lib/server/marketplace/catalog-service";
 import type { CreateHandoff, PublicJob, PublicProposal } from "@/lib/server/marketplace/service";
 
 export const MARKETPLACE_NAV = [
   { href: "/marketplace", label: "Browse jobs" },
+  { href: "/marketplace/gigs", label: "Browse gigs" },
   { href: "/marketplace/post", label: "Post a job" },
+  { href: "/marketplace/gigs/new", label: "Offer a gig" },
   { href: "/marketplace/my-jobs", label: "My jobs" },
   { href: "/marketplace/my-proposals", label: "My proposals" },
+  { href: "/marketplace/my-gigs", label: "My gigs" },
+  { href: "/marketplace/profile", label: "My profile" },
 ] as const;
 
 export const MARKETPLACE_COPY = {
@@ -105,4 +111,92 @@ export function marketplaceHandoffPatch(
 export function marketplaceHandoffDraft(handoff: CreateHandoff): CreateWizardDraft {
   const base = defaultCreateDraft();
   return applyCreateDraftPatch(base, marketplaceHandoffPatch(handoff, base.decimals));
+}
+
+/* ---------- Phase 2: profiles, gigs, search ---------- */
+
+export const GIG_COPY = {
+  browseTitle: "Gigs",
+  browseSubtitle:
+    "Services offered by freelancers. Hiring a gig opens Create contract with the terms prefilled; escrow starts only when you create and fund it on-chain.",
+  empty: "No active gigs match yet.",
+  emptyMine: "You have not created any gigs yet.",
+  pausedNote: "This gig is paused and hidden from the public until you resume it.",
+  hireNote:
+    "Opens Create contract with this gig's terms prefilled and the gig owner as freelancer. You review every step and approve the on-chain create in your wallet.",
+  ownGig: "This is your gig. Employers can hire it from this page.",
+  deleteConfirm: "Delete this gig permanently?",
+} as const;
+
+export const PROFILE_COPY = {
+  emptyProfile: "This wallet has not set up a marketplace profile yet.",
+  editTitle: "My profile",
+  editSubtitle:
+    "Your public marketplace profile, tied to your verified wallet. Avatars and portfolio links must be https URLs; nothing is uploaded.",
+  saved: "Profile saved.",
+} as const;
+
+export const AVAILABILITY_LABELS: Record<PublicProfile["availability"], string> = {
+  available: "Available",
+  limited: "Limited availability",
+  unavailable: "Not available",
+};
+
+export const GIG_STATUS_LABELS: Record<PublicGig["status"], string> = {
+  active: "Active",
+  paused: "Paused",
+};
+
+export function profileHref(wallet: string): string {
+  return `/marketplace/profiles/${encodeURIComponent(wallet)}`;
+}
+
+export function gigHref(gigId: string): string {
+  return `/marketplace/gigs/${encodeURIComponent(gigId)}`;
+}
+
+export type SearchFormState = {
+  q: string;
+  skills: string;
+  mode: "" | PublicJob["paymentMode"];
+  minUi: string;
+  maxUi: string;
+};
+
+export const EMPTY_SEARCH: SearchFormState = { q: "", skills: "", mode: "", minUi: "", maxUi: "" };
+
+/**
+ * Builds the query string for the server-side search. Amounts are converted to
+ * base units here; the server re-validates and bounds everything.
+ */
+export function buildSearchQuery(
+  form: SearchFormState,
+  decimals: number
+): { ok: true; qs: string } | { ok: false; message: string } {
+  const params = new URLSearchParams();
+  const q = form.q.trim();
+  if (q) params.set("q", q.slice(0, 80));
+  const skills = form.skills
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 5);
+  if (skills.length) params.set("skill", skills.join(","));
+  if (form.mode) params.set("mode", form.mode);
+  try {
+    if (form.minUi.trim()) params.set("min", uiAmountToBaseUnits(form.minUi.trim(), decimals).toString());
+    if (form.maxUi.trim()) params.set("max", uiAmountToBaseUnits(form.maxUi.trim(), decimals).toString());
+  } catch {
+    return { ok: false, message: "Enter amounts as plain numbers." };
+  }
+  const qs = params.toString();
+  return { ok: true, qs: qs ? `?${qs}` : "" };
+}
+
+/** Comma list from a text input; the server normalizes and validates. */
+export function splitSkills(text: string): string[] {
+  return text
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
 }

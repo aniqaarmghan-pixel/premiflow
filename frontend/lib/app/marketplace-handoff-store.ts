@@ -17,7 +17,7 @@ export const MARKETPLACE_HANDOFF_VERSION = 1 as const;
 export const MARKETPLACE_HANDOFF_PREFIX = "premiflow:marketplace-handoff:v1:";
 
 export const HANDOFF_COPY = {
-  title: "Selected marketplace proposal",
+  title: "Selected marketplace terms",
   note: "Nothing was sent on-chain; using it only refills the form for your review.",
   replaceWarning: "Using it replaces your unfinished draft. Keep current draft discards these proposal terms instead.",
   blockedByIntent:
@@ -47,9 +47,14 @@ function nonEmpty(value: unknown): value is string {
 export function isCreateHandoff(value: unknown): value is CreateHandoff {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
+  const source =
+    v.source === "gig"
+      ? nonEmpty(v.gigId) && v.jobId === "" && v.proposalId === ""
+      : (v.source === undefined || v.source === "job") &&
+        nonEmpty(v.jobId) &&
+        nonEmpty(v.proposalId);
   return (
-    nonEmpty(v.jobId) &&
-    nonEmpty(v.proposalId) &&
+    source &&
     nonEmpty(v.title) &&
     nonEmpty(v.description) &&
     typeof v.paymentMode === "string" &&
@@ -64,6 +69,7 @@ export function isCreateHandoff(value: unknown): value is CreateHandoff {
 /** Only the known fields; anything else (e.g. mint/resolver) is dropped. */
 function pickHandoff(h: CreateHandoff): CreateHandoff {
   return {
+    ...(h.source === "gig" ? { source: "gig" as const, gigId: h.gigId } : {}),
     jobId: h.jobId,
     proposalId: h.proposalId,
     title: h.title,

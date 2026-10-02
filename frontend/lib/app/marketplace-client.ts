@@ -1,4 +1,10 @@
 import type {
+  GigDetail,
+  ProfilePage,
+  PublicGig,
+  PublicProfile,
+} from "@/lib/server/marketplace/catalog-service";
+import type {
   CreateHandoff,
   JobDetail,
   MyProposalItem,
@@ -96,4 +102,90 @@ export function fetchCreateHandoff(jobId: string) {
   return request<{ handoff: CreateHandoff }>(
     `/api/marketplace/jobs/${encodeURIComponent(jobId)}/handoff`
   );
+}
+
+/* ---------- Phase 2: search, gigs, profiles ---------- */
+
+/** `qs` comes from buildSearchQuery (empty string or "?..."). */
+export function searchJobs(qs: string) {
+  return request<{ jobs: PublicJob[] }>(`/api/marketplace/jobs${qs}`);
+}
+
+export function searchGigs(qs: string) {
+  return request<{ gigs: PublicGig[] }>(`/api/marketplace/gigs${qs}`);
+}
+
+export type GigInput = {
+  title: string;
+  description: string;
+  skills: string[];
+  paymentMode: PublicGig["paymentMode"];
+  priceAmount: string;
+};
+
+export function createGig(input: GigInput) {
+  return request<{ gig: PublicGig }>("/api/marketplace/gigs", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function editGig(gigId: string, input: GigInput) {
+  return request<{ gig: PublicGig }>(`/api/marketplace/gigs/${encodeURIComponent(gigId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(input),
+  });
+}
+
+export function setGigStatus(gigId: string, action: "pause" | "resume") {
+  return request<{ gig: PublicGig }>(`/api/marketplace/gigs/${encodeURIComponent(gigId)}`, {
+    method: "PATCH",
+    body: JSON.stringify({ action }),
+  });
+}
+
+export function deleteGig(gigId: string) {
+  return request<{ deleted: true }>(`/api/marketplace/gigs/${encodeURIComponent(gigId)}`, {
+    method: "DELETE",
+  });
+}
+
+export function fetchMyGigs() {
+  return request<{ gigs: PublicGig[] }>("/api/marketplace/gigs/mine");
+}
+
+export function fetchGigDetail(gigId: string) {
+  return request<GigDetail>(`/api/marketplace/gigs/${encodeURIComponent(gigId)}`);
+}
+
+export function fetchGigHandoff(gigId: string) {
+  return request<{ handoff: CreateHandoff }>(
+    `/api/marketplace/gigs/${encodeURIComponent(gigId)}/handoff`
+  );
+}
+
+export type ProfileInput = {
+  displayName: string;
+  avatarUrl: string;
+  headline: string;
+  bio: string;
+  skills: string[];
+  rateAmount: string;
+  availability: PublicProfile["availability"];
+  portfolio: PublicProfile["portfolio"];
+};
+
+export function fetchMyProfile() {
+  return request<{ wallet: string; profile: PublicProfile | null }>("/api/marketplace/profiles/me");
+}
+
+export function saveMyProfile(input: ProfileInput) {
+  return request<{ profile: PublicProfile }>("/api/marketplace/profiles/me", {
+    method: "PUT",
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchProfilePage(wallet: string) {
+  return request<ProfilePage>(`/api/marketplace/profiles/${encodeURIComponent(wallet)}`);
 }

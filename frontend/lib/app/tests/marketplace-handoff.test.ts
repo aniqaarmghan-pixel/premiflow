@@ -73,6 +73,15 @@ test("marketplace UI: no auto-send, no on-chain client, real data only, nav entr
   assert.match(shell, /\{ href: "\/marketplace", label: "Marketplace", icon: Store \}/);
   assert.deepEqual(
     MARKETPLACE_NAV.map((n) => n.href),
-    ["/marketplace", "/marketplace/post", "/marketplace/my-jobs", "/marketplace/my-proposals"]
+    [
+      "/marketplace",
+      "/marketplace/gigs",
+      "/marketplace/post",
+      "/marketplace/gigs/new",
+      "/marketplace/my-jobs",
+      "/marketplace/my-proposals",
+      "/marketplace/my-gigs",
+      "/marketplace/profile",
+    ]
   );
 });

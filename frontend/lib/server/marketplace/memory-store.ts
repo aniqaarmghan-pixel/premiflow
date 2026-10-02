@@ -1,7 +1,10 @@
+import { matchesSearch } from "./catalog-validation";
 import {
   ACTIVE_PROPOSAL_STATUSES,
   DuplicateProposalError,
+  type MarketplaceGigRecord,
   type MarketplaceJobRecord,
+  type MarketplaceProfileRecord,
   type MarketplaceProposalRecord,
   type MarketplaceStore,
 } from "./store";
@@ -12,7 +15,73 @@ const newestFirst = (a: { createdAt: Date; id: string }, b: { createdAt: Date; i
 export function createMemoryMarketplaceStore(): MarketplaceStore {
   const jobs: MarketplaceJobRecord[] = [];
   const proposals: MarketplaceProposalRecord[] = [];
+  const profiles = new Map<string, MarketplaceProfileRecord>();
+  const gigs: MarketplaceGigRecord[] = [];
+  const cloneProfile = (row: MarketplaceProfileRecord): MarketplaceProfileRecord => ({
+    ...row,
+    skills: [...row.skills],
+    portfolio: row.portfolio.map((item) => ({ ...item })),
+  });
+  const cloneGig = (row: MarketplaceGigRecord): MarketplaceGigRecord => ({
+    ...row,
+    skills: [...row.skills],
+  });
   return {
+    async searchOpenJobs(filter) {
+      return jobs
+        .filter(
+          (row) =>
+            row.status === "open" &&
+            matchesSearch({ ...row, amount: row.budgetAmount, skills: null }, filter)
+        )
+        .sort(newestFirst)
+        .slice(0, filter.limit)
+        .map((row) => ({ ...row }));
+    },
+    async getProfile(wallet) {
+      const row = profiles.get(wallet);
+      return row ? cloneProfile(row) : null;
+    },
+    async upsertProfile(row) {
+      profiles.set(row.wallet, cloneProfile(row));
+      return cloneProfile(row);
+    },
+    async insertGig(row) {
+      gigs.push(cloneGig(row));
+      return cloneGig(row);
+    },
+    async getGig(id) {
+      const row = gigs.find((item) => item.id === id);
+      return row ? cloneGig(row) : null;
+    },
+    async updateGigForOwner(id, owner, patch) {
+      const row = gigs.find((item) => item.id === id);
+      if (!row || row.freelancerWallet !== owner) return null;
+      Object.assign(row, patch, patch.skills ? { skills: [...patch.skills] } : {});
+      return cloneGig(row);
+    },
+    async deleteGigForOwner(id, owner) {
+      const index = gigs.findIndex((item) => item.id === id && item.freelancerWallet === owner);
+      if (index < 0) return false;
+      gigs.splice(index, 1);
+      return true;
+    },
+    async listGigsByFreelancer(wallet) {
+      return gigs
+        .filter((row) => row.freelancerWallet === wallet)
+        .sort(newestFirst)
+        .map(cloneGig);
+    },
+    async searchActiveGigs(filter) {
+      return gigs
+        .filter(
+          (row) =>
+            row.status === "active" && matchesSearch({ ...row, amount: row.priceAmount }, filter)
+        )
+        .sort(newestFirst)
+        .slice(0, filter.limit)
+        .map(cloneGig);
+    },
     async insertJob(row) {
       jobs.push({ ...row });
       return { ...row };
