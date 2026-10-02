@@ -503,7 +503,7 @@ export function ContractMessages({
     <>
       <section
         aria-labelledby="contract-messages-heading"
-        className="rounded-[24px] border border-line bg-card p-4 sm:p-5"
+        className="rounded-[24px] border border-line bg-card p-4 sm:p-5 lg:p-4"
       >
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">

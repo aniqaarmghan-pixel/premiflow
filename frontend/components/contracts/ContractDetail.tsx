@@ -1,5 +1,8 @@
 "use client";
 
+import { browserSignatureStorage, recordResolveSignature } from "@/lib/app/resolve-signature-store";
+import { ACTIVE_CLUSTER_ID } from "@/lib/cluster";
+
 import {
   lifecycleNotificationForAction,
   requestOfferLifecycleNotification,
@@ -824,10 +827,18 @@ export function ContractDetail({ address }: { address: string }) {
             throw new Error(allocation.error ?? "Invalid allocation");
           }
           const parsed = { amount: allocation.award };
-          return client.resolveDispute({
+          const sent = await client.resolveDispute({
             contract: contract.address,
             freelancerContestedAward: parsed.amount,
           });
+          // Confirmed: keep the real signature so "View transaction" can link to it.
+          recordResolveSignature(
+            browserSignatureStorage(),
+            ACTIVE_CLUSTER_ID,
+            contract.address.toBase58(),
+            sent.signature
+          );
+          return sent;
         }
         case "completeContract":
           return client.completeContract(contract.address);
@@ -1014,7 +1025,7 @@ export function ContractDetail({ address }: { address: string }) {
             <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan">
               {presentType(contract.paymentMode)} · {roleLabel(role)}
             </p>
-            <h1 className="mt-1 break-words font-display text-[1.75rem] tracking-tight sm:text-3xl">
+            <h1 className="mt-1 break-words font-display text-[1.75rem] tracking-tight sm:text-3xl lg:text-[1.75rem]">
               {metadata?.title || "Protected contract"}
             </h1>
             <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-ink-soft">
@@ -1069,7 +1080,7 @@ export function ContractDetail({ address }: { address: string }) {
           </div>
         ) : null}
 
-        <Card id="actions" className="scroll-mt-20 p-4 sm:p-5">
+        <Card id="actions" className="scroll-mt-20 p-4 sm:p-5 lg:p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan">
             Next step
           </p>
@@ -1159,7 +1170,7 @@ export function ContractDetail({ address }: { address: string }) {
         {["Cancelled", "Completed", "Resolved", "ActivationRejected", "Declined", "Expired"].includes(
           contract.status
         ) ? (
-          <Card className="p-4 sm:p-5">
+          <Card className="p-4 sm:p-5 lg:p-4">
             <h2 className="font-display text-xl">Settlement</h2>
             <p className="mt-1 text-sm text-ink-soft">
               {contract.status === "Resolved"
@@ -1262,7 +1273,7 @@ export function ContractDetail({ address }: { address: string }) {
 
         <div id="work" className="scroll-mt-20 space-y-4">
         {contract.trialAmount > 0n ? (
-          <Card className="p-4 sm:p-5">
+          <Card className="p-4 sm:p-5 lg:p-4">
             <h2 className="font-display text-xl">Paid trial</h2>
             <p className="mt-1 text-sm text-ink-soft">
               The trial is funded and reviewed before the main contract activates. Approving it
@@ -1318,7 +1329,7 @@ export function ContractDetail({ address }: { address: string }) {
         ) : null}
 
         {workUnitsHaveOwnCards(contract.paymentMode) ? (
-          <Card className="p-4 sm:p-5">
+          <Card className="p-4 sm:p-5 lg:p-4">
             <h2 className="font-display text-xl">
               {contract.paymentMode === "Milestone" ? "Milestones" : "Deliverable"}
             </h2>
@@ -1384,7 +1395,7 @@ export function ContractDetail({ address }: { address: string }) {
         {actions.includes("acceptContract") ? (
           <section
             data-testid="offer-request-changes"
-            className="rounded-2xl border border-line bg-surface p-4 sm:p-5"
+            className="rounded-2xl border border-line bg-surface p-4 sm:p-5 lg:p-4"
           >
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="max-w-2xl">
@@ -1430,7 +1441,7 @@ export function ContractDetail({ address }: { address: string }) {
         </div>
 
         <div className="min-w-0 space-y-4 sm:space-y-5">
-        <Card id="overview" className="scroll-mt-20 p-4 sm:p-5">
+        <Card id="overview" className="scroll-mt-20 p-4 sm:p-5 lg:p-4">
           <p className="text-xs uppercase tracking-[0.16em] text-ink-faint">Overview</p>
           <h2 className="mt-1 font-display text-xl">Contract details</h2>
           {metadata?.description ? (
@@ -1467,7 +1478,7 @@ export function ContractDetail({ address }: { address: string }) {
         </Card>
 
         {!disputeActive ? (
-          <Card id="support" className="scroll-mt-20 border-dashed p-4 sm:p-5">
+          <Card id="support" className="scroll-mt-20 border-dashed p-4 sm:p-5 lg:p-4">
             <h2 className="font-display text-xl">Need help with this contract?</h2>
             <p className="mt-1 text-sm leading-6 text-ink-soft">
               Get support, learn about disputes, or open the Resolution Center.
@@ -1499,7 +1510,7 @@ export function ContractDetail({ address }: { address: string }) {
         {!disputeActive && openDisputeShown ? (
           <details
             id="resolution"
-            className="scroll-mt-20 rounded-[24px] border border-line bg-card p-4 sm:p-5"
+            className="scroll-mt-20 rounded-[24px] border border-line bg-card p-4 sm:p-5 lg:p-4"
           >
             <summary className="cursor-pointer list-none font-display text-xl marker:content-none [&::-webkit-details-marker]:hidden">
               <span className="flex flex-wrap items-center justify-between gap-2">
@@ -1536,7 +1547,7 @@ export function ContractDetail({ address }: { address: string }) {
           <div id="resolution" />
         ) : null}
 
-        <details className="rounded-[24px] border border-line bg-card p-4 sm:p-5">
+        <details className="rounded-[24px] border border-line bg-card p-4 sm:p-5 lg:p-4">
           <summary className="cursor-pointer text-sm font-medium">Advanced details</summary>
           <div className="mt-4 space-y-2">
             <Row label="Contract PDA" value={<Address value={contract.address.toBase58()} />} />
@@ -1665,7 +1676,7 @@ function WorkUnitPanel({
           </p>
           <p className="font-medium">{workUnitStatusLabel(unit.status)}</p>
         </div>
-        <p className="font-display text-2xl">{formatTokenAmount(unit.amount, decimals)}</p>
+        <p className="font-display text-2xl lg:text-xl">{formatTokenAmount(unit.amount, decimals)}</p>
       </div>
       {revision ? (
         <div

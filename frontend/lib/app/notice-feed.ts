@@ -144,3 +144,40 @@ export function noticeFromTxOutcome(
   dedupe.remember(signature);
   return notice;
 }
+
+/** Signatures whose confirmation chime already played (persists across reloads/tabs). */
+export const PLAYED_NOTICE_SOUNDS_KEY = "premiflow:notice-sounds-played:v1";
+export const MAX_PLAYED_NOTICE_SOUNDS = 200;
+export type PlayedSoundStorage = Pick<Storage, "getItem" | "setItem">;
+
+export function browserPlayedSoundStorage(): PlayedSoundStorage | null {
+  try {
+    return typeof window === "undefined" ? null : window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * True only the first time an id is claimed. Read, duplicate or replayed events
+ * (same id) never chime again. Without storage, the in-memory dedupe still applies.
+ */
+export function claimNoticeSound(storage: PlayedSoundStorage | null, id: string): boolean {
+  if (!id) return false;
+  if (!storage) return true;
+  let ids: string[] = [];
+  try {
+    const parsed: unknown = JSON.parse(storage.getItem(PLAYED_NOTICE_SOUNDS_KEY) ?? "[]");
+    if (Array.isArray(parsed)) ids = parsed.filter((v): v is string => typeof v === "string");
+  } catch {
+    ids = [];
+  }
+  if (ids.includes(id)) return false;
+  ids.push(id);
+  try {
+    storage.setItem(PLAYED_NOTICE_SOUNDS_KEY, JSON.stringify(ids.slice(-MAX_PLAYED_NOTICE_SOUNDS)));
+  } catch {
+    // Storage full or blocked: still play once in this session.
+  }
+  return true;
+}

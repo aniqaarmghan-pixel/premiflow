@@ -1,3 +1,4 @@
+import { isRealSignature } from "@/lib/app/resolve-signature-store";
 import { formatUnix } from "@/lib/app/datetime";
 import { formatTokenAmount } from "@/lib/app/money";
 import { resolverCaseCard } from "@/lib/app/resolver-cases";
@@ -38,6 +39,11 @@ export const RESOLVER_WORKSPACE_COPY = {
     "Settlement recorded on-chain. The parties collect or claim their amounts separately; recording the settlement does not move tokens.",
   activityEmpty: "No resolver activity yet.",
   activityNote: "Built from on-chain dispute timestamps of contracts assigned to this wallet.",
+  txHistoryTitle: "Recent on-chain transactions",
+  txHistoryNote: "Read from the RPC for contracts assigned to this wallet (any party or resolver). Links open the block explorer for this network.",
+  txHistoryLoading: "Loading on-chain transactions...",
+  txHistoryEmpty: "No on-chain transactions found for your assigned contracts.",
+  txHistoryError: "On-chain transaction history could not be loaded right now. Dispute timestamps below are still accurate.",
   switchToResolver: "Switch to resolver workspace",
   switchToContracts: "Switch to contracts workspace",
 } as const;
@@ -158,7 +164,11 @@ export type ResolvedCaseRow = {
   txSignature: string | null;
 };
 
-export function resolvedCaseRow(contract: ContractView, decimals: number | undefined): ResolvedCaseRow {
+export function resolvedCaseRow(
+  contract: ContractView,
+  decimals: number | undefined,
+  txSignature: string | null = null
+): ResolvedCaseRow {
   const card = resolverCaseCard(contract, decimals);
   return {
     address: contract.address.toBase58(),
@@ -167,7 +177,8 @@ export function resolvedCaseRow(contract: ContractView, decimals: number | undef
     href: card.href,
     freelancerSettlementLabel: formatTokenAmount(contract.freelancerSettlementAmount, decimals),
     employerRefundableLabel: formatTokenAmount(contract.employerRefundableAmount, decimals),
-    txSignature: null,
+    // Only a real, locally recorded resolve signature; never invented.
+    txSignature: isRealSignature(txSignature) ? txSignature : null,
   };
 }
 

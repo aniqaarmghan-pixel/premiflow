@@ -19,6 +19,8 @@ import {
   dismissNotice,
   noticeFromTxOutcome,
   prependNotice,
+  browserPlayedSoundStorage,
+  claimNoticeSound,
   requestNoticeSound,
   type ConfirmedNoticeInput,
   type InAppNotice,
@@ -58,7 +60,10 @@ export function NoticeProvider({ children }: { children: ReactNode }) {
       );
       if (!notice) return null;
       setNotices((current) => prependNotice(current, notice));
-      requestNoticeSound(isNoticeSoundEnabled(), notice, playNoticeSound);
+      // At most one chime per confirmed signature, even across reloads or tabs.
+      if (isNoticeSoundEnabled() && claimNoticeSound(browserPlayedSoundStorage(), notice.id)) {
+        requestNoticeSound(isNoticeSoundEnabled(), notice, playNoticeSound);
+      }
       return notice;
     },
     []

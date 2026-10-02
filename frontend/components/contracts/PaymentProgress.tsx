@@ -36,7 +36,7 @@ export function PaymentProgress({
   ];
 
   return (
-    <Card className="p-4 sm:p-5">
+    <Card className="p-4 sm:p-5 lg:p-4">
       <p className="text-xs uppercase tracking-[0.16em] text-ink-faint">Payment</p>
       <h3 className="mt-1 font-display text-xl">On-chain balances</h3>
       <p className="mt-1 text-xs text-ink-faint">

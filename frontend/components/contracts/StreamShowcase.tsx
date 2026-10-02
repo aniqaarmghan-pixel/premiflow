@@ -73,7 +73,7 @@ export function StreamShowcase({
 
   return (
     <div
-      className={`@container overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(160deg,#06101c,#0d2238_55%,#10263a)] p-4 text-white shadow-[var(--shadow)] sm:p-5 ${
+      className={`@container overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(160deg,#06101c,#0d2238_55%,#10263a)] p-4 text-white shadow-[var(--shadow)] sm:p-5 lg:p-4 ${
         live ? "pf-stream-live" : ""
       }`}
     >
@@ -82,7 +82,7 @@ export function StreamShowcase({
           <p className="text-xs font-semibold uppercase tracking-[0.22em] text-cyan">
             Streaming salary
           </p>
-          <h3 className="mt-1 font-display text-2xl">Ongoing pay</h3>
+          <h3 className="mt-1 font-display text-2xl lg:text-xl">Ongoing pay</h3>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-white/70">
             {STREAMING_PAY_EXPLAINER}
           </p>

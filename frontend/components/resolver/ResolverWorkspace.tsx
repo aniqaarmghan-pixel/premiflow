@@ -19,6 +19,10 @@ import {
 } from "@/lib/app/resolver-workspace";
 import { useResolverCases } from "@/lib/hooks/useResolverCases";
 import { useResolverReadiness } from "@/lib/hooks/useResolverReadiness";
+import { useResolverTxHistory } from "@/lib/hooks/useResolverTxHistory";
+import { browserSignatureStorage, readResolveSignature } from "@/lib/app/resolve-signature-store";
+import { ACTIVE_CLUSTER_ID } from "@/lib/cluster";
+import { explorerTxUrl } from "@/lib/network";
 import type { ContractView } from "@/lib/streampay-v2";
 
 const TITLES: Record<ResolverWorkspaceView, string> = {
@@ -57,7 +61,7 @@ function DisputeRow({
         <p className="truncate text-sm font-medium">
           {card.title} <span className="text-ink-faint">- {card.typeLabel}</span>
         </p>
-        <p className="text-xs text-ink-soft">
+        <p className="break-words text-xs text-ink-soft">
           Employer {short(card.employer)} - Freelancer {short(card.freelancer)}
         </p>
         <p className="text-xs text-ink-soft">
@@ -77,6 +81,9 @@ export function ResolverWorkspace({ view }: { view: ResolverWorkspaceView }) {
   const resolver = useResolverCases();
   const readiness = useResolverReadiness(resolver.cases);
   const decimalsFor = (c: ContractView) => resolver.decimalsByMint[c.tokenMint.toBase58()];
+  const txHistory = useResolverTxHistory(
+    view === "activity" ? resolver.cases.map((c) => c.address.toBase58()) : []
+  );
 
   let body: React.ReactNode;
   if (!connected) {
@@ -104,7 +111,7 @@ export function ResolverWorkspace({ view }: { view: ResolverWorkspaceView }) {
           </p>
         ) : null}
         <section>
-          <h2 className="font-display text-lg">Disputes requiring attention</h2>
+          <h2 className="font-display text-base sm:text-lg">Disputes requiring attention</h2>
           {attention.length === 0 ? (
             <p className="mt-1 text-sm text-ink-soft">{RESOLVER_WORKSPACE_COPY.noOpen}</p>
           ) : (
@@ -158,7 +165,13 @@ export function ResolverWorkspace({ view }: { view: ResolverWorkspaceView }) {
   } else if (view === "resolved") {
     const rows = resolver.cases
       .filter((c) => c.status === "Resolved")
-      .map((c) => resolvedCaseRow(c, decimalsFor(c)));
+      .map((c) =>
+        resolvedCaseRow(
+          c,
+          decimalsFor(c),
+          readResolveSignature(browserSignatureStorage(), ACTIVE_CLUSTER_ID, c.address.toBase58())
+        )
+      );
     body = (
       <div className="space-y-2">
         <p className="text-sm text-ink-soft">{RESOLVER_WORKSPACE_COPY.resolvedNote}</p>
@@ -168,21 +181,33 @@ export function ResolverWorkspace({ view }: { view: ResolverWorkspaceView }) {
           rows.map((row) => (
             <Card key={row.address} className="px-3 py-2.5">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-medium">
+                <p className="min-w-0 break-words text-sm font-medium">
                   {row.title} <span className="text-ink-faint">- {row.typeLabel}</span>
                 </p>
-                <Link href={row.href} className="text-sm font-medium underline-offset-2 hover:underline">
-                  View case
-                </Link>
+                <span className="flex shrink-0 flex-wrap gap-3">
+                  <Link href={row.href} className="text-sm font-medium underline-offset-2 hover:underline">
+                    View case
+                  </Link>
+                  {row.txSignature ? (
+                    <a
+                      href={explorerTxUrl(row.txSignature)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-sm font-medium underline-offset-2 hover:underline"
+                    >
+                      View transaction
+                    </a>
+                  ) : null}
+                </span>
               </div>
               <dl className="mt-1 grid gap-1 text-xs sm:grid-cols-2">
                 <div>
                   <dt className="text-ink-faint">Freelancer settlement</dt>
-                  <dd>{row.freelancerSettlementLabel}</dd>
+                  <dd className="break-words tabular-nums">{row.freelancerSettlementLabel}</dd>
                 </div>
                 <div>
                   <dt className="text-ink-faint">Employer refundable</dt>
-                  <dd>{row.employerRefundableLabel}</dd>
+                  <dd className="break-words tabular-nums">{row.employerRefundableLabel}</dd>
                 </div>
               </dl>
             </Card>
@@ -192,8 +217,47 @@ export function ResolverWorkspace({ view }: { view: ResolverWorkspaceView }) {
     );
   } else {
     const items = resolverActivity(resolver.cases);
-    body =
-      items.length === 0 ? (
+    const txCard = (
+      <Card className="px-3 py-2.5">
+        <h2 className="text-sm font-semibold">{RESOLVER_WORKSPACE_COPY.txHistoryTitle}</h2>
+        <p className="text-xs text-ink-faint">{RESOLVER_WORKSPACE_COPY.txHistoryNote}</p>
+        {txHistory.status === "error" ? (
+          <p className="mt-2 text-sm text-ink-soft">{RESOLVER_WORKSPACE_COPY.txHistoryError}</p>
+        ) : txHistory.status === "ready" && txHistory.items.length === 0 ? (
+          <p className="mt-2 text-sm text-ink-soft">{RESOLVER_WORKSPACE_COPY.txHistoryEmpty}</p>
+        ) : txHistory.status === "ready" ? (
+          <ul className="mt-2 divide-y divide-white/5">
+            {txHistory.items.map((tx) => (
+              <li
+                key={tx.signature}
+                className="flex min-w-0 flex-col gap-0.5 py-2 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <span className="min-w-0 break-words text-xs text-ink-soft">
+                  <Link href={tx.contractHref} className="underline-offset-2 hover:underline">
+                    Contract {short(tx.contract)}
+                  </Link>
+                  {` - ${tx.timeLabel}${tx.failed ? " - Failed" : ""}`}
+                </span>
+                <a
+                  href={tx.explorerHref}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="shrink-0 text-xs font-medium underline-offset-2 hover:underline"
+                >
+                  View transaction {short(tx.signature)}
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="mt-2 text-sm text-ink-soft">{RESOLVER_WORKSPACE_COPY.txHistoryLoading}</p>
+        )}
+      </Card>
+    );
+    body = (
+      <div className="space-y-3">
+        {txCard}
+        {items.length === 0 ? (
         <Card className="p-4 text-sm text-ink-soft">{RESOLVER_WORKSPACE_COPY.activityEmpty}</Card>
       ) : (
         <Card className="px-3 py-2.5">
@@ -201,7 +265,7 @@ export function ResolverWorkspace({ view }: { view: ResolverWorkspaceView }) {
           <ul className="mt-2 divide-y divide-white/5">
             {items.map((item) => (
               <li key={item.key} className="flex flex-col gap-0.5 py-2 sm:flex-row sm:items-center sm:justify-between">
-                <Link href={item.href} className="text-sm underline-offset-2 hover:underline">
+                <Link href={item.href} className="min-w-0 break-words text-sm underline-offset-2 hover:underline">
                   {item.title}
                 </Link>
                 <span className="text-xs text-ink-faint">
@@ -211,14 +275,16 @@ export function ResolverWorkspace({ view }: { view: ResolverWorkspaceView }) {
             ))}
           </ul>
         </Card>
-      );
+      )}
+      </div>
+    );
   }
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4">
       <header>
         <p className="text-xs uppercase tracking-wide text-ink-faint">Resolver workspace</p>
-        <h1 className="font-display text-2xl">{TITLES[view]}</h1>
+        <h1 className="font-display text-xl sm:text-2xl lg:text-xl">{TITLES[view]}</h1>
         <p className="mt-1 text-sm text-ink-soft">{RESOLVER_WORKSPACE_COPY.notAdmin}</p>
       </header>
       {body}

@@ -98,7 +98,7 @@ export function HourlyShowcase({
 
   return (
     <div
-      className={`rounded-[24px] border p-4 sm:p-5 ${
+      className={`rounded-[24px] border p-4 sm:p-5 lg:p-4 ${
         running
           ? "border-cyan/40 bg-[linear-gradient(160deg,#06101c,#0d2238)] text-white"
           : "border-line bg-card"
@@ -113,7 +113,7 @@ export function HourlyShowcase({
           >
             Hourly salary
           </p>
-          <h3 className="mt-1 font-display text-xl sm:text-2xl">
+          <h3 className="mt-1 font-display text-xl sm:text-2xl lg:text-xl">
             {running ? HOURLY_COPY.runningTitle : presentHourlyHeadline(role, idle)}
           </h3>
         </div>
@@ -143,7 +143,7 @@ export function HourlyShowcase({
       ) : null}
 
       {running ? (
-        <section className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-5" aria-labelledby="hourly-session-heading">
+        <section className="mt-5 rounded-3xl border border-white/10 bg-white/5 p-4 sm:p-5 lg:mt-4 lg:p-4" aria-labelledby="hourly-session-heading">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <h4 id="hourly-session-heading" className="text-sm font-semibold uppercase tracking-[0.14em] text-cyan">
               Work session
@@ -155,7 +155,7 @@ export function HourlyShowcase({
           <p className="mt-3 text-sm text-white/70">
             Started {formatSessionStartedAt(dash.sessionStartedAt)}
           </p>
-          <p className="mt-2 font-display text-3xl tabular-nums tracking-tight sm:text-4xl">
+          <p className="mt-2 font-display text-3xl tabular-nums tracking-tight sm:text-4xl lg:text-3xl">
             {formatElapsedClock(dash.displayElapsed)}
           </p>
           <p className="mt-2 text-sm text-white/60">

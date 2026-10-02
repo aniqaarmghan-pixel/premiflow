@@ -1,5 +1,9 @@
 "use client";
 
+import { browserSignatureStorage, readResolveSignature } from "@/lib/app/resolve-signature-store";
+import { ACTIVE_CLUSTER_ID } from "@/lib/cluster";
+import { explorerTxUrl } from "@/lib/network";
+
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -117,6 +121,10 @@ export function ResolutionCenter({
   const lifecycle = resolutionLifecycleState(contract.status);
   const disputed = contract.status === "Disputed";
   const resolved = contract.status === "Resolved";
+  // Real confirmed resolve signature recorded by this browser, if any.
+  const resolveSignature = resolved
+    ? readResolveSignature(browserSignatureStorage(), ACTIVE_CLUSTER_ID, contract.address.toBase58())
+    : null;
   const address = contract.address.toBase58();
   const { publicKey, signMessage } = useWallet();
   const connectedWallet = publicKey?.toBase58() ?? null;
@@ -310,8 +318,8 @@ export function ResolutionCenter({
       <Card
         className={
           disputed
-            ? "border-danger/40 bg-[linear-gradient(180deg,rgba(232,93,117,0.10),transparent)] p-4 sm:p-5"
-            : "p-4 sm:p-5"
+            ? "border-danger/40 bg-[linear-gradient(180deg,rgba(232,93,117,0.10),transparent)] p-4 sm:p-5 lg:p-4"
+            : "p-4 sm:p-5 lg:p-4"
         }
       >
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-danger">
@@ -377,8 +385,8 @@ export function ResolutionCenter({
       </Card>
 
       {resolverView && (disputed || resolved) ? (
-        <Card className="p-4 sm:p-5">
-          <h3 className="font-display text-lg">{RESOLVER_UX_COPY.accountingHeading}</h3>
+        <Card className="p-4 sm:p-5 lg:p-4">
+          <h3 className="font-display text-lg lg:text-base">{RESOLVER_UX_COPY.accountingHeading}</h3>
           <dl className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             <div className="min-w-0 rounded-2xl bg-paper px-3 py-2">
               <dt className="text-xs uppercase tracking-wide text-ink-faint">Employer</dt>
@@ -408,8 +416,8 @@ export function ResolutionCenter({
       ) : null}
 
       {canSettle && resolverView && disputed ? (
-        <Card className="border-gold/40 p-4 sm:p-5">
-          <h3 className="font-display text-lg">{RESOLVER_UX_COPY.settlementHeading}</h3>
+        <Card className="border-gold/40 p-4 sm:p-5 lg:p-4">
+          <h3 className="font-display text-lg lg:text-base">{RESOLVER_UX_COPY.settlementHeading}</h3>
           <p className="mt-1 text-sm leading-6 text-ink-soft">{RESOLVER_UX_COPY.settlementBody}</p>
           {decimals == null ? (
             <p className="mt-2 text-sm text-ink-soft">{RESOLVER_UX_COPY.decimalsLoading}</p>
@@ -467,8 +475,8 @@ export function ResolutionCenter({
       ) : null}
 
       {resolverView && resolved ? (
-        <Card className="p-4 sm:p-5">
-          <h3 className="font-display text-lg">{RESOLVER_UX_COPY.settlementRecorded}</h3>
+        <Card className="p-4 sm:p-5 lg:p-4">
+          <h3 className="font-display text-lg lg:text-base">{RESOLVER_UX_COPY.settlementRecorded}</h3>
           <p className="mt-1 text-sm leading-6 text-ink-soft">
             {RESOLVER_UX_COPY.settlementRecordedBody}
           </p>
@@ -493,11 +501,21 @@ export function ResolutionCenter({
           <p className="mt-2 text-xs leading-5 text-ink-faint">
             {RESOLVER_UX_COPY.partyClaimGuidance}
           </p>
+          {resolveSignature ? (
+            <a
+              href={explorerTxUrl(resolveSignature)}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-2 inline-block text-xs font-medium underline-offset-2 hover:underline"
+            >
+              View transaction
+            </a>
+          ) : null}
         </Card>
       ) : null}
 
       {showOpenGuidance ? (
-        <Card className="p-4 sm:p-5">
+        <Card className="p-4 sm:p-5 lg:p-4">
           <h3 className="font-display text-xl">{CASE_PREPARATION_COPY.heading}</h3>
           <p className="mt-2 text-sm leading-6 text-ink-soft">{CASE_PREPARATION_COPY.notStored}</p>
           <p className="mt-2 text-sm leading-6 text-ink-soft">{CASE_PREPARATION_COPY.pageOnly}</p>
@@ -511,7 +529,7 @@ export function ResolutionCenter({
       ) : null}
 
       {disputed || resolved ? (
-        <Card className="p-4 sm:p-5">
+        <Card className="p-4 sm:p-5 lg:p-4">
           <h3 className="font-display text-xl">{CASE_WORKSPACE_COPY.heading}</h3>
           {caseState === "loading" || (caseState === "idle" && shouldLoadCase) ? (
             <p className="mt-2 text-sm leading-6 text-ink-soft">{CASE_WORKSPACE_COPY.loading}</p>
@@ -611,7 +629,7 @@ export function ResolutionCenter({
         </Card>
       ) : null}
 
-      <Card className="p-4 sm:p-5">
+      <Card className="p-4 sm:p-5 lg:p-4">
         <h3 className="font-display text-xl">{EVIDENCE_COPY.heading}</h3>
         <p className="mt-1 text-sm text-ink-faint">{EVIDENCE_COPY.noInventedHistory}</p>
         <p className="mt-4 text-xs font-semibold uppercase tracking-[0.16em] text-ink-faint">
@@ -729,7 +747,7 @@ export function ResolutionCenter({
       </Card>
 
       {disputed || resolved ? (
-        <Card className="p-4 sm:p-5">
+        <Card className="p-4 sm:p-5 lg:p-4">
           <h3 className="font-display text-xl">{PARTY_STATEMENTS_COPY.heading}</h3>
           <p className="mt-2 text-sm leading-6 text-ink-soft">{PARTY_STATEMENTS_COPY.ready}</p>
           <p className="mt-2 text-sm leading-6 text-ink-soft">{PARTY_STATEMENTS_COPY.ownOnly}</p>
@@ -765,7 +783,7 @@ export function ResolutionCenter({
       ) : null}
 
       {disputed || resolved ? (
-        <Card className="p-4 sm:p-5">
+        <Card className="p-4 sm:p-5 lg:p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-faint">
             {AI_CASE_SUMMARY_COPY.comingLater}
           </p>
@@ -779,7 +797,7 @@ export function ResolutionCenter({
       ) : null}
 
       {disputed && role === "resolver" ? (
-        <Card className="border-gold/40 bg-[linear-gradient(180deg,rgba(214,176,90,0.10),transparent)] p-4 sm:p-5">
+        <Card className="border-gold/40 bg-[linear-gradient(180deg,rgba(214,176,90,0.10),transparent)] p-4 sm:p-5 lg:p-4">
           <h3 className="font-display text-xl">Decision</h3>
           <p className="mt-2 text-sm leading-6 text-ink-soft">
             You remain the decision-maker. Category and notes do not set a financial split.
@@ -788,7 +806,7 @@ export function ResolutionCenter({
         </Card>
       ) : null}
 
-      <Card className="p-4 sm:p-5">
+      <Card className="p-4 sm:p-5 lg:p-4">
         <h3 className="font-display text-xl">{RESOLVER_EXPLANATION.title}</h3>
         <p className="mt-2 text-sm leading-6 text-ink-soft">{RESOLVER_EXPLANATION.definition}</p>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-ink-soft">
