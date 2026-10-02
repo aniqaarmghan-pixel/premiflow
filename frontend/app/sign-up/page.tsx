@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { ArrowRight, LockKeyhole, Mail, UserRound } from "lucide-react";
 
-import { signIn, signUp } from "@/lib/account-auth/client";
+import { refreshAccountSession, signIn, signUp } from "@/lib/account-auth/client";
+import { runAccountAuthCall } from "@/lib/account-auth/session-flow";
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -72,24 +73,21 @@ export default function SignUpPage() {
     setSubmitting(true);
 
     try {
-      const result = await signUp.email({
-        name: cleanName,
-        email: cleanEmail,
-        password,
+      // No automatic retry: a sign-up that failed late may already exist.
+      const outcome = await runAccountAuthCall({
+        context: "sign_up",
+        retries: 0,
+        call: () => signUp.email({ name: cleanName, email: cleanEmail, password }),
+        refreshSession: refreshAccountSession,
       });
 
-      if (result.error) {
-        setError(
-          result.error.message ??
-            "We could not create your PREMIFLOW account."
-        );
+      if (!outcome.ok) {
+        setError(outcome.message);
         return;
       }
 
       router.push("/");
       router.refresh();
-    } catch {
-      setError("We could not create your PREMIFLOW account.");
     } finally {
       setSubmitting(false);
     }

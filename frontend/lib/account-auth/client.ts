@@ -12,6 +12,14 @@ export const accountAuthClient = createAuthClient({
   basePath: "/api/account-auth",
 });
 
+/**
+ * Re-fetch the cached session (all useSession consumers). The server clears
+ * an expired session cookie on get-session, so this also drops stale state.
+ */
+export function refreshAccountSession(): void {
+  accountAuthClient.$store.notify("$sessionSignal");
+}
+
 export const {
   signIn,
   signOut,

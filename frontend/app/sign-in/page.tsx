@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { ArrowRight, LockKeyhole, Mail } from "lucide-react";
 
-import { signIn } from "@/lib/account-auth/client";
+import { refreshAccountSession, signIn } from "@/lib/account-auth/client";
+import { runAccountAuthCall } from "@/lib/account-auth/session-flow";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -16,6 +17,11 @@ export default function SignInPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
+
+  // Drop any stale cached session (e.g. expired while the tab sat open).
+  useEffect(() => {
+    refreshAccountSession();
+  }, []);
 
   async function handleGoogleSignIn() {
     setError(null);
@@ -59,23 +65,21 @@ export default function SignInPage() {
     setSubmitting(true);
 
     try {
-      const result = await signIn.email({
-        email: cleanEmail,
-        password,
+      const outcome = await runAccountAuthCall({
+        context: "sign_in",
+        retries: 1,
+        call: () => signIn.email({ email: cleanEmail, password }),
+        refreshSession: refreshAccountSession,
       });
 
-      if (result.error) {
-        setError(
-          result.error.message ??
-            "We could not sign you in. Check your email and password."
-        );
+      if (!outcome.ok) {
+        setError(outcome.message);
         return;
       }
 
+      setPassword("");
       router.push("/");
       router.refresh();
-    } catch {
-      setError("We could not sign you in. Please try again.");
     } finally {
       setSubmitting(false);
     }

@@ -14,9 +14,11 @@ import {
 import { useEffect, useId, useRef, useState } from "react";
 
 import {
+  refreshAccountSession,
   signOut,
   useSession,
 } from "@/lib/account-auth/client";
+import { runAccountSignOut } from "@/lib/account-auth/session-flow";
 import {
   ensureMessagingSession,
   messagingSessionErrorMessage,
@@ -130,7 +132,13 @@ export function AccountControl() {
   async function handleSignOut() {
     setMenuOpen(false);
 
-    await signOut();
+    // Revokes the server session (cookie deleted), clears the wallet-auth
+    // cookie and refreshes the cached session in every open tab.
+    await runAccountSignOut({
+      signOut: () => signOut(),
+      clearWalletSession: () => logoutSession(),
+      refreshSession: refreshAccountSession,
+    });
 
     router.push("/");
     router.refresh();
