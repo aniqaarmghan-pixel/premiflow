@@ -160,8 +160,8 @@ const STEPS = [
   "Type",
   "Parties",
   "Payment",
-  "Work",
   "Trial",
+  "Work",
   "Schedule",
   "Review",
 ] as const;
@@ -928,7 +928,7 @@ export function CreateWizard() {
                   />
                 ) : (
                   <Field
-                    label="Amount"
+                    label="Total funded amount"
                     error={errors.totalAmountUi}
                     hint="Total contract value."
                   >
@@ -947,6 +947,7 @@ export function CreateWizard() {
                   Work
                 </h2>
                 <Field
+                  required
                   label="Contract title"
                   error={errors.title}
                   hint="What are you hiring for?"
@@ -967,6 +968,7 @@ export function CreateWizard() {
                 </Field>
                 {draft.paymentMode !== "Hourly" ? (
                   <Field
+                    required
                     label="Deliverables"
                     hint="One item per line."
                     error={errors.deliverables}
@@ -1015,7 +1017,7 @@ export function CreateWizard() {
                   <Field
                     label="Trial amount"
                     error={errors.trialAmountUi}
-                    hint="Separate protected amount."
+                    hint="Paid trial is included in the total funded amount. Main work receives the remainder."
                   >
                     <Input
                       value={draft.trialAmountUi}
@@ -1586,9 +1588,16 @@ function ReviewPanel({
         </div>
       </details>
       {issueCount > 0 ? (
-        <p className="mt-3 text-sm text-danger">
-          {issueCount} field{issueCount === 1 ? "" : "s"} still need attention before create.
-        </p>
+        <div className="mt-3 rounded-xl border border-danger/30 bg-danger/5 p-3">
+                    <p className="text-sm font-medium text-danger">
+                      Fix these fields before creating:
+                    </p>
+                    <ul className="mt-1 space-y-1 text-xs text-danger">
+                      {Array.from(new Set(Object.values(errors))).slice(0, 8).map((message) => (
+                        <li key={message}>• {message}</li>
+                      ))}
+                    </ul>
+                  </div>
       ) : null}
     </Card>
   );
@@ -1726,6 +1735,7 @@ function stepReady(
 ): boolean {
   if (step === 0) return true;
   if (step === 1) return !errors.freelancer;
+
   if (step === 2) {
     if (draft.paymentMode === "Hourly") {
       return (
@@ -1738,12 +1748,27 @@ function stepReady(
     }
     return !errors.mint && !errors.totalAmountUi && !errors.decimals;
   }
+
   if (step === 3) {
-    if (errors.title || errors.description) return false;
-    if (draft.paymentMode === "Milestone") return milestonesOk;
+    return !errors.trialAmountUi && !errors.maxRevisions;
+  }
+
+  if (step === 4) {
+    if (
+      errors.title ||
+      errors.description ||
+      (draft.paymentMode !== "Hourly" && errors.deliverables)
+    ) return false;
+
+    if (draft.paymentMode === "Milestone") {
+      const badMilestone = Object.keys(errors).some(
+        (key) => key === "milestones" || key.startsWith("milestone-")
+      );
+      return milestonesOk && !badMilestone;
+    }
     return true;
   }
-  if (step === 4) return !errors.trialAmountUi && !errors.maxRevisions;
+
   if (step === 5) {
     return (
       !errors.durationSeconds &&
@@ -1754,5 +1779,6 @@ function stepReady(
       !errors.checkpointInterval
     );
   }
+
   return Object.keys(errors).length === 0;
 }

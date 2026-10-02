@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 
 const field =
@@ -5,18 +6,20 @@ const field =
 
 export function Field({
   label,
+  required,
   hint,
   error,
   children,
 }: {
-  label: string;
+  label: ReactNode;
+  required?: boolean;
   hint?: string;
   error?: string;
   children: React.ReactNode;
 }) {
   return (
     <label className="block min-w-0 space-y-1.5">
-      <span className="text-sm font-medium text-ink">{label}</span>
+      <span className="text-sm font-medium text-ink">{label}{required ? <span className="ml-1 text-danger" aria-hidden="true">*</span> : null}</span>
       {children}
       {hint && !error ? <p className="text-xs text-ink-faint">{hint}</p> : null}
       {error ? <p className="text-xs text-danger">{error}</p> : null}
