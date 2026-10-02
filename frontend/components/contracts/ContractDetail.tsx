@@ -1381,6 +1381,40 @@ export function ContractDetail({ address }: { address: string }) {
           <PaymentProgress contract={contract} decimals={decimals} />
         </div>
 
+        {actions.includes("acceptContract") ? (
+          <section
+            data-testid="offer-request-changes"
+            className="rounded-2xl border border-line bg-surface p-4 sm:p-5"
+          >
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="max-w-2xl">
+                <p className="text-sm font-semibold text-ink">
+                  Need different terms before accepting?
+                </p>
+
+                <p className="mt-1 text-sm leading-6 text-ink-soft">
+                  Request changes in the contract chat before accepting the offer.
+                  Tell the employer exactly what should change, such as the amount,
+                  schedule, milestones, review window, or other terms.
+                </p>
+
+                <p className="mt-2 text-xs leading-5 text-ink-faint">
+                  This is a negotiation message only. On-chain terms stay unchanged
+                  until the employer creates or reissues an updated offer. Requesting
+                  changes does not accept, decline, cancel, or move escrow funds.
+                </p>
+              </div>
+
+              <a
+                href={`/contracts/${contract.address.toBase58()}?chat=1#messages`}
+                className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-line px-4 py-2 text-sm font-semibold text-ink transition hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                Request changes
+              </a>
+            </div>
+          </section>
+        ) : null}
+
         <div id="messages" className="scroll-mt-20">
           <Suspense fallback={null}>
             <ContractMessages
