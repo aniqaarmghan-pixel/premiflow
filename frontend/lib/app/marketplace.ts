@@ -2,8 +2,6 @@
  * Off-chain marketplace helpers. Escrow is still created only by the existing
  * on-chain Create flow, signed by the employer; nothing here sends a transaction.
  */
-import { saveCreateDraft } from "@/lib/app/create-draft-store";
-import type { IntentScope, IntentStorage } from "@/lib/app/milestone-create-plan";
 import { lockedCreatePayment } from "@/lib/app/premiflow";
 import {
   applyCreateDraftPatch,
@@ -36,7 +34,7 @@ export const MARKETPLACE_COPY = {
     "Opens Create contract with these terms prefilled. Review every step; you still approve the on-chain create in your wallet.",
   handoffIntentExists:
     "You have a saved Create setup. Finish or discard it in Create contract before starting a new one.",
-  handoffSaved: "Terms saved. In Create contract, choose Restore draft to load them.",
+  handoffSaved: "Terms saved. In Create contract, choose Use selected proposal to load them.",
   closedNote: "This job is closed and accepts no new proposals.",
   filledNote: "The employer selected a proposal for this job.",
 } as const;
@@ -107,31 +105,4 @@ export function marketplaceHandoffPatch(
 export function marketplaceHandoffDraft(handoff: CreateHandoff): CreateWizardDraft {
   const base = defaultCreateDraft();
   return applyCreateDraftPatch(base, marketplaceHandoffPatch(handoff, base.decimals));
-}
-
-/**
- * Writes the prefilled terms as an unfinished Create draft, so the wizard
- * offers "Restore draft". Never writes while a create intent exists and never
- * sends anything; the employer reviews and signs the on-chain create.
- */
-export function writeMarketplaceHandoffDraft(
-  storage: IntentStorage | null,
-  scope: IntentScope,
-  owners: readonly string[],
-  handoff: CreateHandoff,
-  params: { nowMs: number; intentExists: boolean }
-): boolean {
-  if (params.intentExists) return false;
-  const draft = marketplaceHandoffDraft(handoff);
-  let written = false;
-  for (const owner of owners) {
-    written =
-      saveCreateDraft(storage, scope, owner, {
-        draft,
-        step: 0,
-        nowMs: params.nowMs,
-        intentExists: false,
-      }) || written;
-  }
-  return written;
 }

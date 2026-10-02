@@ -7,7 +7,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field, Input, Textarea } from "@/components/ui/Field";
-import { writeMarketplaceHandoffDraft } from "@/lib/app/marketplace";
+import { savePendingHandoff } from "@/lib/app/marketplace-handoff-store";
 import {
   JOB_STATUS_LABELS,
   MARKETPLACE_COPY,
@@ -25,7 +25,6 @@ import {
   submitProposal,
   withdrawProposal,
 } from "@/lib/app/marketplace-client";
-import { NO_WALLET_DRAFT_OWNER } from "@/lib/app/create-draft-store";
 import { loadCreateIntent, type IntentScope } from "@/lib/app/milestone-create-plan";
 import { lockedCreatePayment } from "@/lib/app/premiflow";
 import { ACTIVE_CLUSTER_ID } from "@/lib/cluster";
@@ -93,14 +92,9 @@ export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
         setNotice(MARKETPLACE_COPY.handoffIntentExists);
         return;
       }
-      // Prefill only: the wizard offers Restore draft and never sends on its own.
-      const written = writeMarketplaceHandoffDraft(
-        browserStorage(),
-        CREATE_SCOPE,
-        [wallet, NO_WALLET_DRAFT_OWNER],
-        handoff,
-        { nowMs: Date.now(), intentExists: false }
-      );
+      // Separate pending record for this wallet only; Create applies it on an
+      // explicit "Use selected proposal" choice and never sends on its own.
+      const written = savePendingHandoff(browserStorage(), CREATE_SCOPE, wallet, handoff, Date.now());
       if (!written) {
         setNotice("Could not save the terms in this browser. Check storage settings.");
         return;

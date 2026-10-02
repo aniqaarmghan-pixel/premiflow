@@ -64,6 +64,13 @@ import {
   saveCreateDraft,
   type SavedCreateDraft,
 } from "@/lib/app/create-draft-store";
+import {
+  HANDOFF_COPY,
+  handoffPromptKind,
+  loadPendingHandoff,
+  resolveHandoffChoice,
+  type HandoffChoice,
+} from "@/lib/app/marketplace-handoff-store";
 import { formatTokenAmount } from "@/lib/app/money";
 import {
   lockedCreatePayment,
@@ -287,6 +294,34 @@ export function CreateWizard() {
     setDraft(defaultCreateDraft());
     setStep(0);
     setDraftDecidedFor(draftOwner);
+  }
+
+  // Marketplace handoff: separate pending record for this wallet only. Applied
+  // only on an explicit choice and consumed once, so it cannot reappear.
+  const [handoffDecidedFor, setHandoffDecidedFor] = useState<string | null>(null);
+  const pendingHandoff = useMemo(() => {
+    if (!hydrated || !employerKey || handoffDecidedFor === employerKey) return null;
+    return loadPendingHandoff(intentStorage(), INTENT_SCOPE, employerKey);
+  }, [hydrated, employerKey, handoffDecidedFor]);
+  const handoffPrompt = handoffPromptKind({
+    pending: pendingHandoff != null,
+    draftExists: draftOffer != null,
+    intentExists: savedLoad.kind !== "none",
+  });
+
+  function chooseHandoff(choice: HandoffChoice) {
+    if (!employerKey) return;
+    const result = resolveHandoffChoice(intentStorage(), INTENT_SCOPE, employerKey, choice, {
+      intentExists: savedLoad.kind !== "none",
+    });
+    if (result.consumed) setHandoffDecidedFor(employerKey);
+    if (result.draft) {
+      // Explicit replace: refills the form only; Create & Send Offer stays manual.
+      setDraft(result.draft);
+      setStep(0);
+      setDraftDecidedFor(draftOwner);
+      setProgressNote(HANDOFF_COPY.imported);
+    }
   }
 
   const errors = useMemo(
@@ -918,7 +953,39 @@ export function CreateWizard() {
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_240px]">
       <div className="min-w-0">
-        {draftOffer ? (
+        {pendingHandoff && handoffPrompt !== "none" ? (
+          <div
+            role="status"
+            className="mb-3 rounded-xl border border-line bg-paper-2 px-3 py-2.5 text-sm text-ink"
+          >
+            <p className="font-semibold">{HANDOFF_COPY.title}</p>
+            <p className="mt-0.5 break-words text-ink-soft [overflow-wrap:anywhere]">
+              {pendingHandoff.handoff.title} ({pendingHandoff.handoff.paymentMode}). {HANDOFF_COPY.note}
+            </p>
+            {handoffPrompt === "blocked_by_intent" ? (
+              <p className="mt-1 text-ink-soft">{HANDOFF_COPY.blockedByIntent}</p>
+            ) : handoffPrompt === "replace_or_keep" ? (
+              <p className="mt-1 text-ink-soft">{HANDOFF_COPY.replaceWarning}</p>
+            ) : null}
+            <div className="mt-2 flex flex-wrap gap-2">
+              {handoffPrompt !== "blocked_by_intent" ? (
+                <Button type="button" onClick={() => chooseHandoff("import")}>
+                  Use selected proposal
+                </Button>
+              ) : null}
+              {handoffPrompt === "replace_or_keep" ? (
+                <Button type="button" variant="ghost" onClick={() => chooseHandoff("keep")}>
+                  Keep current draft
+                </Button>
+              ) : (
+                <Button type="button" variant="ghost" onClick={() => chooseHandoff("dismiss")}>
+                  Dismiss
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : null}
+        {draftOffer && !pendingHandoff ? (
           <div
             role="status"
             className="mb-3 rounded-xl border border-line bg-paper-2 px-3 py-2.5 text-sm text-ink"
