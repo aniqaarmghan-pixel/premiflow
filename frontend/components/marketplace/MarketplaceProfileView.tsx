@@ -19,6 +19,7 @@ import {
   SkillList,
   StatusPill,
 } from "./MarketplaceParts";
+import { MarketplaceTrustSummary } from "./MarketplaceTrustSummary";
 
 export function MarketplaceProfileView({ wallet }: { wallet: string }) {
   const session = useMarketplaceSession();
@@ -77,6 +78,8 @@ export function MarketplaceProfileView({ wallet }: { wallet: string }) {
           </Link>
         ) : null}
       </Card>
+
+      <MarketplaceTrustSummary wallet={query.data.wallet} />
 
       {profile && profile.portfolio.length > 0 ? (
         <section className="min-w-0 space-y-2">

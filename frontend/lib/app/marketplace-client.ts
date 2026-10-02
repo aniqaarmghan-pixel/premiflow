@@ -1,4 +1,13 @@
-import type { SavedItem } from "@/lib/server/marketplace/favorites-service";
+import type { SavedIds, SavedItem } from "@/lib/server/marketplace/favorites-service";
+import type {
+  ContractLinkView,
+  MyInvitationItem,
+  PublicContractLink,
+  PublicInvitation,
+  PublicReview,
+  ReviewEligibility,
+  TrustSummary,
+} from "@/lib/server/marketplace/trust-service";
 import type { FavoriteTarget, GigPackage } from "@/lib/server/marketplace/store";
 import type {
   FreelancerCard,
@@ -182,6 +191,79 @@ export function fetchGigHandoff(gigId: string, tier?: GigPackage["tier"]) {
 
 export function fetchSaved() {
   return request<{ items: SavedItem[] }>("/api/marketplace/saved");
+}
+
+/** Ids-only saved status: one request shared by every Save button (see marketplace-saved-store). */
+export function fetchSavedIds() {
+  return request<SavedIds>("/api/marketplace/saved/ids");
+}
+
+/* ---- Phase 5: trust, hiring, contract links ---- */
+
+export function fetchTrustSummary(wallet: string) {
+  return request<{ summary: TrustSummary }>(`/api/marketplace/trust/${encodeURIComponent(wallet)}`);
+}
+
+export function fetchReviewEligibility(contractAddress: string) {
+  return request<ReviewEligibility>(`/api/marketplace/reviews?contract=${encodeURIComponent(contractAddress)}`);
+}
+
+export function submitReview(input: { contractAddress: string; score: number; body: string }) {
+  return request<{ review: PublicReview }>("/api/marketplace/reviews", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchJobInvitations(jobId: string) {
+  return request<{ invitations: PublicInvitation[] }>(`/api/marketplace/jobs/${encodeURIComponent(jobId)}/invitations`);
+}
+
+export function inviteToJob(jobId: string, input: { invitee: string; message: string }) {
+  return request<{ invitation: PublicInvitation }>(`/api/marketplace/jobs/${encodeURIComponent(jobId)}/invitations`, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+export function fetchMyInvitations() {
+  return request<{ items: MyInvitationItem[] }>("/api/marketplace/invitations/mine");
+}
+
+export function answerInvitation(invitationId: string, action: "accept" | "decline") {
+  return request<{ invitation: PublicInvitation }>(`/api/marketplace/invitations/${encodeURIComponent(invitationId)}`, {
+    method: "POST",
+    body: JSON.stringify({ action }),
+  });
+}
+
+export function fetchShortlist(jobId: string) {
+  return request<{ proposalIds: string[] }>(`/api/marketplace/jobs/${encodeURIComponent(jobId)}/shortlist`);
+}
+
+export function setShortlist(jobId: string, proposalId: string, shortlisted: boolean) {
+  const base = `/api/marketplace/jobs/${encodeURIComponent(jobId)}/shortlist`;
+  return shortlisted
+    ? request<{ proposalIds: string[] }>(base, { method: "PUT", body: JSON.stringify({ proposalId }) })
+    : request<{ proposalIds: string[] }>(`${base}?proposalId=${encodeURIComponent(proposalId)}`, { method: "DELETE" });
+}
+
+export function fetchContractLinks(filter: { jobId: string } | { gigId: string }) {
+  const qs = "jobId" in filter ? `jobId=${encodeURIComponent(filter.jobId)}` : `gigId=${encodeURIComponent(filter.gigId)}`;
+  return request<{ links: ContractLinkView[] }>(`/api/marketplace/contract-links?${qs}`);
+}
+
+export function linkMarketplaceContract(input: {
+  contractAddress: string;
+  source: "job" | "gig";
+  jobId?: string;
+  proposalId?: string;
+  gigId?: string;
+}) {
+  return request<{ link: PublicContractLink; created: boolean }>("/api/marketplace/contract-links", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }
 
 export function saveListing(type: FavoriteTarget, id: string) {

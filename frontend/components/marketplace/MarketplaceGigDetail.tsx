@@ -30,7 +30,9 @@ import type { PackageTier } from "@/lib/server/marketplace/store";
 
 import { MarketplaceGigMedia } from "./MarketplaceGigMedia";
 import { Avatar, MarketplaceHeader, ProfileLink, SkillList, StatusPill } from "./MarketplaceParts";
+import { MarketplaceContractLinks } from "./MarketplaceContractLinks";
 import { MarketplaceSaveToggle } from "./MarketplaceSaveToggle";
+import { MarketplaceTrustSummary } from "./MarketplaceTrustSummary";
 
 export function MarketplaceGigDetail({ gigId }: { gigId: string }) {
   const router = useRouter();
@@ -228,6 +230,8 @@ export function MarketplaceGigDetail({ gigId }: { gigId: string }) {
         </Card>
       ) : null}
       {notice ? <p className="text-sm text-ink-soft" aria-live="polite">{notice}</p> : null}
+      <MarketplaceTrustSummary wallet={gig.freelancerWallet} />
+      {session.wallet ? <MarketplaceContractLinks source="gig" gigId={gig.id} canLink /> : null}
     </div>
   );
 }

@@ -19,6 +19,16 @@ export const NOTIFICATION_KINDS = [
   "dispute_opened",
   "dispute_resolved",
   "deadline_warning",
+  // Marketplace (off-chain, Phase 5)
+  "marketplace_proposal_received",
+  "marketplace_proposal_withdrawn",
+  "marketplace_proposal_selected",
+  "marketplace_invitation_received",
+  "marketplace_invitation_accepted",
+  "marketplace_invitation_declined",
+  "marketplace_gig_hired",
+  "marketplace_review_eligible",
+  "marketplace_review_received",
 ] as const;
 
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];

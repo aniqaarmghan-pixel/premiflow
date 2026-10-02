@@ -7,6 +7,7 @@ import {
   marketplaceContext,
   marketplaceSessionWallet,
 } from "@/lib/server/marketplace/route-context";
+import { notifyProposalSelected } from "@/lib/server/marketplace/proposal-notices";
 import { selectProposal } from "@/lib/server/marketplace/service";
 
 export const runtime = "nodejs";
@@ -25,6 +26,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
       jobId: id,
       proposalId: body.proposalId,
     });
+    await notifyProposalSelected(ctx.market, ctx.stores.notifications, detail.job.id);
     return NextResponse.json(detail);
   } catch (err) {
     return handleRouteError(err);

@@ -279,6 +279,15 @@ const TYPE_LABELS: Partial<Record<NotificationKind, string>> = {
   dispute_opened: "Dispute",
   dispute_resolved: "Dispute",
   deadline_warning: "Deadline",
+  marketplace_proposal_received: "Proposal",
+  marketplace_proposal_withdrawn: "Proposal",
+  marketplace_proposal_selected: "Selected",
+  marketplace_invitation_received: "Invitation",
+  marketplace_invitation_accepted: "Invitation",
+  marketplace_invitation_declined: "Invitation",
+  marketplace_gig_hired: "Hired",
+  marketplace_review_eligible: "Review",
+  marketplace_review_received: "Review",
 };
 
 export function notificationTypeLabel(type: string): string {

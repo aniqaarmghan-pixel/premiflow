@@ -89,6 +89,24 @@ export async function unsaveListing(
   return { saved: false, removed: await store.removeFavorite(wallet, targetType, targetId) };
 }
 
+export type SavedIds = { jobs: string[]; gigs: string[] };
+
+/**
+ * Ids-only saved status for the signed-in wallet: one cheap query that every
+ * Save button on a page shares (instead of each card loading the full list).
+ */
+export async function listSavedIds(
+  store: MarketplaceStore,
+  input: { sessionWallet: string | null }
+): Promise<SavedIds> {
+  const wallet = requireMarketplaceWallet(input.sessionWallet);
+  const rows = await store.listFavorites(wallet, FAVORITES_LIMIT);
+  return {
+    jobs: rows.filter((f) => f.targetType === "job").map((f) => f.targetId),
+    gigs: rows.filter((f) => f.targetType === "gig").map((f) => f.targetId),
+  };
+}
+
 export async function listSaved(
   store: MarketplaceStore,
   input: { sessionWallet: string | null }

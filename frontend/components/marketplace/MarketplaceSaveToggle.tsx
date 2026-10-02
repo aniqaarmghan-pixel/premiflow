@@ -1,25 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { marketplaceErrorMessage } from "@/lib/app/marketplace";
-import { fetchSaved, saveListing, unsaveListing } from "@/lib/app/marketplace-client";
-import { useMarketplaceQuery, useMarketplaceSession } from "@/lib/hooks/useMarketplace";
+import { fetchSavedIds, saveListing, unsaveListing } from "@/lib/app/marketplace-client";
+import { createSavedIdsStore, isSavedIn } from "@/lib/app/marketplace-saved-store";
+import { useMarketplaceSession } from "@/lib/hooks/useMarketplace";
 import type { FavoriteTarget } from "@/lib/server/marketplace/store";
+
+/** Shared by every Save button: one ids-only request per wallet, not one full list per card. */
+const savedIds = createSavedIdsStore(fetchSavedIds);
 
 /** Save/unsave a job or gig for the signed-in wallet (server enforces ownership). */
 export function MarketplaceSaveToggle({ type, id }: { type: FavoriteTarget; id: string }) {
   const session = useMarketplaceSession();
-  const query = useMarketplaceQuery(session.wallet ? `saved:${session.wallet}` : null, fetchSaved);
-  const [override, setOverride] = useState<boolean | null>(null);
+  const snapshot = useSyncExternalStore(savedIds.subscribe, savedIds.getSnapshot, savedIds.getSnapshot);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
 
-  const listed =
-    query.status === "ready" && query.data.items.some((item) => item.targetType === type && item.targetId === id);
-  const saved = override ?? listed;
+  useEffect(() => {
+    void savedIds.ensure(session.wallet);
+  }, [session.wallet]);
 
+  const saved = snapshot.wallet === session.wallet && isSavedIn(snapshot, type, id);
   if (!session.wallet) return null;
 
   async function toggle() {
@@ -29,7 +33,7 @@ export function MarketplaceSaveToggle({ type, id }: { type: FavoriteTarget; id: 
       await session.ensure();
       if (saved) await unsaveListing(type, id);
       else await saveListing(type, id);
-      setOverride(!saved);
+      savedIds.setSaved(type, id, !saved);
     } catch (err) {
       setNotice(marketplaceErrorMessage(err));
     } finally {

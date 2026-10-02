@@ -20,6 +20,8 @@ import {
   closeJob,
   fetchCreateHandoff,
   fetchJobDetail,
+  fetchShortlist,
+  setShortlist,
   selectProposal,
   submitProposal,
   withdrawProposal,
@@ -33,6 +35,8 @@ import { STREAMPAY_PROGRAM_ID } from "@/lib/streampay-v2/constants";
 import { PublicKey } from "@solana/web3.js";
 
 import { JobTags, MarketplaceHeader, ProfileLink, StatusPill } from "./MarketplaceParts";
+import { MarketplaceContractLinks } from "./MarketplaceContractLinks";
+import { MarketplaceJobInvites } from "./MarketplaceJobInvites";
 import { MarketplaceSaveToggle } from "./MarketplaceSaveToggle";
 
 const CREATE_SCOPE: IntentScope = {
@@ -66,6 +70,9 @@ export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
   const [notice, setNotice] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [amountUi, setAmountUi] = useState("");
+  const shortlistKey =
+    query.status === "ready" && query.data.viewerRole === "owner" ? `shortlist:${jobId}:${session.wallet ?? ""}` : null;
+  const shortlist = useMarketplaceQuery(shortlistKey, () => fetchShortlist(jobId));
 
   async function run(action: () => Promise<unknown>, done: string | null) {
     setBusy(true);
@@ -125,6 +132,8 @@ export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
 
   const { job, viewerRole, proposals, ownProposal } = query.data;
   const isOwner = viewerRole === "owner";
+  const shortlisted = new Set(shortlist.status === "ready" ? shortlist.data.proposalIds : []);
+  const selectedId = proposals.find((p) => p.status === "selected")?.id ?? null;
   const looksLikeOwner = !isOwner && session.wallet === job.employerWallet;
   const open = job.status === "open";
   const canPropose = open && !isOwner && !looksLikeOwner && (!ownProposal || ownProposal.status === "withdrawn" || ownProposal.status === "rejected");
@@ -209,6 +218,22 @@ export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
                   <p className="whitespace-pre-wrap break-words text-sm text-ink [overflow-wrap:anywhere]">
                     {p.message}
                   </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button
+                      variant="secondary"
+                      disabled={busy || shortlist.status !== "ready"}
+                      aria-pressed={shortlisted.has(p.id)}
+                      onClick={() =>
+                        void run(async () => {
+                          await setShortlist(job.id, p.id, !shortlisted.has(p.id));
+                          shortlist.reload();
+                        }, null)
+                      }
+                    >
+                      {shortlisted.has(p.id) ? "Shortlisted" : "Shortlist"}
+                    </Button>
+                    <span className="text-xs text-ink-faint">Private to you.</span>
+                  </div>
                   {open && p.status === "submitted" ? (
                     <div>
                       <Button
@@ -236,6 +261,14 @@ export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
             </div>
           ) : null}
         </Card>
+      ) : null}
+
+      {isOwner ? <MarketplaceJobInvites jobId={job.id} open={open} /> : null}
+      {isOwner && selectedId ? (
+        <MarketplaceContractLinks source="job" jobId={job.id} proposalId={selectedId} canLink />
+      ) : null}
+      {!isOwner && ownProposal?.status === "selected" ? (
+        <MarketplaceContractLinks source="job" jobId={job.id} proposalId={ownProposal.id} canLink />
       ) : null}
 
       {ownProposal ? (

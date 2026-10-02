@@ -277,9 +277,11 @@ test("migration 0011: additive, journaled, favorites unique key", () => {
   const journal = JSON.parse(read("drizzle/meta/_journal.json")) as {
     entries: { idx: number; tag: string; when: number }[];
   };
-  const last = journal.entries.at(-1)!;
-  assert.deepEqual([last.idx, last.tag], [11, "0011_marketplace_rich_listings"]);
-  assert.ok(last.when > journal.entries.at(-2)!.when);
+  const at = journal.entries.findIndex((e) => e.idx === 11);
+  assert.ok(at > 0);
+  const entry = journal.entries[at];
+  assert.equal(entry.tag, "0011_marketplace_rich_listings");
+  assert.ok(entry.when > journal.entries[at - 1].when);
   const schema = read("lib/server/db/schema.ts");
   assert.match(schema, /marketplace_favorites_pk/);
 });

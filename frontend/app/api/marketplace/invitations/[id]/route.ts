@@ -4,31 +4,30 @@ import { handleRouteError, requireMutatingOrigin } from "@/lib/server/api-guard"
 import { readJsonObject } from "@/lib/server/http";
 import {
   limitMarketplaceWrites,
-  marketplaceContext,
   marketplaceSessionWallet,
+  marketplaceTrustContext,
+  trustDeps,
 } from "@/lib/server/marketplace/route-context";
-import { notifyProposalReceived } from "@/lib/server/marketplace/proposal-notices";
-import { submitProposal } from "@/lib/server/marketplace/service";
+import { respondToInvitation } from "@/lib/server/marketplace/trust-service";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** Invited freelancer answers: body { action: "accept" | "decline" }. */
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   try {
     requireMutatingOrigin(request);
     const { id } = await context.params;
-    const ctx = marketplaceContext();
+    const ctx = marketplaceTrustContext();
     const wallet = await marketplaceSessionWallet(request, ctx);
     await limitMarketplaceWrites(ctx, wallet);
     const body = await readJsonObject(request);
-    const proposal = await submitProposal(ctx.market, {
+    const invitation = await respondToInvitation(trustDeps(ctx), {
       sessionWallet: wallet,
-      jobId: id,
-      message: body.message,
-      proposedAmount: body.proposedAmount,
+      invitationId: id,
+      action: body.action,
     });
-    await notifyProposalReceived(ctx.market, ctx.stores.notifications, proposal.id);
-    return NextResponse.json({ proposal }, { status: 201 });
+    return NextResponse.json({ invitation });
   } catch (err) {
     return handleRouteError(err);
   }

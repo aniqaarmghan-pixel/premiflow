@@ -1,9 +1,17 @@
 import { requireSession } from "../api-guard";
 import { AuthError } from "../auth/service";
-import { productionMarketplaceStore, productionStores, type MessagingStores } from "../compose";
+import {
+  productionMarketplaceStore,
+  productionMarketplaceTrustStore,
+  productionStores,
+  type MessagingStores,
+} from "../compose";
 import { getServerEnv, type ServerEnv } from "../env";
 import { RATE_LIMITS, consumeRateLimit } from "../rate-limit";
+import { snapshotFactsReader, type ContractFactsReader } from "./contract-reader";
 import type { MarketplaceStore } from "./store";
+import type { TrustDeps } from "./trust-service";
+import type { MarketplaceTrustStore } from "./trust-store";
 
 export type MarketplaceRouteContext = {
   env: ServerEnv;
@@ -11,11 +19,35 @@ export type MarketplaceRouteContext = {
   market: MarketplaceStore;
 };
 
+export type MarketplaceTrustContext = MarketplaceRouteContext & {
+  trust: MarketplaceTrustStore;
+  readContract: ContractFactsReader;
+};
+
 export function marketplaceContext(): MarketplaceRouteContext {
   return {
     env: getServerEnv(),
     stores: productionStores(),
     market: productionMarketplaceStore(),
+  };
+}
+
+/** Phase 5 context: adds the trust store and a read-only on-chain contract reader. */
+export function marketplaceTrustContext(): MarketplaceTrustContext {
+  const base = marketplaceContext();
+  return {
+    ...base,
+    trust: productionMarketplaceTrustStore(),
+    readContract: snapshotFactsReader(base.env.solanaRpcUrl),
+  };
+}
+
+export function trustDeps(ctx: MarketplaceTrustContext): TrustDeps {
+  return {
+    market: ctx.market,
+    trust: ctx.trust,
+    notifications: ctx.stores.notifications,
+    readContract: ctx.readContract,
   };
 }
 

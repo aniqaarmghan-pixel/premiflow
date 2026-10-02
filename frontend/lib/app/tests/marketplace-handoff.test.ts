@@ -85,6 +85,7 @@ test("marketplace UI: no auto-send, no on-chain client, real data only, nav entr
       "/marketplace/my-gigs",
       "/marketplace/profile",
       "/marketplace/saved",
+      "/marketplace/invitations",
     ]
   );
 });

@@ -35,6 +35,7 @@ export const MARKETPLACE_MANAGE_NAV = [
   { href: "/marketplace/my-gigs", label: "My gigs" },
   { href: "/marketplace/profile", label: "My profile" },
   { href: "/marketplace/saved", label: "Saved" },
+  { href: "/marketplace/invitations", label: "Invitations" },
 ] as const;
 
 export const MARKETPLACE_NAV = [...MARKETPLACE_DISCOVER_NAV, ...MARKETPLACE_MANAGE_NAV] as const;

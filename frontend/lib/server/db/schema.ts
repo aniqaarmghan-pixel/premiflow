@@ -496,7 +496,16 @@ export const notifications = pgTable(
         'contract_cancelled',
         'dispute_opened',
         'dispute_resolved',
-        'deadline_warning'
+        'deadline_warning',
+        'marketplace_proposal_received',
+        'marketplace_proposal_withdrawn',
+        'marketplace_proposal_selected',
+        'marketplace_invitation_received',
+        'marketplace_invitation_accepted',
+        'marketplace_invitation_declined',
+        'marketplace_gig_hired',
+        'marketplace_review_eligible',
+        'marketplace_review_received'
       )`
     ),
     check(
@@ -734,5 +743,91 @@ export const marketplaceFavorites = pgTable(
     primaryKey({ columns: [table.wallet, table.targetType, table.targetId], name: "marketplace_favorites_pk" }),
     index("marketplace_favorites_wallet_created_idx").on(table.wallet, table.createdAt),
     check("marketplace_favorites_target_enum", sql`${table.targetType} in ('job', 'gig')`),
+  ]
+);
+
+/**
+ * Phase 5: verified reviews. A row exists only after the server re-read the
+ * PREMIFLOW contract on-chain as Completed and the reviewer was a party.
+ * One review per (reviewer, contract); summaries are computed, never stored.
+ */
+export const marketplaceReviews = pgTable(
+  "marketplace_reviews",
+  {
+    id: uuid("id").primaryKey(),
+    contractAddress: text("contract_address").notNull(),
+    reviewerWallet: text("reviewer_wallet").notNull(),
+    revieweeWallet: text("reviewee_wallet").notNull(),
+    reviewerRole: text("reviewer_role").notNull(),
+    score: integer("score").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketplace_reviews_reviewer_contract_uidx").on(table.reviewerWallet, table.contractAddress),
+    index("marketplace_reviews_reviewee_created_idx").on(table.revieweeWallet, table.createdAt),
+    index("marketplace_reviews_contract_idx").on(table.contractAddress),
+    check("marketplace_reviews_score_range", sql`${table.score} >= 1 and ${table.score} <= 5`),
+    check("marketplace_reviews_body_len", sql`char_length(${table.body}) <= 1000`),
+    check("marketplace_reviews_role_enum", sql`${table.reviewerRole} in ('employer', 'freelancer')`),
+    check("marketplace_reviews_not_self", sql`${table.reviewerWallet} <> ${table.revieweeWallet}`),
+  ]
+);
+
+/** Phase 5: employer -> freelancer job invitations (one per job + freelancer). */
+export const marketplaceInvitations = pgTable(
+  "marketplace_invitations",
+  {
+    id: uuid("id").primaryKey(),
+    jobId: uuid("job_id").notNull(),
+    employerWallet: text("employer_wallet").notNull(),
+    freelancerWallet: text("freelancer_wallet").notNull(),
+    message: text("message").notNull(),
+    status: text("status").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("marketplace_invitations_job_freelancer_uidx").on(table.jobId, table.freelancerWallet),
+    index("marketplace_invitations_freelancer_created_idx").on(table.freelancerWallet, table.createdAt),
+    check("marketplace_invitations_status_enum", sql`${table.status} in ('pending', 'accepted', 'declined')`),
+    check("marketplace_invitations_message_len", sql`char_length(${table.message}) <= 500`),
+  ]
+);
+
+/** Phase 5: employer-private proposal shortlist. */
+export const marketplaceShortlist = pgTable(
+  "marketplace_shortlist",
+  {
+    jobId: uuid("job_id").notNull(),
+    proposalId: uuid("proposal_id").notNull(),
+    employerWallet: text("employer_wallet").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.jobId, table.proposalId], name: "marketplace_shortlist_pk" })]
+);
+
+/** Phase 5: which marketplace listing a verified PREMIFLOW contract came from. */
+export const marketplaceContractLinks = pgTable(
+  "marketplace_contract_links",
+  {
+    contractAddress: text("contract_address").primaryKey(),
+    source: text("source").notNull(),
+    jobId: uuid("job_id"),
+    proposalId: uuid("proposal_id"),
+    gigId: uuid("gig_id"),
+    employerWallet: text("employer_wallet").notNull(),
+    freelancerWallet: text("freelancer_wallet").notNull(),
+    linkedBy: text("linked_by").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index("marketplace_contract_links_job_idx").on(table.jobId),
+    index("marketplace_contract_links_gig_idx").on(table.gigId),
+    check("marketplace_contract_links_source_enum", sql`${table.source} in ('job', 'gig')`),
+    check(
+      "marketplace_contract_links_target",
+      sql`(${table.source} = 'job' and ${table.jobId} is not null and ${table.proposalId} is not null and ${table.gigId} is null) or (${table.source} = 'gig' and ${table.gigId} is not null and ${table.jobId} is null)`
+    ),
   ]
 );

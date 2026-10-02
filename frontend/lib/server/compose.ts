@@ -1,6 +1,8 @@
 import { getDb } from "./db/client";
 import { createDrizzleMarketplaceStore } from "./db/marketplace-store";
 import type { MarketplaceStore } from "./marketplace/store";
+import { createDrizzleMarketplaceTrustStore } from "./db/marketplace-trust-store";
+import type { MarketplaceTrustStore } from "./marketplace/trust-store";
 import { createDrizzleAttachmentStore } from "./db/attachment-store";
 import {
   createDrizzleAuthStore,
@@ -48,6 +50,11 @@ export function productionStores(): MessagingStores {
 /** Off-chain marketplace store (separate from MessagingStores; additive). */
 export function productionMarketplaceStore(): MarketplaceStore {
   return createDrizzleMarketplaceStore(getDb());
+}
+
+/** Phase 5 trust/hiring store (reviews, invitations, shortlist, contract links). */
+export function productionMarketplaceTrustStore(): MarketplaceTrustStore {
+  return createDrizzleMarketplaceTrustStore(getDb());
 }
 
 export function productionBlobStorage(): BlobStorage {

@@ -6,6 +6,7 @@ import {
   marketplaceContext,
   marketplaceSessionWallet,
 } from "@/lib/server/marketplace/route-context";
+import { notifyProposalWithdrawn } from "@/lib/server/marketplace/proposal-notices";
 import { withdrawProposal } from "@/lib/server/marketplace/service";
 
 export const runtime = "nodejs";
@@ -19,6 +20,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     const wallet = await marketplaceSessionWallet(request, ctx);
     await limitMarketplaceWrites(ctx, wallet);
     const proposal = await withdrawProposal(ctx.market, { sessionWallet: wallet, proposalId: id });
+    await notifyProposalWithdrawn(ctx.market, ctx.stores.notifications, proposal.id);
     return NextResponse.json({ proposal });
   } catch (err) {
     return handleRouteError(err);
