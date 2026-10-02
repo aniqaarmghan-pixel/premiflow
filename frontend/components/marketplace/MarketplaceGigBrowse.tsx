@@ -3,13 +3,12 @@
 import Link from "next/link";
 import { useState } from "react";
 
-import { Card } from "@/components/ui/Card";
 import { GIG_COPY, buildSearchQuery } from "@/lib/app/marketplace";
 import { searchGigs } from "@/lib/app/marketplace-client";
 import { lockedCreatePayment } from "@/lib/app/premiflow";
 import { useMarketplaceQuery } from "@/lib/hooks/useMarketplace";
 
-import { GigSummaryCard, MarketplaceHeader, SearchFilters } from "./MarketplaceParts";
+import { EmptyState, GigSummaryCard, MarketplaceHeader, SearchFilters, SkeletonGrid } from "./MarketplaceParts";
 
 export function MarketplaceGigBrowse() {
   const locked = lockedCreatePayment();
@@ -17,10 +16,11 @@ export function MarketplaceGigBrowse() {
   const [filterError, setFilterError] = useState<string | null>(null);
   const query = useMarketplaceQuery(`gigs${qs}`, () => searchGigs(qs));
   return (
-    <div className="min-w-0 space-y-4">
+    <div className="pf-fade-in min-w-0 space-y-4">
       <MarketplaceHeader title={GIG_COPY.browseTitle} subtitle={GIG_COPY.browseSubtitle} />
       <SearchFilters
         tokenName={locked.tokenName}
+        amountNoun="Price"
         onApply={(form) => {
           const built = buildSearchQuery(form, locked.decimals);
           if (!built.ok) {
@@ -34,23 +34,22 @@ export function MarketplaceGigBrowse() {
       {filterError ? <p className="text-sm text-danger">{filterError}</p> : null}
       {query.status === "ready" ? (
         query.data.gigs.length === 0 ? (
-          <Card className="p-4 text-sm text-ink-soft">
-            {GIG_COPY.empty}{" "}
+          <EmptyState title={GIG_COPY.empty}>
             <Link href="/marketplace/gigs/new" className="font-medium text-accent underline">
               Offer a gig
             </Link>
-          </Card>
+          </EmptyState>
         ) : (
-          <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {query.data.gigs.map((gig) => (
               <GigSummaryCard key={gig.id} gig={gig} />
             ))}
           </div>
         )
       ) : query.status === "error" ? (
-        <Card className="p-4 text-sm text-ink-soft">{query.error.message}</Card>
+        <EmptyState title="Gigs could not load">{query.error.message}</EmptyState>
       ) : (
-        <Card className="p-4 text-sm text-ink-soft">Loading gigs...</Card>
+        <SkeletonGrid count={6} tall />
       )}
     </div>
   );

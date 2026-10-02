@@ -68,7 +68,7 @@ test("gig handoff: draft uses gig owner as freelancer and locked token config", 
 test("search query builder: base-unit conversion, bounded text and skills", () => {
   assert.deepEqual(buildSearchQuery(EMPTY_SEARCH, 6), { ok: true, qs: "" });
   const built = buildSearchQuery(
-    { q: " logo ", skills: "a,b,,c,d,e,f", mode: "Hourly", minUi: "1.5", maxUi: "10" },
+    { ...EMPTY_SEARCH, q: " logo ", skills: "a,b,,c,d,e,f", mode: "Hourly", minUi: "1.5", maxUi: "10" },
     6
   );
   assert.equal(built.ok, true);

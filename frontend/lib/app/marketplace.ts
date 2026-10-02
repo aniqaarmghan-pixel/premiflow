@@ -9,12 +9,21 @@ import {
   defaultCreateDraft,
   type CreateWizardDraft,
 } from "@/lib/app/validation";
+import type { MarketplaceCategorySlug } from "@/lib/app/marketplace-categories";
 import type { PublicGig, PublicProfile } from "@/lib/server/marketplace/catalog-service";
+import type { MarketplaceSort } from "@/lib/server/marketplace/store";
 import type { CreateHandoff, PublicJob, PublicProposal } from "@/lib/server/marketplace/service";
 
-export const MARKETPLACE_NAV = [
-  { href: "/marketplace", label: "Browse jobs" },
-  { href: "/marketplace/gigs", label: "Browse gigs" },
+/** Public discovery sections. */
+export const MARKETPLACE_DISCOVER_NAV = [
+  { href: "/marketplace", label: "Home" },
+  { href: "/marketplace/jobs", label: "Jobs" },
+  { href: "/marketplace/gigs", label: "Gigs" },
+  { href: "/marketplace/freelancers", label: "Freelancers" },
+] as const;
+
+/** Signed-in management pages (unchanged destinations). */
+export const MARKETPLACE_MANAGE_NAV = [
   { href: "/marketplace/post", label: "Post a job" },
   { href: "/marketplace/gigs/new", label: "Offer a gig" },
   { href: "/marketplace/my-jobs", label: "My jobs" },
@@ -22,6 +31,23 @@ export const MARKETPLACE_NAV = [
   { href: "/marketplace/my-gigs", label: "My gigs" },
   { href: "/marketplace/profile", label: "My profile" },
 ] as const;
+
+export const MARKETPLACE_NAV = [...MARKETPLACE_DISCOVER_NAV, ...MARKETPLACE_MANAGE_NAV] as const;
+
+const MANAGE_HREFS: readonly string[] = MARKETPLACE_MANAGE_NAV.map((item) => item.href);
+
+/**
+ * Exactly one discovery tab is active for detail pages (job, gig, profile);
+ * management pages and Home only match exactly.
+ */
+export function isMarketplaceNavActive(href: string, pathname: string | null): boolean {
+  if (!pathname) return false;
+  const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
+  if (path === href) return true;
+  if (href === "/marketplace" || MANAGE_HREFS.includes(href) || MANAGE_HREFS.includes(path)) return false;
+  if (href === "/marketplace/freelancers") return path.startsWith("/marketplace/profiles/");
+  return path.startsWith(`${href}/`);
+}
 
 export const MARKETPLACE_COPY = {
   browseTitle: "Marketplace",
@@ -161,9 +187,50 @@ export type SearchFormState = {
   mode: "" | PublicJob["paymentMode"];
   minUi: string;
   maxUi: string;
+  category: "" | MarketplaceCategorySlug;
+  sort: MarketplaceSort;
 };
 
-export const EMPTY_SEARCH: SearchFormState = { q: "", skills: "", mode: "", minUi: "", maxUi: "" };
+export const EMPTY_SEARCH: SearchFormState = {
+  q: "",
+  skills: "",
+  mode: "",
+  minUi: "",
+  maxUi: "",
+  category: "",
+  sort: "newest",
+};
+
+export const SORT_OPTIONS: ReadonlyArray<{ value: MarketplaceSort; label: string }> = [
+  { value: "newest", label: "Newest" },
+  { value: "amount_asc", label: "Price: low to high" },
+  { value: "amount_desc", label: "Price: high to low" },
+];
+
+const MODES: readonly string[] = ["Fixed", "Milestone", "Streaming", "Hourly"];
+const SORTS: readonly string[] = ["newest", "amount_asc", "amount_desc"];
+
+/** Prefill the filter form from a URL; unknown values are dropped (server re-validates). */
+export function searchFormFromParams(
+  params: { get(name: string): string | null },
+  decimals: number,
+  isCategory: (value: string) => value is MarketplaceCategorySlug
+): SearchFormState {
+  const toUi = (value: string | null) =>
+    value && /^\d{1,20}$/.test(value) ? baseUnitsToUi(value, decimals) : "";
+  const mode = params.get("mode") ?? "";
+  const category = params.get("category") ?? "";
+  const sort = params.get("sort") ?? "newest";
+  return {
+    q: (params.get("q") ?? "").slice(0, 80),
+    skills: (params.get("skill") ?? "").slice(0, 200),
+    mode: MODES.includes(mode) ? (mode as SearchFormState["mode"]) : "",
+    minUi: toUi(params.get("min")),
+    maxUi: toUi(params.get("max")),
+    category: isCategory(category) ? category : "",
+    sort: SORTS.includes(sort) ? (sort as MarketplaceSort) : "newest",
+  };
+}
 
 /**
  * Builds the query string for the server-side search. Amounts are converted to
@@ -183,6 +250,8 @@ export function buildSearchQuery(
     .slice(0, 5);
   if (skills.length) params.set("skill", skills.join(","));
   if (form.mode) params.set("mode", form.mode);
+  if (form.category) params.set("category", form.category);
+  if (form.sort && form.sort !== "newest") params.set("sort", form.sort);
   try {
     if (form.minUi.trim()) params.set("min", uiAmountToBaseUnits(form.minUi.trim(), decimals).toString());
     if (form.maxUi.trim()) params.set("max", uiAmountToBaseUnits(form.maxUi.trim(), decimals).toString());
@@ -199,4 +268,51 @@ export function splitSkills(text: string): string[] {
     .split(",")
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+/* ---------- Phase 3: discovery copy ---------- */
+
+/** How each payment mode is delivered and paid through PREMIFLOW escrow. */
+export const DELIVERY_TERMS: Record<PublicJob["paymentMode"], string> = {
+  Fixed: "One delivery, paid from escrow on approval",
+  Milestone: "Delivered in milestones, each approved from escrow",
+  Streaming: "Paid continuously from escrow while work is active",
+  Hourly: "Hours logged and approved, paid from escrow",
+};
+
+export const HOW_IT_WORKS = [
+  { title: "Discover", body: "Search jobs, gigs and freelancer profiles by skill, category and budget." },
+  { title: "Agree", body: "Pick a proposal or a gig. The terms prefill Create contract for you to review." },
+  { title: "Escrow", body: "The employer creates and funds the contract on-chain from their own wallet." },
+  { title: "Deliver", body: "The freelancer submits work against the contract's milestones, hours or stream." },
+  { title: "Get paid", body: "Approved work is released from escrow to the freelancer's wallet." },
+] as const;
+
+export const TRUST_POINTS = [
+  {
+    title: "Escrow held by the program",
+    body: "Contract funds sit in the PREMIFLOW Solana program's escrow for that contract, not in a PREMIFLOW-controlled wallet.",
+  },
+  {
+    title: "You sign every step",
+    body: "Creating, funding, approving and releasing are wallet-signed transactions you can verify on-chain.",
+  },
+  {
+    title: "Nothing moves before escrow",
+    body: "Listings, proposals and profiles are off-chain. No funds move until an employer creates and funds a contract.",
+  },
+  {
+    title: "A path for disputes",
+    body: "Disputes go to the Resolution Center for review by the contract's designated resolver. Outcomes are not guaranteed.",
+  },
+] as const;
+
+export const FEATURED_NOTE =
+  "Recently updated profiles with a name, headline and skills. Not ranked, reviewed or endorsed.";
+
+export function searchPageHref(params: Record<string, string>): string {
+  const qs = new URLSearchParams(
+    Object.entries(params).filter(([, value]) => value !== "")
+  ).toString();
+  return qs ? `/marketplace/search?${qs}` : "/marketplace/search";
 }

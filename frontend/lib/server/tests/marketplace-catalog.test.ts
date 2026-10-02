@@ -354,7 +354,7 @@ test("catalog migration 0009: additive, journaled, not applied by tests", () => 
 
 test("marketplace UI: active tab label color is on an inner span (global a color override)", () => {
   const parts = read("components/marketplace/MarketplaceParts.tsx");
-  assert.match(parts, /<span className=\{active \? "text-white" : "text-ink-soft"\}>\{item\.label\}<\/span>/);
+  assert.match(parts, /<span className=\{active \? "text-white" : tone === "discover" \? "text-ink" : "text-ink-soft"\}>/);
   assert.match(read("components/marketplace/MarketplaceJobDetail.tsx"), /ProfileLink wallet=\{job\.employerWallet\}/);
   assert.match(read("components/marketplace/MarketplaceJobDetail.tsx"), /ProfileLink wallet=\{p\.freelancerWallet\}/);
   assert.match(read("components/marketplace/MarketplaceGigDetail.tsx"), /stashCreateHandoff/);

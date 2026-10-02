@@ -1,4 +1,16 @@
-import { and, desc, eq, ilike, inArray, ne, or, sql, type SQL } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNotNull,
+  ne,
+  or,
+  sql,
+  type AnyColumn,
+  type SQL,
+} from "drizzle-orm";
 
 import type { MessagingDatabase } from "./client";
 import {
@@ -7,6 +19,7 @@ import {
   marketplaceProfiles,
   marketplaceProposals,
 } from "./schema";
+import { categoryPattern } from "@/lib/app/marketplace-categories";
 import { escapeLike } from "../marketplace/catalog-validation";
 import {
   ACTIVE_PROPOSAL_STATUSES,
@@ -80,8 +93,60 @@ function searchConditions(
     );
   }
   if (filter.paymentMode) conditions.push(eq(cols.paymentMode, filter.paymentMode));
+  if (filter.category) {
+    // Pattern comes from the constant keyword list and is still bound as a parameter.
+    const pattern = categoryPattern(filter.category);
+    conditions.push(
+      cols.skills
+        ? sql`(${cols.title} || ' ' || ${cols.description} || ' ' || coalesce((${cols.skills})::text, '')) ~* ${pattern}`
+        : sql`(${cols.title} || ' ' || ${cols.description}) ~* ${pattern}`
+    );
+  }
   if (filter.minAmount) conditions.push(sql`(${cols.amount})::numeric >= ${filter.minAmount}::numeric`);
   if (filter.maxAmount) conditions.push(sql`(${cols.amount})::numeric <= ${filter.maxAmount}::numeric`);
+  return conditions;
+}
+
+/** ORDER BY for the validated sort; amount ties fall back to newest first. */
+function sortOrder(
+  sort: MarketplaceSearchFilter["sort"],
+  amount: AnyColumn,
+  created: AnyColumn,
+  id: AnyColumn
+): SQL[] {
+  const newest = [desc(created), desc(id)];
+  if (sort === "amount_asc") return [sql`(${amount})::numeric asc nulls last`, ...newest];
+  if (sort === "amount_desc") return [sql`(${amount})::numeric desc nulls last`, ...newest];
+  return newest;
+}
+
+function profileConditions(filter: MarketplaceSearchFilter, completeOnly: boolean): SQL[] {
+  const p = marketplaceProfiles;
+  const conditions: SQL[] = [];
+  if (completeOnly) {
+    conditions.push(ne(p.displayName, ""), ne(p.headline, ""), sql`jsonb_array_length(${p.skills}) > 0`);
+  }
+  if (filter.text) {
+    const pattern = `%${escapeLike(filter.text)}%`;
+    conditions.push(
+      or(
+        ilike(p.displayName, pattern),
+        ilike(p.headline, pattern),
+        ilike(p.bio, pattern),
+        sql`(${p.skills})::text ilike ${pattern}`
+      ) as SQL
+    );
+  }
+  for (const skill of filter.skills) {
+    conditions.push(sql`${p.skills} @> ${JSON.stringify([skill])}::jsonb`);
+  }
+  if (filter.category) {
+    const pattern = categoryPattern(filter.category);
+    conditions.push(sql`(${p.headline} || ' ' || ${p.bio} || ' ' || (${p.skills})::text) ~* ${pattern}`);
+  }
+  if (filter.minAmount || filter.maxAmount) conditions.push(isNotNull(p.rateAmount));
+  if (filter.minAmount) conditions.push(sql`(${p.rateAmount})::numeric >= ${filter.minAmount}::numeric`);
+  if (filter.maxAmount) conditions.push(sql`(${p.rateAmount})::numeric <= ${filter.maxAmount}::numeric`);
   return conditions;
 }
 
@@ -110,7 +175,9 @@ export function createDrizzleMarketplaceStore(db: MessagingDatabase): Marketplac
             })
           )
         )
-        .orderBy(desc(marketplaceJobs.createdAt), desc(marketplaceJobs.id))
+        .orderBy(
+          ...sortOrder(filter.sort, marketplaceJobs.budgetAmount, marketplaceJobs.createdAt, marketplaceJobs.id)
+        )
         .limit(filter.limit);
       return rows.map(asJob);
     },
@@ -179,9 +246,36 @@ export function createDrizzleMarketplaceStore(db: MessagingDatabase): Marketplac
             })
           )
         )
-        .orderBy(desc(marketplaceGigs.createdAt), desc(marketplaceGigs.id))
+        .orderBy(
+          ...sortOrder(filter.sort, marketplaceGigs.priceAmount, marketplaceGigs.createdAt, marketplaceGigs.id)
+        )
         .limit(filter.limit);
       return rows.map(asGig);
+    },
+    async searchProfiles(filter, opts) {
+      const rows = await db
+        .select()
+        .from(marketplaceProfiles)
+        .where(and(...profileConditions(filter, opts.completeOnly)))
+        .orderBy(
+          ...sortOrder(
+            filter.sort,
+            marketplaceProfiles.rateAmount,
+            marketplaceProfiles.updatedAt,
+            marketplaceProfiles.wallet
+          )
+        )
+        .limit(filter.limit);
+      return rows.map(asProfile);
+    },
+    async getProfilesByWallets(wallets) {
+      const unique = [...new Set(wallets)].slice(0, 50);
+      if (unique.length === 0) return [];
+      const rows = await db
+        .select()
+        .from(marketplaceProfiles)
+        .where(inArray(marketplaceProfiles.wallet, unique));
+      return rows.map(asProfile);
     },
     async insertJob(row) {
       const [saved] = await db.insert(marketplaceJobs).values(row).returning();

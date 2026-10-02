@@ -1,3 +1,5 @@
+import type { MarketplaceCategorySlug } from "@/lib/app/marketplace-categories";
+
 export const JOB_PAYMENT_MODES = ["Fixed", "Milestone", "Streaming", "Hourly"] as const;
 export type JobPaymentMode = (typeof JOB_PAYMENT_MODES)[number];
 
@@ -135,12 +137,19 @@ export type MarketplaceGigPatch = Partial<
 >;
 
 /** Already validated and bounded by parseSearchParams. */
+export const MARKETPLACE_SORTS = ["newest", "amount_asc", "amount_desc"] as const;
+export type MarketplaceSort = (typeof MARKETPLACE_SORTS)[number];
+
 export type MarketplaceSearchFilter = {
   text: string | null;
   skills: string[];
   paymentMode: JobPaymentMode | null;
   minAmount: string | null;
   maxAmount: string | null;
+  /** Validated category slug; matched by a constant keyword pattern. */
+  category: MarketplaceCategorySlug | null;
+  /** amount = job budget, gig price, or profile hourly rate. */
+  sort: MarketplaceSort;
   limit: number;
 };
 
@@ -161,4 +170,14 @@ export interface MarketplaceCatalogStore {
   listGigsByFreelancer(wallet: string): Promise<MarketplaceGigRecord[]>;
   /** Active gigs only, newest first. */
   searchActiveGigs(filter: MarketplaceSearchFilter): Promise<MarketplaceGigRecord[]>;
+  /**
+   * Public profile listing. paymentMode does not apply; min/max/sort use the
+   * hourly rate. completeOnly keeps profiles with a name, headline and skills.
+   */
+  searchProfiles(
+    filter: MarketplaceSearchFilter,
+    opts: { completeOnly: boolean }
+  ): Promise<MarketplaceProfileRecord[]>;
+  /** Bounded batch lookup (callers pass at most SEARCH_LIMITS.maxLimit wallets). */
+  getProfilesByWallets(wallets: string[]): Promise<MarketplaceProfileRecord[]>;
 }

@@ -4,9 +4,14 @@
  */
 import { PublicKey } from "@solana/web3.js";
 
+import { isCategorySlug, matchesCategory } from "@/lib/app/marketplace-categories";
+
 import { HttpError } from "../http";
 import {
   JOB_PAYMENT_MODES,
+  MARKETPLACE_SORTS,
+  type MarketplaceProfileRecord,
+  type MarketplaceSort,
   PROFILE_AVAILABILITY,
   type JobPaymentMode,
   type MarketplaceSearchFilter,
@@ -255,12 +260,26 @@ export function parseSearchParams(params: URLSearchParams): MarketplaceSearchFil
     throw invalid("Minimum amount cannot exceed maximum amount.");
   }
 
+  const categoryRaw = params.get("category");
+  let category: MarketplaceSearchFilter["category"] = null;
+  if (categoryRaw) {
+    if (!isCategorySlug(categoryRaw)) throw invalid("Unknown category.");
+    category = categoryRaw;
+  }
+
+  const sortRaw = params.get("sort");
+  let sort: MarketplaceSort = "newest";
+  if (sortRaw) {
+    if (!(MARKETPLACE_SORTS as readonly string[]).includes(sortRaw)) throw invalid("Unknown sort order.");
+    sort = sortRaw as MarketplaceSort;
+  }
+
   const limitRaw = Number.parseInt(params.get("limit") ?? "", 10);
   const limit = Number.isFinite(limitRaw)
     ? Math.min(Math.max(limitRaw, 1), SEARCH_LIMITS.maxLimit)
     : SEARCH_LIMITS.maxLimit;
 
-  return { text, skills, paymentMode, minAmount, maxAmount, limit };
+  return { text, skills, paymentMode, minAmount, maxAmount, category, sort, limit };
 }
 
 /** Reference matcher (memory store + tests); mirrors the SQL conditions. */
@@ -275,6 +294,12 @@ export function matchesSearch(
     if (!ok) return false;
   }
   if (filter.paymentMode && row.paymentMode !== filter.paymentMode) return false;
+  if (
+    filter.category &&
+    !matchesCategory(`${row.title} ${row.description} ${(row.skills ?? []).join(" ")}`, filter.category)
+  ) {
+    return false;
+  }
   const amount = BigInt(row.amount);
   if (filter.minAmount && amount < BigInt(filter.minAmount)) return false;
   if (filter.maxAmount && amount > BigInt(filter.maxAmount)) return false;
@@ -288,4 +313,49 @@ export function isWalletAddress(value: unknown): value is string {
   } catch {
     return false;
   }
+}
+
+/** Reference matcher for the public profile listing (memory store + tests). */
+export function matchesProfileSearch(
+  row: MarketplaceProfileRecord,
+  filter: MarketplaceSearchFilter,
+  opts: { completeOnly: boolean }
+): boolean {
+  if (opts.completeOnly && (!row.displayName || !row.headline || row.skills.length === 0)) return false;
+  const haystack = `${row.displayName}\n${row.headline}\n${row.bio}\n${row.skills.join(" ")}`.toLowerCase();
+  if (filter.text && !haystack.includes(filter.text.toLowerCase())) return false;
+  for (const skill of filter.skills) {
+    if (!row.skills.includes(skill)) return false;
+  }
+  if (
+    filter.category &&
+    !matchesCategory(`${row.headline} ${row.bio} ${row.skills.join(" ")}`, filter.category)
+  ) {
+    return false;
+  }
+  if (filter.minAmount || filter.maxAmount) {
+    if (!row.rateAmount) return false;
+    const rate = BigInt(row.rateAmount);
+    if (filter.minAmount && rate < BigInt(filter.minAmount)) return false;
+    if (filter.maxAmount && rate > BigInt(filter.maxAmount)) return false;
+  }
+  return true;
+}
+
+/** Reference ordering shared by the memory store; SQL mirrors it. */
+export function compareForSort<T extends { createdAt: Date; id: string }>(
+  sort: MarketplaceSort,
+  amountOf: (row: T) => string | null
+): (a: T, b: T) => number {
+  const newest = (a: T, b: T) =>
+    b.createdAt.getTime() - a.createdAt.getTime() || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0);
+  if (sort === "newest") return newest;
+  const dir = sort === "amount_asc" ? 1 : -1;
+  return (a, b) => {
+    const x = amountOf(a);
+    const y = amountOf(b);
+    if (x === null || y === null) return x === y ? newest(a, b) : x === null ? 1 : -1;
+    const diff = BigInt(x) - BigInt(y);
+    return diff === 0n ? newest(a, b) : diff > 0n ? dir : -dir;
+  };
 }

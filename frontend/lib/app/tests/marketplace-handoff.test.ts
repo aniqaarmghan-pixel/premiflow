@@ -75,7 +75,9 @@ test("marketplace UI: no auto-send, no on-chain client, real data only, nav entr
     MARKETPLACE_NAV.map((n) => n.href),
     [
       "/marketplace",
+      "/marketplace/jobs",
       "/marketplace/gigs",
+      "/marketplace/freelancers",
       "/marketplace/post",
       "/marketplace/gigs/new",
       "/marketplace/my-jobs",

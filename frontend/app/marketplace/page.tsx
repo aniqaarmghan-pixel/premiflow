@@ -1,7 +1,7 @@
 "use client";
 
-import { MarketplaceBrowse } from "@/components/marketplace/MarketplaceBrowse";
+import { MarketplaceHome } from "@/components/marketplace/MarketplaceHome";
 
 export default function Page() {
-  return <MarketplaceBrowse />;
+  return <MarketplaceHome />;
 }

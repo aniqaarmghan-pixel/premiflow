@@ -129,8 +129,108 @@ export async function searchJobs(
 export async function searchGigs(
   store: MarketplaceStore,
   params: URLSearchParams
-): Promise<PublicGig[]> {
-  return (await store.searchActiveGigs(parseSearchParams(params))).map(toPublicGig);
+): Promise<GigCard[]> {
+  return withSellers(store, await store.searchActiveGigs(parseSearchParams(params)));
+}
+
+/* ---------------- discovery (Phase 3) ---------------- */
+
+/** Public seller block shown on gig cards. */
+export type GigCard = PublicGig & { seller: ProfileSummary | null };
+
+/**
+ * Safe public listing fields. Bio, portfolio and timestamps other than
+ * updatedAt stay on the full profile page.
+ */
+export type FreelancerCard = {
+  wallet: string;
+  displayName: string;
+  avatarUrl: string | null;
+  headline: string;
+  skills: string[];
+  rateAmount: string | null;
+  availability: ProfileAvailability;
+  updatedAt: string;
+};
+
+export const SEARCH_TYPES = ["all", "jobs", "gigs", "freelancers"] as const;
+export type SearchType = (typeof SEARCH_TYPES)[number];
+/** Per-section cap for the unified search (the explicit limit can only lower it). */
+export const UNIFIED_SECTION_LIMIT = 12;
+
+export type UnifiedSearchResult = {
+  type: SearchType;
+  jobs: PublicJob[];
+  gigs: GigCard[];
+  freelancers: FreelancerCard[];
+};
+
+export function toFreelancerCard(row: MarketplaceProfileRecord): FreelancerCard {
+  return {
+    wallet: row.wallet,
+    displayName: row.displayName,
+    avatarUrl: row.avatarUrl,
+    headline: row.headline,
+    skills: [...row.skills],
+    rateAmount: row.rateAmount,
+    availability: row.availability,
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+function toSummary(row: MarketplaceProfileRecord): ProfileSummary {
+  return {
+    wallet: row.wallet,
+    displayName: row.displayName,
+    avatarUrl: row.avatarUrl,
+    headline: row.headline,
+  };
+}
+
+async function withSellers(store: MarketplaceStore, rows: MarketplaceGigRecord[]): Promise<GigCard[]> {
+  const wallets = [...new Set(rows.map((row) => row.freelancerWallet))];
+  const profiles = wallets.length ? await store.getProfilesByWallets(wallets) : [];
+  const byWallet = new Map(profiles.map((p) => [p.wallet, toSummary(p)]));
+  return rows.map((row) => ({ ...toPublicGig(row), seller: byWallet.get(row.freelancerWallet) ?? null }));
+}
+
+/** Public. ?featured=1 keeps complete profiles (name, headline, skills), newest update first. */
+export async function searchFreelancers(
+  store: MarketplaceStore,
+  params: URLSearchParams
+): Promise<FreelancerCard[]> {
+  const featured = params.get("featured");
+  if (featured !== null && featured !== "1" && featured !== "0") {
+    throw new HttpError(400, "invalid_marketplace_input", "featured must be 1 or 0.");
+  }
+  const rows = await store.searchProfiles(parseSearchParams(params), { completeOnly: featured === "1" });
+  return rows.map(toFreelancerCard);
+}
+
+/** Public unified search over open jobs, active gigs and public profiles. */
+export async function searchMarketplace(
+  store: MarketplaceStore,
+  params: URLSearchParams
+): Promise<UnifiedSearchResult> {
+  const typeRaw = params.get("type") ?? "all";
+  if (!(SEARCH_TYPES as readonly string[]).includes(typeRaw)) {
+    throw new HttpError(400, "invalid_marketplace_input", "Unknown search type.");
+  }
+  const type = typeRaw as SearchType;
+  const parsed = parseSearchParams(params);
+  const filter = { ...parsed, limit: Math.min(parsed.limit, UNIFIED_SECTION_LIMIT) };
+  const want = (t: SearchType) => type === "all" || type === t;
+  const [jobs, gigs, profiles] = await Promise.all([
+    want("jobs") ? store.searchOpenJobs(filter) : Promise.resolve([]),
+    want("gigs") ? store.searchActiveGigs(filter) : Promise.resolve([]),
+    want("freelancers") ? store.searchProfiles(filter, { completeOnly: false }) : Promise.resolve([]),
+  ]);
+  return {
+    type,
+    jobs: jobs.map(toPublicJob),
+    gigs: await withSellers(store, gigs),
+    freelancers: profiles.map(toFreelancerCard),
+  };
 }
 
 /* ---------------- profiles ---------------- */

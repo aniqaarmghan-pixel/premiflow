@@ -1,4 +1,4 @@
-import { matchesSearch } from "./catalog-validation";
+import { compareForSort, matchesProfileSearch, matchesSearch } from "./catalog-validation";
 import {
   ACTIVE_PROPOSAL_STATUSES,
   DuplicateProposalError,
@@ -34,7 +34,7 @@ export function createMemoryMarketplaceStore(): MarketplaceStore {
             row.status === "open" &&
             matchesSearch({ ...row, amount: row.budgetAmount, skills: null }, filter)
         )
-        .sort(newestFirst)
+        .sort(compareForSort(filter.sort, (row) => row.budgetAmount))
         .slice(0, filter.limit)
         .map((row) => ({ ...row }));
     },
@@ -78,9 +78,25 @@ export function createMemoryMarketplaceStore(): MarketplaceStore {
           (row) =>
             row.status === "active" && matchesSearch({ ...row, amount: row.priceAmount }, filter)
         )
-        .sort(newestFirst)
+        .sort(compareForSort(filter.sort, (row) => row.priceAmount))
         .slice(0, filter.limit)
         .map(cloneGig);
+    },
+    async searchProfiles(filter, opts) {
+      // Profiles have no id; "newest" means most recently updated.
+      type Keyed = { createdAt: Date; id: string; rate: string | null; row: MarketplaceProfileRecord };
+      return [...profiles.values()]
+        .filter((row) => matchesProfileSearch(row, filter, opts))
+        .map((row): Keyed => ({ createdAt: row.updatedAt, id: row.wallet, rate: row.rateAmount, row }))
+        .sort(compareForSort<Keyed>(filter.sort, (k) => k.rate))
+        .slice(0, filter.limit)
+        .map((k) => cloneProfile(k.row));
+    },
+    async getProfilesByWallets(wallets) {
+      return wallets
+        .map((wallet) => profiles.get(wallet))
+        .filter((row): row is MarketplaceProfileRecord => Boolean(row))
+        .map(cloneProfile);
     },
     async insertJob(row) {
       jobs.push({ ...row });

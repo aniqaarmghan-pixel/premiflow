@@ -311,7 +311,7 @@ function walk(dir: string): string[] {
 
 test("marketplace routes: wallet only from the signed session, origin-checked writes", () => {
   const routes = walk("app/api/marketplace").filter((f) => f.endsWith("route.ts"));
-  assert.equal(routes.length, 14);
+  assert.equal(routes.length, 16);
   for (const file of routes) {
     const source = readFileSync(file, "utf8");
     assert.doesNotMatch(source, /body\.(employerWallet|freelancerWallet|wallet|sessionWallet|tokenMint)/, file);

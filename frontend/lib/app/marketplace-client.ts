@@ -1,8 +1,11 @@
 import type {
+  FreelancerCard,
+  GigCard,
   GigDetail,
   ProfilePage,
   PublicGig,
   PublicProfile,
+  UnifiedSearchResult,
 } from "@/lib/server/marketplace/catalog-service";
 import type {
   CreateHandoff,
@@ -112,7 +115,7 @@ export function searchJobs(qs: string) {
 }
 
 export function searchGigs(qs: string) {
-  return request<{ gigs: PublicGig[] }>(`/api/marketplace/gigs${qs}`);
+  return request<{ gigs: GigCard[] }>(`/api/marketplace/gigs${qs}`);
 }
 
 export type GigInput = {
@@ -188,4 +191,14 @@ export function saveMyProfile(input: ProfileInput) {
 
 export function fetchProfilePage(wallet: string) {
   return request<ProfilePage>(`/api/marketplace/profiles/${encodeURIComponent(wallet)}`);
+}
+
+/* ---------- Phase 3: discovery ---------- */
+
+export function fetchFreelancers(qs: string) {
+  return request<{ freelancers: FreelancerCard[] }>(`/api/marketplace/freelancers${qs}`);
+}
+
+export function searchMarketplace(qs: string) {
+  return request<UnifiedSearchResult>(`/api/marketplace/search${qs}`);
 }
