@@ -1,6 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
 
-import { toDatetimeLocalValue } from "@/lib/app/datetime";
 import { STREAMING_VS_HOURLY } from "@/lib/app/contract-type-guide";
 import {
   ASSISTANT_AUTHORITY_BOUNDARY,
@@ -93,9 +92,7 @@ export function createProposalToDraftPatch(
     reviewDuration: proposal.reviewDuration,
     activationReviewDuration: proposal.activationReviewDuration,
     maxRevisions: proposal.maxRevisions,
-    acceptanceDeadlineLocal: toDatetimeLocalValue(
-      proposal.acceptanceDeadlineOffsetSeconds
-    ),
+    acceptanceWindowSeconds: proposal.acceptanceDeadlineOffsetSeconds,
     startMode:
       proposal.paymentMode === "Hourly" ? "OnActivation" : proposal.startMode,
     milestones:

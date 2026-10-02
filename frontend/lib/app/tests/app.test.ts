@@ -310,6 +310,7 @@ test("create-contract form validation", () => {
     reviewDuration: 600,
     activationReviewDuration: 3600,
     maxRevisions: 2,
+    acceptanceWindowSeconds: 172_800,
     acceptanceDeadlineLocal: future,
     title: "Landing page",
     description: "Ship the page",

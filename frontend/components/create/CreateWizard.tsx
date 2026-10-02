@@ -6,7 +6,7 @@ import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { PublicKey } from "@solana/web3.js";
 import { AnimatePresence, motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import { TypeMotif } from "@/components/contracts/TypeMotif";
 import { SuccessMoment } from "@/components/contracts/SuccessMoment";
@@ -53,6 +53,17 @@ import {
   type ObservedCreateState,
 } from "@/lib/app/milestone-create-plan";
 import { releaseUnsentCreateAttempt } from "@/lib/app/create-attempt-recovery";
+import {
+  CREATE_DRAFT_SAVE_DEBOUNCE_MS,
+  NO_WALLET_DRAFT_OWNER,
+  acceptanceWindowOptions,
+  clearAllCreateDrafts,
+  clearCreateDraft,
+  loadCreateDraft,
+  resolveAcceptanceDeadline,
+  saveCreateDraft,
+  type SavedCreateDraft,
+} from "@/lib/app/create-draft-store";
 import { formatTokenAmount } from "@/lib/app/money";
 import {
   lockedCreatePayment,
@@ -112,6 +123,11 @@ function intentStorage(): IntentStorage | null {
     // Storage blocked by the browser: saving fails loudly before any send.
     return null;
   }
+}
+
+/** Client-only flag without setState in an effect (server render is false). */
+function subscribeNothing(): () => void {
+  return () => {};
 }
 
 function nowSeconds(): number {
@@ -233,6 +249,46 @@ export function CreateWizard() {
   const savedIntent = savedLoad.kind === "ready" ? savedLoad.intent : null;
   const savedCorruptMessage = savedLoad.kind === "corrupt" ? savedLoad.message : null;
 
+  // P4: unfinished Create draft. Local only, never sent, never replaces a saved setup.
+  const hydrated = useSyncExternalStore(subscribeNothing, () => true, () => false);
+  const draftOwner = employerKey ?? NO_WALLET_DRAFT_OWNER;
+  const [draftDecidedFor, setDraftDecidedFor] = useState<string | null>(null);
+  const draftClosedRef = useRef(false);
+  const draftOffer = useMemo<SavedCreateDraft | null>(() => {
+    if (!hydrated || draftDecidedFor === draftOwner || savedLoad.kind !== "none") return null;
+    return loadCreateDraft(intentStorage(), INTENT_SCOPE, draftOwner, STEPS.length - 1);
+  }, [hydrated, draftDecidedFor, draftOwner, savedLoad.kind]);
+
+  useEffect(() => {
+    // Never save while a create intent exists, or over a draft awaiting Restore / Start fresh.
+    if (!hydrated || draftOffer || savedLoad.kind !== "none") return;
+    const handle = window.setTimeout(() => {
+      if (draftClosedRef.current) return;
+      saveCreateDraft(intentStorage(), INTENT_SCOPE, draftOwner, {
+        draft,
+        step,
+        nowMs: Date.now(),
+        intentExists: false,
+      });
+    }, CREATE_DRAFT_SAVE_DEBOUNCE_MS);
+    return () => window.clearTimeout(handle);
+  }, [hydrated, draftOffer, savedLoad.kind, draftOwner, draft, step]);
+
+  function restoreDraft(saved: SavedCreateDraft) {
+    // Refills the form only. Create & Send Offer stays a manual, reviewed step.
+    setDraft(saved.draft);
+    setStep(saved.step);
+    setDraftDecidedFor(draftOwner);
+    setProgressNote("Draft restored. Review each step, then press Create & Send Offer when ready.");
+  }
+
+  function startFresh() {
+    clearCreateDraft(intentStorage(), INTENT_SCOPE, draftOwner);
+    setDraft(defaultCreateDraft());
+    setStep(0);
+    setDraftDecidedFor(draftOwner);
+  }
+
   const errors = useMemo(
     () =>
       publicKey
@@ -326,9 +382,30 @@ export function CreateWizard() {
         .filter(Boolean),
     };
     const stored = await localMetadataStore.put(metadata);
-    const acceptanceDeadline = localDateTimeInputToUnixSeconds(
-      draft.acceptanceDeadlineLocal
-    );
+    // A saved setup is locked once a create may have been sent.
+    const loaded = loadSavedIntent(publicKey.toBase58());
+    if (loaded.kind === "corrupt") {
+      setSetupNotice(null);
+      setSetupConflict({ message: loaded.message, allowResume: false });
+      return;
+    }
+    // "Accept within" becomes an absolute deadline right before the first create
+    // attempt. An attempted setup always keeps its stored deadline unchanged.
+    const acceptanceDeadline = resolveAcceptanceDeadline({
+      windowSeconds: draft.acceptanceWindowSeconds,
+      nowSeconds: nowSeconds(),
+      saved: loaded.kind === "ready" ? loaded.intent : null,
+    });
+    if (
+      draft.paymentMode !== "Hourly" &&
+      draft.startMode === "Scheduled" &&
+      localDateTimeInputToUnixSeconds(draft.scheduledStartLocal) < acceptanceDeadline
+    ) {
+      setProgressNote(
+        "Scheduled start must not precede the acceptance deadline. Move the start later or shorten Accept within."
+      );
+      return;
+    }
     const scheduledStartTime =
       draft.startMode === "Scheduled"
         ? localDateTimeInputToUnixSeconds(draft.scheduledStartLocal)
@@ -394,13 +471,7 @@ export function CreateWizard() {
           : [],
       request,
     };
-    // A saved setup is locked once a create may have been sent.
-    const loaded = loadSavedIntent(terms.employer);
-    if (loaded.kind === "corrupt") {
-      setSetupNotice(null);
-      setSetupConflict({ message: loaded.message, allowResume: false });
-      return;
-    }
+    // `loaded` was read above, before the acceptance deadline was fixed.
     // One stable contract ID per creation attempt: a retry, failure or unknown
     // confirmation reuses the saved ID instead of generating a new one.
     const ensured = ensureCreateIntent({
@@ -419,6 +490,8 @@ export function CreateWizard() {
       return;
     }
     saveCreateIntent(intentStorage(), ensured.intent);
+    // The saved setup now holds these terms; the local draft is no longer needed.
+    clearAllCreateDrafts(intentStorage(), INTENT_SCOPE, terms.employer);
     setIntentVersion((v) => v + 1);
     await runSetup(ensured.intent);
   }
@@ -638,6 +711,12 @@ export function CreateWizard() {
     } catch {
       // Verified complete on-chain; a leftover saved setup would re-verify as complete.
     }
+    draftClosedRef.current = true;
+    clearAllCreateDrafts(
+      intentStorage(),
+      { cluster: intent.cluster, programId: intent.programId },
+      intent.employer
+    );
     setIntentVersion((v) => v + 1);
     setCreatedAddress(progress.contractAddress);
     if (progress.status === "PendingAcceptance") {
@@ -839,6 +918,25 @@ export function CreateWizard() {
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_240px]">
       <div className="min-w-0">
+        {draftOffer ? (
+          <div
+            role="status"
+            className="mb-3 rounded-xl border border-line bg-paper-2 px-3 py-2.5 text-sm text-ink"
+          >
+            <p className="font-semibold">Unfinished draft found</p>
+            <p className="mt-0.5 text-ink-soft">
+              Saved in this browser{draftOffer.savedAt ? ` on ${new Date(draftOffer.savedAt).toLocaleString()}` : ""}. Nothing was sent on-chain; restoring only refills the form.
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button type="button" onClick={() => restoreDraft(draftOffer)}>
+                Restore draft
+              </Button>
+              <Button type="button" variant="ghost" onClick={startFresh}>
+                Start fresh
+              </Button>
+            </div>
+          </div>
+        ) : null}
         <ol className="mb-3 flex min-w-0 flex-wrap gap-1.5 sm:mb-4 sm:gap-1">
           {STEPS.map((label, i) => (
             <li key={label}>
@@ -1080,15 +1178,20 @@ export function CreateWizard() {
                   </Field>
                 ) : null}
                 <Field
-                  label="Acceptance deadline"
-                  error={errors.acceptanceDeadlineLocal}
-                  hint="Freelancer must accept by this time."
+                  label="Accept within"
+                  error={errors.acceptanceWindowSeconds}
+                  hint="The exact acceptance deadline is set when you press Create & Send Offer and stays fixed for that setup."
                 >
-                  <Input
-                    type="datetime-local"
-                    value={draft.acceptanceDeadlineLocal}
-                    onChange={(e) => patch({ acceptanceDeadlineLocal: e.target.value })}
-                  />
+                  <Select
+                    value={String(draft.acceptanceWindowSeconds)}
+                    onChange={(e) => patch({ acceptanceWindowSeconds: Number(e.target.value) })}
+                  >
+                    {acceptanceWindowOptions(draft.acceptanceWindowSeconds).map((option) => (
+                      <option key={option.seconds} value={option.seconds}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
                 </Field>
                 {draft.paymentMode === "Hourly" ? (
                   <>
@@ -1774,7 +1877,7 @@ function stepReady(
       !errors.durationSeconds &&
       !errors.engagementDurationValue &&
       !errors.reviewDuration &&
-      !errors.acceptanceDeadlineLocal &&
+      !errors.acceptanceWindowSeconds &&
       !errors.scheduledStartLocal &&
       !errors.checkpointInterval
     );

@@ -1,6 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
 
-import { toDatetimeLocalValue } from "@/lib/app/datetime";
 import {
   assertResolverDistinct,
   findResolver,
@@ -54,7 +53,10 @@ export type CreateWizardDraft = {
   reviewDuration: number;
   activationReviewDuration: number;
   maxRevisions: number;
-  acceptanceDeadlineLocal: string;
+  /** "Accept within" window; the absolute deadline is fixed right before the first create attempt. */
+  acceptanceWindowSeconds: number;
+  /** @deprecated Legacy absolute deadline from older drafts; ignored by validation. */
+  acceptanceDeadlineLocal?: string;
   title: string;
   description: string;
   deliverables: string;
@@ -110,7 +112,7 @@ export function defaultCreateDraft(): CreateWizardDraft {
     reviewDuration: 3_600,
     activationReviewDuration: 3_600,
     maxRevisions: 2,
-    acceptanceDeadlineLocal: toDatetimeLocalValue(172_800),
+    acceptanceWindowSeconds: 172_800,
     title: "",
     description: "",
     deliverables: "",
@@ -432,23 +434,20 @@ function validateCreateDraftWithPartyErrors(
     }
   }
 
-  const acceptance = Date.parse(draft.acceptanceDeadlineLocal);
-  if (Number.isNaN(acceptance)) {
-    errors.acceptanceDeadlineLocal = "Set an acceptance deadline.";
-  } else {
-    const seconds = Math.floor(acceptance / 1000);
-    if (seconds <= nowSeconds) {
-      errors.acceptanceDeadlineLocal = "Acceptance deadline must be in the future.";
-    } else if (seconds - nowSeconds > MAX_ACCEPTANCE_WINDOW) {
-      errors.acceptanceDeadlineLocal = "Acceptance window is too long.";
-    }
+  const acceptanceWindow = draft.acceptanceWindowSeconds;
+  if (!Number.isSafeInteger(acceptanceWindow) || acceptanceWindow <= 0) {
+    errors.acceptanceWindowSeconds = "Choose how long the freelancer has to accept.";
+  } else if (acceptanceWindow > MAX_ACCEPTANCE_WINDOW) {
+    errors.acceptanceWindowSeconds = "Acceptance window is too long.";
   }
+  // Estimate only: the exact deadline is fixed right before the first create attempt.
+  const acceptanceEstimate = nowSeconds + acceptanceWindow;
 
   if (draft.startMode === "Scheduled") {
     const start = Date.parse(draft.scheduledStartLocal);
     if (Number.isNaN(start)) {
       errors.scheduledStartLocal = "Set a scheduled start.";
-    } else if (!Number.isNaN(acceptance) && start / 1000 < acceptance / 1000) {
+    } else if (!errors.acceptanceWindowSeconds && start / 1000 < acceptanceEstimate) {
       errors.scheduledStartLocal =
         "Scheduled start must not precede the acceptance deadline.";
     }
