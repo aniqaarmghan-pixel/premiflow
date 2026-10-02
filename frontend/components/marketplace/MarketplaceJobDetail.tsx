@@ -32,7 +32,7 @@ import { deriveContractPda, uiAmountToBaseUnits } from "@/lib/streampay-v2";
 import { STREAMPAY_PROGRAM_ID } from "@/lib/streampay-v2/constants";
 import { PublicKey } from "@solana/web3.js";
 
-import { MarketplaceHeader, ProfileLink, StatusPill } from "./MarketplaceParts";
+import { JobTags, MarketplaceHeader, ProfileLink, StatusPill } from "./MarketplaceParts";
 
 const CREATE_SCOPE: IntentScope = {
   cluster: ACTIVE_CLUSTER_ID,
@@ -144,6 +144,7 @@ export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
         <p className="whitespace-pre-wrap break-words text-sm leading-6 text-ink [overflow-wrap:anywhere]">
           {job.description}
         </p>
+        <JobTags job={job} />
         {job.status === "closed" ? (
           <p className="text-xs text-ink-faint">{MARKETPLACE_COPY.closedNote}</p>
         ) : null}

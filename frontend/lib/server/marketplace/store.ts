@@ -25,6 +25,10 @@ export type MarketplaceJobRecord = {
   createdAt: Date;
   updatedAt: Date;
   closedAt: Date | null;
+  /** Normalized skills; [] for jobs posted before migration 0010. */
+  skills: string[];
+  /** Explicit category; null means derive from keywords. */
+  category: MarketplaceCategorySlug | null;
 };
 
 export type MarketplaceProposalRecord = {
@@ -45,6 +49,8 @@ export type MarketplaceJobPatch = Partial<
     | "description"
     | "paymentMode"
     | "budgetAmount"
+    | "skills"
+    | "category"
     | "status"
     | "selectedProposalId"
     | "closedAt"

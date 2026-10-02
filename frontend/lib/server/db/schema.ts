@@ -537,6 +537,9 @@ export const marketplaceJobs = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
     closedAt: timestamp("closed_at", { withTimezone: true }),
+    // 0010: additive, defaulted; existing rows keep [] / NULL.
+    skills: jsonb("skills").$type<string[]>().notNull().default(sql`'[]'::jsonb`),
+    category: text("category"),
   },
   (table) => [
     index("marketplace_jobs_status_created_idx").on(table.status, table.createdAt, table.id),
@@ -552,6 +555,14 @@ export const marketplaceJobs = pgTable(
       sql`char_length(${table.description}) between 1 and 4000`
     ),
     check("marketplace_jobs_budget_digits", sql`${table.budgetAmount} ~ '^[0-9]{1,20}$'`),
+    check(
+      "marketplace_jobs_skills_array",
+      sql`jsonb_typeof(${table.skills}) = 'array' AND jsonb_array_length(${table.skills}) <= 10`
+    ),
+    check(
+      "marketplace_jobs_category_enum",
+      sql`${table.category} IS NULL OR ${table.category} in ('development', 'web3', 'design', 'ai', 'video', 'marketing', 'writing', 'business')`
+    ),
     check(
       "marketplace_jobs_filled_selection",
       sql`${table.status} <> 'filled' OR ${table.selectedProposalId} IS NOT NULL`

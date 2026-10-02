@@ -39,6 +39,8 @@ export async function POST(request: Request) {
       description: body.description,
       paymentMode: body.paymentMode,
       budgetAmount: body.budgetAmount,
+      skills: body.skills,
+      category: body.category,
       // Token comes from trusted config, never from the client.
       tokenMint: new PublicKey(lockedCreatePayment().mint).toBase58(),
     });

@@ -9,7 +9,11 @@ import {
   defaultCreateDraft,
   type CreateWizardDraft,
 } from "@/lib/app/validation";
-import type { MarketplaceCategorySlug } from "@/lib/app/marketplace-categories";
+import {
+  MARKETPLACE_CATEGORIES,
+  categorizeText,
+  type MarketplaceCategorySlug,
+} from "@/lib/app/marketplace-categories";
 import type { PublicGig, PublicProfile } from "@/lib/server/marketplace/catalog-service";
 import type { MarketplaceSort } from "@/lib/server/marketplace/store";
 import type { CreateHandoff, PublicJob, PublicProposal } from "@/lib/server/marketplace/service";
@@ -315,4 +319,17 @@ export function searchPageHref(params: Record<string, string>): string {
     Object.entries(params).filter(([, value]) => value !== "")
   ).toString();
   return qs ? `/marketplace/search?${qs}` : "/marketplace/search";
+}
+
+/** Explicit job category, else the first keyword-derived one (legacy rows). */
+export function jobCategory(
+  job: Pick<PublicJob, "title" | "description" | "skills" | "category">
+): MarketplaceCategorySlug | null {
+  if (job.category) return job.category;
+  const derived = categorizeText(`${job.title} ${job.description} ${(job.skills ?? []).join(" ")}`);
+  return derived.length > 0 ? derived[0] : null;
+}
+
+export function categoryLabelOf(slug: MarketplaceCategorySlug): string {
+  return MARKETPLACE_CATEGORIES.find((c) => c.slug === slug)?.label ?? slug;
 }

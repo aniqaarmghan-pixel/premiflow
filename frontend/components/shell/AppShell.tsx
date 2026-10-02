@@ -161,6 +161,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Link
                 key={item.href}
                 href={item.href}
+                aria-current={active ? "page" : undefined}
                 className={`relative flex items-center gap-2 rounded-2xl px-3 py-2.5 text-sm transition ${
                   active ? "text-white" : "text-white/60 hover:bg-white/5 hover:text-white"
                 }`}
@@ -265,17 +266,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   }}
                 />
               ) : null}
-              {nav.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setOpen(false)}
-                  className="mb-1 flex min-h-11 items-center gap-2 rounded-2xl px-3 py-2.5 text-sm text-white/75 hover:bg-white/10 hover:text-white"
-                >
-                  <item.icon size={16} />
-                  {item.label}
-                </Link>
-              ))}
+              {nav.map((item) => {
+                const active = isNavActive(item.href, pathname);
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    aria-current={active ? "page" : undefined}
+                    className={`mb-1 flex min-h-11 items-center gap-2 rounded-2xl px-3 py-2.5 text-sm ${
+                      active
+                        ? "bg-white/10 text-white shadow-[inset_0_0_0_1px_rgba(46,230,214,.4)]"
+                        : "text-white/75 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <item.icon size={16} className={active ? "text-cyan" : ""} />
+                    {item.label}
+                  </Link>
+                );
+              })}
               <div className="mt-6 border-t border-white/10 pt-4">
                 <ClientOnly>
                   <SoundPreference compact />

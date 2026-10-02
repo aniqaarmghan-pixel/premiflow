@@ -41,6 +41,9 @@ export type JobInput = {
   description: string;
   paymentMode: PublicJob["paymentMode"];
   budgetAmount: string;
+  skills: string[];
+  /** "" = no explicit category (derived from keywords). */
+  category: "" | NonNullable<PublicJob["category"]>;
 };
 
 export function fetchOpenJobs() {

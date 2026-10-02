@@ -158,7 +158,7 @@ test("wizard wiring: explicit buttons, wallet-scoped, no auto-send, draft prompt
   const wizard = readFileSync("components/create/CreateWizard.tsx", "utf8");
   assert.match(wizard, /onClick=\{\(\) => chooseHandoff\("import"\)\}/);
   assert.match(wizard, /onClick=\{\(\) => chooseHandoff\("keep"\)\}/);
-  assert.match(wizard, /Use selected proposal/);
+  assert.match(wizard, /\{handoffUseLabel\(pendingHandoff\.handoff\)\}/);
   assert.match(wizard, /Keep current draft/);
   assert.match(wizard, /if \(!hydrated \|\| !employerKey \|\| handoffDecidedFor === employerKey\) return null;/);
   assert.match(wizard, /intentExists: savedLoad\.kind !== "none"/);

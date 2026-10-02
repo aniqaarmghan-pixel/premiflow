@@ -45,6 +45,8 @@ export async function PATCH(request: Request, context: Context) {
             description: body.description,
             paymentMode: body.paymentMode,
             budgetAmount: body.budgetAmount,
+            skills: body.skills,
+            category: body.category,
           });
     return NextResponse.json({ job });
   } catch (err) {

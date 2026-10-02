@@ -10,7 +10,9 @@ import {
   amountLabel,
   baseUnitsToUi,
   marketplaceErrorMessage,
+  splitSkills,
 } from "@/lib/app/marketplace";
+import { MARKETPLACE_CATEGORIES } from "@/lib/app/marketplace-categories";
 import { editJob, fetchJobDetail, postJob, type JobInput } from "@/lib/app/marketplace-client";
 import { lockedCreatePayment } from "@/lib/app/premiflow";
 import { useMarketplaceQuery, useMarketplaceSession } from "@/lib/hooks/useMarketplace";
@@ -24,9 +26,18 @@ type FormState = {
   description: string;
   paymentMode: PublicJob["paymentMode"];
   amountUi: string;
+  skills: string;
+  category: JobInput["category"];
 };
 
-const EMPTY_FORM: FormState = { title: "", description: "", paymentMode: "Fixed", amountUi: "" };
+const EMPTY_FORM: FormState = {
+  title: "",
+  description: "",
+  paymentMode: "Fixed",
+  amountUi: "",
+  skills: "",
+  category: "",
+};
 const MODES: PublicJob["paymentMode"][] = ["Fixed", "Milestone", "Streaming", "Hourly"];
 
 export function MarketplaceJobForm({ jobId }: { jobId?: string }) {
@@ -49,6 +60,8 @@ export function MarketplaceJobForm({ jobId }: { jobId?: string }) {
           description: loaded.job.description,
           paymentMode: loaded.job.paymentMode,
           amountUi: baseUnitsToUi(loaded.job.budgetAmount, locked.decimals),
+          skills: (loaded.job.skills ?? []).join(", "),
+          category: loaded.job.category ?? "",
         }
       : EMPTY_FORM);
 
@@ -65,6 +78,8 @@ export function MarketplaceJobForm({ jobId }: { jobId?: string }) {
         description: current.description,
         paymentMode: current.paymentMode,
         budgetAmount: uiAmountToBaseUnits(current.amountUi, locked.decimals).toString(),
+        skills: splitSkills(current.skills),
+        category: current.category,
       };
       await session.ensure();
       const saved = jobId ? await editJob(jobId, input) : await postJob(input);
@@ -115,6 +130,28 @@ export function MarketplaceJobForm({ jobId }: { jobId?: string }) {
               onChange={(e) => update({ description: e.target.value })}
             />
           </Field>
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
+            <Field label="Skills (comma separated, up to 10)">
+              <Input
+                value={current.skills}
+                maxLength={400}
+                onChange={(e) => update({ skills: e.target.value })}
+              />
+            </Field>
+            <Field label="Category (optional)">
+              <Select
+                value={current.category}
+                onChange={(e) => update({ category: e.target.value as FormState["category"] })}
+              >
+                <option value="">Detect from title and skills</option>
+                {MARKETPLACE_CATEGORIES.map((c) => (
+                  <option key={c.slug} value={c.slug}>
+                    {c.label}
+                  </option>
+                ))}
+              </Select>
+            </Field>
+          </div>
           <div className="grid min-w-0 gap-3 sm:grid-cols-2">
             <Field label="Payment mode">
               <Select

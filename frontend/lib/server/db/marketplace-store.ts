@@ -5,6 +5,7 @@ import {
   ilike,
   inArray,
   isNotNull,
+  isNull,
   ne,
   or,
   sql,
@@ -19,7 +20,7 @@ import {
   marketplaceProfiles,
   marketplaceProposals,
 } from "./schema";
-import { categoryPattern } from "@/lib/app/marketplace-categories";
+import { categoryPattern, isCategorySlug } from "@/lib/app/marketplace-categories";
 import { escapeLike } from "../marketplace/catalog-validation";
 import {
   ACTIVE_PROPOSAL_STATUSES,
@@ -42,6 +43,8 @@ function asJob(row: typeof marketplaceJobs.$inferSelect): MarketplaceJobRecord {
     ...row,
     paymentMode: row.paymentMode as JobPaymentMode,
     status: row.status as JobStatus,
+    skills: Array.isArray(row.skills) ? row.skills : [],
+    category: isCategorySlug(row.category) ? row.category : null,
   };
 }
 
@@ -78,7 +81,11 @@ function searchConditions(
     description: typeof marketplaceJobs.description | typeof marketplaceGigs.description;
     paymentMode: typeof marketplaceJobs.paymentMode | typeof marketplaceGigs.paymentMode;
     amount: typeof marketplaceJobs.budgetAmount | typeof marketplaceGigs.priceAmount;
-    skills: typeof marketplaceGigs.skills | null;
+    skills: typeof marketplaceGigs.skills | typeof marketplaceJobs.skills | null;
+    /** Jobs: explicit category column, keyword derivation when NULL. */
+    category?: typeof marketplaceJobs.category;
+    /** Jobs: rows with no skills (pre-0010) match skills by keyword. */
+    skillFallback?: boolean;
   }
 ): SQL[] {
   const conditions: SQL[] = [];
@@ -88,18 +95,28 @@ function searchConditions(
   };
   if (filter.text) conditions.push(textMatch(filter.text));
   for (const skill of filter.skills) {
-    conditions.push(
-      cols.skills ? sql`${cols.skills} @> ${JSON.stringify([skill])}::jsonb` : textMatch(skill)
-    );
+    const has = (col: NonNullable<typeof cols.skills>) => sql`${col} @> ${JSON.stringify([skill])}::jsonb`;
+    if (!cols.skills) conditions.push(textMatch(skill));
+    else if (cols.skillFallback) {
+      conditions.push(
+        or(
+          and(sql`jsonb_array_length(${cols.skills}) > 0`, has(cols.skills)),
+          and(sql`jsonb_array_length(${cols.skills}) = 0`, textMatch(skill))
+        ) as SQL
+      );
+    } else conditions.push(has(cols.skills));
   }
   if (filter.paymentMode) conditions.push(eq(cols.paymentMode, filter.paymentMode));
   if (filter.category) {
     // Pattern comes from the constant keyword list and is still bound as a parameter.
     const pattern = categoryPattern(filter.category);
+    const derived = cols.skills
+      ? sql`(${cols.title} || ' ' || ${cols.description} || ' ' || coalesce((${cols.skills})::text, '')) ~* ${pattern}`
+      : sql`(${cols.title} || ' ' || ${cols.description}) ~* ${pattern}`;
     conditions.push(
-      cols.skills
-        ? sql`(${cols.title} || ' ' || ${cols.description} || ' ' || coalesce((${cols.skills})::text, '')) ~* ${pattern}`
-        : sql`(${cols.title} || ' ' || ${cols.description}) ~* ${pattern}`
+      cols.category
+        ? (or(eq(cols.category, filter.category), and(isNull(cols.category), derived)) as SQL)
+        : derived
     );
   }
   if (filter.minAmount) conditions.push(sql`(${cols.amount})::numeric >= ${filter.minAmount}::numeric`);
@@ -171,7 +188,9 @@ export function createDrizzleMarketplaceStore(db: MessagingDatabase): Marketplac
               description: marketplaceJobs.description,
               paymentMode: marketplaceJobs.paymentMode,
               amount: marketplaceJobs.budgetAmount,
-              skills: null,
+              skills: marketplaceJobs.skills,
+              category: marketplaceJobs.category,
+              skillFallback: true,
             })
           )
         )

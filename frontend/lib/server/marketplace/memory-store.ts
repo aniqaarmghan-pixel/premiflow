@@ -32,7 +32,7 @@ export function createMemoryMarketplaceStore(): MarketplaceStore {
         .filter(
           (row) =>
             row.status === "open" &&
-            matchesSearch({ ...row, amount: row.budgetAmount, skills: null }, filter)
+            matchesSearch({ ...row, amount: row.budgetAmount, skillFallback: true }, filter)
         )
         .sort(compareForSort(filter.sort, (row) => row.budgetAmount))
         .slice(0, filter.limit)

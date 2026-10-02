@@ -17,6 +17,8 @@ import {
   DELIVERY_TERMS,
   AVAILABILITY_LABELS,
   isMarketplaceNavActive,
+  jobCategory,
+  categoryLabelOf,
   amountLabel,
   formatMarketplaceAmount,
   gigHref,
@@ -112,6 +114,7 @@ export function JobSummaryCard({ job, footer }: { job: PublicJob; footer?: React
       <p className="mt-1 line-clamp-2 break-words text-sm text-ink-soft [overflow-wrap:anywhere]">
         {job.description}
       </p>
+      <JobTags job={job} className="mt-2" />
       <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-faint">
         <ProfileLink wallet={job.employerWallet} prefix="Employer" />
         <span>{job.paymentMode}</span>
@@ -122,6 +125,23 @@ export function JobSummaryCard({ job, footer }: { job: PublicJob; footer?: React
       </p>
       {footer}
     </Card>
+  );
+}
+
+/** Category chip (explicit, else keyword-derived) plus job skills. */
+export function JobTags({ job, className = "" }: { job: PublicJob; className?: string }) {
+  const category = jobCategory(job);
+  const skills = (job.skills ?? []).slice(0, 6);
+  if (!category && skills.length === 0) return null;
+  return (
+    <div className={`flex min-w-0 flex-wrap items-center gap-1.5 ${className}`}>
+      {category ? (
+        <span className="rounded-full bg-ink px-2 py-0.5 text-xs font-semibold text-white">
+          {categoryLabelOf(category)}
+        </span>
+      ) : null}
+      <SkillList skills={skills} />
+    </div>
   );
 }
 

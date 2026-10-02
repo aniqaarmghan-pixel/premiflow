@@ -343,7 +343,7 @@ test("marketplace migration: additive, journaled, constrained, not applied by te
   const jobsEntry = journal.entries.find((e) => e.idx === 8);
   assert.equal(jobsEntry?.tag, "0008_marketplace_jobs");
   const last = journal.entries[journal.entries.length - 1];
-  assert.deepEqual([last.idx, last.tag], [9, "0009_marketplace_profiles_gigs"]);
+  assert.deepEqual([last.idx, last.tag], [10, "0010_marketplace_job_skills_category"]);
   const schema = readFileSync("lib/server/db/schema.ts", "utf8");
   assert.match(schema, /pgTable\(\s*"marketplace_jobs"/);
   assert.match(schema, /pgTable\(\s*"marketplace_proposals"/);

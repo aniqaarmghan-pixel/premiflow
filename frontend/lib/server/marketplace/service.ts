@@ -1,5 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 
+import type { MarketplaceCategorySlug } from "@/lib/app/marketplace-categories";
+import { JOB_SKILLS_MAX, parseCategory, parseSkills } from "./catalog-validation";
 import { randomId } from "../crypto";
 import { HttpError } from "../http";
 import {
@@ -34,6 +36,8 @@ export type PublicJob = {
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
+  skills: string[];
+  category: MarketplaceCategorySlug | null;
 };
 
 export type PublicProposal = {
@@ -83,6 +87,8 @@ export function toPublicJob(row: MarketplaceJobRecord): PublicJob {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     closedAt: row.closedAt ? row.closedAt.toISOString() : null,
+    skills: [...(row.skills ?? [])],
+    category: row.category ?? null,
   };
 }
 
@@ -176,6 +182,8 @@ export async function createJob(
     paymentMode: unknown;
     budgetAmount: unknown;
     tokenMint: unknown;
+    skills?: unknown;
+    category?: unknown;
   },
   now = new Date()
 ): Promise<PublicJob> {
@@ -193,6 +201,8 @@ export async function createJob(
     createdAt: now,
     updatedAt: now,
     closedAt: null,
+    skills: parseSkills(input.skills, JOB_SKILLS_MAX),
+    category: parseCategory(input.category),
   };
   return toPublicJob(await store.insertJob(row));
 }
@@ -206,6 +216,8 @@ export async function updateJob(
     description?: unknown;
     paymentMode?: unknown;
     budgetAmount?: unknown;
+    skills?: unknown;
+    category?: unknown;
   },
   now = new Date()
 ): Promise<PublicJob> {
@@ -219,6 +231,8 @@ export async function updateJob(
   }
   if (input.paymentMode !== undefined) patch.paymentMode = paymentMode(input.paymentMode);
   if (input.budgetAmount !== undefined) patch.budgetAmount = baseAmount(input.budgetAmount, "Budget");
+  if (input.skills !== undefined) patch.skills = parseSkills(input.skills, JOB_SKILLS_MAX);
+  if (input.category !== undefined) patch.category = parseCategory(input.category);
   const saved = await store.updateJobIfStatus(job.id, "open", patch);
   if (!saved) throw new HttpError(409, "job_not_open", "This job is no longer open.");
   return toPublicJob(saved);

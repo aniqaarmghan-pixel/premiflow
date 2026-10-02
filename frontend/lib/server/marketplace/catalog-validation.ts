@@ -4,7 +4,11 @@
  */
 import { PublicKey } from "@solana/web3.js";
 
-import { isCategorySlug, matchesCategory } from "@/lib/app/marketplace-categories";
+import {
+  isCategorySlug,
+  matchesCategory,
+  type MarketplaceCategorySlug,
+} from "@/lib/app/marketplace-categories";
 
 import { HttpError } from "../http";
 import {
@@ -33,6 +37,15 @@ export const PROFILE_LIMITS = {
 export const GIG_LIMITS = { title: 120, description: 4_000, skills: 10, perFreelancer: 20 } as const;
 
 export const SEARCH_LIMITS = { text: 80, skills: 5, maxLimit: 50 } as const;
+
+export const JOB_SKILLS_MAX = 10;
+
+/** Optional listing category: empty/null means "derive from keywords". */
+export function parseCategory(value: unknown): MarketplaceCategorySlug | null {
+  if (value === undefined || value === null || value === "") return null;
+  if (!isCategorySlug(value)) throw invalid("Choose a category from the list.");
+  return value;
+}
 
 const SKILL_MAX = 32;
 const U64_MAX = 18_446_744_073_709_551_615n;
@@ -284,21 +297,32 @@ export function parseSearchParams(params: URLSearchParams): MarketplaceSearchFil
 
 /** Reference matcher (memory store + tests); mirrors the SQL conditions. */
 export function matchesSearch(
-  row: { title: string; description: string; paymentMode: JobPaymentMode; amount: string; skills: string[] | null },
+  row: {
+    title: string;
+    description: string;
+    paymentMode: JobPaymentMode;
+    amount: string;
+    skills: string[] | null;
+    /** Jobs only: explicit category wins over keyword derivation. */
+    category?: MarketplaceCategorySlug | null;
+    /** Jobs only: rows without skills (pre-0010) match skills by keyword. */
+    skillFallback?: boolean;
+  },
   filter: MarketplaceSearchFilter
 ): boolean {
   const haystack = `${row.title}\n${row.description}`.toLowerCase();
   if (filter.text && !haystack.includes(filter.text.toLowerCase())) return false;
+  const useKeywordSkills = !row.skills || (row.skillFallback === true && row.skills.length === 0);
   for (const skill of filter.skills) {
-    const ok = row.skills ? row.skills.includes(skill) : haystack.includes(skill);
+    const ok = useKeywordSkills ? haystack.includes(skill) : (row.skills ?? []).includes(skill);
     if (!ok) return false;
   }
   if (filter.paymentMode && row.paymentMode !== filter.paymentMode) return false;
-  if (
-    filter.category &&
-    !matchesCategory(`${row.title} ${row.description} ${(row.skills ?? []).join(" ")}`, filter.category)
-  ) {
-    return false;
+  if (filter.category) {
+    const ok = row.category
+      ? row.category === filter.category
+      : matchesCategory(`${row.title} ${row.description} ${(row.skills ?? []).join(" ")}`, filter.category);
+    if (!ok) return false;
   }
   const amount = BigInt(row.amount);
   if (filter.minAmount && amount < BigInt(filter.minAmount)) return false;

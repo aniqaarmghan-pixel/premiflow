@@ -67,6 +67,7 @@ import {
 import {
   HANDOFF_COPY,
   handoffPromptKind,
+  handoffUseLabel,
   loadPendingHandoff,
   resolveHandoffChoice,
   type HandoffChoice,
@@ -970,7 +971,7 @@ export function CreateWizard() {
             <div className="mt-2 flex flex-wrap gap-2">
               {handoffPrompt !== "blocked_by_intent" ? (
                 <Button type="button" onClick={() => chooseHandoff("import")}>
-                  Use selected proposal
+                  {handoffUseLabel(pendingHandoff.handoff)}
                 </Button>
               ) : null}
               {handoffPrompt === "replace_or_keep" ? (

@@ -71,6 +71,13 @@
       "when": 1791144000000,
       "tag": "0009_marketplace_profiles_gigs",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1791147600000,
+      "tag": "0010_marketplace_job_skills_category",
+      "breakpoints": true
     }
   ]
 }

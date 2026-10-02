@@ -19,11 +19,16 @@ export const MARKETPLACE_HANDOFF_PREFIX = "premiflow:marketplace-handoff:v1:";
 export const HANDOFF_COPY = {
   title: "Selected marketplace terms",
   note: "Nothing was sent on-chain; using it only refills the form for your review.",
-  replaceWarning: "Using it replaces your unfinished draft. Keep current draft discards these proposal terms instead.",
+  replaceWarning: "Using it replaces your unfinished draft. Keep current draft discards these selected terms instead.",
   blockedByIntent:
-    "You have a saved Create setup. Finish or discard it before using the selected proposal; it was left untouched.",
-  imported: "Selected proposal loaded. Review each step, then press Create & Send Offer when ready.",
+    "You have a saved Create setup. Finish or discard it before using the selected terms; it was left untouched.",
+  imported: "Selected terms loaded. Review each step, then press Create & Send Offer when ready.",
 } as const;
+
+/** Button wording follows where the terms came from (wording only; same import action). */
+export function handoffUseLabel(handoff: Pick<CreateHandoff, "source">): string {
+  return handoff.source === "gig" ? "Use selected gig" : "Use selected proposal";
+}
 
 export type PendingHandoff = { handoff: CreateHandoff; savedAt: number };
 export type HandoffChoice = "import" | "keep" | "dismiss";
