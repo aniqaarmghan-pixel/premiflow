@@ -639,6 +639,81 @@ export function ResolutionCenter({
             </dl>
           </>
         ) : null}
+        {caseRecord && (disputed || resolved) ? (
+          <div className="mt-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-faint">
+              Submitted message snapshots
+            </p>
+
+            {caseRecord.evidence.length > 0 ? (
+              <div className="mt-3 space-y-3">
+                {caseRecord.evidence.map((item) => (
+                  <div
+                    key={item.id}
+                    className="rounded-2xl border border-line bg-paper px-3 py-3"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-ink">
+                        Message snapshot
+                      </p>
+
+                      <time
+                        className="text-[11px] text-ink-faint"
+                        dateTime={item.submittedAt}
+                      >
+                        Submitted {new Date(item.submittedAt).toLocaleString()}
+                      </time>
+                    </div>
+
+                    <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-ink-soft [overflow-wrap:anywhere]">
+                      {item.bodySnapshot}
+                    </p>
+
+                    <dl className="mt-3 grid gap-2 text-xs text-ink-faint sm:grid-cols-2">
+                      <div>
+                        <dt className="font-semibold">Original sender</dt>
+                        <dd className="mt-1 break-all">
+                          {item.senderWalletSnapshot}
+                        </dd>
+                      </div>
+
+                      <div>
+                        <dt className="font-semibold">Submitted by</dt>
+                        <dd className="mt-1 break-all">
+                          {item.submittedByRole}: {item.submittedBy}
+                        </dd>
+                      </div>
+
+                      <div>
+                        <dt className="font-semibold">Original message time</dt>
+                        <dd className="mt-1">
+                          {new Date(item.createdAtSnapshot).toLocaleString()}
+                        </dd>
+                      </div>
+
+                      <div>
+                        <dt className="font-semibold">Snapshot rule</dt>
+                        <dd className="mt-1">
+                          Immutable case copy — not live chat access
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-2 text-sm leading-6 text-ink-soft">
+                No contract-message snapshots have been submitted to this case.
+              </p>
+            )}
+
+            <p className="mt-3 text-sm leading-6 text-ink-soft">
+              The resolver can read these submitted snapshots but does not receive
+              access to the private employer/freelancer message thread.
+            </p>
+          </div>
+        ) : null}
+
         <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-ink-faint">
           {EVIDENCE_COPY.comingLater}
         </p>

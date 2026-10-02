@@ -39,6 +39,10 @@ import {
   type ApiError,
 } from "@/lib/app/messages-client";
 import {
+  addMessageToResolutionEvidence,
+  fetchResolutionCase,
+} from "@/lib/app/resolution-case-client";
+import {
   discardPendingAttachment,
   uploadContractAttachment,
 } from "@/lib/app/attachments-client";
@@ -100,6 +104,11 @@ export function ContractMessages({
   const [followNewest, setFollowNewest] = useState(true);
   const [loadingEarlier, setLoadingEarlier] = useState(false);
   const [newActivity, setNewActivity] = useState(false);
+  const [evidenceEnabled, setEvidenceEnabled] = useState(false);
+  const [evidenceIds, setEvidenceIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [evidenceBusyId, setEvidenceBusyId] = useState<string | null>(null);
   const lastParticipantWallet = useRef<string | null | undefined>(
     participantWallet
   );
@@ -137,9 +146,40 @@ export function ContractMessages({
     setNextCursor(null);
     setLoadingEarlier(false);
     setNewActivity(false);
+    setEvidenceEnabled(false);
+    setEvidenceIds(new Set());
+    setEvidenceBusyId(null);
     cursorInitialized.current = false;
     newestIdRef.current = null;
   }, []);
+
+  useEffect(() => {
+    if (state !== "ready" || !participant) return;
+
+    let cancelled = false;
+
+    void fetchResolutionCase(contractAddress)
+      .then((result) => {
+        if (cancelled) return;
+        const active =
+          result.case.chainStatus === "Disputed" ||
+          result.case.chainStatus === "Resolved";
+        setEvidenceEnabled(active);
+        setEvidenceIds(
+          new Set(result.case.evidence.map((item) => item.messageId))
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setEvidenceEnabled(false);
+          setEvidenceIds(new Set());
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [contractAddress, participant, state]);
 
   const applyApiError = useCallback((err: unknown) => {
     const api = err as ApiError;
@@ -387,6 +427,36 @@ export function ContractMessages({
     }
   }
 
+  async function onAddEvidence(messageId: string) {
+    if (!evidenceEnabled || evidenceBusyId) return;
+
+    setEvidenceBusyId(messageId);
+
+    try {
+      const result = await addMessageToResolutionEvidence(
+        contractAddress,
+        messageId
+      );
+
+      setEvidenceIds(
+        new Set(result.case.evidence.map((item) => item.messageId))
+      );
+    } catch (err) {
+      const api = err as ApiError;
+
+      if (
+        api.code === "case_not_found" ||
+        api.code === "not_disputed"
+      ) {
+        setEvidenceEnabled(false);
+      }
+
+      applyApiError(err);
+    } finally {
+      setEvidenceBusyId(null);
+    }
+  }
+
   async function onLoadEarlier() {
     if (!canRequestEarlierPage({ nextCursor, loadingEarlier })) return;
     setFollowNewest(false);
@@ -515,6 +585,10 @@ export function ContractMessages({
             onFollowNewestChange={setFollowNewest}
             newActivity={newActivity}
             onJumpToLatest={jumpToLatest}
+            evidenceEnabled={evidenceEnabled}
+            evidenceIds={evidenceIds}
+            evidenceBusyId={evidenceBusyId}
+            onAddEvidence={(messageId) => void onAddEvidence(messageId)}
           />
         ) : null}
 

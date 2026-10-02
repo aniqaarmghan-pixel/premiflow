@@ -76,3 +76,17 @@ export function upsertResolutionCaseStatement(address: string, body: string) {
     }
   );
 }
+
+
+export function addMessageToResolutionEvidence(
+  address: string,
+  messageId: string
+) {
+  return request<{ case: PublicResolutionCase }>(
+    `/api/contracts/${address}/case/evidence`,
+    {
+      method: "POST",
+      body: JSON.stringify({ messageId }),
+    }
+  );
+}

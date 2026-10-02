@@ -213,7 +213,7 @@ test("mergeMessagesById prevents duplicates across polls", () => {
 
 test("resolver and AI still have no automatic thread access", () => {
   assert.equal(resolveInitialPanelState({ connected: true, role: "resolver" }), "unauthorized");
-  assert.match(MESSAGE_EVIDENCE_COPY.body, /will not automatically read/i);
+  assert.match(MESSAGE_EVIDENCE_COPY.body, /never automatically receives access|will not automatically read/i);
   const messages = SUPPORT_TOPICS.find((topic) => topic.id === "messages");
   assert.doesNotMatch(messages?.body.join(" ") ?? "", /being connected/);
   assert.match(messages?.body.join(" ") ?? "", /stored by PREMIFLOW off-chain/);

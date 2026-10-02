@@ -50,7 +50,7 @@ export const LIVE_ASSISTANT = {
   error: "The Assistant could not answer. The contract page still works.",
   neverExecutes: "PREMIFLOW Assistant never Collects, Claims, cancels, or resolves a dispute.",
   privateMessages:
-    "Private employer/freelancer messages are not sent to the Assistant. Selecting messages or attachments as evidence comes later.",
+    "Private employer/freelancer messages are not sent to the Assistant. A participant may explicitly submit a selected message snapshot to a Resolution Case; this does not expose the private thread to the Assistant.",
 } as const;
 
 export const LIVE_SUGGESTIONS = {

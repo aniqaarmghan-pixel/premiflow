@@ -10,7 +10,9 @@ import { randomId } from "../crypto";
 import { RATE_LIMITS, consumeRateLimit } from "../rate-limit";
 import type {
   CaseStore,
+  EvidenceSnapshotRecord,
   DisputeOpener,
+  MessageStore,
   OffchainWorkflowStatus,
   PartyStatementRecord,
   PartyStatementRole,
@@ -84,6 +86,18 @@ export type PublicPartyStatement = {
   submittedAt: string;
 };
 
+export type PublicEvidenceSnapshot = {
+  id: string;
+  contractAddress: string;
+  messageId: string;
+  submittedBy: string;
+  submittedByRole: PartyStatementRole;
+  senderWalletSnapshot: string;
+  bodySnapshot: string;
+  createdAtSnapshot: string;
+  submittedAt: string;
+};
+
 export type PublicResolutionCase = {
   id: string;
   contractAddress: string;
@@ -111,6 +125,7 @@ export type PublicResolutionCase = {
   updatedAt: string;
   employerStatement: PublicPartyStatement | null;
   freelancerStatement: PublicPartyStatement | null;
+  evidence: PublicEvidenceSnapshot[];
   viewerRole: PartyStatementRole | "resolver";
   payoutState: ChainPayoutState;
 };
@@ -186,6 +201,22 @@ function toPublicStatement(row: PartyStatementRecord): PublicPartyStatement {
   };
 }
 
+function toPublicEvidence(
+  row: EvidenceSnapshotRecord
+): PublicEvidenceSnapshot {
+  return {
+    id: row.id,
+    contractAddress: row.contractAddress,
+    messageId: row.messageId,
+    submittedBy: row.submittedBy,
+    submittedByRole: row.submittedByRole,
+    senderWalletSnapshot: row.senderWalletSnapshot,
+    bodySnapshot: row.bodySnapshot,
+    createdAtSnapshot: row.createdAtSnapshot.toISOString(),
+    submittedAt: row.submittedAt.toISOString(),
+  };
+}
+
 function statementsByRole(rows: PartyStatementRecord[]): {
   employerStatement: PublicPartyStatement | null;
   freelancerStatement: PublicPartyStatement | null;
@@ -204,7 +235,8 @@ function presentCase(
   row: ResolutionCaseRecord,
   facts: ContractCaseFacts,
   statements: PartyStatementRecord[],
-  viewerRole: PartyStatementRole | "resolver"
+  viewerRole: PartyStatementRole | "resolver",
+  evidence: EvidenceSnapshotRecord[] = []
 ): PublicResolutionCase {
   const payoutState = payoutStateFromChain(facts);
   const derivedWorkflow = workflowFromStatements(statements);
@@ -241,6 +273,7 @@ function presentCase(
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     ...statementsByRole(statements),
+    evidence: evidence.map(toPublicEvidence),
     viewerRole,
     payoutState,
   };
@@ -399,7 +432,8 @@ export async function createOrRecoverResolutionCase(
   }
 
   const statements = await stores.cases.listStatements(saved.id);
-  return presentCase(saved, facts, statements, viewerRole);
+  const evidence = await stores.cases.listEvidence(saved.id);
+  return presentCase(saved, facts, statements, viewerRole, evidence);
 }
 
 async function recoverExisting(
@@ -430,7 +464,8 @@ async function recoverExisting(
     now,
   });
   const statements = await store.listStatements(saved.id);
-  return presentCase(saved, facts, statements, viewerRole);
+  const evidence = await store.listEvidence(saved.id);
+  return presentCase(saved, facts, statements, viewerRole, evidence);
 }
 
 export async function getResolutionCase(
@@ -466,7 +501,8 @@ export async function getResolutionCase(
     });
   }
   const statements = await store.listStatements(saved.id);
-  return presentCase(saved, facts, statements, viewerRole);
+  const evidence = await store.listEvidence(saved.id);
+  return presentCase(saved, facts, statements, viewerRole, evidence);
 }
 
 export async function updateCaseNotes(
@@ -519,7 +555,8 @@ export async function updateCaseNotes(
     now,
   });
   const statements = await stores.cases.listStatements(saved.id);
-  return presentCase(saved, facts, statements, viewerRole);
+  const evidence = await stores.cases.listEvidence(saved.id);
+  return presentCase(saved, facts, statements, viewerRole, evidence);
 }
 
 export async function upsertOwnStatement(
@@ -595,7 +632,122 @@ export async function upsertOwnStatement(
     await stores.cases.updateCase(existing.id, { workflowStatus, updatedAt: now });
   }
   const saved = (await stores.cases.getCaseById(existing.id)) ?? existing;
-  return presentCase(saved, facts, statements, role);
+  const evidence = await stores.cases.listEvidence(saved.id);
+  return presentCase(saved, facts, statements, role, evidence);
+}
+
+export async function addMessageEvidence(
+  stores: {
+    cases: CaseStore;
+    messages: MessageStore;
+    rates?: RateLimitStore;
+  },
+  reader: ContractFactsReader,
+  input: {
+    contractAddress: string;
+    sessionWallet: string;
+    messageId: unknown;
+  },
+  now = new Date()
+): Promise<PublicResolutionCase> {
+  const contractAddress = parseContractAddress(input.contractAddress);
+
+  if (typeof input.messageId !== "string" || !input.messageId.trim()) {
+    throw new CaseValidationError("Message is required.");
+  }
+
+  const messageId = input.messageId.trim();
+
+  if (stores.rates) {
+    await consumeRateLimit(
+      stores.rates,
+      `case-evidence:${input.sessionWallet}:${contractAddress}`,
+      RATE_LIMITS.sendMax,
+      RATE_LIMITS.sendWindowMs,
+      now
+    );
+  }
+
+  const facts = await reader.read(contractAddress);
+  const role = requireParty(input.sessionWallet, facts);
+
+  if (!chainSupportsResolutionCase(facts.status)) {
+    throw new CaseStateError(
+      "not_disputed",
+      "Message evidence can be submitted only for a Disputed or Resolved contract."
+    );
+  }
+
+  const existing = await stores.cases.getCaseByContract(contractAddress);
+  if (!existing) {
+    throw new CaseStateError(
+      "case_not_found",
+      "Resolution Case was not found."
+    );
+  }
+
+  const message = await stores.messages.getMessage(messageId);
+  if (!message || message.contractAddress !== contractAddress) {
+    throw new CaseAccessError(
+      "That message is not part of this contract conversation."
+    );
+  }
+
+  const previous = await stores.cases.getEvidenceByMessage(
+    existing.id,
+    message.id
+  );
+
+  if (!previous) {
+    const row: EvidenceSnapshotRecord = {
+      id: randomId(),
+      caseId: existing.id,
+      contractAddress,
+      messageId: message.id,
+      submittedBy: input.sessionWallet,
+      submittedByRole: role,
+      senderWalletSnapshot: message.senderWallet,
+      bodySnapshot: message.body,
+      createdAtSnapshot: message.createdAt,
+      submittedAt: now,
+    };
+
+    try {
+      const savedEvidence = await stores.cases.insertEvidence(row);
+
+      await recordEvent(stores.cases, {
+        caseId: existing.id,
+        eventType: CASE_EVENT_TYPES.evidenceAdded,
+        actorWallet: input.sessionWallet,
+        payload: {
+          evidenceId: savedEvidence.id,
+          messageId: savedEvidence.messageId,
+        },
+        now,
+      });
+    } catch (err) {
+      if (!isUniqueViolation(err)) throw err;
+
+      const raced = await stores.cases.getEvidenceByMessage(
+        existing.id,
+        message.id
+      );
+      if (!raced) throw err;
+    }
+  }
+
+  const current =
+    (await stores.cases.getCaseById(existing.id)) ?? existing;
+  const statements = await stores.cases.listStatements(existing.id);
+  const evidence = await stores.cases.listEvidence(existing.id);
+
+  return presentCase(
+    current,
+    facts,
+    statements,
+    role,
+    evidence
+  );
 }
 
 export function categoryDeterminesAward(): boolean {

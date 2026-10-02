@@ -78,16 +78,14 @@ export const EVIDENCE_COPY = {
 } as const;
 
 export const COMING_LATER_EVIDENCE = [
-  "File attachments",
-  "Support or chat message references",
-  "Selected contract-message snapshots",
+  "File-attachment evidence snapshots",
   "AI case summaries",
 ] as const;
 
 export const MESSAGE_EVIDENCE_COPY = {
-  comingLater: true,
+  comingLater: false,
   actionLabel: "Add to dispute evidence",
-  body: "A future action will let a participant submit a selected message snapshot. The resolver will not automatically read the private conversation.",
+  body: "Participants can submit selected contract messages as immutable Resolution Case snapshots. The resolver sees only the submitted snapshots and never automatically receives access to the private conversation.",
 } as const;
 
 export const PARTY_STATEMENTS_COPY = {

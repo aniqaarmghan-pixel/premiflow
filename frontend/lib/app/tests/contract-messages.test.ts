@@ -60,7 +60,8 @@ test("resolver is not automatically a chat participant", () => {
   assert.match(contractMessagesCopy("resolver").body, /does not automatically read/i);
   assert.equal(MESSAGE_EVIDENCE_PLAN.automaticResolverAccess, false);
   assert.equal(MESSAGE_EVIDENCE_PLAN.disclosesEntireThread, false);
-  assert.equal(canSelectMessageForEvidence("employer"), false);
+  assert.equal(canSelectMessageForEvidence("employer"), true);
+  assert.equal(canSelectMessageForEvidence("freelancer"), true);
   assert.equal(canSelectMessageForEvidence("resolver"), false);
 });
 
@@ -100,12 +101,12 @@ test("support, messages, dispute, and assistant stay distinct", () => {
   assert.match(messages?.body.join(" ") ?? "", /not Resolution Center/i);
 });
 
-test("future evidence selection is a snapshot, not thread disclosure", () => {
+test("evidence selection is a snapshot, not thread disclosure", () => {
   assert.equal(MESSAGE_EVIDENCE_PLAN.actionLabel, "Add to dispute evidence");
   assert.equal(MESSAGE_EVIDENCE_PLAN.createsSnapshot, true);
-  assert.equal(MESSAGE_EVIDENCE_PLAN.connected, false);
+  assert.equal(MESSAGE_EVIDENCE_PLAN.connected, true);
   assert.equal(MESSAGE_EVIDENCE_COPY.actionLabel, "Add to dispute evidence");
-  assert.match(MESSAGE_EVIDENCE_COPY.body, /will not automatically read/i);
+  assert.match(MESSAGE_EVIDENCE_COPY.body, /never automatically receives access|will not automatically read/i);
   assert.match(plannedMessageContextLabel("fixed_deliverable"), /main deliverable/);
   assert.match(plannedMessageContextLabel("milestone", { index: 2 }), /milestone 2/);
   assert.match(plannedMessageContextLabel("streaming_schedule"), /schedule/);

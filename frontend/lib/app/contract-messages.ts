@@ -93,12 +93,12 @@ export const CONTRACT_MESSAGE_AI_POLICY = {
 
 export const MESSAGE_EVIDENCE_PLAN = {
   actionLabel: "Add to dispute evidence",
-  connected: false,
+  connected: true,
   automaticResolverAccess: false,
   createsSnapshot: true,
   disclosesEntireThread: false,
   explanation:
-    "A future action will let a participant submit a selected message snapshot to a dispute. The resolver will not automatically read the private conversation.",
+    "A participant may submit one selected message as an immutable Resolution Case snapshot. The resolver sees only submitted snapshots and never receives automatic access to the private conversation.",
 } as const;
 
 export const CONTRACT_MESSAGING_BACKEND_REQUIRED = [

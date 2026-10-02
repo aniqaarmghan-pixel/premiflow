@@ -70,7 +70,7 @@ export const SUPPORT_TOPICS: readonly SupportTopic[] = [
     body: [
       "Contract Messages is employer and freelancer communication about one contract. That is not Help & Support, not Resolution Center, and not PREMIFLOW Assistant.",
       "Ordinary message text is stored by PREMIFLOW off-chain, not on Solana. Access requires a verified wallet that is the employer or freelancer. This is not end-to-end encryption.",
-      "The resolver does not automatically read private chat. A later “Add to dispute evidence” action would submit a selected snapshot, not the entire conversation.",
+      "The resolver does not automatically read private chat. “Add to dispute evidence” submits only the selected immutable message snapshot, not the entire conversation.",
     ],
   },
   {

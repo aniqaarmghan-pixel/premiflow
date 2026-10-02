@@ -4,6 +4,7 @@ import type { MessagingDatabase } from "./client";
 import {
   authChallenges,
   caseEvents,
+  caseEvidenceSnapshots,
   contractMessages,
   contractWorkSubmissionLinks,
   contractWorkSubmissions,
@@ -18,6 +19,7 @@ import { randomId } from "../crypto";
 import type {
   AuthStore,
   CaseStore,
+  EvidenceSnapshotRecord,
   MessageStore,
   NotificationRecord,
   NotificationStore,
@@ -192,6 +194,17 @@ function asStatement(row: typeof partyStatements.$inferSelect): PartyStatementRe
   };
 }
 
+
+function asEvidence(
+  row: typeof caseEvidenceSnapshots.$inferSelect
+): EvidenceSnapshotRecord {
+  return {
+    ...row,
+    submittedByRole:
+      row.submittedByRole as EvidenceSnapshotRecord["submittedByRole"],
+  };
+}
+
 export function createDrizzleCaseStore(db: MessagingDatabase): CaseStore {
   return {
     async getCaseByContract(contractAddress) {
@@ -248,6 +261,36 @@ export function createDrizzleCaseStore(db: MessagingDatabase): CaseStore {
         })
         .returning();
       return asStatement(saved);
+    },
+    async listEvidence(caseId) {
+      const rows = await db
+        .select()
+        .from(caseEvidenceSnapshots)
+        .where(eq(caseEvidenceSnapshots.caseId, caseId))
+        .orderBy(
+          caseEvidenceSnapshots.submittedAt,
+          caseEvidenceSnapshots.id
+        );
+      return rows.map(asEvidence);
+    },
+    async getEvidenceByMessage(caseId, messageId) {
+      const [row] = await db
+        .select()
+        .from(caseEvidenceSnapshots)
+        .where(
+          and(
+            eq(caseEvidenceSnapshots.caseId, caseId),
+            eq(caseEvidenceSnapshots.messageId, messageId)
+          )
+        );
+      return row ? asEvidence(row) : null;
+    },
+    async insertEvidence(row) {
+      const [saved] = await db
+        .insert(caseEvidenceSnapshots)
+        .values(row)
+        .returning();
+      return asEvidence(saved);
     },
     async insertEvent(row) {
       const [saved] = await db.insert(caseEvents).values(row).returning();

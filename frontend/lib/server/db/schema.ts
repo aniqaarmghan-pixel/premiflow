@@ -203,6 +203,51 @@ export const caseEvents = pgTable(
 );
 
 /**
+ * Immutable selected-message snapshots submitted to a Resolution Case.
+ *
+ * This table deliberately stores copied message facts instead of granting the
+ * resolver access to the private employer/freelancer conversation.
+ */
+export const caseEvidenceSnapshots = pgTable(
+  "case_evidence_snapshots",
+  {
+    id: uuid("id").primaryKey(),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => resolutionCases.id, { onDelete: "cascade" }),
+    contractAddress: text("contract_address").notNull(),
+    messageId: uuid("message_id").notNull(),
+    submittedBy: text("submitted_by").notNull(),
+    submittedByRole: text("submitted_by_role").notNull(),
+    senderWalletSnapshot: text("sender_wallet_snapshot").notNull(),
+    bodySnapshot: text("body_snapshot").notNull(),
+    createdAtSnapshot: timestamp("created_at_snapshot", {
+      withTimezone: true,
+    }).notNull(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("case_evidence_case_message_uidx").on(
+      table.caseId,
+      table.messageId
+    ),
+    index("case_evidence_case_submitted_idx").on(
+      table.caseId,
+      table.submittedAt,
+      table.id
+    ),
+    check(
+      "case_evidence_submitter_role_enum",
+      sql`${table.submittedByRole} in ('employer', 'freelancer')`
+    ),
+    check(
+      "case_evidence_body_len",
+      sql`char_length(${table.bodySnapshot}) between 1 and 2000`
+    ),
+  ]
+);
+
+/**
  * Append-only off-chain delivery history for Submit Trial / Submit Work.
  * Solana remains authoritative for eligibility and review lifecycle.
  * Block 3C attachments will reference submissionId — do not store file bytes here.

@@ -164,7 +164,7 @@ export const ABOUT_MESSAGES = {
   body: [
     "Contract Messages is employer and freelancer communication about one contract. It stays with the agreement instead of living only in a private inbox.",
     "Messages are stored by PREMIFLOW for authorized contract access. This is not end-to-end encryption, and it is not recorded on Solana.",
-    "The resolver does not automatically receive private-chat access. A later evidence snapshot would be a chosen submission, not the whole thread.",
+    "The resolver does not automatically receive private-chat access. A participant may submit a selected message as an immutable Resolution Case snapshot; the whole thread remains private.",
   ],
 } as const;
 

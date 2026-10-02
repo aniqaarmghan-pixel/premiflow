@@ -157,6 +157,10 @@ export function ChatHistory({
   onFollowNewestChange,
   newActivity,
   onJumpToLatest,
+  evidenceEnabled = false,
+  evidenceIds = new Set<string>(),
+  evidenceBusyId = null,
+  onAddEvidence,
 }: {
   messages: readonly PublicContractMessage[];
   connectedWallet: string | null;
@@ -169,6 +173,10 @@ export function ChatHistory({
   onFollowNewestChange: (follow: boolean) => void;
   newActivity: boolean;
   onJumpToLatest: () => void;
+  evidenceEnabled?: boolean;
+  evidenceIds?: ReadonlySet<string>;
+  evidenceBusyId?: string | null;
+  onAddEvidence?: (messageId: string) => void;
 }) {
   const scroller = useRef<HTMLDivElement>(null);
   const pendingPrepend = useRef(false);
@@ -278,6 +286,10 @@ export function ChatHistory({
                   message={item.message}
                   mine={mine}
                   otherLabel={otherLabel}
+                  evidenceEnabled={evidenceEnabled}
+                  evidenceAdded={evidenceIds.has(item.message.id)}
+                  evidenceBusy={evidenceBusyId === item.message.id}
+                  onAddEvidence={onAddEvidence}
                 />
               );
             })}
@@ -312,12 +324,20 @@ export function ChatMessageBubble({
   message,
   mine,
   otherLabel,
+  evidenceEnabled = false,
+  evidenceAdded = false,
+  evidenceBusy = false,
+  onAddEvidence,
 }: {
   message: PublicContractMessage;
   mine: boolean;
   otherLabel: string;
   contextLabel?: string;
   replyToMessageId?: string | null;
+  evidenceEnabled?: boolean;
+  evidenceAdded?: boolean;
+  evidenceBusy?: boolean;
+  onAddEvidence?: (messageId: string) => void;
 }) {
   const side = messageBubbleSide(mine);
   const label = mine ? "You" : otherLabel;
@@ -340,6 +360,26 @@ export function ChatMessageBubble({
       <time className="mt-1 text-[11px] text-ink-faint" dateTime={message.createdAt}>
         {messageTimestampLabel(message.createdAt)}
       </time>
+
+      {evidenceEnabled ? (
+        <button
+          type="button"
+          disabled={evidenceAdded || evidenceBusy}
+          onClick={() => onAddEvidence?.(message.id)}
+          className="mt-1 text-[11px] font-semibold text-accent underline-offset-2 hover:underline disabled:cursor-default disabled:text-ink-faint disabled:no-underline"
+          aria-label={
+            evidenceAdded
+              ? "Added to dispute evidence"
+              : "Add message to dispute evidence"
+          }
+        >
+          {evidenceAdded
+            ? "Added to dispute evidence"
+            : evidenceBusy
+              ? "Adding evidence…"
+              : "Add to dispute evidence"}
+        </button>
+      ) : null}
     </li>
   );
 }

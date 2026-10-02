@@ -119,6 +119,19 @@ export type CaseEventRecord = {
   createdAt: Date;
 };
 
+export type EvidenceSnapshotRecord = {
+  id: string;
+  caseId: string;
+  contractAddress: string;
+  messageId: string;
+  submittedBy: string;
+  submittedByRole: PartyStatementRole;
+  senderWalletSnapshot: string;
+  bodySnapshot: string;
+  createdAtSnapshot: Date;
+  submittedAt: Date;
+};
+
 export type ResolutionCasePatch = Partial<
   Pick<
     ResolutionCaseRecord,
@@ -147,6 +160,12 @@ export interface CaseStore {
     partyWallet: string
   ): Promise<PartyStatementRecord | null>;
   upsertStatement(row: PartyStatementRecord): Promise<PartyStatementRecord>;
+  listEvidence(caseId: string): Promise<EvidenceSnapshotRecord[]>;
+  getEvidenceByMessage(
+    caseId: string,
+    messageId: string
+  ): Promise<EvidenceSnapshotRecord | null>;
+  insertEvidence(row: EvidenceSnapshotRecord): Promise<EvidenceSnapshotRecord>;
   insertEvent(row: CaseEventRecord): Promise<CaseEventRecord>;
 }
 
