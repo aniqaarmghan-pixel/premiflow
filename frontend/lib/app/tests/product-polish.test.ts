@@ -64,7 +64,7 @@ test("resolve wiring: signature recorded after the confirmed send; View transact
   assert.ok(i > 0);
   assert.ok(detail.indexOf("recordResolveSignature(", i) > i);
   const rc = read("components/contracts/ResolutionCenter.tsx");
-  assert.match(rc, /\{resolveSignature \? \(\s*<a\s+href=\{explorerTxUrl\(resolveSignature\)\}/);
+  assert.match(rc, /\{shownResolveSignature \? \(\s*<a\s+href=\{explorerTxUrl\(shownResolveSignature\)\}/);
   const ws = read("components/resolver/ResolverWorkspace.tsx");
   assert.match(ws, /\{row\.txSignature \? \(\s*<a\s+href=\{explorerTxUrl\(row\.txSignature\)\}/);
   assert.equal(read("lib/streampay-v2/send.ts").includes("recordResolveSignature"), false);

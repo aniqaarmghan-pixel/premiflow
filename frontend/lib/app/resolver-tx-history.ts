@@ -59,5 +59,9 @@ export function mergeResolverTxHistory(
     if (a.blockTime != null && b.blockTime == null) return -1;
     return b.slot - a.slot;
   });
-  return rows.slice(0, limit).map(({ slot: _slot, ...item }) => item);
+  return rows.slice(0, limit).map((row) => {
+    const item: ResolverTxItem & { slot?: number } = { ...row };
+    delete item.slot;
+    return item;
+  });
 }

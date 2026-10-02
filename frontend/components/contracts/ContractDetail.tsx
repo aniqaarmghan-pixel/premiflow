@@ -1042,7 +1042,7 @@ export function ContractDetail({ address }: { address: string }) {
                 </span>
               ) : null}
             </div>
-            <div className="mt-3 flex items-center gap-3">
+            <div className="mt-3 flex min-w-0 items-center gap-3">
               <Identicon seed={other.address.toBase58()} />
               <div className="min-w-0">
                 <p className="text-sm text-ink-faint">{other.label}</p>
@@ -1126,7 +1126,7 @@ export function ContractDetail({ address }: { address: string }) {
           ) : null}
 
           {contractButtons.length > 0 || primaryUnitButtons.length > 0 ? (
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap gap-2 max-sm:flex-col max-sm:items-stretch">
               {primaryUnitButtons.map(({ action, unit }) => (
                 <Button
                   key={`${unit.address.toBase58()}-${action}`}

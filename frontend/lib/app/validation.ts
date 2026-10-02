@@ -78,7 +78,10 @@ export function applyCreateDraftPatch(
   prev: CreateWizardDraft,
   partial: Partial<CreateWizardDraft>
 ): CreateWizardDraft {
-  const { mint: _mint, resolver: _resolver, decimals: _decimals, ...unlocked } = partial;
+  const unlocked: Partial<CreateWizardDraft> = { ...partial };
+  delete unlocked.mint;
+  delete unlocked.resolver;
+  delete unlocked.decimals;
   const merged = { ...prev, ...unlocked };
   if (merged.paymentMode === "Hourly") {
     const engagement = parseEngagementDuration(

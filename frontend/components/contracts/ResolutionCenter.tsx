@@ -1,11 +1,15 @@
 "use client";
 
-import { browserSignatureStorage, readResolveSignature } from "@/lib/app/resolve-signature-store";
+import {
+  browserSignatureStorage,
+  isRealSignature,
+  readResolveSignature,
+} from "@/lib/app/resolve-signature-store";
 import { ACTIVE_CLUSTER_ID } from "@/lib/cluster";
 import { explorerTxUrl } from "@/lib/network";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 
 import { presentResolver } from "@/lib/app/dispute-ux";
@@ -41,6 +45,7 @@ import {
 import {
   fetchResolutionCase,
   recoverResolutionCase,
+  recordResolutionCaseSignature,
   updateResolutionCaseNotes,
   upsertResolutionCaseStatement,
   type ApiError,
@@ -130,6 +135,8 @@ export function ResolutionCenter({
   const connectedWallet = publicKey?.toBase58() ?? null;
   const [caseState, setCaseState] = useState<ResolutionCaseClientState>("idle");
   const [caseRecord, setCaseRecord] = useState<ResolutionCaseView | null>(null);
+  const [serverResolveSignature, setServerResolveSignature] = useState<string | null>(null);
+  const resolveSyncAttempted = useRef<string | null>(null);
   const [statementDraft, setStatementDraft] = useState("");
   const [notesBusy, setNotesBusy] = useState(false);
   const [statementBusy, setStatementBusy] = useState(false);
@@ -268,6 +275,24 @@ export function ResolutionCenter({
     }
   }
 
+  // Shared, server-verified signature on the case (visible to both parties and the resolver).
+  const caseSignatureRaw = caseRecord?.resolveSignature ?? null;
+  const caseResolveSignature = isRealSignature(caseSignatureRaw) ? caseSignatureRaw : null;
+  useEffect(() => {
+    // Resolver only: share this browser's confirmed signature once; the server re-verifies.
+    if (role !== "resolver" || !resolved || !resolveSignature) return;
+    if (caseState !== "ready" || !caseRecord || caseResolveSignature) return;
+    if (resolveSyncAttempted.current === resolveSignature) return;
+    resolveSyncAttempted.current = resolveSignature;
+    recordResolutionCaseSignature(address, resolveSignature)
+      .then((result) => {
+        if (isRealSignature(result.resolveSignature)) {
+          setServerResolveSignature(result.resolveSignature);
+        }
+      })
+      .catch(() => undefined);
+  }, [address, caseRecord, caseResolveSignature, caseState, resolveSignature, resolved, role]);
+
   if (!showOpenGuidance && !disputed && !resolved) return null;
 
   const ownStatement =
@@ -278,6 +303,8 @@ export function ResolutionCenter({
         : null;
   const canEditStatement = canEditPartyStatementForRole(role);
   const resolverView = role === "resolver";
+  // Case record first, then this session's sync result, then the local fallback.
+  const shownResolveSignature = caseResolveSignature ?? serverResolveSignature ?? resolveSignature;
   const shouldLoadCase =
     shouldAttemptCaseRecover(contract.status, role) ||
     shouldLoadCaseAsResolver(contract.status, role);
@@ -352,6 +379,16 @@ export function ResolutionCenter({
           <>
             <p className="mt-2 text-sm leading-6 text-ink-soft">{RESOLUTION_CENTER_COPY.resolvedBody}</p>
             <p className="mt-2 text-sm leading-6 text-ink-soft">{RESOLUTION_CENTER_COPY.noTransfer}</p>
+            {!resolverView && shownResolveSignature ? (
+              <a
+                href={explorerTxUrl(shownResolveSignature)}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2 inline-block text-xs font-medium underline-offset-2 hover:underline"
+              >
+                View transaction
+              </a>
+            ) : null}
           </>
         ) : (
           <>
@@ -447,7 +484,7 @@ export function ResolutionCenter({
                   />
                 </Field>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap gap-2 max-sm:flex-col max-sm:items-stretch">
                 <Button variant="secondary" onClick={() => setAllocation(contract.contestedAmount)}>
                   All to freelancer
                 </Button>
@@ -501,9 +538,9 @@ export function ResolutionCenter({
           <p className="mt-2 text-xs leading-5 text-ink-faint">
             {RESOLVER_UX_COPY.partyClaimGuidance}
           </p>
-          {resolveSignature ? (
+          {shownResolveSignature ? (
             <a
-              href={explorerTxUrl(resolveSignature)}
+              href={explorerTxUrl(shownResolveSignature)}
               target="_blank"
               rel="noreferrer"
               className="mt-2 inline-block text-xs font-medium underline-offset-2 hover:underline"
@@ -899,7 +936,7 @@ function Row({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="flex min-w-0 items-start justify-between gap-3 rounded-2xl bg-paper px-3 py-3">
       <dt className="shrink-0 text-xs uppercase tracking-wide text-ink-faint">{label}</dt>
-      <dd className="min-w-0 text-right text-sm text-ink">{value}</dd>
+      <dd className="min-w-0 break-words text-right text-sm text-ink [overflow-wrap:anywhere]">{value}</dd>
     </div>
   );
 }

@@ -216,13 +216,11 @@ export function parseCreateDraft(raw: string | null, maxStep: number): SavedCrea
 
 export function serializeCreateDraft(draft: CreateWizardDraft, step: number, nowMs: number): string {
   // Locked payment fields are never stored; they are re-applied on restore.
-  const {
-    mint: _mint,
-    resolver: _resolver,
-    decimals: _decimals,
-    acceptanceDeadlineLocal: _legacy,
-    ...rest
-  } = draft;
+  const rest: Partial<CreateWizardDraft> = { ...draft };
+  delete rest.mint;
+  delete rest.resolver;
+  delete rest.decimals;
+  delete rest.acceptanceDeadlineLocal;
   return JSON.stringify({ version: CREATE_DRAFT_VERSION, step, savedAt: nowMs, draft: rest });
 }
 

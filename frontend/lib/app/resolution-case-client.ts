@@ -78,6 +78,17 @@ export function upsertResolutionCaseStatement(address: string, body: string) {
 }
 
 
+/** Resolver only: shares the confirmed resolve signature on the case (write-once). */
+export function recordResolutionCaseSignature(address: string, signature: string) {
+  return request<{ resolveSignature: string; recorded: boolean }>(
+    `/api/contracts/${address}/case/resolve-signature`,
+    {
+      method: "POST",
+      body: JSON.stringify({ signature }),
+    }
+  );
+}
+
 export function addMessageToResolutionEvidence(
   address: string,
   messageId: string

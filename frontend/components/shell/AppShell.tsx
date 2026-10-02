@@ -292,10 +292,12 @@ function WorkspaceSwitch({ mode, onToggle }: { mode: WorkspaceMode; onToggle: ()
     <button
       type="button"
       onClick={onToggle}
-      className="mb-2 mt-3 inline-flex w-full items-center gap-2 rounded-xl border border-white/15 px-3 py-1.5 text-xs text-white/75 transition hover:bg-white/10 hover:text-white"
+      className="mb-2 mt-3 inline-flex w-full min-w-0 items-center gap-2 rounded-xl border border-white/15 px-3 py-1.5 text-left text-xs text-white/75 transition hover:bg-white/10 hover:text-white"
     >
-      <ArrowLeftRight size={14} />
-      {mode === "resolver" ? "Switch to contracts workspace" : "Switch to resolver workspace"}
+      <ArrowLeftRight size={14} className="shrink-0" aria-hidden="true" />
+      <span className="min-w-0 truncate">
+        {mode === "resolver" ? "Switch to contracts workspace" : "Switch to resolver workspace"}
+      </span>
     </button>
   );
 }
