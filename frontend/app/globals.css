@@ -752,3 +752,12 @@ body {
     bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px)) !important;
   }
 }
+
+/* Desktop dashboard sidebar: fixed to the viewport; only its nav region scrolls. */
+@media (min-width: 1024px) {
+  .pf-sidebar {
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+  }
+}

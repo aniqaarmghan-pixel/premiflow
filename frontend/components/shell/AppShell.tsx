@@ -207,8 +207,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="pf-dashboard min-h-screen min-w-0 lg:grid lg:grid-cols-[224px_minmax(0,1fr)] 2xl:grid-cols-[248px_minmax(0,1fr)]">
-      <aside className="hidden bg-navy px-3.5 py-5 text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:self-start lg:overflow-y-auto pf-rail">
-        <Link href={DASHBOARD_HREF} className="px-2">
+      <aside className="pf-sidebar hidden bg-navy px-3.5 pt-5 text-white lg:sticky lg:top-0 lg:flex lg:flex-col lg:self-start lg:overflow-hidden">
+        <Link href={DASHBOARD_HREF} className="shrink-0 px-2">
           <BrandMark light size={44} />
           <p
             className="mt-3"
@@ -222,11 +222,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {brand.tagline}
           </p>
         </Link>
-        {workspace.canSwitch ? (
-          <WorkspaceSwitch mode={workspace.mode} onToggle={switchWorkspace} />
-        ) : null}
-        {workspace.mode !== "resolver" ? <ExploreMarketplaceLink /> : null}
-        <nav aria-label="Dashboard sections" className="mt-3 flex flex-1 flex-col gap-0.5">
+        <div className="shrink-0">
+          {workspace.canSwitch ? (
+            <WorkspaceSwitch mode={workspace.mode} onToggle={switchWorkspace} />
+          ) : null}
+          {workspace.mode !== "resolver" ? <ExploreMarketplaceLink /> : null}
+        </div>
+        {/* Only this region scrolls; brand/switch/Explore stay pinned above it. */}
+        <div className="pf-rail -mx-1 mt-1 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-1 pb-[calc(6rem+env(safe-area-inset-bottom))]">
+        <nav aria-label="Dashboard sections" className="mt-2 flex shrink-0 flex-col gap-0.5">
           {navGroups.flatMap((group) => [
             group.title ? (
               <p
@@ -265,11 +269,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             }),
           ])}
         </nav>
-        <div className="mt-auto space-y-3 rounded-2xl bg-white/5 px-3 py-3 text-[11px] leading-5 text-white/50">
+        <div className="mt-auto shrink-0 space-y-3 rounded-2xl bg-white/5 px-3 py-3 text-[11px] leading-5 text-white/50">
           <p>Value stays in the contract until work is verified.</p>
           <ClientOnly>
             <SoundPreference compact />
           </ClientOnly>
+        </div>
         </div>
       </aside>
 
