@@ -253,7 +253,7 @@ test("a released intent round-trips through storage as unlocked", () => {
 test("create page is account-first instead of wallet-gated", () => {
   const page = readFileSync(join(process.cwd(), "app/create/page.tsx"), "utf8");
 
-  assert.match(page, /useSession\(\)/);
+  assert.match(page, /useAccountSession\(\)/);
   assert.match(page, /<CreateWizard \/>/);
 
   assert.doesNotMatch(page, /ConnectPrompt/);

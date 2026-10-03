@@ -28,11 +28,12 @@ import {
   X,
   type LucideIcon,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { brand } from "@/lib/brand";
-import { useSession } from "@/lib/account-auth/client";
+import { useAccountSession } from "@/lib/account-auth/useAccountSession";
+import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
 import { RESOLVER_NAV, type WorkspaceMode } from "@/lib/app/resolver-workspace";
 import { DASHBOARD_HREF, isDashboardNavActive, shellKind } from "@/lib/app/site-routes";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
@@ -110,7 +111,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const { data: session, isPending } = useSession();
+  const {
+    data: session,
+    isPending,
+    status: sessionStatus,
+    reconnecting,
+    exhausted: sessionExhausted,
+    retry: retrySession,
+  } = useAccountSession();
+  const drawerRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(open, drawerRef, () => setOpen(false));
   const workspace = useWorkspace();
 
   const user = session?.user ?? null;
@@ -120,10 +130,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isPublicSite = kind === "public";
 
   useEffect(() => {
-    if (isPending || isPublicAuthPage || isPublicSite || user) return;
+    // Only a confirmed "no session" (or a genuine 401) signs the tab out;
+    // transient Neon/network failures keep the user and retry instead.
+    if (isPending || isPublicAuthPage || isPublicSite || user || sessionStatus !== "unauthenticated") return;
 
     router.replace("/sign-in");
-  }, [isPending, isPublicAuthPage, isPublicSite, router, user]);
+  }, [isPending, isPublicAuthPage, isPublicSite, router, sessionStatus, user]);
 
   // Authentication and password-recovery pages are intentionally outside the authenticated
   // application shell. Visitors should not see workspace navigation,
@@ -154,6 +166,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // While Better Auth checks the existing PREMIFLOW session, show an
   // intentional entry state instead of rendering an empty dashboard.
+  if (!user && reconnecting && sessionExhausted) {
+    return <SessionUnavailable onRetry={retrySession} />;
+  }
+
   if (isPending || !user) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-paper px-6">
@@ -167,7 +183,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </p>
 
           <p className="mt-2 text-sm text-ink-soft">
-            Checking your account session.
+            {reconnecting ? "Reconnecting to your account. You have not been signed out." : "Checking your account session."}
           </p>
 
           <div
@@ -189,7 +205,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="pf-dashboard min-h-screen min-w-0 lg:grid lg:grid-cols-[224px_minmax(0,1fr)] 2xl:grid-cols-[248px_minmax(0,1fr)]">
-      <aside className="hidden bg-navy px-3.5 py-5 text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:self-start lg:overflow-y-auto">
+      <aside className="hidden bg-navy px-3.5 py-5 text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:self-start lg:overflow-y-auto pf-rail">
         <Link href={DASHBOARD_HREF} className="px-2">
           <BrandMark light size={44} />
           <p
@@ -256,8 +272,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="flex min-w-0 items-center gap-1.5 sm:gap-2 lg:hidden">
             <button
               type="button"
-              className="inline-flex size-10 shrink-0 items-center justify-center rounded-full hover:bg-paper-2"
+              className="inline-flex size-11 shrink-0 items-center justify-center rounded-full hover:bg-paper-2"
               aria-label="Open navigation"
+              aria-expanded={open}
+              aria-haspopup="dialog"
               onClick={() => setOpen(true)}
             >
               <Menu size={18} />
@@ -288,6 +306,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </ClientOnly>
         </header>
         <main className="mx-auto w-full min-w-0 max-w-6xl flex-1 overflow-x-hidden px-3 pb-28 pt-5 sm:px-6 sm:pb-24 sm:pt-6 lg:px-6 lg:pb-10 lg:pt-5 xl:px-8 2xl:max-w-7xl">
+          {reconnecting ? (
+            <div
+              role="status"
+              className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-2 rounded-2xl border border-line bg-card px-4 py-2.5 text-sm text-ink-soft"
+            >
+              <span>
+                {sessionExhausted
+                  ? "PREMIFLOW is having trouble reaching your account. You are still signed in."
+                  : "Reconnecting to PREMIFLOW. You are still signed in."}
+              </span>
+              {sessionExhausted ? (
+                <button
+                  type="button"
+                  onClick={retrySession}
+                  className="min-h-11 rounded-full border border-line px-4 text-sm font-semibold text-ink hover:bg-paper-2"
+                >
+                  Try again
+                </button>
+              ) : null}
+            </div>
+          ) : null}
           {children}
         </main>
         <ClientOnly>
@@ -303,19 +342,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <button className="absolute inset-0 bg-navy/50" onClick={() => setOpen(false)} />
-            <motion.nav
+            <button
+              type="button"
+              tabIndex={-1}
+              data-focus-skip
+              aria-label="Close navigation"
+              className="absolute inset-0 bg-navy/60 backdrop-blur-[2px]"
+              onClick={() => setOpen(false)}
+            />
+            <motion.div
+              ref={drawerRef}
+              role="dialog"
+              aria-modal="true"
+              aria-label="Dashboard navigation"
               initial={{ x: -20, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: -12, opacity: 0 }}
-              className="relative flex h-full w-[min(18rem,88vw)] flex-col overflow-y-auto bg-navy p-5 text-white shadow-xl"
+              className="pf-rail relative flex h-full w-[min(19rem,88vw)] flex-col overflow-y-auto bg-navy p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] text-white shadow-xl"
             >
               <div className="mb-6 flex items-center justify-between gap-3">
                 <BrandMark light size={30} />
                 <button
                   type="button"
                   aria-label="Close navigation"
-                  className="inline-flex size-10 items-center justify-center rounded-full hover:bg-white/10"
+                  data-autofocus
+                  className="inline-flex size-11 items-center justify-center rounded-full hover:bg-white/10"
                   onClick={() => setOpen(false)}
                 >
                   <X size={18} />
@@ -330,6 +381,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   }}
                 />
               ) : null}
+              <nav aria-label="Dashboard" className="flex flex-col">
               {navGroups.flatMap((group) => group.items).map((item) => {
                 const active = isDashboardNavActive(item.href, pathname);
                 return (
@@ -349,12 +401,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   </Link>
                 );
               })}
+              </nav>
               <div className="mt-6 border-t border-white/10 pt-4">
                 <ClientOnly>
                   <SoundPreference compact />
                 </ClientOnly>
               </div>
-            </motion.nav>
+            </motion.div>
           </motion.div>
         ) : null}
       </AnimatePresence>
@@ -374,5 +427,28 @@ function WorkspaceSwitch({ mode, onToggle }: { mode: WorkspaceMode; onToggle: ()
         {mode === "resolver" ? "Switch to contracts workspace" : "Switch to resolver workspace"}
       </span>
     </button>
+  );
+}
+
+function SessionUnavailable({ onRetry }: { onRetry: () => void }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-paper px-6">
+      <div role="alert" className="max-w-sm text-center">
+        <div className="flex justify-center">
+          <BrandMark size={48} />
+        </div>
+        <p className="mt-5 text-sm font-semibold text-ink">PREMIFLOW is temporarily unavailable</p>
+        <p className="mt-2 text-sm text-ink-soft">
+          We could not reach your account service. You have not been signed out; this is usually brief.
+        </p>
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mt-5 min-h-11 rounded-full bg-ink px-6 text-sm font-semibold text-white transition hover:brightness-110"
+        >
+          Try again
+        </button>
+      </div>
+    </div>
   );
 }

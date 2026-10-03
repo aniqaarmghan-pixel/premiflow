@@ -45,6 +45,8 @@ import type {
   PublicGig,
 } from "@/lib/server/marketplace/catalog-service";
 import type { PublicJob } from "@/lib/server/marketplace/service";
+import { playableVideoUrl } from "@/lib/app/marketplace-media";
+import { GigVideoButton } from "./MarketplaceVideoModal";
 
 /** Discovery + management tabs. Label color lives on an inner span so no global anchor rule can mute it. */
 export function MarketplaceNav({ className = "" }: { className?: string }) {
@@ -230,12 +232,15 @@ export function QueryState({
   wallet,
   onVerify,
   verifying,
+  onRetry,
 }: {
   status: "idle" | "loading" | "error";
   error?: MarketplaceApiError;
   wallet: string | null;
   onVerify: () => void;
   verifying: boolean;
+  /** Shown for transient failures (network, 5xx) so the user can reload in place. */
+  onRetry?: () => void;
 }) {
   if (!wallet) {
     return <Card className="p-4 text-sm text-ink-soft">{MARKETPLACE_COPY.connectWallet}</Card>;
@@ -251,9 +256,20 @@ export function QueryState({
     );
   }
   if (status === "error") {
-    return <Card className="p-4 text-sm text-ink-soft">{error?.message ?? "Could not load."}</Card>;
+    return <ErrorState title="Could not load this page" error={error} onRetry={onRetry} />;
   }
-  return <Card className="p-4 text-sm text-ink-soft">Loading...</Card>;
+  return (
+    <div role="status" aria-live="polite" className="grid min-w-0 gap-3">
+      <span className="sr-only">Loading...</span>
+      {[0, 1].map((i) => (
+        <div
+          key={i}
+          aria-hidden="true"
+          className="h-20 animate-pulse rounded-[20px] border border-line bg-card motion-reduce:animate-none"
+        />
+      ))}
+    </div>
+  );
 }
 
 /** Link to a wallet's public marketplace profile. */
@@ -341,7 +357,7 @@ function categoryLabel(slug: MarketplaceCategorySlug): string {
 /**
  * Visual service card. Media is only the seller's own cover / avatar (https,
  * set by the seller); otherwise a category gradient. A small badge shows when
- * the gig includes a video (the player itself lives on the detail page).
+ * the gig includes a playable video; its play button opens an accessible player.
  */
 export function GigSummaryCard({
   gig,
@@ -353,10 +369,11 @@ export function GigSummaryCard({
   const primary: MarketplaceCategorySlug | "none" = gigCategory(gig) ?? "none";
   const seller = gig.seller ?? null;
   const cover = gig.coverUrl ?? null;
-  const hasVideo = Boolean(gig.videoUrl);
+  const hasVideo = playableVideoUrl(gig.videoUrl) !== null;
   const delivery = gigDeliveryLabel(gig.deliveryDays);
   return (
     <article className="pf-card group flex min-w-0 flex-col overflow-hidden rounded-[20px] border border-line bg-card shadow-[var(--shadow)]">
+      <div className="relative">
       <Link
         href={gigHref(gig.id)}
         aria-label={gig.title}
@@ -385,14 +402,6 @@ export function GigSummaryCard({
         ) : (
           <CategoryArt slug={primary} className="pf-zoom absolute inset-0 h-full w-full" />
         )}
-        {hasVideo ? (
-          <span
-            aria-hidden="true"
-            className="pf-play absolute left-1/2 top-1/2 flex size-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white/15 backdrop-blur-md"
-          >
-            <Play size={20} className="ml-0.5 fill-white text-white" />
-          </span>
-        ) : null}
         <span
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-[linear-gradient(180deg,transparent,rgba(4,10,20,.55))]"
@@ -413,6 +422,12 @@ export function GigSummaryCard({
           </span>
         ) : null}
       </Link>
+      {hasVideo ? (
+        <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+          <GigVideoButton title={gig.title} videoUrl={gig.videoUrl} posterUrl={cover} className="pf-play" />
+        </span>
+      ) : null}
+      </div>
       <div className="flex min-w-0 flex-1 flex-col gap-2 p-4">
         <p className="flex min-w-0 items-center gap-2 text-xs text-ink-faint">
           <Avatar url={seller?.avatarUrl ?? null} size={22} />
@@ -549,7 +564,7 @@ export function ErrorState({
         <button
           type="button"
           onClick={onRetry}
-          className="pf-chip inline-flex min-h-10 items-center gap-2 rounded-full border border-line bg-white px-4 text-sm font-semibold text-ink hover:border-accent/50"
+          className="pf-chip inline-flex min-h-11 items-center gap-2 rounded-full border border-line bg-white px-4 text-sm font-semibold text-ink hover:border-accent/50"
         >
           <RefreshCw size={14} aria-hidden="true" />
           Try again

@@ -85,7 +85,7 @@ test("public navbar: marketplace-first items, active states, search and dashboar
 test("app shell: public pages skip the account gate; dashboard sidebar holds the workspace", () => {
   const shell = read("components/shell/AppShell.tsx");
   assert.match(shell, /const kind = shellKind\(pathname\);/);
-  assert.match(shell, /if \(isPending \|\| isPublicAuthPage \|\| isPublicSite \|\| user\) return;/);
+  assert.match(shell, /if \(isPending \|\| isPublicAuthPage \|\| isPublicSite \|\| user \|\| sessionStatus !== "unauthenticated"\) return;/);
   assert.match(shell, /<PublicShell signedIn=\{Boolean\(user\)\} pending=\{isPending\}>/);
   assert.ok(shell.indexOf("if (isPublicSite)") < shell.indexOf("if (isPending || !user)"), "public shell renders before the gate");
   for (const label of ["Overview", "My Jobs", "My Proposals", "My Gigs", "Invitations", "Saved", "Contracts", "Messages & Activity", "Reviews", "Profile"]) {

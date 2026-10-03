@@ -4,11 +4,11 @@ import Link from "next/link";
 
 import { CreateWizard } from "@/components/create/CreateWizard";
 import { PageFade } from "@/components/shell/PageFade";
-import { useSession } from "@/lib/account-auth/client";
+import { useAccountSession } from "@/lib/account-auth/useAccountSession";
 import { brand } from "@/lib/brand";
 
 export default function CreatePage() {
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending } = useAccountSession();
   const user = session?.user ?? null;
 
   return (

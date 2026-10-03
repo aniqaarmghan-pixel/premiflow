@@ -1,6 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "gold";
@@ -30,13 +30,15 @@ export function Button({
   disabled,
   ...props
 }: Props) {
+  const reduceMotion = useReducedMotion();
+  const still = disabled || reduceMotion;
   return (
     <motion.button
       type="button"
-      whileTap={disabled ? undefined : { scale: 0.98 }}
-      whileHover={disabled ? undefined : { y: -2 }}
+      whileTap={still ? undefined : { scale: 0.98 }}
+      whileHover={still ? undefined : { y: -2 }}
       transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-      className={`inline-flex items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${styles[variant]} ${
+      className={`inline-flex min-h-11 items-center justify-center gap-2 rounded-full px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${styles[variant]} ${
         variant === "primary" || variant === "gold" ? "pf-cta" : ""
       } ${className}`}
       disabled={disabled}

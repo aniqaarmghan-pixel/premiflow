@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import {
   AccountSessionRequiredError,
+  AccountSessionUnavailableError,
   requireAccountSession,
 } from "@/lib/server/account-auth/session";
 import {
@@ -24,6 +25,12 @@ function errorResponse(err: unknown) {
     );
   }
 
+  if (err instanceof AccountSessionUnavailableError) {
+    return NextResponse.json(
+      { error: "account_session_unavailable", message: err.message },
+      { status: 503, headers: { "Retry-After": "2" } }
+    );
+  }
   if (err instanceof WalletLinkConflictError) {
     return NextResponse.json(
       { error: "wallet_already_linked", message: err.message },

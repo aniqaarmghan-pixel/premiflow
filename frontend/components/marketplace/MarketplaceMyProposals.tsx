@@ -78,6 +78,7 @@ export function MarketplaceMyProposals() {
           status={query.status}
           error={query.status === "error" ? query.error : undefined}
           wallet={session.wallet}
+          onRetry={query.reload}
           onVerify={() => void verify()}
           verifying={verifying}
         />

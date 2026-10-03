@@ -12,7 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useSession } from "@/lib/account-auth/client";
+import { useAccountSession } from "@/lib/account-auth/useAccountSession";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import {
@@ -83,7 +83,7 @@ function TypeIcon({ type }: { type: string }) {
  */
 export function NotificationBell() {
   const router = useRouter();
-  const { data: accountSession, isPending: accountPending } = useSession();
+  const { data: accountSession, isPending: accountPending } = useAccountSession();
 
   const accountId = accountSession?.user?.id ?? null;
   const hasSession = Boolean(accountId) && !accountPending;

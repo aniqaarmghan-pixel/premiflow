@@ -1,8 +1,9 @@
 "use client";
+import { playableVideoUrl } from "@/lib/app/marketplace-media";
 
 /**
  * Seller-owned gig media, linked by https URL only (nothing is bundled or proxied).
- * Images load lazily; the optional video never starts on its own, preloads only metadata on
+ * Images load lazily; the optional video (shown only for a valid direct file URL) never starts on its own, preloads only metadata on
  * demand (preload="none"), starts muted, and always shows controls, so it is safe
  * for reduced-motion users.
  */
@@ -17,7 +18,8 @@ export function MarketplaceGigMedia({
   media: string[];
   videoUrl: string | null;
 }) {
-  if (!coverUrl && media.length === 0 && !videoUrl) return null;
+  const playable = playableVideoUrl(videoUrl);
+  if (!coverUrl && media.length === 0 && !playable) return null;
   return (
     <section aria-label="Gig media" className="min-w-0 space-y-3">
       {coverUrl ? (
@@ -31,9 +33,10 @@ export function MarketplaceGigMedia({
           className="aspect-[16/9] w-full rounded-[var(--radius)] border border-line object-cover"
         />
       ) : null}
-      {videoUrl ? (
+      {playable ? (
         <video
-          src={videoUrl}
+          src={playable}
+          poster={coverUrl ?? undefined}
           controls
           muted
           playsInline

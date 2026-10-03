@@ -68,7 +68,9 @@ export default function SignInPage() {
     try {
       const outcome = await runAccountAuthCall({
         context: "sign_in",
-        retries: 1,
+        // Transient Neon / network failures (e.g. after the tab sat idle)
+        // retry with capped backoff; they are never shown as bad credentials.
+        retries: 2,
         call: () => signIn.email({ email: cleanEmail, password }),
         refreshSession: refreshAccountSession,
       });

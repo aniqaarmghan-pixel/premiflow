@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import type { ReactNode } from "react";
 import {
   Briefcase,
@@ -20,12 +20,9 @@ import {
 import { ContractCard } from "@/components/contracts/ContractCard";
 import { WhyPremiflowTeaser } from "@/components/about/AboutPage";
 import { PageFade } from "@/components/shell/PageFade";
-import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { HeroFlow } from "@/components/illustrations/HeroFlow";
-import { brand } from "@/lib/brand";
 import { OVERVIEW_DASHBOARD_HREFS } from "@/lib/app/contracts-list-query";
 import {
   ACTION_REQUIRED_COPY,
@@ -47,6 +44,16 @@ import { useResolverCases } from "@/lib/hooks/useResolverCases";
 import { AssignedDisputesSection } from "@/components/contracts/AssignedDisputesSection";
 import { useNow } from "@/lib/hooks/useNow";
 import { shortenAddress } from "@/lib/network";
+import { useAccountSession } from "@/lib/account-auth/useAccountSession";
+import { greetingName, upcomingDeadlines, type DeadlineItem } from "@/lib/app/dashboard-command";
+import {
+  ActivityPanel,
+  MarketplaceWorkspacePanel,
+  PanelCard,
+  QUICK_ACTIONS,
+  ReputationPanel,
+} from "@/components/overview/DashboardWorkspace";
+import { CalendarClock } from "lucide-react";
 
 const NAV_CARD_FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2";
@@ -78,12 +85,21 @@ export function OverviewPage() {
 
   if (status === "error") {
     return (
-      <EmptyState
-        kind="contracts"
-        title="Could not load contracts"
-        body={error ?? "The RPC request failed."}
-        action={{ label: "Retry", onClick: () => void refresh() }}
-      />
+      <PageFade>
+        <CommandHeader />
+        <div className="mt-5">
+          <EmptyState
+            kind="contracts"
+            title="Contracts are temporarily unavailable"
+            body={`${error ?? "The RPC request failed."} Your contracts are safe on-chain; this only affects loading them here.`}
+            action={{ label: "Retry", onClick: () => void refresh() }}
+          />
+        </div>
+        <div className="mt-5 grid min-w-0 gap-3 lg:grid-cols-2">
+          <MarketplaceWorkspacePanel />
+          <ActivityPanel />
+        </div>
+      </PageFade>
     );
   }
 
@@ -104,9 +120,8 @@ export function OverviewPage() {
 
   return (
     <PageFade>
-      <Hero />
-      <WhyPremiflowTeaser />
-      <div className="mt-5 grid gap-3 lg:grid-cols-12">
+      <CommandHeader />
+      <div className="mt-5 grid min-w-0 gap-3 lg:grid-cols-12">
         <Card className="relative overflow-hidden p-4 sm:p-5 lg:col-span-8">
           <div className="pointer-events-none absolute -right-8 -top-10 h-40 w-40 rounded-full bg-accent/15 blur-3xl" />
           <div className="flex items-center gap-2 text-accent">
@@ -202,6 +217,20 @@ export function OverviewPage() {
         />
       </div>
 
+      <div className="mt-5 grid min-w-0 gap-3 lg:grid-cols-12">
+        <div className="min-w-0 lg:col-span-8">
+          <MarketplaceWorkspacePanel />
+        </div>
+        <div className="min-w-0 lg:col-span-4">
+          <DeadlinesPanel items={upcomingDeadlines(offers)} />
+        </div>
+        <div className="min-w-0 lg:col-span-7">
+          <ActivityPanel />
+        </div>
+        <div className="min-w-0 lg:col-span-5">
+          <ReputationPanel />
+        </div>
+      </div>
       {actionItems.length > 0 ? <ActionRequiredSection items={actionItems} /> : null}
 
       {resolverCases.cases.length > 0 ? (
@@ -312,6 +341,9 @@ export function OverviewPage() {
           )}
         </Card>
       </section>
+      <div className="mt-6">
+        <WhyPremiflowTeaser />
+      </div>
     </PageFade>
   );
 }
@@ -428,43 +460,75 @@ function ActionRequiredSection({ items }: { items: ActionRequiredItem[] }) {
   );
 }
 
-function Hero() {
+function CommandHeader() {
+  const { user } = useAccountSession();
+  const name = greetingName(user);
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(135deg,#06101c_0%,#0b1d33_48%,#102a3d_100%)] px-3.5 py-5 text-white sm:rounded-[28px] sm:px-6 sm:py-7">
-      <div className="pointer-events-none absolute -left-16 top-0 h-56 w-56 rounded-full bg-cyan/20 blur-3xl" />
-      <div className="pointer-events-none absolute right-0 top-10 h-64 w-64 rounded-full bg-violet/20 blur-3xl" />
-      <div className="relative grid min-w-0 items-center gap-4 sm:gap-5 lg:grid-cols-[1.05fr_.95fr] lg:gap-6">
+    <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(135deg,#071222_0%,#0b1a2e_55%,#0f2335_100%)] px-4 py-5 text-white sm:rounded-[28px] sm:px-6 sm:py-6">
+      <div aria-hidden="true" className="pointer-events-none absolute -left-20 -top-16 h-56 w-56 rounded-full bg-cyan/15 blur-3xl" />
+      <div aria-hidden="true" className="pointer-events-none absolute -right-10 bottom-0 h-48 w-48 rounded-full bg-violet/15 blur-3xl" />
+      <div className="relative flex min-w-0 flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan">
-            {brand.eyebrow}
-          </p>
-          <h1 className="mt-2 font-display text-[1.4rem] leading-[1.18] text-white sm:mt-2.5 sm:text-[2rem] lg:text-[2.25rem]">
-            {brand.tagline}
+          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan">Command center</p>
+          <h1 className="mt-2 break-words font-display text-[1.45rem] leading-tight sm:text-[1.9rem] [overflow-wrap:anywhere]">
+            {name ? `Welcome back, ${name}` : "Welcome back"}
           </h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-white/70 sm:mt-2.5 sm:text-[0.95rem]">
-            {brand.description}
+          <p className="mt-1.5 max-w-xl text-sm leading-6 text-white/65">
+            Everything below is loaded from your contracts and marketplace activity. Nothing is estimated.
           </p>
-          <div className="mt-3.5 flex flex-col gap-2.5 sm:mt-4 sm:flex-row sm:flex-wrap">
-            <Link href="/create" className="w-full sm:w-auto">
-              <Button className="w-full px-3.5 py-2.5 text-[13px] sm:w-auto sm:py-2">
-                Create contract
-              </Button>
-            </Link>
-            <Link href="/contracts" className="w-full sm:w-auto">
-              <Button
-                variant="secondary"
-                className="w-full border-white/15 bg-white/5 px-3.5 py-2.5 text-[13px] text-white hover:bg-white/10 sm:w-auto sm:py-2"
-              >
-                Explore contracts
-              </Button>
-            </Link>
-          </div>
         </div>
-        <div className="min-w-0 overflow-hidden rounded-xl border border-white/10 bg-white/5 sm:rounded-2xl">
-          <HeroFlow dense />
-        </div>
+        <nav aria-label="Quick actions" className="min-w-0">
+          <ul className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            {QUICK_ACTIONS.map(({ href, label, icon: Icon }, i) => (
+              <li key={href} className="min-w-0">
+                <Link
+                  href={href}
+                  className={`flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-full px-4 text-[13px] font-semibold transition ${NAV_CARD_FOCUS} ${
+                    i === 0
+                      ? "bg-white text-ink hover:bg-white/90"
+                      : "border border-white/15 bg-white/5 text-white hover:bg-white/10"
+                  }`}
+                >
+                  <Icon size={15} aria-hidden="true" className="shrink-0" />
+                  <span className="truncate">{label}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </div>
     </div>
+  );
+}
+function DeadlinesPanel({ items }: { items: DeadlineItem[] }) {
+  return (
+    <PanelCard title="Deadlines" icon={<CalendarClock size={15} aria-hidden="true" />}>
+      {items.length === 0 ? (
+        <p className="text-sm text-ink-soft">No acceptance deadlines pending on loaded contracts.</p>
+      ) : (
+        <ul className="space-y-2">
+          {items.map((d) => (
+            <li key={d.address} className="min-w-0">
+              <Link
+                href={d.href}
+                className={`flex min-h-11 min-w-0 items-center justify-between gap-3 rounded-2xl bg-paper px-3 py-2.5 transition hover:bg-accent-soft ${NAV_CARD_FOCUS}`}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium text-ink">{d.title}</span>
+                  <span className="block text-xs text-ink-faint">
+                    {d.passed ? "Passed " : "Due "}
+                    {formatUnix(d.deadline)}
+                  </span>
+                </span>
+                <span className="shrink-0 font-mono text-[11px] text-ink-faint" title={d.address}>
+                  {shortenAddress(d.address)}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </PanelCard>
   );
 }
 
@@ -524,11 +588,12 @@ function Bento({
     blue: "from-accent-2/20 to-white",
     navy: "from-ink/10 to-white",
   };
+  const reduceMotion = useReducedMotion();
   return (
     <Link
       href={href}
       aria-label={`${label}: ${value}. Open matching contracts.`}
-      className={`block cursor-pointer overflow-hidden rounded-[var(--radius)] border border-line bg-gradient-to-br p-3.5 shadow-[var(--shadow)] transition hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-[0_18px_36px_-24px_rgba(18,194,184,.45)] active:translate-y-0 sm:p-4 ${NAV_CARD_FOCUS} ${tones[tone]} ${className}`}
+      className={`block cursor-pointer overflow-hidden rounded-[var(--radius)] border border-line bg-gradient-to-br p-3.5 shadow-[var(--shadow)] transition motion-safe:hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-[0_18px_36px_-24px_rgba(18,194,184,.45)] active:translate-y-0 sm:p-4 ${NAV_CARD_FOCUS} ${tones[tone]} ${className}`}
     >
       <p className="flex items-center gap-2 text-[11px] font-medium text-ink-faint">
         {icon}
@@ -536,7 +601,7 @@ function Bento({
       </p>
       <motion.p
         key={value}
-        initial={{ opacity: 0, y: 8 }}
+        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         className="mt-2 font-display text-2xl sm:text-3xl"
       >

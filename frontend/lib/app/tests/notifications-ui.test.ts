@@ -141,7 +141,7 @@ test("pagination / load more", () => {
 });
 
 test("notification bell authorization comes from the PREMIFLOW account session", () => {
-  assert.match(BELL, /useSession\(\)/);
+  assert.match(BELL, /useAccountSession\(\)/);
   assert.match(BELL, /accountSession\?\.user\?\.id/);
   assert.match(
     BELL,

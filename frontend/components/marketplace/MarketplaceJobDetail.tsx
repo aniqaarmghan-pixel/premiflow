@@ -302,7 +302,15 @@ export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
       ) : null}
 
       {canPropose ? (
-        <Card className="min-w-0 space-y-3 p-4">
+        <a
+          href="#send-proposal"
+          className="sticky bottom-3 z-20 flex min-h-12 items-center justify-center rounded-full bg-accent px-5 text-sm font-semibold text-white shadow-[0_18px_40px_-18px_rgba(13,148,136,.8)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 sm:hidden"
+        >
+          Apply to this job
+        </a>
+      ) : null}
+      {canPropose ? (
+        <Card id="send-proposal" className="min-w-0 scroll-mt-24 space-y-3 p-4">
           <h2 className="text-sm font-semibold">Send a proposal</h2>
           <Field label="Message">
             <Textarea

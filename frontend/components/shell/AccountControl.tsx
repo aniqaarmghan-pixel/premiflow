@@ -16,8 +16,8 @@ import { useEffect, useId, useRef, useState } from "react";
 import {
   refreshAccountSession,
   signOut,
-  useSession,
 } from "@/lib/account-auth/client";
+import { useAccountSession } from "@/lib/account-auth/useAccountSession";
 import { runAccountSignOut } from "@/lib/account-auth/session-flow";
 import {
   ensureMessagingSession,
@@ -27,7 +27,7 @@ import { logoutSession } from "@/lib/app/messages-client";
 
 export function AccountControl() {
   const router = useRouter();
-  const { data: session, isPending } = useSession();
+  const { data: session, isPending } = useAccountSession();
   const { publicKey, signMessage } = useWallet();
 
   const [menuOpen, setMenuOpen] = useState(false);
