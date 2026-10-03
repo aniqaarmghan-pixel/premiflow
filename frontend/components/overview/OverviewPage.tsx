@@ -1,5 +1,6 @@
 "use client";
 
+import { useEmployerProposals } from "@/lib/hooks/useEmployerProposals";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "framer-motion";
@@ -89,6 +90,7 @@ export function OverviewPage() {
   const { now } = useNow(30_000);
   const router = useRouter();
   const ws = useDashboardWorkspace();
+  const employerProposals = useEmployerProposals(ws.data?.jobs);
   const unreadNotifications = useUnreadNotificationCount();
   const reviewPrompts = useReviewPrompts(
     [...grouped.all]
@@ -154,6 +156,7 @@ export function OverviewPage() {
     unreadMessages: unreadNotifications,
     pendingInvitations: ws.data ? ws.data.invitations.filter((i) => i.invitation.status === "pending").length : 0,
     reviewPrompts,
+    proposals: employerProposals.items,
   });
   const hiringSteps = hiringPipeline({
     hiring: grouped.hiring,
@@ -612,12 +615,16 @@ function AttentionPanel({ items }: { items: AttentionItem[] }) {
               <Link
                 href={entry.href}
                 className={`flex min-h-12 min-w-0 items-center gap-3 rounded-2xl border px-3 py-2.5 transition hover:border-accent/40 hover:bg-accent-soft/60 ${NAV_CARD_FOCUS} ${
-                  entry.overdue ? "border-gold/40 bg-gold-soft/60" : "border-line bg-paper/70"
+                  entry.overdue
+                    ? "border-gold/40 bg-gold-soft/60"
+                    : entry.kind === "proposal"
+                      ? "border-accent/50 bg-accent-soft/50"
+                      : "border-line bg-paper/70"
                 }`}
               >
                 <span
                   aria-hidden="true"
-                  className={`size-2 shrink-0 rounded-full ${entry.overdue ? "bg-gold" : entry.kind === "offer" ? "bg-cyan" : entry.kind === "messages" ? "bg-violet" : entry.kind === "feedback" ? "bg-gold" : "bg-accent"}`}
+                  className={`size-2 shrink-0 rounded-full ${entry.overdue ? "bg-gold" : entry.kind === "proposal" ? "bg-accent" : entry.kind === "offer" ? "bg-cyan" : entry.kind === "messages" ? "bg-violet" : entry.kind === "feedback" ? "bg-gold" : "bg-accent"}`}
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-ink">{entry.title}</span>
@@ -626,6 +633,11 @@ function AttentionPanel({ items }: { items: AttentionItem[] }) {
                     {entry.due ? ` - ${entry.overdue ? "was due" : "due"} ${formatUnix(entry.due)}` : ""}
                   </span>
                 </span>
+                {entry.cta ? (
+                  <span className="shrink-0 rounded-full bg-accent px-3 py-1 text-xs font-semibold text-white">
+                    {entry.cta}
+                  </span>
+                ) : null}
               </Link>
             </li>
           ))}

@@ -7,6 +7,13 @@
 import type { ContractView } from "@/lib/streampay-v2/types";
 import type { ActionRequiredItem, OfferListItem } from "./dashboard-offers";
 import type { MarketplaceWorkspaceData } from "./dashboard-command";
+import {
+  newProposalsLabel,
+  proposalReviewHref,
+  shortWallet,
+  type EmployerProposalItem,
+} from "./employer-proposals";
+import { formatMarketplaceAmount } from "./marketplace";
 import { financialProgress, presentType, type DashboardSummary } from "./view-model";
 
 /* ---------- Role context ---------- */
@@ -163,13 +170,27 @@ export function freelancerPipeline(input: {
 
 export type AttentionItem = {
   id: string;
-  kind: "action" | "offer" | "review" | "feedback" | "messages" | "invitation";
+  kind: "proposal" | "action" | "offer" | "review" | "feedback" | "messages" | "invitation";
   title: string;
   detail: string;
   href: string;
+  /** Explicit call to action shown on the row (e.g. "Review proposal"). */
+  cta?: string;
   /** Unix seconds, when the item has a real deadline. */
   due: number | null;
   overdue: boolean;
+};
+
+const PROPOSAL_ROWS = 3;
+
+export const ATTENTION_RANK: Record<AttentionItem["kind"], number> = {
+  proposal: 0,
+  offer: 1,
+  action: 2,
+  review: 3,
+  invitation: 4,
+  messages: 5,
+  feedback: 6,
 };
 
 export function attentionQueue(input: {
@@ -180,9 +201,37 @@ export function attentionQueue(input: {
   pendingInvitations: number;
   /** Completed contracts where the review API reports the wallet is eligible to leave a review. */
   reviewPrompts?: readonly string[];
+  /** Submitted proposals on the employer's open jobs (existing job-detail API). */
+  proposals?: readonly EmployerProposalItem[];
   limit?: number;
 }): AttentionItem[] {
   const items: AttentionItem[] = [];
+  const proposals = input.proposals ?? [];
+  for (const p of proposals.slice(0, PROPOSAL_ROWS)) {
+    items.push({
+      id: `proposal-${p.proposalId}`,
+      kind: "proposal",
+      title: `New proposal: ${p.jobTitle}`,
+      detail: `${shortWallet(p.freelancerWallet)} proposed ${formatMarketplaceAmount(p.proposedAmount)}`,
+      href: proposalReviewHref(p.jobId, p.proposalId),
+      cta: "Review proposal",
+      due: null,
+      overdue: false,
+    });
+  }
+  if (proposals.length > PROPOSAL_ROWS) {
+    const more = proposals.length - PROPOSAL_ROWS;
+    items.push({
+      id: "proposals-more",
+      kind: "proposal",
+      title: `+${more} more ${more === 1 ? "proposal" : "proposals"} to review`,
+      detail: `${newProposalsLabel(proposals.length)} across your open jobs`,
+      href: "/marketplace/my-jobs",
+      cta: "Open My jobs",
+      due: null,
+      overdue: false,
+    });
+  }
   for (const o of input.offersToAnswer) {
     items.push({
       id: `offer-${o.address}`,
@@ -217,13 +266,25 @@ export function attentionQueue(input: {
       overdue: false,
     });
   }
-  for (const address of input.reviewPrompts ?? []) {
+  // Review reminders are grouped so they never crowd out urgent work.
+  const reviewPrompts = input.reviewPrompts ?? [];
+  if (reviewPrompts.length === 1) {
     items.push({
-      id: `feedback-${address}`,
+      id: `feedback-${reviewPrompts[0]}`,
       kind: "feedback",
       title: "Leave a review",
       detail: "Contract completed - share your feedback",
-      href: `/contracts/${address}#review`,
+      href: `/contracts/${reviewPrompts[0]}#review`,
+      due: null,
+      overdue: false,
+    });
+  } else if (reviewPrompts.length > 1) {
+    items.push({
+      id: "feedback-group",
+      kind: "feedback",
+      title: `${reviewPrompts.length} contracts awaiting your review`,
+      detail: "Completed contracts - starting with the most recent",
+      href: `/contracts/${reviewPrompts[0]}#review`,
       due: null,
       overdue: false,
     });
@@ -250,10 +311,13 @@ export function attentionQueue(input: {
       overdue: false,
     });
   }
-  // Overdue first, then soonest real deadline, then the rest in insertion order.
+  // Priority: proposals, offers, deadlines/actions, submitted work, invitations,
+  // unread messages, then reviews. Within a group: overdue, soonest deadline, order.
   const ranked = items
     .map((item, index) => ({ item, index }))
     .sort((a, b) => {
+      const rank = ATTENTION_RANK[a.item.kind] - ATTENTION_RANK[b.item.kind];
+      if (rank !== 0) return rank;
       if (a.item.overdue !== b.item.overdue) return a.item.overdue ? -1 : 1;
       const ad = a.item.due ?? Number.POSITIVE_INFINITY;
       const bd = b.item.due ?? Number.POSITIVE_INFINITY;

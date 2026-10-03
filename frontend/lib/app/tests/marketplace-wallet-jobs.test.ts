@@ -103,7 +103,7 @@ test("job cards are whole-card links everywhere; inner actions isolated", () => 
 test("public navbar logo is larger responsively without changing artwork", () => {
   const shell = read("components/site/PublicShell.tsx");
   assert.match(shell, /<span className="inline-flex sm:hidden">\s*<BrandMark light size=\{34\} wordmarkFontSize="1\.3rem" \/>/);
-  assert.match(shell, /<span className="hidden sm:inline-flex">\s*<BrandMark light size=\{38\} wordmarkFontSize="1\.42rem" \/>/);
+  assert.match(shell, /<span className="hidden sm:inline-flex">\s*<BrandMark light size=\{44\} wordmarkFontSize="1\.64rem" \/>/);
   assert.match(shell, /h-16 w-full max-w-7xl/);
   const mark = read("components/brand/BrandMark.tsx");
   assert.match(mark, /wordmarkFontSize\?: string;/);

@@ -2,11 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field, Input, Textarea } from "@/components/ui/Field";
+import { Modal } from "@/components/ui/Modal";
+import { shortWallet } from "@/lib/app/employer-proposals";
+import type { PublicProposal } from "@/lib/server/marketplace/service";
 import { savePendingHandoff } from "@/lib/app/marketplace-handoff-store";
 import {
   JOB_STATUS_LABELS,
@@ -60,6 +63,24 @@ function createIntentExists(employer: string): boolean {
   return result.kind !== "none";
 }
 
+function subscribeNoop() {
+  return () => {};
+}
+
+/** `?proposal=<id>` / `#proposals` deep link from the dashboard or My jobs (client only). */
+function useProposalDeepLink(): { proposalId: string | null; section: boolean } {
+  const location = useSyncExternalStore(
+    subscribeNoop,
+    () => `${window.location.search}${window.location.hash}`,
+    () => ""
+  );
+  const hashIndex = location.indexOf("#");
+  const search = hashIndex >= 0 ? location.slice(0, hashIndex) : location;
+  const hash = hashIndex >= 0 ? location.slice(hashIndex) : "";
+  const proposalId = new URLSearchParams(search).get("proposal");
+  return { proposalId, section: Boolean(proposalId) || hash === "#proposals" };
+}
+
 export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
   const router = useRouter();
   const session = useMarketplaceSession();
@@ -68,12 +89,26 @@ export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
     fetchJobDetail(jobId)
   );
   const [busy, setBusy] = useState(false);
+  const [confirmProposal, setConfirmProposal] = useState<PublicProposal | null>(null);
+  const deepLink = useProposalDeepLink();
+  const scrolledRef = useRef(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [amountUi, setAmountUi] = useState("");
   const shortlistKey =
     query.status === "ready" && query.data.viewerRole === "owner" ? `shortlist:${jobId}:${session.wallet ?? ""}` : null;
   const shortlist = useMarketplaceQuery(shortlistKey, () => fetchShortlist(jobId));
+  // Scroll to the linked proposal (or the proposals section) once the owner view has loaded.
+  useEffect(() => {
+    if (scrolledRef.current || query.status !== "ready" || !deepLink.section) return;
+    const target =
+      (deepLink.proposalId ? document.getElementById(`proposal-${deepLink.proposalId}`) : null) ??
+      document.getElementById("proposals");
+    if (!target) return;
+    scrolledRef.current = true;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    target.scrollIntoView({ block: "center", behavior: reduce ? "auto" : "smooth" });
+  }, [query.status, deepLink.section, deepLink.proposalId]);
 
   async function run(action: () => Promise<unknown>, done: string | null) {
     setBusy(true);
@@ -135,6 +170,7 @@ export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
   const isOwner = viewerRole === "owner";
   const shortlisted = new Set(shortlist.status === "ready" ? shortlist.data.proposalIds : []);
   const selectedId = proposals.find((p) => p.status === "selected")?.id ?? null;
+  const submittedCount = proposals.filter((p) => p.status === "submitted").length;
   const looksLikeOwner = !isOwner && session.wallet === job.employerWallet;
   const open = job.status === "open";
   const canPropose = open && !isOwner && !looksLikeOwner && (!ownProposal || ownProposal.status === "withdrawn" || ownProposal.status === "rejected");
@@ -178,8 +214,15 @@ export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
 
       {isOwner ? (
         <Card className="min-w-0 space-y-3 p-4">
-          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
-            <h2 className="text-sm font-semibold">Proposals ({proposals.length})</h2>
+          <div id="proposals" className="flex min-w-0 scroll-mt-24 flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold">
+              Proposals ({proposals.length})
+              {submittedCount > 0 ? (
+                <span className="ml-2 rounded-full bg-accent px-2 py-0.5 text-xs font-semibold text-white">
+                  {submittedCount} awaiting your decision
+                </span>
+              ) : null}
+            </h2>
             {open ? (
               <div className="flex flex-wrap gap-2 max-sm:w-full max-sm:flex-col max-sm:items-stretch">
                 <Link
@@ -206,14 +249,35 @@ export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
           {proposals.length === 0 ? (
             <p className="text-sm text-ink-soft">{MARKETPLACE_COPY.emptyProposals}</p>
           ) : (
-            <ul className="divide-y divide-line">
+            <ul className="space-y-3">
               {proposals.map((p) => (
-                <li key={p.id} className="flex min-w-0 flex-col gap-2 py-3">
+                <li
+                  key={p.id}
+                  id={`proposal-${p.id}`}
+                  data-highlighted={deepLink.proposalId === p.id ? "true" : undefined}
+                  className={`flex min-w-0 scroll-mt-24 flex-col gap-2 rounded-2xl border p-3 transition ${
+                    p.status === "selected"
+                      ? "border-accent bg-accent-soft/60"
+                      : p.status === "submitted"
+                        ? "border-accent/40 bg-card"
+                        : "border-line bg-paper/60 opacity-80"
+                  } ${deepLink.proposalId === p.id ? "ring-2 ring-accent ring-offset-2" : ""}`}
+                >
                   <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-xs text-ink-faint">
                     <ProfileLink wallet={p.freelancerWallet} prefix="Freelancer" label={p.freelancerWallet} />
-                    <StatusPill>{PROPOSAL_STATUS_LABELS[p.status]}</StatusPill>
+                    <span
+                      className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                        p.status === "selected"
+                          ? "bg-accent text-white"
+                          : p.status === "submitted"
+                            ? "bg-accent-soft text-ink"
+                            : "bg-paper-2 text-ink-soft"
+                      }`}
+                    >
+                      {p.status === "submitted" ? "New - awaiting your decision" : PROPOSAL_STATUS_LABELS[p.status]}
+                    </span>
                   </div>
-                  <p className="text-xs text-ink-soft">
+                  <p className="text-sm font-semibold text-ink">
                     Proposed {formatMarketplaceAmount(p.proposedAmount)}
                   </p>
                   <p className="whitespace-pre-wrap break-words text-sm text-ink [overflow-wrap:anywhere]">
@@ -237,30 +301,68 @@ export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
                   </div>
                   {open && p.status === "submitted" ? (
                     <div>
-                      <Button
-                        disabled={busy}
-                        onClick={() => {
-                          if (window.confirm("Select this proposal? Other submitted proposals will be declined.")) {
-                            void run(() => selectProposal(job.id, p.id), "Proposal selected.");
-                          }
-                        }}
-                      >
+                      <Button disabled={busy} onClick={() => setConfirmProposal(p)}>
                         Select proposal
                       </Button>
                     </div>
+                  ) : null}
+                  {p.status === "selected" && job.status === "filled" ? (
+                    <p className="text-sm font-medium text-ink">
+                      Selected. Next step:{" "}
+                      <a href="#create-contract" className="font-semibold text-accent underline">
+                        Create protected contract
+                      </a>
+                    </p>
                   ) : null}
                 </li>
               ))}
             </ul>
           )}
           {job.status === "filled" ? (
-            <div className="space-y-2 border-t border-line pt-3">
+            <div
+              id="create-contract"
+              className="scroll-mt-24 space-y-2 rounded-2xl border border-accent/50 bg-accent-soft/50 p-3"
+            >
+              <p className="text-sm font-semibold text-ink">Next step: create the protected contract</p>
               <p className="text-xs text-ink-faint">{MARKETPLACE_COPY.handoffNote}</p>
               <Button disabled={busy} onClick={() => void startCreate()}>
-                Create contract
+                Create protected contract
               </Button>
             </div>
           ) : null}
+          <Modal
+            open={confirmProposal !== null}
+            title="Select this proposal?"
+            onClose={() => setConfirmProposal(null)}
+            footer={
+              <>
+                <Button variant="secondary" onClick={() => setConfirmProposal(null)}>
+                  Cancel
+                </Button>
+                <Button
+                  disabled={busy}
+                  onClick={() => {
+                    const chosen = confirmProposal;
+                    setConfirmProposal(null);
+                    if (chosen) void run(() => selectProposal(job.id, chosen.id), "Proposal selected.");
+                  }}
+                >
+                  Select proposal
+                </Button>
+              </>
+            }
+          >
+            {confirmProposal ? (
+              <div className="space-y-2">
+                <p>
+                  You are selecting the proposal from {shortWallet(confirmProposal.freelancerWallet)} for{" "}
+                  {formatMarketplaceAmount(confirmProposal.proposedAmount)}.
+                </p>
+                <p className="font-medium text-ink">Other submitted proposals for this job will be declined.</p>
+                <p>After selecting, you create the protected contract from the selected proposal.</p>
+              </div>
+            ) : null}
+          </Modal>
         </Card>
       ) : null}
 
