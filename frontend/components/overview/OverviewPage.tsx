@@ -136,7 +136,7 @@ export function OverviewPage() {
   const sharedDecimals =
     mintKeys.length === 1 ? decimalsByMint[mintKeys[0]] : undefined;
   const mixedMints = mintKeys.length > 1;
-  const streaming = liveStreamContracts(grouped.all);
+  const streaming = liveStreamContracts(grouped.all, now);
   // Direct wallet vs contract.freelancer / contract.employer on each contract;
   // PendingAcceptance only, all four modes. Freelancer wins when both.
   const offers = offerSectionsForWallets(accountWallets, grouped.all, now);
@@ -387,7 +387,7 @@ export function OverviewPage() {
                   >
                     <p className="font-medium">{presentType(c.paymentMode)}</p>
                     <p className="text-xs text-ink-faint">
-                      {roleAwareStatusLabelForWallets(accountWallets, c)} · {c.openReviewCount} in review
+                      {roleAwareStatusLabelForWallets(accountWallets, c, now)} · {c.openReviewCount} in review
                     </p>
                   </Link>
                 </li>
@@ -407,7 +407,7 @@ export function OverviewPage() {
               {recent.map((c) => (
                 <li key={c.address.toBase58()} className="text-sm">
                   <Link href={`/contracts/${c.address.toBase58()}`} className="font-medium">
-                    {presentType(c.paymentMode)} · {roleAwareStatusLabelForWallets(accountWallets, c)}
+                    {presentType(c.paymentMode)} · {roleAwareStatusLabelForWallets(accountWallets, c, now)}
                   </Link>
                   <p className="text-xs text-ink-faint">Created {formatUnix(c.createdAt)}</p>
                 </li>

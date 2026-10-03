@@ -10,10 +10,12 @@ import { presentType, roleLabel } from "@/lib/app/view-model";
 import { accountRoleForContract } from "@/lib/app/account-wallet-identity";
 import { roleAwareStatusLabelForWallets } from "@/lib/app/dashboard-offers";
 import { useContracts } from "@/lib/hooks/ContractsProvider";
+import { useNow } from "@/lib/hooks/useNow";
 
 type Stamp = { at: number; label: string; href: string };
 
 export function ActivityPage() {
+  const { now } = useNow(30_000);
   const { status, grouped, accountWallets, refresh } = useContracts();
   if (status === "loading" || status === "idle") return <Skeleton className="h-64 w-full" />;
   if (status === "error") {
@@ -43,7 +45,7 @@ export function ActivityPage() {
     if (contract.disputedAt) stamps.push({ at: contract.disputedAt, label: `${prefix} disputed`, href });
     stamps.push({
       at: contract.createdAt,
-      label: `${prefix}: ${roleAwareStatusLabelForWallets(accountWallets, contract)}`,
+      label: `${prefix}: ${roleAwareStatusLabelForWallets(accountWallets, contract, now)}`,
       href,
     });
   }

@@ -36,7 +36,11 @@ import {
 } from "@/lib/streampay-v2";
 
 import { allowsSettlementClaims } from "@/lib/streampay-v2/types";
-import type { StreamingEarnedBasis } from "@/lib/app/stream-display";
+import {
+  STREAMING_ENDED_LABEL,
+  STREAMING_ENDED_SHORT_LABEL,
+  type StreamingEarnedBasis,
+} from "@/lib/app/stream-display";
 
 export { roleForContract };
 
@@ -127,6 +131,22 @@ export function filterContracts(
 
 export function presentStatus(status: ContractStatus): string {
   return contractStatusLabel(status);
+}
+
+/**
+ * Display status for lists, cards and badges. An on-chain Active Streaming
+ * contract at or after end_time reads "Streaming ended" ("Ended" when compact),
+ * matching ContractDetail. The on-chain status itself is never changed.
+ */
+export function presentContractStatus(
+  contract: Pick<ContractView, "status" | "paymentMode" | "startTime" | "endTime">,
+  now?: number,
+  options: { compact?: boolean } = {}
+): string {
+  if (now !== undefined && isStreamEnded(contract, now)) {
+    return options.compact ? STREAMING_ENDED_SHORT_LABEL : STREAMING_ENDED_LABEL;
+  }
+  return presentStatus(contract.status);
 }
 
 /**

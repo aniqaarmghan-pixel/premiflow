@@ -38,7 +38,7 @@ test("Activity uses account wallet-set status while assistant keeps connected-wa
   const activity = read("components/activity/ActivityPage.tsx");
   assert.match(
     activity,
-    /roleAwareStatusLabelForWallets\(accountWallets, contract\)/
+    /roleAwareStatusLabelForWallets\(accountWallets, contract, now\)/
   );
   assert.match(
     activity,
@@ -152,7 +152,7 @@ test("/contracts list passes unread counts to ContractCard badge", () => {
   assert.match(card, /aria-label=\{unreadMessageAriaLabel\(unreadMessages\)\}/);
   assert.match(
     card,
-    /label=\{roleAwareStatusLabelForWallets\(accountWallets, contract\)\}/
+    /label=\{roleAwareStatusLabelForWallets\(accountWallets, contract, now\)\}/
   );
   const hook = read("lib/hooks/useUnreadMessageCounts.ts");
   assert.match(hook, /fetchNotifications\(\{ limit: 50 \}\)/);

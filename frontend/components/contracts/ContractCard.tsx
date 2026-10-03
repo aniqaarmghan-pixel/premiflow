@@ -22,6 +22,7 @@ import {
 import type { ContractView } from "@/lib/streampay-v2";
 import { accountRoleForContract } from "@/lib/app/account-wallet-identity";
 import { useContracts } from "@/lib/hooks/ContractsProvider";
+import { useNow } from "@/lib/hooks/useNow";
 
 export function ContractCard({
   contract,
@@ -33,6 +34,7 @@ export function ContractCard({
   unreadMessages?: number;
 }) {
   const { accountWallets } = useContracts();
+  const { now } = useNow(30_000);
   const partyRole = accountRoleForContract(accountWallets, contract);
 
   if (partyRole === "none") return null;
@@ -89,7 +91,7 @@ export function ContractCard({
             ) : null}
             <StatusBadge
               status={contract.status}
-              label={roleAwareStatusLabelForWallets(accountWallets, contract)}
+              label={roleAwareStatusLabelForWallets(accountWallets, contract, now)}
               compact
             />
           </div>
@@ -126,7 +128,8 @@ export function ContractCard({
             partyRole === "both" && contract.status === "PendingAcceptance"
               ? "freelancer"
               : role,
-            contract
+            contract,
+            now
           )}
         </p>
       </Card>

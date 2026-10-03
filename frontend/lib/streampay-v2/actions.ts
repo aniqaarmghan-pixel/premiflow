@@ -191,7 +191,11 @@ export function availableActions(input: ActionAvailabilityInput): UiAction[] {
             (contract.paymentMode === "Fixed" ||
               contract.paymentMode === "Milestone") &&
             mayAttemptCompletion(contract, now)
-          )
+          ) &&
+          // Ended Streaming: everything is earned and awaits freelancer
+          // collection. Cancel would only relabel it Cancelled (Rust
+          // materializes accrual to end_time first), so it is not offered.
+          !isStreamEnded(contract, now)
         ) {
           actions.add("cancelActiveContract");
         }
@@ -261,7 +265,12 @@ export function availableActions(input: ActionAvailabilityInput): UiAction[] {
     ) {
       actions.add("withdrawFreelancer");
     }
-    if (mayAttemptCompletion(contract, now)) {
+    if (
+      mayAttemptCompletion(contract, now) &&
+      // complete_contract is permissionless and not needed for the freelancer
+      // to collect; the employer is not prompted to finalize an ended stream.
+      !(role === "employer" && isStreamEnded(contract, now))
+    ) {
       actions.add("completeContract");
     }
   }

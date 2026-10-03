@@ -153,3 +153,4 @@ export function streamingEndedRoleCopy(
   }
   return null;
 }
+export const STREAMING_ENDED_SHORT_LABEL = "Ended";

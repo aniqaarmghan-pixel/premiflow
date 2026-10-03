@@ -125,7 +125,7 @@ test("ContractDetail triggers lifecycle notifications only after confirmed tx, n
   const card = read("components/contracts/ContractCard.tsx");
   assert.match(
     card,
-    /roleAwareStatusLabelForWallets\(accountWallets, contract\)/
+    /roleAwareStatusLabelForWallets\(accountWallets, contract, now\)/
   );
   assert.doesNotMatch(card, /if \(!publicKey\) return null;/);
   assert.match(card, /BOTH_PARTIES_CARD_LABEL/);

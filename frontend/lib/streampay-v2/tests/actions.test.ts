@@ -599,7 +599,11 @@ test("Streaming open dispute uses projected stream accrual", () => {
   });
   assert.ok(!employerEnd.includes("openDispute"));
   assert.ok(!freelancerEnd.includes("openDispute"));
-  assert.ok(employerEnd.includes("completeContract"));
+  // Ended stream: completion stays available (permissionless) to the freelancer;
+  // the employer is no longer prompted to finalize or cancel.
+  assert.ok(!employerEnd.includes("completeContract"));
+  assert.ok(!employerEnd.includes("cancelActiveContract"));
+  assert.ok(freelancerEnd.includes("completeContract"));
 
   const trialStarted = makeContract({
     status: "Active",

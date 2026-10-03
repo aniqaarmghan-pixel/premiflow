@@ -161,7 +161,7 @@ test("Streaming PendingAcceptance is not counted as a live stream", () => {
       .streamingActive,
     1
   );
-  assert.match(OVERVIEW, /liveStreamContracts\(grouped\.all\)/);
+  assert.match(OVERVIEW, /liveStreamContracts\(grouped\.all, now\)/);
 });
 
 test("all four modes are classified the same way", () => {
@@ -350,12 +350,12 @@ test("role-aware PendingAcceptance wording leaves presentStatus unchanged", () =
   }
   assert.match(
     CONTRACT_CARD,
-    /label=\{roleAwareStatusLabelForWallets\(accountWallets, contract\)\}/
+    /label=\{roleAwareStatusLabelForWallets\(accountWallets, contract, now\)\}/
   );
   assert.doesNotMatch(CONTRACT_CARD, /presentStatus/);
   assert.match(
     OVERVIEW,
-    /roleAwareStatusLabelForWallets\(accountWallets, c\)/
+    /roleAwareStatusLabelForWallets\(accountWallets, c, now\)/
   );
   assert.doesNotMatch(OVERVIEW, /presentStatus/);
 });

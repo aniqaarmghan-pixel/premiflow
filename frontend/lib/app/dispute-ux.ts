@@ -2,7 +2,9 @@ import type { PublicKey } from "@solana/web3.js";
 
 import { findResolver, resolverLabel } from "@/lib/app/premiflow";
 import {
+  isStreamEnded,
   projectedContestedRemainder,
+  projectedFinalStreamClaim,
   remainingEmployerRefund,
   remainingFreelancerClaim,
   type ContractRole,
@@ -245,6 +247,13 @@ export function contractCardNextHint(
   }
   if (status === "PendingEmployerApproval" && role === "employer") {
     return "Next: review activation";
+  }
+  if (isStreamEnded(contract, now)) {
+    const pending = projectedFinalStreamClaim(contract, now) > 0n;
+    if (!pending) return "Stream ended: final pay collected";
+    if (role === "freelancer") return "Next: collect final pay";
+    if (role === "employer") return "Final payment awaiting freelancer collection";
+    return "Streaming ended";
   }
   if (status === "Active" && paymentMode === "Streaming") {
     return "Next: watch the stream";

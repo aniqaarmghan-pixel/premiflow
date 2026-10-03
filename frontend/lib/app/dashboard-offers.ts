@@ -3,8 +3,35 @@ import type { PublicKey } from "@solana/web3.js";
 
 import { formatUnix } from "@/lib/app/datetime";
 import { walletSetIncludesParty } from "@/lib/app/account-wallet-identity";
-import { presentStatus } from "@/lib/app/view-model";
-import type { ContractView, PaymentModeName } from "@/lib/streampay-v2";
+import { presentContractStatus, presentStatus } from "@/lib/app/view-model";
+import { isStreamEnded, type ContractView, type PaymentModeName } from "@/lib/streampay-v2";
+
+type EndedStatusFields = Partial<Pick<ContractView, "paymentMode" | "startTime" | "endTime">>;
+
+/** On-chain label, or "Streaming ended" for an Active Streaming contract past end_time when `now` is known. */
+function endedAwareStatus(
+  contract: Pick<ContractView, "status"> & EndedStatusFields,
+  now?: number
+): string {
+  if (
+    now !== undefined &&
+    contract.paymentMode !== undefined &&
+    contract.startTime !== undefined &&
+    contract.endTime !== undefined
+  ) {
+    return presentContractStatus(
+      {
+        status: contract.status,
+        paymentMode: contract.paymentMode,
+        startTime: contract.startTime,
+        endTime: contract.endTime,
+      },
+      now
+    );
+  }
+  const onChain = presentStatus(contract.status);
+  return onChain;
+}
 
 /**
  * Home dashboard discovery helpers (offers, action required, role-aware labels).
@@ -230,13 +257,14 @@ export function offerItemCopy(
  */
 export function roleAwareStatusLabel(
   wallet: PublicKey | null | undefined,
-  contract: Pick<ContractView, "status" | "employer" | "freelancer">
+  contract: Pick<ContractView, "status" | "employer" | "freelancer"> & EndedStatusFields,
+  now?: number
 ): string {
   if (contract.status === "PendingAcceptance") {
     if (walletIsParty(wallet, contract.freelancer)) return ROLE_AWARE_STATUS_COPY.freelancerOffer;
     if (walletIsParty(wallet, contract.employer)) return ROLE_AWARE_STATUS_COPY.employerOffer;
   }
-  return presentStatus(contract.status);
+  return endedAwareStatus(contract, now);
 }
 
 /**
@@ -250,7 +278,8 @@ export function roleAwareStatusLabel(
  */
 export function roleAwareStatusLabelForWallets(
   wallets: readonly PublicKey[],
-  contract: Pick<ContractView, "status" | "employer" | "freelancer">
+  contract: Pick<ContractView, "status" | "employer" | "freelancer"> & EndedStatusFields,
+  now?: number
 ): string {
   if (contract.status === "PendingAcceptance") {
     if (walletSetIncludesParty(wallets, contract.freelancer)) {
@@ -262,7 +291,7 @@ export function roleAwareStatusLabelForWallets(
     }
   }
 
-  return presentStatus(contract.status);
+  return endedAwareStatus(contract, now);
 }
 
 export function actionRequiredItems(
@@ -354,11 +383,28 @@ export function actionRequiredItemsForWallets(
   return items;
 }
 
-/** "Streaming now": Active streaming contracts only (never PendingAcceptance). */
-export function liveStreamContracts<T extends Pick<ContractView, "paymentMode" | "status">>(
-  contracts: readonly T[]
-): T[] {
-  return contracts.filter((c) => c.paymentMode === "Streaming" && c.status === "Active");
+/**
+ * "Streaming now": Active streaming contracts only (never PendingAcceptance).
+ * With `now`, streams at or after end_time are excluded (they show "Streaming ended").
+ */
+export function liveStreamContracts<
+  T extends Pick<ContractView, "paymentMode" | "status"> &
+    Partial<Pick<ContractView, "startTime" | "endTime">>,
+>(contracts: readonly T[], now?: number): T[] {
+  return contracts.filter(
+    (c) =>
+      c.paymentMode === "Streaming" &&
+      c.status === "Active" &&
+      !(
+        now !== undefined &&
+        c.startTime !== undefined &&
+        c.endTime !== undefined &&
+        isStreamEnded(
+          { paymentMode: c.paymentMode, status: c.status, startTime: c.startTime, endTime: c.endTime },
+          now
+        )
+      )
+  );
 }
 
 /** Viewer's side on one contract; "both" when one wallet is employer and freelancer. */
