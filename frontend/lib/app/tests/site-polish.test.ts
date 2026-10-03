@@ -99,3 +99,15 @@ test("safety: polish files are UI-only", () => {
     );
   }
 });
+
+test("public pages show discovery nav only; management lives in the dashboard sidebar", () => {
+  const parts = read("components/marketplace/MarketplaceParts.tsx");
+  assert.match(parts, /\{shellKind\(pathname\) === "app" \? \(\s*<nav aria-label="Manage marketplace"/);
+  assert.equal(shellKind("/marketplace/jobs"), "public");
+  assert.equal(shellKind("/marketplace/profiles/w"), "public");
+  assert.equal(shellKind("/marketplace/my-jobs"), "app");
+  const shell = read("components/shell/AppShell.tsx");
+  for (const href of ["/marketplace/post", "/marketplace/gigs/new", "/marketplace/my-jobs", "/marketplace/my-proposals", "/marketplace/my-gigs", "/marketplace/profile", "/marketplace/saved", "/marketplace/invitations"]) {
+    assert.ok(shell.includes(`href: "${href}"`), href);
+  }
+});

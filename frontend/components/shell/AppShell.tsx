@@ -17,10 +17,12 @@ import {
   Info,
   LayoutDashboard,
   MailOpen,
+  Megaphone,
   Menu,
   Package,
   ScrollText,
   Send,
+  Sparkles,
   Store,
   UserRound,
   X,
@@ -56,6 +58,8 @@ const NAV_GROUPS: ReadonlyArray<NavGroup> = [
   {
     title: "Work",
     items: [
+      { href: "/marketplace/post", label: "Post a job", icon: Megaphone },
+      { href: "/marketplace/gigs/new", label: "Offer a gig", icon: Sparkles },
       { href: "/marketplace/my-jobs", label: "My Jobs", icon: Briefcase },
       { href: "/marketplace/my-proposals", label: "My Proposals", icon: Send },
       { href: "/marketplace/my-gigs", label: "My Gigs", icon: Package },

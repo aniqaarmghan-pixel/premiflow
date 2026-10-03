@@ -76,6 +76,8 @@ export const DASHBOARD_NAV_HREFS = [
   "/contracts",
   "/create",
   "/activity",
+  "/marketplace/post",
+  "/marketplace/gigs/new",
   "/marketplace/my-jobs",
   "/marketplace/my-proposals",
   "/marketplace/my-gigs",

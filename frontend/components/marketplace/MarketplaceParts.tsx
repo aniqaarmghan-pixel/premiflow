@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { Aurora } from "@/components/site/Aurora";
+import { shellKind } from "@/lib/app/site-routes";
 import { CategoryArt } from "@/components/site/CategoryArt";
 import { CloudOff, Play, RefreshCw, Sparkles } from "lucide-react";
 
@@ -74,9 +75,12 @@ export function MarketplaceNav({ className = "" }: { className?: string }) {
       <nav aria-label="Marketplace discovery" className="flex min-w-0 flex-wrap gap-2">
         {MARKETPLACE_DISCOVER_NAV.map((item) => tab(item, "discover"))}
       </nav>
-      <nav aria-label="Manage marketplace" className="flex min-w-0 flex-wrap gap-2">
-        {MARKETPLACE_MANAGE_NAV.map((item) => tab(item, "manage"))}
-      </nav>
+      {/* Management links only inside the signed-in dashboard; public pages stay discovery-only. */}
+      {shellKind(pathname) === "app" ? (
+        <nav aria-label="Manage marketplace" className="flex min-w-0 flex-wrap gap-2">
+          {MARKETPLACE_MANAGE_NAV.map((item) => tab(item, "manage"))}
+        </nav>
+      ) : null}
     </div>
   );
 }

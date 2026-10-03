@@ -76,7 +76,7 @@ export function PublicShell({
             <BrandMark light size={32} />
           </Link>
 
-          <nav aria-label="Marketplace" className="ml-4 hidden min-w-0 items-center gap-1 lg:flex">
+          <nav aria-label="Marketplace" className="ml-6 hidden min-w-0 items-center gap-0.5 lg:flex xl:ml-10 xl:gap-1">
             {PUBLIC_NAV.map((item) => {
               const active = isPublicNavActive(item.href, pathname);
               return (
@@ -84,7 +84,7 @@ export function PublicShell({
                   key={item.href}
                   href={item.href}
                   aria-current={active ? "page" : undefined}
-                  className={`pf-chip rounded-full border px-3.5 py-2 text-sm font-medium ${
+                  className={`pf-chip rounded-full border px-3 py-2 text-[0.9rem] font-medium tracking-[-0.01em] xl:px-4 ${
                     active ? "border-aqua/60 text-white" : "border-transparent text-white/70 hover:text-white"
                   }`}
                 >
