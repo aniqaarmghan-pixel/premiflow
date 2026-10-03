@@ -22,8 +22,10 @@ test("public navbar and hero: Sign in / Join / Dashboard, no prominent Connect W
 
 test("wallet is requested only next to hire / apply actions, on click", () => {
   const prompt = read("components/site/WalletActionPrompt.tsx");
-  assert.match(prompt, /onClick=\{\(\) => setVisible\(true\)\}/);
-  assert.doesNotMatch(prompt, /useEffect|connect\(\)|select\(/);
+  // Click-only: the prompt itself has no effects; the shared hook connects only after a user request.
+  assert.match(prompt, /onClick=\{request\}/);
+  assert.doesNotMatch(prompt, /useEffect|setVisible\(true\)/);
+  assert.match(read("lib/hooks/useWalletConnectRequest.ts"), /if \(!requestedRef\.current/);
   assert.match(read("components/marketplace/MarketplaceGigDetail.tsx"), /<WalletActionPrompt message=\{MARKETPLACE_COPY\.connectWallet\} action="Connect wallet to hire" \/>/);
   assert.match(read("components/marketplace/MarketplaceJobDetail.tsx"), /<WalletActionPrompt message=\{MARKETPLACE_COPY\.connectWallet\} action="Connect wallet to apply" \/>/);
 });

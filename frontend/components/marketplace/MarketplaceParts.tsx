@@ -162,14 +162,14 @@ export function StatusPill({ children }: { children: ReactNode }) {
 }
 
 /**
- * Job card. With `wholeCardLink` the title link is stretched over the whole
+ * Job card (shared everywhere). By default (`wholeCardLink`) the title link is stretched over the whole
  * card (real <Link>: Enter natively, Space handled), and inner links/footer
  * sit above the overlay and stop propagation so they never double-trigger.
  */
 export function JobSummaryCard({
   job,
   footer,
-  wholeCardLink = false,
+  wholeCardLink = true,
 }: {
   job: PublicJob;
   footer?: ReactNode;

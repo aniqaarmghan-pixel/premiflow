@@ -73,7 +73,13 @@ export function PublicShell({
       >
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 lg:h-[72px] lg:px-8">
           <Link href="/" aria-label="PREMIFLOW marketplace home" className="shrink-0">
-            <BrandMark light size={32} />
+            {/* ~8% larger on phones (no overflow at 360px), ~18% larger from sm up. */}
+            <span className="inline-flex sm:hidden">
+              <BrandMark light size={34} wordmarkFontSize="1.3rem" />
+            </span>
+            <span className="hidden sm:inline-flex">
+              <BrandMark light size={38} wordmarkFontSize="1.42rem" />
+            </span>
           </Link>
 
           <nav aria-label="Marketplace" className="ml-6 hidden min-w-0 items-center gap-0.5 lg:flex xl:ml-10 xl:gap-1">

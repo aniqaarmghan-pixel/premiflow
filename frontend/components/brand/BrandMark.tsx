@@ -19,10 +19,13 @@ export function BrandMark({
   size = 36,
   light = false,
   wordmark = true,
+  wordmarkFontSize,
 }: {
   size?: number;
   light?: boolean;
   wordmark?: boolean;
+  /** Optional wordmark font-size override (layout only; artwork unchanged). */
+  wordmarkFontSize?: string;
 }) {
   const wordmarkStyle =
     size >= 56
@@ -32,6 +35,9 @@ export function BrandMark({
         : size >= 32
           ? { fontSize: "1.2rem", letterSpacing: "-0.02em" }
           : { fontSize: "1.15rem", letterSpacing: "-0.02em" };
+  const resolvedWordmarkStyle = wordmarkFontSize
+    ? { ...wordmarkStyle, fontSize: wordmarkFontSize }
+    : wordmarkStyle;
   const gap = size >= 56 ? 12 : size >= 44 ? 14 : 12;
 
   return (
@@ -60,7 +66,7 @@ export function BrandMark({
       {wordmark ? (
         <span
           className="font-extrabold leading-none"
-          style={wordmarkStyle}
+          style={resolvedWordmarkStyle}
           aria-label={brand.name}
         >
           <span style={{ color: light ? "#FFFFFF" : NAVY }}>PREMI</span>
