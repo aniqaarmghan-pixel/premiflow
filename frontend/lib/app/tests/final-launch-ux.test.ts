@@ -118,8 +118,8 @@ test("desktop sidebar fills 100dvh with an internal hidden-scrollbar nav; logos 
   assert.match(css, /\.pf-rail::-webkit-scrollbar\s*\{\s*display:\s*none/);
 
   const pub = read("components/site/PublicShell.tsx");
-  assert.match(pub, /<BrandMark light size=\{50\} wordmarkFontSize="1\.85rem" \/>/);
-  assert.match(pub, /<BrandMark light size=\{34\} wordmarkFontSize="1\.3rem" \/>/);
+  assert.match(pub, /<BrandMark light trim size=\{58\} gap=\{14\} wordmarkFontSize="2\.2rem" \/>/);
+  assert.match(pub, /<BrandMark light trim size=\{36\} gap=\{10\} wordmarkFontSize="1\.4rem" \/>/);
   assert.match(pub, /className="min-w-max shrink-0"/);
 });
 

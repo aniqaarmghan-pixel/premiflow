@@ -102,10 +102,11 @@ test("job cards are whole-card links everywhere; inner actions isolated", () => 
 
 test("public navbar logo is larger responsively without changing artwork", () => {
   const shell = read("components/site/PublicShell.tsx");
-  assert.match(shell, /<span className="inline-flex sm:hidden">\s*<BrandMark light size=\{34\} wordmarkFontSize="1\.3rem" \/>/);
+  assert.match(shell, /<span className="inline-flex sm:hidden">\s*<BrandMark light trim size=\{36\} gap=\{10\} wordmarkFontSize="1\.4rem" \/>/);
   // Tablet and xl+: stronger 50px / 1.85rem; lg (full nav in the row): 44px / 1.64rem.
-  assert.match(shell, /<span className="hidden sm:inline-flex lg:hidden xl:inline-flex">\s*<BrandMark light size=\{50\} wordmarkFontSize="1\.85rem" \/>/);
-  assert.match(shell, /<span className="hidden lg:inline-flex xl:hidden">\s*<BrandMark light size=\{44\} wordmarkFontSize="1\.64rem" \/>/);
+  assert.match(shell, /<span className="hidden sm:inline-flex lg:hidden">\s*<BrandMark light trim size=\{52\} gap=\{12\} wordmarkFontSize="2rem" \/>/);
+  assert.match(shell, /<span className="hidden lg:inline-flex xl:hidden">\s*<BrandMark light trim size=\{50\} gap=\{12\} wordmarkFontSize="1\.9rem" \/>/);
+  assert.match(shell, /<span className="hidden xl:inline-flex">\s*<BrandMark light trim size=\{58\} gap=\{14\} wordmarkFontSize="2\.2rem" \/>/);
   assert.match(shell, /h-16 w-full max-w-7xl/);
   const mark = read("components/brand/BrandMark.tsx");
   assert.match(mark, /wordmarkFontSize\?: string;/);

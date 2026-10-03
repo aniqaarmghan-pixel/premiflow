@@ -109,10 +109,10 @@ test("desktop density: no zoom, scale or root font-size hacks; mobile targets ke
   assert.match(shell, /lg:h-\[100dvh\]/);
 });
 
-test("logo sizes preserved: public 44px / 1.64rem from sm up, 34 / 1.3rem mobile, app shell 44", () => {
+test("logo sizes preserved: trimmed responsive public brand and app shell 44", () => {
   const pub = read("components/site/PublicShell.tsx");
-  assert.match(pub, /<BrandMark light size=\{44\} wordmarkFontSize="1\.64rem" \/>/);
-  assert.match(pub, /<BrandMark light size=\{34\} wordmarkFontSize="1\.3rem" \/>/);
+  assert.match(pub, /<BrandMark light trim size=\{50\} gap=\{12\} wordmarkFontSize="1\.9rem" \/>/);
+  assert.match(pub, /<BrandMark light trim size=\{36\} gap=\{10\} wordmarkFontSize="1\.4rem" \/>/);
   assert.match(pub, /h-16 w-full max-w-7xl/);
   const shell = read("components/shell/AppShell.tsx");
   assert.match(shell, /<BrandMark light size=\{44\}/);
