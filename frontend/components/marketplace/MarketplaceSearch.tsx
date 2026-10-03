@@ -12,6 +12,7 @@ import { useMarketplaceQuery } from "@/lib/hooks/useMarketplace";
 
 import {
   EmptyState,
+  ErrorState,
   FreelancerSummaryCard,
   GigSummaryCard,
   JobSummaryCard,
@@ -97,7 +98,7 @@ export function MarketplaceSearch() {
       </div>
 
       {query.status === "error" ? (
-        <EmptyState title="Search could not run">{query.error.message}</EmptyState>
+        <ErrorState title="Search could not run" error={query.error} onRetry={query.reload} />
       ) : !sections ? (
         <SkeletonGrid count={6} tall />
       ) : total === 0 ? (

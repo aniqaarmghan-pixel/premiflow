@@ -8,7 +8,14 @@ import { searchJobs } from "@/lib/app/marketplace-client";
 import { lockedCreatePayment } from "@/lib/app/premiflow";
 import { useMarketplaceQuery } from "@/lib/hooks/useMarketplace";
 
-import { EmptyState, JobSummaryCard, MarketplaceHeader, SearchFilters, SkeletonGrid } from "./MarketplaceParts";
+import {
+  EmptyState,
+  ErrorState,
+  JobSummaryCard,
+  MarketplaceHeader,
+  SearchFilters,
+  SkeletonGrid,
+} from "./MarketplaceParts";
 
 export function MarketplaceBrowse() {
   const locked = lockedCreatePayment();
@@ -46,7 +53,7 @@ export function MarketplaceBrowse() {
           </div>
         )
       ) : query.status === "error" ? (
-        <EmptyState title="Jobs could not load">{query.error.message}</EmptyState>
+        <ErrorState title="Jobs could not load" error={query.error} onRetry={query.reload} />
       ) : (
         <SkeletonGrid count={4} />
       )}

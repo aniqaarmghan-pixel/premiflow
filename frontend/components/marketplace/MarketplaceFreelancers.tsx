@@ -10,6 +10,7 @@ import { useMarketplaceQuery } from "@/lib/hooks/useMarketplace";
 
 import {
   EmptyState,
+  ErrorState,
   FreelancerSummaryCard,
   MarketplaceHeader,
   SearchFilters,
@@ -58,7 +59,7 @@ export function MarketplaceFreelancers() {
           </div>
         )
       ) : query.status === "error" ? (
-        <EmptyState title="Profiles could not load">{query.error.message}</EmptyState>
+        <ErrorState title="Profiles could not load" error={query.error} onRetry={query.reload} />
       ) : (
         <SkeletonGrid count={6} />
       )}

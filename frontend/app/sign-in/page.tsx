@@ -7,6 +7,7 @@ import { ArrowRight, LockKeyhole, Mail } from "lucide-react";
 
 import { refreshAccountSession, signIn } from "@/lib/account-auth/client";
 import { runAccountAuthCall } from "@/lib/account-auth/session-flow";
+import { POST_SIGN_IN_HREF } from "@/lib/app/site-routes";
 
 export default function SignInPage() {
   const router = useRouter();
@@ -30,7 +31,7 @@ export default function SignInPage() {
     try {
       const result = await signIn.social({
         provider: "google",
-        callbackURL: "/",
+        callbackURL: POST_SIGN_IN_HREF,
       });
 
       if (result?.error) {
@@ -78,7 +79,7 @@ export default function SignInPage() {
       }
 
       setPassword("");
-      router.push("/");
+      router.push(POST_SIGN_IN_HREF);
       router.refresh();
     } finally {
       setSubmitting(false);

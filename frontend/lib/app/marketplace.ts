@@ -20,7 +20,7 @@ import type { CreateHandoff, PublicJob, PublicProposal } from "@/lib/server/mark
 
 /** Public discovery sections. */
 export const MARKETPLACE_DISCOVER_NAV = [
-  { href: "/marketplace", label: "Home" },
+  { href: "/", label: "Home" },
   { href: "/marketplace/jobs", label: "Jobs" },
   { href: "/marketplace/gigs", label: "Gigs" },
   { href: "/marketplace/freelancers", label: "Freelancers" },
@@ -50,7 +50,7 @@ export function isMarketplaceNavActive(href: string, pathname: string | null): b
   if (!pathname) return false;
   const path = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
   if (path === href) return true;
-  if (href === "/marketplace" || MANAGE_HREFS.includes(href) || MANAGE_HREFS.includes(path)) return false;
+  if (href === "/" || href === "/marketplace" || MANAGE_HREFS.includes(href) || MANAGE_HREFS.includes(path)) return false;
   if (href === "/marketplace/freelancers") return path.startsWith("/marketplace/profiles/");
   return path.startsWith(`${href}/`);
 }

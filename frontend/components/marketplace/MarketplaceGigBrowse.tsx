@@ -8,7 +8,14 @@ import { searchGigs } from "@/lib/app/marketplace-client";
 import { lockedCreatePayment } from "@/lib/app/premiflow";
 import { useMarketplaceQuery } from "@/lib/hooks/useMarketplace";
 
-import { EmptyState, GigSummaryCard, MarketplaceHeader, SearchFilters, SkeletonGrid } from "./MarketplaceParts";
+import {
+  EmptyState,
+  ErrorState,
+  GigSummaryCard,
+  MarketplaceHeader,
+  SearchFilters,
+  SkeletonGrid,
+} from "./MarketplaceParts";
 
 export function MarketplaceGigBrowse() {
   const locked = lockedCreatePayment();
@@ -47,7 +54,7 @@ export function MarketplaceGigBrowse() {
           </div>
         )
       ) : query.status === "error" ? (
-        <EmptyState title="Gigs could not load">{query.error.message}</EmptyState>
+        <ErrorState title="Gigs could not load" error={query.error} onRetry={query.reload} />
       ) : (
         <SkeletonGrid count={6} tall />
       )}

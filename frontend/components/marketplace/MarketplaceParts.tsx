@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, type ReactNode } from "react";
+import { CloudOff, Play, RefreshCw, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -103,33 +104,38 @@ export function StatusPill({ children }: { children: ReactNode }) {
 
 export function JobSummaryCard({ job, footer }: { job: PublicJob; footer?: ReactNode }) {
   return (
-    <Card className="pf-lift min-w-0 p-3 sm:p-4">
+    <article className="pf-card group relative min-w-0 overflow-hidden rounded-[20px] border border-line bg-card p-4 shadow-[var(--shadow)] sm:p-5">
+      <span
+        aria-hidden="true"
+        className="absolute inset-y-0 left-0 w-1 bg-[linear-gradient(180deg,#2ee6d6,#4f8cff_60%,#8b7bff)] opacity-70 transition-opacity group-hover:opacity-100"
+      />
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
         <Link
           href={`/marketplace/jobs/${job.id}`}
-          className="min-w-0 break-words font-semibold text-ink underline-offset-2 hover:underline [overflow-wrap:anywhere]"
+          className="min-w-0 break-words text-base font-semibold leading-snug text-ink underline-offset-2 hover:underline [overflow-wrap:anywhere]"
         >
           {job.title}
         </Link>
         <StatusPill>{JOB_STATUS_LABELS[job.status]}</StatusPill>
       </div>
-      <p className="mt-1 line-clamp-2 break-words text-sm text-ink-soft [overflow-wrap:anywhere]">
+      <p className="mt-1.5 line-clamp-2 break-words text-sm leading-6 text-ink-soft [overflow-wrap:anywhere]">
         {job.description}
       </p>
-      <JobTags job={job} className="mt-2" />
-      <p className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-faint">
-        <ProfileLink wallet={job.employerWallet} prefix="Employer" />
-        <span>{job.paymentMode}</span>
-        <span>
+      <JobTags job={job} className="mt-3" />
+      <div className="mt-4 flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
+        <p className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-faint">
+          <ProfileLink wallet={job.employerWallet} prefix="Employer" />
+          <span className="rounded-full bg-paper-2 px-2 py-0.5 font-medium text-ink-soft">{job.paymentMode}</span>
+          <span>Posted {new Date(job.createdAt).toLocaleDateString()}</span>
+        </p>
+        <span className="rounded-full bg-[color-mix(in_srgb,var(--accent)_14%,white)] px-3 py-1 text-sm font-semibold text-ink">
           {amountLabel(job.paymentMode)}: {formatMarketplaceAmount(job.budgetAmount)}
         </span>
-        <span>Posted {new Date(job.createdAt).toLocaleDateString()}</span>
-      </p>
+      </div>
       {footer}
-    </Card>
+    </article>
   );
 }
-
 /** Category chip (explicit, else keyword-derived) plus job skills. */
 export function JobTags({ job, className = "" }: { job: PublicJob; className?: string }) {
   const category = jobCategory(job);
@@ -270,7 +276,11 @@ function categoryLabel(slug: MarketplaceCategorySlug): string {
   return MARKETPLACE_CATEGORIES.find((c) => c.slug === slug)?.label ?? slug;
 }
 
-/** Visual service card. Media is only the seller's own https avatar; otherwise a category gradient. */
+/**
+ * Visual service card. Media is only the seller's own cover / avatar (https,
+ * set by the seller); otherwise a category gradient. A small badge shows when
+ * the gig includes a video (the player itself lives on the detail page).
+ */
 export function GigSummaryCard({
   gig,
   footer,
@@ -281,13 +291,14 @@ export function GigSummaryCard({
   const primary: MarketplaceCategorySlug | "none" = gigCategory(gig) ?? "none";
   const seller = gig.seller ?? null;
   const cover = gig.coverUrl ?? null;
+  const hasVideo = Boolean(gig.videoUrl);
   const delivery = gigDeliveryLabel(gig.deliveryDays);
   return (
-    <article className="pf-lift flex min-w-0 flex-col overflow-hidden rounded-[var(--radius)] border border-line bg-card shadow-[var(--shadow)]">
+    <article className="pf-card group flex min-w-0 flex-col overflow-hidden rounded-[20px] border border-line bg-card shadow-[var(--shadow)]">
       <Link
         href={gigHref(gig.id)}
         aria-label={gig.title}
-        className={`relative flex aspect-[16/9] items-center justify-center ${COVER_GRADIENTS[primary]}`}
+        className={`relative flex aspect-[16/10] items-center justify-center overflow-hidden ${COVER_GRADIENTS[primary]}`}
       >
         {cover ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -297,7 +308,7 @@ export function GigSummaryCard({
             loading="lazy"
             decoding="async"
             referrerPolicy="no-referrer"
-            className="absolute inset-0 h-full w-full object-cover"
+            className="pf-zoom absolute inset-0 h-full w-full object-cover"
           />
         ) : seller?.avatarUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -307,15 +318,19 @@ export function GigSummaryCard({
             loading="lazy"
             decoding="async"
             referrerPolicy="no-referrer"
-            className="h-16 w-16 rounded-full border-2 border-white/70 object-cover shadow-lg sm:h-20 sm:w-20"
+            className="pf-zoom h-16 w-16 rounded-full border-2 border-white/70 object-cover shadow-lg sm:h-20 sm:w-20"
           />
         ) : (
-          <span aria-hidden="true" className="font-display text-3xl text-white/80">
+          <span aria-hidden="true" className="pf-zoom font-display text-4xl font-semibold text-white/85">
             {(seller?.displayName || gig.title).slice(0, 1).toUpperCase()}
           </span>
         )}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-[linear-gradient(180deg,transparent,rgba(4,10,20,.55))]"
+        />
         {primary !== "none" ? (
-          <span className="absolute left-3 top-3 rounded-full bg-black/35 px-2 py-0.5 text-[11px] font-semibold text-white">
+          <span className="absolute left-3 top-3 rounded-full bg-black/40 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
             {categoryLabel(primary)}
           </span>
         ) : null}
@@ -323,15 +338,21 @@ export function GigSummaryCard({
           <span className="absolute right-3 top-3 rounded-full bg-white/90 px-2 py-0.5 text-[11px] font-semibold text-ink">
             {GIG_STATUS_LABELS[gig.status]}
           </span>
+        ) : hasVideo ? (
+          <span className="absolute right-3 top-3 inline-flex items-center gap-1 rounded-full bg-black/45 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur-sm">
+            <Play size={11} aria-hidden="true" className="fill-white" />
+            Video
+          </span>
         ) : null}
       </Link>
-      <div className="flex min-w-0 flex-1 flex-col gap-2 p-3 sm:p-4">
+      <div className="flex min-w-0 flex-1 flex-col gap-2 p-4">
         <p className="flex min-w-0 items-center gap-2 text-xs text-ink-faint">
+          <Avatar url={seller?.avatarUrl ?? null} size={22} />
           <ProfileLink wallet={gig.freelancerWallet} label={seller?.displayName || undefined} />
         </p>
         <Link
           href={gigHref(gig.id)}
-          className="line-clamp-2 min-w-0 break-words font-semibold text-ink underline-offset-2 hover:underline [overflow-wrap:anywhere]"
+          className="line-clamp-2 min-w-0 break-words font-semibold leading-snug text-ink underline-offset-2 hover:underline [overflow-wrap:anywhere]"
         >
           {gig.title}
         </Link>
@@ -341,24 +362,38 @@ export function GigSummaryCard({
           {delivery ? <span>{delivery}</span> : null}
           {(gig.packages ?? []).length > 0 ? <span>{gig.packages.length} packages</span> : null}
         </p>
-        <div className="mt-auto flex min-w-0 flex-wrap items-baseline justify-between gap-2 border-t border-line pt-2">
-          <span className="text-xs text-ink-faint">{gig.paymentMode}</span>
-          <span className="text-sm font-semibold text-ink">
-            {gigPriceLabel(gig)}
-          </span>
+        <div className="mt-auto flex min-w-0 flex-wrap items-baseline justify-between gap-2 border-t border-line pt-3">
+          <span className="text-xs uppercase tracking-wide text-ink-faint">{gig.paymentMode}</span>
+          <span className="text-base font-semibold text-ink">{gigPriceLabel(gig)}</span>
         </div>
         {footer}
       </div>
     </article>
   );
 }
-
 /** Public profile card: safe listing fields only. */
 export function FreelancerSummaryCard({ freelancer }: { freelancer: FreelancerCardData }) {
+  const available = freelancer.availability === "available";
   return (
-    <article className="pf-lift flex min-w-0 flex-col gap-3 rounded-[var(--radius)] border border-line bg-card p-4 shadow-[var(--shadow)]">
-      <div className="flex min-w-0 items-center gap-3">
-        <Avatar url={freelancer.avatarUrl} size={52} />
+    <article className="pf-card group relative flex min-w-0 flex-col overflow-hidden rounded-[20px] border border-line bg-card shadow-[var(--shadow)]">
+      <div
+        aria-hidden="true"
+        className="pf-zoom h-16 bg-[radial-gradient(120%_140%_at_0%_0%,#2ee6d6_0%,transparent_55%),radial-gradient(120%_140%_at_100%_0%,#8b7bff_0%,transparent_55%),linear-gradient(135deg,#0a1628,#13315c)]"
+      />
+      <div className="flex min-w-0 flex-1 flex-col gap-3 px-4 pb-4">
+        <div className="-mt-7 flex min-w-0 items-end gap-3">
+          <span className="rounded-full border-4 border-card bg-card">
+            <Avatar url={freelancer.avatarUrl} size={56} />
+          </span>
+          <span
+            className={`mb-1 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+              available ? "bg-[color-mix(in_srgb,var(--ok)_14%,white)] text-ok" : "bg-paper-2 text-ink-faint"
+            }`}
+          >
+            <span aria-hidden="true" className={`size-1.5 rounded-full ${available ? "bg-ok" : "bg-ink-faint"}`} />
+            {AVAILABILITY_LABELS[freelancer.availability]}
+          </span>
+        </div>
         <div className="min-w-0">
           <Link
             href={profileHref(freelancer.wallet)}
@@ -367,25 +402,26 @@ export function FreelancerSummaryCard({ freelancer }: { freelancer: FreelancerCa
             {freelancer.displayName || shortWallet(freelancer.wallet)}
           </Link>
           {freelancer.headline ? (
-            <p className="line-clamp-2 break-words text-xs text-ink-soft [overflow-wrap:anywhere]">
+            <p className="mt-0.5 line-clamp-2 break-words text-xs leading-5 text-ink-soft [overflow-wrap:anywhere]">
               {freelancer.headline}
             </p>
           ) : null}
         </div>
-      </div>
-      <SkillList skills={freelancer.skills.slice(0, 5)} />
-      <div className="mt-auto flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-line pt-2 text-xs">
-        <span className="text-ink-faint">{AVAILABILITY_LABELS[freelancer.availability]}</span>
-        {freelancer.rateAmount ? (
-          <span className="font-semibold text-ink">{formatMarketplaceAmount(freelancer.rateAmount)} / hour</span>
-        ) : (
-          <span className="text-ink-faint">Rate on request</span>
-        )}
+        <SkillList skills={freelancer.skills.slice(0, 5)} />
+        <div className="mt-auto flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-xs">
+          <Link href={profileHref(freelancer.wallet)} className="font-semibold text-accent">
+            View profile
+          </Link>
+          {freelancer.rateAmount ? (
+            <span className="font-semibold text-ink">{formatMarketplaceAmount(freelancer.rateAmount)} / hour</span>
+          ) : (
+            <span className="text-ink-faint">Rate on request</span>
+          )}
+        </div>
       </div>
     </article>
   );
 }
-
 /** Loading placeholders; pulse is disabled for reduced motion. */
 export function SkeletonGrid({ count = 3, tall = false }: { count?: number; tall?: boolean }) {
   return (
@@ -402,13 +438,58 @@ export function SkeletonGrid({ count = 3, tall = false }: { count?: number; tall
 
 export function EmptyState({ title, children }: { title: string; children?: ReactNode }) {
   return (
-    <div className="min-w-0 rounded-[var(--radius)] border border-dashed border-line bg-card-2 p-6 text-center">
-      <p className="font-semibold text-ink">{title}</p>
+    <div className="min-w-0 rounded-[20px] border border-dashed border-line bg-[radial-gradient(420px_160px_at_50%_0%,rgba(46,230,214,.10),transparent_70%)] bg-card-2 px-6 py-10 text-center">
+      <span
+        aria-hidden="true"
+        className="mx-auto flex size-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,rgba(46,230,214,.18),rgba(139,123,255,.18))] text-accent"
+      >
+        <Sparkles size={18} />
+      </span>
+      <p className="mt-3 font-semibold text-ink">{title}</p>
       {children ? <div className="mt-2 text-sm text-ink-soft">{children}</div> : null}
     </div>
   );
 }
-
+/** Discovery load failure with a retry. Browsing never needs a wallet, so this never asks for one. */
+export function ErrorState({
+  title,
+  error,
+  onRetry,
+}: {
+  title: string;
+  error?: MarketplaceApiError;
+  onRetry?: () => void;
+}) {
+  return (
+    <div
+      role="alert"
+      className="flex min-w-0 flex-col items-center gap-3 rounded-[20px] border border-line bg-card px-6 py-8 text-center shadow-[var(--shadow)]"
+    >
+      <span
+        aria-hidden="true"
+        className="flex size-11 items-center justify-center rounded-2xl bg-[color-mix(in_srgb,var(--danger)_10%,white)] text-danger"
+      >
+        <CloudOff size={18} />
+      </span>
+      <div>
+        <p className="font-semibold text-ink">{title}</p>
+        <p className="mt-1 text-sm text-ink-soft">
+          {error?.message ?? "Could not reach PREMIFLOW. Try again."}
+        </p>
+      </div>
+      {onRetry ? (
+        <button
+          type="button"
+          onClick={onRetry}
+          className="pf-chip inline-flex min-h-10 items-center gap-2 rounded-full border border-line bg-white px-4 text-sm font-semibold text-ink hover:border-accent/50"
+        >
+          <RefreshCw size={14} aria-hidden="true" />
+          Try again
+        </button>
+      ) : null}
+    </div>
+  );
+}
 const SEARCH_MODES = ["Fixed", "Milestone", "Streaming", "Hourly"] as const;
 
 /** Search/filter form; the server validates, parameterizes and bounds every field. */

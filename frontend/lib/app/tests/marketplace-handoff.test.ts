@@ -70,11 +70,11 @@ test("marketplace UI: no auto-send, no on-chain client, real data only, nav entr
   assert.match(detail, /router\.push\("\/create"\)/);
   assert.match(detail, /if \(createIntentExists\(wallet\)\)/);
   const shell = readFileSync("components/shell/AppShell.tsx", "utf8");
-  assert.match(shell, /\{ href: "\/marketplace", label: "Marketplace", icon: Store \}/);
+  assert.match(shell, /\{ href: "\/", label: "Marketplace", icon: Store \}/);
   assert.deepEqual(
     MARKETPLACE_NAV.map((n) => n.href),
     [
-      "/marketplace",
+      "/",
       "/marketplace/jobs",
       "/marketplace/gigs",
       "/marketplace/freelancers",
