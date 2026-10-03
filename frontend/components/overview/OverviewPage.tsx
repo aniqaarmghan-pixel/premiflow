@@ -53,6 +53,7 @@ import {
   QUICK_ACTIONS,
   ReputationPanel,
   useDashboardWorkspace,
+  useReviewPrompts,
   useUnreadNotificationCount,
 } from "@/components/overview/DashboardWorkspace";
 import { CountUp, ProgressBar } from "@/components/overview/DashboardVisuals";
@@ -89,6 +90,12 @@ export function OverviewPage() {
   const router = useRouter();
   const ws = useDashboardWorkspace();
   const unreadNotifications = useUnreadNotificationCount();
+  const reviewPrompts = useReviewPrompts(
+    [...grouped.all]
+      .filter((c) => c.status === "Completed")
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .map((c) => c.address.toBase58())
+  );
 
   if (status === "loading" || status === "idle") {
     return (
@@ -146,6 +153,7 @@ export function OverviewPage() {
     reviewContracts: pending,
     unreadMessages: unreadNotifications,
     pendingInvitations: ws.data ? ws.data.invitations.filter((i) => i.invitation.status === "pending").length : 0,
+    reviewPrompts,
   });
   const hiringSteps = hiringPipeline({
     hiring: grouped.hiring,
@@ -609,7 +617,7 @@ function AttentionPanel({ items }: { items: AttentionItem[] }) {
               >
                 <span
                   aria-hidden="true"
-                  className={`size-2 shrink-0 rounded-full ${entry.overdue ? "bg-gold" : entry.kind === "offer" ? "bg-cyan" : entry.kind === "messages" ? "bg-violet" : "bg-accent"}`}
+                  className={`size-2 shrink-0 rounded-full ${entry.overdue ? "bg-gold" : entry.kind === "offer" ? "bg-cyan" : entry.kind === "messages" ? "bg-violet" : entry.kind === "feedback" ? "bg-gold" : "bg-accent"}`}
                 />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-ink">{entry.title}</span>

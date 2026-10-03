@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { ContractAssistant } from "@/components/copilot/ContractAssistant";
 import { FloatingCreateGuidance } from "@/components/copilot/FloatingCreateGuidance";
@@ -47,12 +47,21 @@ function useDesktopLauncher() {
   return desktop;
 }
 
+
+function subscribeNoop() {
+  return () => {};
+}
+
 export function FloatingAssistant() {
   const pathname = usePathname();
   const { publicKey } = useWallet();
   const { grouped } = useContracts();
   const desktop = useDesktopLauncher();
-  const [mounted, setMounted] = useState(false);
+  const mounted = useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false
+  );
   const [open, setOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
 
@@ -84,11 +93,6 @@ export function FloatingAssistant() {
   }, [contractAddress, grouped.all, publicKey]);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
-
-  useEffect(() => {
-    setShowWelcome(true);
     const timer = window.setTimeout(() => setShowWelcome(false), WELCOME_MS);
     return () => window.clearTimeout(timer);
   }, []);

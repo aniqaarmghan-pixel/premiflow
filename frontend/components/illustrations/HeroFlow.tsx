@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useId, useSyncExternalStore } from "react";
 
 const TRACK = "M70 92 C 160 28, 250 156, 360 78 S 500 40, 530 88";
+
+function subscribeNoop() {
+  return () => {};
+}
 
 /**
  * Decorative employer → escrow → freelancer flow.
@@ -25,11 +29,12 @@ export function HeroFlow({
   const glowId = `pf-part-glow-${raw}`;
   const shieldId = `pf-shield-${raw}`;
   const trackId = `pf-hero-track-${raw}`;
-  const [motionReady, setMotionReady] = useState(false);
-
-  useEffect(() => {
-    setMotionReady(true);
-  }, []);
+  // false during SSR/hydration, true once running on the client.
+  const motionReady = useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false
+  );
 
   const heightClass = compact
     ? "h-28"

@@ -35,6 +35,7 @@ import {
 } from "@/lib/app/resolver-cases";
 import { StatusBadge } from "@/components/contracts/StatusBadge";
 import { ContractMessages } from "@/components/contracts/ContractMessages";
+import { ContractReviewForm } from "@/components/marketplace/MarketplaceContractLinks";
 import { HourlyShowcase } from "@/components/contracts/HourlyShowcase";
 import { StreamShowcase } from "@/components/contracts/StreamShowcase";
 import {
@@ -341,6 +342,7 @@ export function ContractDetail({ address }: { address: string }) {
     const isSubmit =
       confirm?.action === "submitWorkUnit" || confirm?.action === "submitTrialWork";
     if (!isSubmit) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resets delivery-session state alongside the async verification path below.
       setDeliverySession({ status: "unknown", error: null });
       return;
     }
@@ -1426,6 +1428,14 @@ export function ContractDetail({ address }: { address: string }) {
           </section>
         ) : null}
 
+        {contract.status === "Completed" && displayPartyWallet ? (
+          <section id="review" className="scroll-mt-20" aria-label="Leave a review">
+            <ContractReviewForm
+              contractAddress={contract.address.toBase58()}
+              wallet={displayPartyWallet.toBase58()}
+            />
+          </section>
+        ) : null}
         <div id="messages" className="scroll-mt-20">
           <Suspense fallback={null}>
             <ContractMessages

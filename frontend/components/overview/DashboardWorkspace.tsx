@@ -16,6 +16,7 @@ import {
   fetchMyInvitations,
   fetchMyJobs,
   fetchMyProposals,
+  fetchReviewEligibility,
   fetchTrustSummary,
 } from "@/lib/app/marketplace-client";
 import { notificationHrefPath } from "@/lib/app/notifications-ui";
@@ -120,6 +121,22 @@ export function useDashboardWorkspace() {
   return { session, query, verify, verifying, data };
 }
 export type DashboardWorkspaceState = ReturnType<typeof useDashboardWorkspace>;
+
+/**
+ * Completed contracts the verified wallet can still review (existing review
+ * eligibility API). Checks at most the 6 most recent; empty when unavailable.
+ */
+export function useReviewPrompts(contractAddresses: readonly string[]): string[] {
+  const session = useMarketplaceSession();
+  const list = contractAddresses.slice(0, 6);
+  const key =
+    session.wallet && list.length > 0 ? `dash-review-prompts:${session.wallet}:${list.join(",")}` : null;
+  const query = useMarketplaceQuery(key, async () => {
+    const results = await Promise.allSettled(list.map((address) => fetchReviewEligibility(address)));
+    return results.flatMap((r) => (r.status === "fulfilled" && r.value.eligible ? [r.value.contractAddress] : []));
+  });
+  return query.status === "ready" ? query.data : [];
+}
 
 /** Unread notification count (same endpoint as the bell); null when unavailable. */
 export function useUnreadNotificationCount(): number | null {

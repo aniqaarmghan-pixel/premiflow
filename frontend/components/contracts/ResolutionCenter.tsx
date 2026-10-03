@@ -144,7 +144,7 @@ export function ResolutionCenter({
   const [employerDraft, setEmployerDraft] = useState<string | null>(null);
 
   const loadCase = useCallback(
-    async (requestedMode: "get" | "recover") => {
+    async function loadCaseImpl(requestedMode: "get" | "recover"): Promise<void> {
       if (
         !shouldAttemptCaseRecover(contract.status, role) &&
         !shouldLoadCaseAsResolver(contract.status, role)
@@ -192,7 +192,7 @@ export function ResolutionCenter({
             setCaseState("not_created");
             return;
           }
-          await loadCase("recover");
+          await loadCaseImpl("recover");
           return;
         }
         if (api.status === 503 || api.code === "backend_unavailable") {

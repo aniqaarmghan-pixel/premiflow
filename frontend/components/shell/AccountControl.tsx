@@ -38,9 +38,8 @@ export function AccountControl() {
 
   const user = session?.user ?? null;
 
-  useEffect(() => {
-    if (!user) setMenuOpen(false);
-  }, [user]);
+  // Close the account menu once the session is gone (adjusted during render).
+  if (!user && menuOpen) setMenuOpen(false);
 
   useEffect(() => {
     if (!menuOpen) return;

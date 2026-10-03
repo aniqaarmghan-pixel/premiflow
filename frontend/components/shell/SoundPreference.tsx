@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import {
   isNoticeSoundEnabled,
@@ -8,12 +8,18 @@ import {
 } from "@/lib/app/notices";
 import { unlockNoticeAudio } from "@/lib/app/notice-sound";
 
-export function SoundPreference({ compact = false }: { compact?: boolean }) {
-  const [enabled, setEnabled] = useState(false);
+function subscribeNoop() {
+  return () => {};
+}
 
-  useEffect(() => {
-    setEnabled(isNoticeSoundEnabled());
-  }, []);
+export function SoundPreference({ compact = false }: { compact?: boolean }) {
+  const storedEnabled = useSyncExternalStore(
+    subscribeNoop,
+    isNoticeSoundEnabled,
+    () => false
+  );
+  const [override, setEnabled] = useState<boolean | null>(null);
+  const enabled = override ?? storedEnabled;
 
   function toggle() {
     const next = !enabled;

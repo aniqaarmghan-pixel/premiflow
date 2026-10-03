@@ -163,7 +163,7 @@ export function freelancerPipeline(input: {
 
 export type AttentionItem = {
   id: string;
-  kind: "action" | "offer" | "review" | "messages" | "invitation";
+  kind: "action" | "offer" | "review" | "feedback" | "messages" | "invitation";
   title: string;
   detail: string;
   href: string;
@@ -178,6 +178,8 @@ export function attentionQueue(input: {
   reviewContracts: readonly ContractView[];
   unreadMessages: number | null;
   pendingInvitations: number;
+  /** Completed contracts where the review API reports the wallet is eligible to leave a review. */
+  reviewPrompts?: readonly string[];
   limit?: number;
 }): AttentionItem[] {
   const items: AttentionItem[] = [];
@@ -211,6 +213,17 @@ export function attentionQueue(input: {
       title: `${c.openReviewCount} ${c.openReviewCount === 1 ? "submission" : "submissions"} in review`,
       detail: `${presentType(c.paymentMode)} contract`,
       href: `/contracts/${address}`,
+      due: null,
+      overdue: false,
+    });
+  }
+  for (const address of input.reviewPrompts ?? []) {
+    items.push({
+      id: `feedback-${address}`,
+      kind: "feedback",
+      title: "Leave a review",
+      detail: "Contract completed - share your feedback",
+      href: `/contracts/${address}#review`,
       due: null,
       overdue: false,
     });

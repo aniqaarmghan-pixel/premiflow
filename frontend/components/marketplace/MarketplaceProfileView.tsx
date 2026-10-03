@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { ExternalLink } from "lucide-react";
 
 import { Card } from "@/components/ui/Card";
 import {
@@ -83,18 +84,25 @@ export function MarketplaceProfileView({ wallet }: { wallet: string }) {
 
       {profile && profile.portfolio.length > 0 ? (
         <section className="min-w-0 space-y-2">
-          <h2 className="font-display text-lg">Portfolio</h2>
-          <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+          <h2 className="font-display text-lg">
+            Portfolio <span className="text-sm font-normal text-ink-faint">({profile.portfolio.length})</span>
+          </h2>
+          <div className="grid min-w-0 gap-3 sm:grid-cols-2">
             {profile.portfolio.map((item) => (
-              <Card key={item.url + item.title} className="min-w-0 space-y-1 p-3 sm:p-4">
+              <Card key={item.url + item.title} className="min-w-0 space-y-1.5 p-3 transition hover:border-accent/40 sm:p-4">
                 <a
                   href={item.url}
                   target="_blank"
                   rel="noopener noreferrer nofollow ugc"
-                  className="break-words font-semibold text-accent underline [overflow-wrap:anywhere]"
+                  className="inline-flex max-w-full items-start gap-1.5 break-words font-semibold text-accent underline [overflow-wrap:anywhere] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
                 >
-                  {item.title}
+                  <span className="min-w-0">{item.title}</span>
+                  <ExternalLink className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                  <span className="sr-only">(opens in a new tab)</span>
                 </a>
+                {portfolioHost(item.url) ? (
+                  <p className="truncate text-xs text-ink-faint">{portfolioHost(item.url)}</p>
+                ) : null}
                 {item.description ? (
                   <p className="break-words text-sm text-ink-soft [overflow-wrap:anywhere]">{item.description}</p>
                 ) : null}
@@ -127,4 +135,12 @@ export function MarketplaceProfileView({ wallet }: { wallet: string }) {
       ) : null}
     </div>
   );
+}
+
+function portfolioHost(url: string): string | null {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return null;
+  }
 }

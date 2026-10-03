@@ -30,9 +30,8 @@ export function WalletControl() {
     publicKeyBase58: pubkey,
   });
 
-  useEffect(() => {
-    if (!uiConnected) setMenuOpen(false);
-  }, [uiConnected, pubkey]);
+  // Close the wallet menu once the wallet disconnects (adjusted during render).
+  if (!uiConnected && menuOpen) setMenuOpen(false);
 
   useEffect(() => {
     if (

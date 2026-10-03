@@ -252,3 +252,27 @@ test("mobile bottom nav: Home / Explore / Contracts / Messages / More with safe-
   assert.match(shell, /<DashboardBottomNav pathname=\{pathname\} moreOpen=\{open\} onMore=\{\(\) => setOpen\(true\)\} \/>/);
   assert.match(shell, /pb-\[calc\(7\.5rem\+env\(safe-area-inset-bottom\)\)\]/);
 });
+
+test("attention queue includes review prompts from the eligibility API", () => {
+  const items = attentionQueue({
+    actionItems: [],
+    offersToAnswer: [],
+    reviewContracts: [],
+    unreadMessages: null,
+    pendingInvitations: 0,
+    reviewPrompts: ["Contract111"],
+  });
+  assert.equal(items.length, 1);
+  assert.equal(items[0].kind, "feedback");
+  assert.equal(items[0].href, "/contracts/Contract111#review");
+});
+
+test("contract detail renders the verified review form for completed contracts", () => {
+  const detail = readFileSync("components/contracts/ContractDetail.tsx", "utf8");
+  assert.match(detail, /contract\.status === "Completed" && displayPartyWallet/);
+  assert.match(detail, /<ContractReviewForm/);
+  const links = readFileSync("components/marketplace/MarketplaceContractLinks.tsx", "utf8");
+  assert.match(links, /export function ContractReviewForm/);
+  const ws = readFileSync("components/overview/DashboardWorkspace.tsx", "utf8");
+  assert.match(ws, /fetchReviewEligibility\(address\)/);
+});
