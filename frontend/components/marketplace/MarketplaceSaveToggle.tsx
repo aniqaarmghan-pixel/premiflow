@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { Bookmark } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
 import { marketplaceErrorMessage } from "@/lib/app/marketplace";
@@ -44,7 +45,10 @@ export function MarketplaceSaveToggle({ type, id }: { type: FavoriteTarget; id: 
   return (
     <span className="inline-flex flex-col items-start gap-1">
       <Button variant="secondary" disabled={busy} aria-pressed={saved} onClick={() => void toggle()}>
-        {saved ? "Saved" : "Save"}
+        <span key={saved ? "saved" : "save"} className={saved ? "pf-pop items-center gap-1.5" : "inline-flex items-center gap-1.5"}>
+          <Bookmark size={14} aria-hidden="true" className={saved ? "fill-current text-accent" : ""} />
+          {saved ? "Saved" : "Save"}
+        </span>
       </Button>
       {notice ? (
         <span className="text-xs text-danger" aria-live="polite">

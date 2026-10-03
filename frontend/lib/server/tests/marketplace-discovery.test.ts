@@ -251,10 +251,12 @@ test("discovery hero video: optional, safe sources, reduced motion and mobile sk
 test("discovery home: honest sections, no fake social proof, five workflow steps", () => {
   const home = read("components/marketplace/MarketplaceHome.tsx");
   assert.deepEqual(HOW_IT_WORKS.map((s) => s.title), ["Discover", "Agree", "Escrow", "Deliver", "Get paid"]);
-  for (const section of ["Latest gigs", "Latest jobs", "Featured freelancers", "How PREMIFLOW works", "Escrow and security", "<footer"]) {
+  for (const section of ["Latest gigs", "Latest jobs", "Featured freelancers", "How PREMIFLOW works", "Escrow and security"]) {
     assert.ok(home.includes(section), section);
   }
   assert.match(home, /FEATURED_NOTE/);
+  assert.match(read("components/site/SiteFooter.tsx"), /<footer/);
+  assert.match(read("components/site/PublicShell.tsx"), /<SiteFooter \/>/);
   const marketplace = read("lib/app/marketplace.ts");
   assert.match(marketplace, /Not ranked, reviewed or endorsed/);
   for (const src of [home, marketplace, read("components/marketplace/MarketplaceParts.tsx")]) {

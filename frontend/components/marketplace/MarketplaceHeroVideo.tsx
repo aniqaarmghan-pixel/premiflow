@@ -20,12 +20,27 @@ const serverAllows = () => false;
 
 /**
  * Decorative background video. Rendered only on the client, only on md+ screens
- * and only without prefers-reduced-motion; otherwise the gradient shows.
+ * and only without prefers-reduced-motion; otherwise the owned poster (when
+ * configured) or the CSS aurora gradient shows.
  */
 export function MarketplaceHeroVideo({ config = MARKETPLACE_HERO_VIDEO }: { config?: HeroVideoConfig | null }) {
   const allowed = useSyncExternalStore(subscribe, clientAllows, serverAllows);
   const video = resolveHeroVideo(config);
-  if (!video || !allowed) return null;
+  if (!video) return null;
+  if (!allowed) {
+    // Small screens / reduced motion: the owned poster (if any) as a still frame.
+    if (!video.poster) return null;
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={video.poster}
+        alt=""
+        aria-hidden="true"
+        decoding="async"
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-30"
+      />
+    );
+  }
   return (
     <video
       className="pointer-events-none absolute inset-0 hidden h-full w-full object-cover opacity-35 md:block motion-reduce:hidden"

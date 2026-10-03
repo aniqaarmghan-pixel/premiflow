@@ -29,6 +29,7 @@ import { useMarketplaceQuery, useMarketplaceSession } from "@/lib/hooks/useMarke
 import type { PackageTier } from "@/lib/server/marketplace/store";
 
 import { MarketplaceGigMedia } from "./MarketplaceGigMedia";
+import { WalletActionPrompt } from "@/components/site/WalletActionPrompt";
 import { Avatar, MarketplaceHeader, ProfileLink, SkillList, StatusPill } from "./MarketplaceParts";
 import { MarketplaceContractLinks } from "./MarketplaceContractLinks";
 import { MarketplaceSaveToggle } from "./MarketplaceSaveToggle";
@@ -225,7 +226,7 @@ export function MarketplaceGigDetail({ gigId }: { gigId: string }) {
             {selectedTier ? `Hire ${PACKAGE_TIER_LABELS[selectedTier]} via Create contract` : "Hire via Create contract"}
           </Button>
           {!session.wallet ? (
-            <p className="text-xs text-ink-faint">{MARKETPLACE_COPY.connectWallet}</p>
+            <WalletActionPrompt message={MARKETPLACE_COPY.connectWallet} action="Connect wallet to hire" />
           ) : null}
         </Card>
       ) : null}

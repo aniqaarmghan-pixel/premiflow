@@ -34,6 +34,7 @@ import { deriveContractPda, uiAmountToBaseUnits } from "@/lib/streampay-v2";
 import { STREAMPAY_PROGRAM_ID } from "@/lib/streampay-v2/constants";
 import { PublicKey } from "@solana/web3.js";
 
+import { WalletActionPrompt } from "@/components/site/WalletActionPrompt";
 import { JobTags, MarketplaceHeader, ProfileLink, StatusPill } from "./MarketplaceParts";
 import { MarketplaceContractLinks } from "./MarketplaceContractLinks";
 import { MarketplaceJobInvites } from "./MarketplaceJobInvites";
@@ -329,7 +330,7 @@ export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
               Send proposal
             </Button>
             {!session.wallet ? (
-              <p className="text-xs text-ink-faint">{MARKETPLACE_COPY.connectWallet}</p>
+              <WalletActionPrompt message={MARKETPLACE_COPY.connectWallet} action="Connect wallet to apply" />
             ) : null}
           </div>
         </Card>

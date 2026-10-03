@@ -5,6 +5,9 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   Activity,
   ArrowLeftRight,
+  BadgeCheck,
+  Bookmark,
+  Briefcase,
   CheckCircle2,
   CircleHelp,
   FilePlus2,
@@ -13,9 +16,15 @@ import {
   Inbox,
   Info,
   LayoutDashboard,
+  MailOpen,
+  Megaphone,
   Menu,
+  Package,
   ScrollText,
+  Send,
+  Sparkles,
   Store,
+  UserRound,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -24,10 +33,12 @@ import { AnimatePresence, motion } from "framer-motion";
 
 import { brand } from "@/lib/brand";
 import { useSession } from "@/lib/account-auth/client";
-import { RESOLVER_NAV, isNavActive, type WorkspaceMode } from "@/lib/app/resolver-workspace";
+import { RESOLVER_NAV, type WorkspaceMode } from "@/lib/app/resolver-workspace";
+import { DASHBOARD_HREF, isDashboardNavActive, shellKind } from "@/lib/app/site-routes";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
 import { BrandMark } from "@/components/brand/BrandMark";
 import { FloatingAssistant } from "@/components/copilot/FloatingAssistant";
+import { PublicShell } from "@/components/site/PublicShell";
 import { AccountControl } from "./AccountControl";
 import { ClientOnly } from "./ClientOnly";
 import { NetworkControl } from "./NetworkControl";
@@ -35,14 +46,50 @@ import { NotificationBell } from "./NotificationBell";
 import { SoundPreference } from "./SoundPreference";
 import { WalletControl } from "./WalletControl";
 
-const NAV = [
-  { href: "/", label: "Overview", icon: LayoutDashboard },
-  { href: "/contracts", label: "Contracts", icon: ScrollText },
-  { href: "/create", label: "Create contract", icon: FilePlus2 },
-  { href: "/marketplace", label: "Marketplace", icon: Store },
-  { href: "/activity", label: "Activity", icon: Activity },
-  { href: "/about", label: "About", icon: Info },
-  { href: "/support", label: "Help & Support", icon: CircleHelp },
+type NavItem = { href: string; label: string; icon: LucideIcon };
+type NavGroup = { title: string | null; items: ReadonlyArray<NavItem> };
+
+/** Private dashboard sidebar. Every entry links to an existing route. */
+const NAV_GROUPS: ReadonlyArray<NavGroup> = [
+  {
+    title: null,
+    items: [{ href: "/dashboard", label: "Overview", icon: LayoutDashboard }],
+  },
+  {
+    title: "Work",
+    items: [
+      { href: "/marketplace/post", label: "Post a job", icon: Megaphone },
+      { href: "/marketplace/gigs/new", label: "Offer a gig", icon: Sparkles },
+      { href: "/marketplace/my-jobs", label: "My Jobs", icon: Briefcase },
+      { href: "/marketplace/my-proposals", label: "My Proposals", icon: Send },
+      { href: "/marketplace/my-gigs", label: "My Gigs", icon: Package },
+      { href: "/marketplace/invitations", label: "Invitations", icon: MailOpen },
+      { href: "/marketplace/saved", label: "Saved", icon: Bookmark },
+    ],
+  },
+  {
+    title: "Contracts",
+    items: [
+      { href: "/contracts", label: "Contracts", icon: ScrollText },
+      { href: "/create", label: "Create contract", icon: FilePlus2 },
+      { href: "/activity", label: "Messages & Activity", icon: Activity },
+    ],
+  },
+  {
+    title: "You",
+    items: [
+      { href: "/dashboard/reviews", label: "Reviews", icon: BadgeCheck },
+      { href: "/marketplace/profile", label: "Profile", icon: UserRound },
+    ],
+  },
+  {
+    title: "PREMIFLOW",
+    items: [
+      { href: "/", label: "Marketplace", icon: Store },
+      { href: "/about", label: "About", icon: Info },
+      { href: "/support", label: "Help & Support", icon: CircleHelp },
+    ],
+  },
 ];
 
 const RESOLVER_ICONS: Record<string, LucideIcon> = {
@@ -67,17 +114,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const workspace = useWorkspace();
 
   const user = session?.user ?? null;
-  const isPublicAuthPage =
-    pathname === "/sign-in" ||
-    pathname === "/sign-up" ||
-    pathname === "/forgot-password" ||
-    pathname === "/reset-password";
+  const kind = shellKind(pathname);
+  const isPublicAuthPage = kind === "auth";
+  // Marketplace discovery is public: no account gate and no wallet needed.
+  const isPublicSite = kind === "public";
 
   useEffect(() => {
-    if (isPending || isPublicAuthPage || user) return;
+    if (isPending || isPublicAuthPage || isPublicSite || user) return;
 
     router.replace("/sign-in");
-  }, [isPending, isPublicAuthPage, router, user]);
+  }, [isPending, isPublicAuthPage, isPublicSite, router, user]);
 
   // Authentication and password-recovery pages are intentionally outside the authenticated
   // application shell. Visitors should not see workspace navigation,
@@ -95,6 +141,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+    );
+  }
+
+  if (isPublicSite) {
+    return (
+      <PublicShell signedIn={Boolean(user)} pending={isPending}>
+        {children}
+      </PublicShell>
     );
   }
 
@@ -126,17 +180,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
-  const nav: ReadonlyArray<{ href: string; label: string; icon: LucideIcon }> =
-    workspace.mode === "resolver" ? RESOLVER_NAV_ITEMS : NAV;
+  const navGroups: ReadonlyArray<NavGroup> =
+    workspace.mode === "resolver" ? [{ title: null, items: RESOLVER_NAV_ITEMS }] : NAV_GROUPS;
   const switchWorkspace = () => {
     const next = workspace.toggle();
-    router.push(next === "resolver" ? "/resolver" : "/");
+    router.push(next === "resolver" ? "/resolver" : DASHBOARD_HREF);
   };
 
   return (
-    <div className="min-h-screen min-w-0 lg:grid lg:grid-cols-[224px_minmax(0,1fr)] 2xl:grid-cols-[248px_minmax(0,1fr)]">
+    <div className="pf-dashboard min-h-screen min-w-0 lg:grid lg:grid-cols-[224px_minmax(0,1fr)] 2xl:grid-cols-[248px_minmax(0,1fr)]">
       <aside className="hidden bg-navy px-3.5 py-5 text-white lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:self-start lg:overflow-y-auto">
-        <Link href="/" className="px-2">
+        <Link href={DASHBOARD_HREF} className="px-2">
           <BrandMark light size={44} />
           <p
             className="mt-3"
@@ -153,23 +207,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {workspace.canSwitch ? (
           <WorkspaceSwitch mode={workspace.mode} onToggle={switchWorkspace} />
         ) : null}
-        <nav className="mt-6 flex flex-1 flex-col gap-1">
-          {nav.map((item) => {
-            const active = isNavActive(item.href, pathname);
+        <nav className="mt-5 flex flex-1 flex-col gap-0.5">
+          {navGroups.flatMap((group) => [
+            group.title ? (
+              <p
+                key={`g-${group.title}`}
+                className="px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35"
+              >
+                {group.title}
+              </p>
+            ) : null,
+            ...group.items.map((item) => {
+            const active = isDashboardNavActive(item.href, pathname);
             const Icon = item.icon;
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`relative flex items-center gap-2 rounded-2xl px-3 py-2.5 text-sm transition ${
+                className={`relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition ${
                   active ? "text-white" : "text-white/60 hover:bg-white/5 hover:text-white"
                 }`}
               >
                 {active ? (
                   <motion.span
                     layoutId="pf-nav-pill"
-                    className="absolute inset-0 rounded-2xl bg-white/10 shadow-[inset_0_0_0_1px_rgba(46,230,214,.4)]"
+                    className="absolute inset-0 rounded-xl bg-white/10 shadow-[inset_0_0_0_1px_rgba(46,230,214,.4)]"
                     transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
                   />
                 ) : null}
@@ -177,7 +240,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <span className="relative z-10">{item.label}</span>
               </Link>
             );
-          })}
+            }),
+          ])}
         </nav>
         <div className="mt-auto space-y-3 rounded-2xl bg-white/5 px-3 py-3 text-[11px] leading-5 text-white/50">
           <p>Value stays in the contract until work is verified.</p>
@@ -266,8 +330,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   }}
                 />
               ) : null}
-              {nav.map((item) => {
-                const active = isNavActive(item.href, pathname);
+              {navGroups.flatMap((group) => group.items).map((item) => {
+                const active = isDashboardNavActive(item.href, pathname);
                 return (
                   <Link
                     key={item.href}

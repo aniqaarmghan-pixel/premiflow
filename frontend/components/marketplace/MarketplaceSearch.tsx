@@ -12,6 +12,7 @@ import { useMarketplaceQuery } from "@/lib/hooks/useMarketplace";
 
 import {
   EmptyState,
+  ErrorState,
   FreelancerSummaryCard,
   GigSummaryCard,
   JobSummaryCard,
@@ -59,7 +60,10 @@ export function MarketplaceSearch() {
 
   return (
     <div className="pf-fade-in min-w-0 space-y-4">
-      <MarketplaceHeader title="Search" subtitle="Jobs, gigs and freelancer profiles in one place." />
+      <MarketplaceHeader
+        hero
+        eyebrow="Search"
+        art="ai" title="Search" subtitle="Jobs, gigs and freelancer profiles in one place." />
       <SearchFilters
         key={base}
         initial={form}
@@ -97,7 +101,7 @@ export function MarketplaceSearch() {
       </div>
 
       {query.status === "error" ? (
-        <EmptyState title="Search could not run">{query.error.message}</EmptyState>
+        <ErrorState title="Search could not run" error={query.error} onRetry={query.reload} />
       ) : !sections ? (
         <SkeletonGrid count={6} tall />
       ) : total === 0 ? (

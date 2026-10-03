@@ -46,6 +46,8 @@
   --color-navy: var(--navy);
   --color-cyan: var(--cyan);
   --color-violet: var(--violet);
+  --color-aqua: var(--aqua);
+  --color-midnight: var(--midnight);
   --font-sans: var(--font-jakarta);
   --font-display: var(--font-jakarta);
   --font-serif: var(--font-instrument);
@@ -388,5 +390,336 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Marketplace-first site: midnight / aqua / violet system + motion.
+   Every animation below is one-shot or hover/focus driven, and the
+   reduced-motion block at the end turns all of it off.
+   ------------------------------------------------------------------ */
+:root {
+  --midnight: #040a14;
+  --midnight-2: #0a1628;
+  --aqua: #2ee6d6;
+  --blue: #4f8cff;
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+.pf-midnight {
+  background-color: var(--midnight);
+  background-image:
+    radial-gradient(900px 480px at 12% -10%, rgba(46, 230, 214, 0.18), transparent 60%),
+    radial-gradient(760px 420px at 100% 10%, rgba(139, 123, 255, 0.2), transparent 60%),
+    radial-gradient(700px 380px at 50% 120%, rgba(79, 140, 255, 0.18), transparent 65%);
+  color: #fff;
+}
+.pf-gradient-text {
+  background: linear-gradient(100deg, #ffffff 10%, #9ff6ee 45%, #a9b8ff 80%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.pf-grid-fade {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: radial-gradient(ellipse at 50% 0%, #000 30%, transparent 75%);
+}
+.pf-glass {
+  background: rgba(10, 22, 40, 0.72);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+}
+
+/* Hero reveal: staggered on first paint via --pf-d. */
+@keyframes pf-hero-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+    filter: blur(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+.pf-hero-in {
+  animation: pf-hero-in 760ms var(--ease-out-soft) both;
+  animation-delay: var(--pf-d, 0ms);
+}
+
+/* Scroll reveal (toggled by the Reveal component's IntersectionObserver). */
+.pf-reveal {
+  opacity: 0;
+  transform: translateY(22px);
+  transition:
+    opacity 700ms var(--ease-out-soft),
+    transform 700ms var(--ease-out-soft);
+  transition-delay: var(--pf-d, 0ms);
+}
+.pf-reveal[data-revealed="true"] {
+  opacity: 1;
+  transform: none;
+}
+
+/* Card hover lift + media zoom. */
+.pf-card {
+  transition:
+    transform 260ms var(--ease-out-soft),
+    box-shadow 260ms var(--ease-out-soft),
+    border-color 260ms ease;
+}
+.pf-card:hover,
+.pf-card:focus-within {
+  transform: translateY(-4px);
+  box-shadow: 0 28px 60px -32px rgba(4, 10, 20, 0.55);
+  border-color: rgba(46, 230, 214, 0.45);
+}
+.pf-zoom {
+  transition: transform 700ms var(--ease-out-soft);
+}
+.pf-card:hover .pf-zoom,
+.pf-card:focus-within .pf-zoom {
+  transform: scale(1.06);
+}
+
+/* Chips: hover, focus and selected states. */
+.pf-chip {
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms var(--ease-out-soft);
+}
+.pf-chip:hover {
+  transform: translateY(-1px);
+}
+.pf-chip[aria-pressed="true"],
+.pf-chip[aria-current="page"] {
+  border-color: rgba(46, 230, 214, 0.7);
+  background-color: rgba(46, 230, 214, 0.14);
+}
+
+/* Search focus: soft aqua glow and slight lift. */
+.pf-search {
+  transition:
+    box-shadow 300ms var(--ease-out-soft),
+    transform 300ms var(--ease-out-soft);
+}
+.pf-search:focus-within {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 3px rgba(46, 230, 214, 0.35),
+    0 30px 70px -30px rgba(46, 230, 214, 0.55);
+}
+
+/* Save microinteraction (one pop per state change). */
+@keyframes pf-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+.pf-pop {
+  display: inline-flex;
+  animation: pf-pop 360ms var(--ease-out-soft) both;
+}
+
+/* Discover -> Agree -> Escrow -> Deliver -> Get paid: plays once when revealed. */
+.pf-flow-track {
+  transform: scaleX(0);
+  transform-origin: left center;
+}
+[data-revealed="true"] .pf-flow-track {
+  transform: scaleX(1);
+  transition: transform 2200ms var(--ease-out-soft) 200ms;
+}
+.pf-flow-dot {
+  transition:
+    background-color 400ms ease,
+    box-shadow 400ms ease,
+    color 400ms ease;
+  transition-delay: var(--pf-d, 0ms);
+}
+[data-revealed="true"] .pf-flow-dot {
+  background-color: var(--aqua);
+  color: var(--midnight);
+  box-shadow: 0 0 0 6px rgba(46, 230, 214, 0.16);
+}
+
+/* Escrow visual: a calm glow that settles after a few breaths. */
+@keyframes pf-escrow-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(46, 230, 214, 0);
+  }
+  50% {
+    box-shadow: 0 0 46px 4px rgba(46, 230, 214, 0.22);
+  }
+}
+.pf-escrow-breathe {
+  animation: pf-escrow-breathe 4.8s ease-in-out 3;
+}
+@keyframes pf-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.pf-fill {
+  transform-origin: left center;
+  animation: pf-fill 1800ms var(--ease-out-soft) 600ms both;
+}
+
+/* Route change fade for public pages. */
+.pf-page {
+  animation: pf-fade-in 380ms var(--ease-out-soft) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-hero-in,
+  .pf-page,
+  .pf-pop,
+  .pf-fill,
+  .pf-escrow-breathe {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+  .pf-reveal,
+  .pf-reveal[data-revealed="true"] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+  .pf-card,
+  .pf-card:hover,
+  .pf-card:focus-within,
+  .pf-zoom,
+  .pf-card:hover .pf-zoom,
+  .pf-card:focus-within .pf-zoom,
+  .pf-chip,
+  .pf-chip:hover,
+  .pf-search,
+  .pf-search:focus-within {
+    transform: none;
+    transition: none;
+  }
+  .pf-flow-track,
+  [data-revealed="true"] .pf-flow-track {
+    transform: scaleX(1);
+    transition: none;
+  }
+  .pf-flow-dot {
+    transition: none;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Final polish: aurora hero fallback, media cards, mobile rails,
+   calmer dashboard. Reduced motion makes all of it static.
+   ------------------------------------------------------------------ */
+.pf-aurora {
+  position: absolute;
+  inset: -20%;
+  overflow: hidden;
+  filter: blur(60px) saturate(130%);
+  opacity: 0.75;
+}
+.pf-aurora > span {
+  position: absolute;
+  border-radius: 9999px;
+  mix-blend-mode: screen;
+  will-change: transform;
+}
+.pf-aurora > span:nth-child(1) {
+  left: 5%;
+  top: 10%;
+  width: 46%;
+  height: 52%;
+  background: radial-gradient(circle, rgba(46, 230, 214, 0.55), transparent 65%);
+  animation: pf-aurora-a 26s ease-in-out infinite alternate;
+}
+.pf-aurora > span:nth-child(2) {
+  right: 0%;
+  top: 0%;
+  width: 52%;
+  height: 58%;
+  background: radial-gradient(circle, rgba(139, 123, 255, 0.55), transparent 65%);
+  animation: pf-aurora-b 32s ease-in-out infinite alternate;
+}
+.pf-aurora > span:nth-child(3) {
+  left: 30%;
+  bottom: 0%;
+  width: 50%;
+  height: 50%;
+  background: radial-gradient(circle, rgba(79, 140, 255, 0.5), transparent 65%);
+  animation: pf-aurora-c 38s ease-in-out infinite alternate;
+}
+@keyframes pf-aurora-a {
+  to {
+    transform: translate3d(18%, 12%, 0) scale(1.15);
+  }
+}
+@keyframes pf-aurora-b {
+  to {
+    transform: translate3d(-16%, 14%, 0) scale(0.9);
+  }
+}
+@keyframes pf-aurora-c {
+  to {
+    transform: translate3d(10%, -16%, 0) scale(1.1);
+  }
+}
+
+/* Media-first gig card: play affordance grows on hover/focus. */
+.pf-play {
+  transition:
+    transform 320ms var(--ease-out-soft),
+    background-color 320ms ease;
+}
+.pf-card:hover .pf-play,
+.pf-card:focus-within .pf-play {
+  transform: scale(1.08);
+  background-color: rgba(255, 255, 255, 0.28);
+}
+
+/* Horizontal chip rail on small screens (no visible scrollbar). */
+.pf-rail {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.pf-rail::-webkit-scrollbar {
+  display: none;
+}
+
+/* Dashboard: calm, flat surface for dense information. */
+.pf-dashboard {
+  background: var(--paper);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-aurora > span,
+  .pf-aurora > span:nth-child(1),
+  .pf-aurora > span:nth-child(2),
+  .pf-aurora > span:nth-child(3) {
+    animation: none !important;
+    transform: none;
+  }
+  .pf-play,
+  .pf-card:hover .pf-play,
+  .pf-card:focus-within .pf-play {
+    transform: none;
+    transition: none;
   }
 }
