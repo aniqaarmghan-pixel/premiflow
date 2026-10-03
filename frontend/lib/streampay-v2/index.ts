@@ -216,3 +216,4 @@ export type {
 } from "./types";
 
 export { REQUIRED_V2_INSTRUCTIONS } from "./idl-required";
+export { clampStreamNow, isStreamEnded, projectedFinalStreamClaim } from "./derived";

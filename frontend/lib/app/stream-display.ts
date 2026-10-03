@@ -107,3 +107,49 @@ export function streamingFrozenNote(basis: StreamingEarnedBasis): string | null 
 export function streamingTrialIncludedNote(trialText: string): string {
   return `Includes trial pay of ${trialText} already released.`;
 }
+
+export const STREAMING_ENDED_LABEL = "Streaming ended";
+export const STREAMING_COLLECT_FINAL_LABEL = "Collect final pay";
+export const STREAMING_EMPLOYER_FINAL_AWAITING =
+  "Final payment awaiting freelancer collection";
+export const STREAMING_EMPLOYER_FINAL_COLLECTED =
+  "Final streaming pay has been collected by the freelancer.";
+export const STREAMING_ENDED_FREELANCER_HINT =
+  "The stream reached its end time and stopped accruing. Collect final pay records the remaining earned pay up to the end time and transfers it to your wallet in one transaction.";
+export const STREAMING_ENDED_FREELANCER_DONE =
+  "The stream reached its end time. All earned pay has been collected.";
+export const STREAMING_ENDED_EMPLOYER_HINT =
+  "The stream reached its end time and stopped accruing. Earned pay is fixed at the end time and needs no approval. The freelancer collects it with their wallet.";
+export const STREAMING_FINAL_EARNED_LABEL = "Final earned (at end time)";
+export const STREAMING_FINAL_TO_COLLECT_LABEL = "Final pay to collect";
+
+export function streamingStatusLabel(input: {
+  live: boolean;
+  ended: boolean;
+  status: string;
+}): string {
+  if (input.ended) return STREAMING_ENDED_LABEL;
+  if (input.live) return "Accruing";
+  return input.status;
+}
+
+export function streamingEndedRoleCopy(
+  role: string | undefined,
+  finalClaimable: bigint
+): { headline: string; body: string } | null {
+  if (role === "freelancer") {
+    return finalClaimable > 0n
+      ? { headline: STREAMING_COLLECT_FINAL_LABEL, body: STREAMING_ENDED_FREELANCER_HINT }
+      : { headline: STREAMING_ENDED_LABEL, body: STREAMING_ENDED_FREELANCER_DONE };
+  }
+  if (role === "employer") {
+    return {
+      headline:
+        finalClaimable > 0n
+          ? STREAMING_EMPLOYER_FINAL_AWAITING
+          : STREAMING_EMPLOYER_FINAL_COLLECTED,
+      body: STREAMING_ENDED_EMPLOYER_HINT,
+    };
+  }
+  return null;
+}

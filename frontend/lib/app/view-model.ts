@@ -21,6 +21,9 @@ import {
   streamDurationSeconds,
   streamElapsedSeconds,
   streamRemainingSeconds,
+  clampStreamNow,
+  isStreamEnded,
+  projectedFinalStreamClaim,
   workUnitStatusDetail,
   type ContractRole,
   type ContractStatus,
@@ -336,6 +339,10 @@ export type StreamingDashboard = {
   frozenAt: number;
   /** Trial pay already released (releasedAmount minus stream-released), 0 without a trial. */
   trialPaid: bigint;
+  /** Active Streaming at or after end_time (display only; no on-chain event). */
+  ended: boolean;
+  /** Canonical projected Collect amount once ended; 0n otherwise. */
+  finalClaimable: bigint;
   /** Hero figure: frozen on-chain earned, or trial paid + live stream estimate while Active. */
   displayEarned: bigint;
 };
@@ -346,8 +353,11 @@ export type StreamingDashboard = {
  */
 export function streamingDashboard(
   contract: ContractView,
-  now: number
+  rawNow: number
 ): StreamingDashboard {
+  // The display clock never advances past end_time, so accrual stops exactly there.
+  const now = clampStreamNow(contract, rawNow);
+  const ended = isStreamEnded(contract, rawNow);
   const durationSeconds = streamDurationSeconds(contract);
   const progress = financialProgress(contract);
   const frozen = streamFrozenState(contract, durationSeconds);
@@ -377,6 +387,8 @@ export function streamingDashboard(
     earnedBasis: frozen ? frozen.basis : "estimate",
     frozenAt: frozen ? frozen.at : 0,
     trialPaid,
+    ended,
+    finalClaimable: ended ? projectedFinalStreamClaim(contract, now) : 0n,
     displayEarned: frozen
       ? frozen.earned
       : trialPaid + estimatedStreamAccrualForContract(contract, now),

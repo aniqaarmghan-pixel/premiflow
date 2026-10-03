@@ -357,3 +357,47 @@ export function isHourlyEngagementExpired(
 ): boolean {
   return now >= contract.endTime;
 }
+
+/**
+ * Streaming + Active and the scheduled end_time has been reached. Display/UX only:
+ * nothing happens on-chain at the timestamp; the freelancer still collects.
+ */
+export function isStreamEnded(
+  contract: Pick<ContractView, "paymentMode" | "status" | "startTime" | "endTime">,
+  now: number
+): boolean {
+  return (
+    contract.paymentMode === "Streaming" &&
+    contract.status === "Active" &&
+    contract.startTime > 0 &&
+    contract.endTime > contract.startTime &&
+    now >= contract.endTime
+  );
+}
+
+/** Clamp a display clock to end_time so streaming accrual never advances past the end. */
+export function clampStreamNow(
+  contract: Pick<ContractView, "startTime" | "endTime">,
+  now: number
+): number {
+  if (
+    contract.startTime > 0 &&
+    contract.endTime > contract.startTime &&
+    now > contract.endTime
+  ) {
+    return contract.endTime;
+  }
+  return now;
+}
+
+/**
+ * Amount a one-click Collect would transfer for an Active Streaming contract:
+ * the canonical materialized released amount at min(now, end_time) minus what
+ * was already withdrawn. Display/UX only; the program is authoritative.
+ */
+export function projectedFinalStreamClaim(contract: ContractView, now: number): bigint {
+  return saturatingSub(
+    projectedMaterializedReleasedAmount(contract, clampStreamNow(contract, now)),
+    contract.withdrawnAmount
+  );
+}

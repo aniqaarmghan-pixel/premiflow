@@ -113,6 +113,8 @@ import { localMetadataStore } from "@/lib/app/local-metadata";
 import { formatTokenAmount } from "@/lib/app/money";
 import {
   STREAMING_PAY_EXPLAINER,
+  STREAMING_COLLECT_FINAL_LABEL,
+  STREAMING_ENDED_LABEL,
   streamingTrialStartedCopy,
 } from "@/lib/app/stream-display";
 import {
@@ -173,6 +175,8 @@ import {
   hashBytes,
   remainingEmployerRefund,
   remainingFreelancerClaim,
+  isStreamEnded,
+  projectedFinalStreamClaim,
   settlementView,
   workUnitStatusLabel,
   type ContractMetadata,
@@ -1052,7 +1056,14 @@ export function ContractDetail({ address }: { address: string }) {
               </div>
             </div>
           </div>
-          <StatusBadge status={contract.status} label={presentStatus(contract.status)} />
+          <StatusBadge
+            status={contract.status}
+            label={
+              isStreamEnded(contract, now)
+                ? STREAMING_ENDED_LABEL
+                : presentStatus(contract.status)
+            }
+          />
         </header>
 
         <div className="grid min-w-0 gap-4 sm:gap-5 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-start 2xl:grid-cols-[minmax(0,1fr)_22rem]">
@@ -2123,6 +2134,14 @@ function ConfirmBody({
             : copy.intro}
         </p>
         {streaming ? <p>{STREAMING_PAY_EXPLAINER}</p> : null}
+        {streaming && isStreamEnded(contract, now) ? (
+          <p className="font-medium text-ink">
+            {STREAMING_COLLECT_FINAL_LABEL}:{" "}
+            {formatTokenAmount(projectedFinalStreamClaim(contract, now), decimals)}. The stream has
+            ended. This first records earned pay up to the end time (release stream accrual) and
+            then transfers it to your wallet, in one transaction.
+          </p>
+        ) : null}
         {contract.paymentMode === "Hourly" ? <p>{HOURLY_COPY.collectExplain}</p> : null}
         <dl className="grid gap-2 sm:grid-cols-3">
           <div>

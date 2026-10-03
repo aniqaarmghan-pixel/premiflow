@@ -19,6 +19,11 @@ import {
   streamingEarnedLabel,
   streamingFrozenNote,
   streamingTrialIncludedNote,
+  STREAMING_COLLECT_FINAL_LABEL,
+  STREAMING_FINAL_EARNED_LABEL,
+  STREAMING_FINAL_TO_COLLECT_LABEL,
+  streamingEndedRoleCopy,
+  streamingStatusLabel,
 } from "@/lib/app/stream-display";
 import { streamingDashboard } from "@/lib/app/view-model";
 import {
@@ -65,11 +70,15 @@ export function StreamShowcase({
   const elapsedMs = dash.elapsedSeconds * 1000;
   const pct = contract.startTime === 0 ? 0 : (elapsedMs / durationMs) * 100;
   const amount = (value: bigint) => formatTokenAmount(value, decimals);
-  const collectLabel =
-    dash.availableToCollect > 0n
+  const collectLabel = dash.ended
+    ? STREAMING_COLLECT_FINAL_LABEL
+    : dash.availableToCollect > 0n
       ? `Collect ${amount(dash.availableToCollect)}`
       : "Collect pay";
   const stillActive = contract.status === "Active";
+  const endedCopy = dash.ended ? streamingEndedRoleCopy(role, dash.finalClaimable) : null;
+  // Once ended, Collect final pay (which prepends the release) is the single action.
+  const showRelease = Boolean(canRelease && onRelease && !dash.ended);
 
   return (
     <div
@@ -89,10 +98,14 @@ export function StreamShowcase({
         </div>
         <span
           className={`rounded-full px-3 py-1 text-xs font-semibold ${
-            live ? "bg-cyan/15 text-cyan" : "bg-white/10 text-white/70"
+            live
+              ? "bg-cyan/15 text-cyan"
+              : dash.ended
+                ? "bg-gold/15 text-gold"
+                : "bg-white/10 text-white/70"
           }`}
         >
-          {live ? "Accruing" : contract.status}
+          {streamingStatusLabel({ live, ended: dash.ended, status: contract.status })}
         </span>
       </div>
       <div className="mt-4 rounded-3xl border border-white/10 bg-white/5">
@@ -106,7 +119,9 @@ export function StreamShowcase({
         {amount(dash.displayEarned)}
       </p>
       <p className="text-sm text-white/55">
-        {frozen ? (
+        {dash.ended ? (
+          <>Final earned at the end time - canonical on-chain floor formula, stopped at end_time</>
+        ) : frozen ? (
           streamingFrozenNote(dash.earnedBasis)
         ) : (
           <>
@@ -141,12 +156,19 @@ export function StreamShowcase({
           </p>
         ) : null}
         <div className="mt-2.5 grid gap-2.5 @sm:grid-cols-2 @xl:grid-cols-4">
-          <Mini label={streamingEarnedLabel(dash.earnedBasis)} value={amount(dash.displayEarned)} />
+          <Mini
+            label={dash.ended ? STREAMING_FINAL_EARNED_LABEL : streamingEarnedLabel(dash.earnedBasis)}
+            value={amount(dash.displayEarned)}
+          />
           <Mini label={STREAMING_DASHBOARD_LABELS.alreadyRecorded} value={amount(dash.alreadyRecorded)} />
           <Mini label={STREAMING_DASHBOARD_LABELS.alreadyCollected} value={amount(dash.alreadyCollected)} />
           <Mini
-            label={STREAMING_DASHBOARD_LABELS.availableToCollect}
-            value={amount(dash.availableToCollect)}
+            label={
+              dash.ended
+                ? STREAMING_FINAL_TO_COLLECT_LABEL
+                : STREAMING_DASHBOARD_LABELS.availableToCollect
+            }
+            value={amount(dash.ended ? dash.finalClaimable : dash.availableToCollect)}
             emphasize
           />
         </div>
@@ -183,10 +205,19 @@ export function StreamShowcase({
         <Mini label={STREAMING_DASHBOARD_LABELS.remainingEscrow} value={amount(dash.remainingEscrow)} />
       </div>
 
-      {(canRelease && onRelease) || (canCollect && onCollect) ? (
+      {endedCopy ? (
+        <div
+          role="status"
+          className="mt-4 rounded-2xl border border-gold/30 bg-gold/10 px-4 py-3"
+        >
+          <p className="font-semibold text-gold">{endedCopy.headline}</p>
+          <p className="mt-1 text-sm leading-6 text-white/75">{endedCopy.body}</p>
+        </div>
+      ) : null}
+      {showRelease || (canCollect && onCollect) ? (
         <div className="mt-4 flex flex-col gap-3">
           <div className="flex flex-wrap gap-2">
-            {canRelease && onRelease ? (
+            {showRelease && onRelease ? (
               <Button onClick={onRelease} disabled={busy} aria-label={STREAMING_RELEASE_LABEL}>
                 {STREAMING_RELEASE_LABEL}
               </Button>
@@ -195,23 +226,23 @@ export function StreamShowcase({
               <Button
                 onClick={onCollect}
                 disabled={busy}
-                variant="secondary"
+                variant={dash.ended ? "primary" : "secondary"}
                 aria-label={collectLabel}
               >
                 {collectLabel}
               </Button>
             ) : null}
           </div>
-          {canRelease ? (
+          {showRelease ? (
             <p className="text-sm leading-6 text-white/65">{STREAMING_RELEASE_HINT}</p>
           ) : null}
-          {canCollect ? (
+          {canCollect && !dash.ended ? (
             <p className="text-sm leading-6 text-white/65">{STREAMING_COLLECT_HINT}</p>
           ) : null}
         </div>
       ) : null}
 
-      {stillActive && dash.availableToCollect === 0n ? (
+      {stillActive && dash.availableToCollect === 0n && !dash.ended ? (
         <p className="mt-4 text-sm leading-6 text-white/60">{STREAMING_ZERO_AVAILABLE_HINT}</p>
       ) : null}
     </div>

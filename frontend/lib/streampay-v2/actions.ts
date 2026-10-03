@@ -5,7 +5,9 @@ import {
   isHourlyEngagementExpired,
   isReviewDeadlineActive,
   isStreamCurrentlyAccruing,
+  isStreamEnded,
   mayAttemptCompletion,
+  projectedFinalStreamClaim,
   projectedContestedRemainder,
   remainingEmployerRefund,
   remainingFreelancerClaim,
@@ -244,7 +246,20 @@ export function availableActions(input: ActionAvailabilityInput): UiAction[] {
       contract.startTime > 0 &&
       now >= contract.startTime
     )) {
-      actions.add("releaseStreamAccrual");
+      // After end_time the employer is not offered a manual "Update earnings":
+      // earned pay is fixed at end_time and the freelancer collects it.
+      if (!(role === "employer" && isStreamEnded(contract, now))) {
+        actions.add("releaseStreamAccrual");
+      }
+    }
+    // Ended stream: offer "Collect final pay" when the canonical projected
+    // claim is positive. Collect prepends release_stream_accrual in the same tx.
+    if (
+      role === "freelancer" &&
+      isStreamEnded(contract, now) &&
+      projectedFinalStreamClaim(contract, now) > 0n
+    ) {
+      actions.add("withdrawFreelancer");
     }
     if (mayAttemptCompletion(contract, now)) {
       actions.add("completeContract");
