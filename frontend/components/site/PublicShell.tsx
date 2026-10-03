@@ -71,18 +71,21 @@ export function PublicShell({
             : "border-b border-transparent bg-transparent"
         }`}
       >
-        <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 lg:h-[68px] lg:px-8">
+        <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 sm:h-[72px] sm:px-6 lg:h-[76px] lg:px-8 xl:h-20">
           <Link href="/" aria-label="PREMIFLOW marketplace home" className="min-w-max shrink-0">
-            {/* Phone unchanged. Tablet and xl+: ~50px mark / 1.85rem wordmark. At lg the
-                full nav shares the row, so 44px / 1.64rem keeps it balanced and unclipped. */}
+            {/* `trim`: size = VISIBLE mark height (the PNG is ~78% transparent padding,
+                which is what kept earlier "bigger" sizes looking small). */}
             <span className="inline-flex sm:hidden">
-              <BrandMark light size={34} wordmarkFontSize="1.3rem" />
+              <BrandMark light trim size={36} gap={10} wordmarkFontSize="1.4rem" />
             </span>
-            <span className="hidden sm:inline-flex lg:hidden xl:inline-flex">
-              <BrandMark light size={50} wordmarkFontSize="1.85rem" />
+            <span className="hidden sm:inline-flex lg:hidden">
+              <BrandMark light trim size={52} gap={12} wordmarkFontSize="2rem" />
             </span>
             <span className="hidden lg:inline-flex xl:hidden">
-              <BrandMark light size={44} wordmarkFontSize="1.64rem" />
+              <BrandMark light trim size={50} gap={12} wordmarkFontSize="1.9rem" />
+            </span>
+            <span className="hidden xl:inline-flex">
+              <BrandMark light trim size={58} gap={14} wordmarkFontSize="2.2rem" />
             </span>
           </Link>
 

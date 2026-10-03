@@ -15,17 +15,33 @@ const CYAN = "#3BB3D0";
  */
 const MARK_ZOOM = 512 / 136;
 
+/**
+ * Measured opaque bounds of the 512x512 PNG: x 196-315, y 200-311 (120x112,
+ * centred). With `trim`, `size` is the VISIBLE artwork height: the slot hugs
+ * the artwork (1px source margin) instead of reserving the transparent padding,
+ * so a 58px slot shows a ~58px mark. Artwork itself is unchanged.
+ */
+const ART_W = 120;
+const ART_H = 112;
+const TRIM_SRC_H = ART_H + 2;
+
 export function BrandMark({
   size = 36,
   light = false,
   wordmark = true,
   wordmarkFontSize,
+  trim = false,
+  gap: gapOverride,
 }: {
   size?: number;
   light?: boolean;
   wordmark?: boolean;
   /** Optional wordmark font-size override (layout only; artwork unchanged). */
   wordmarkFontSize?: string;
+  /** Size the slot to the visible artwork (size = visible mark height). */
+  trim?: boolean;
+  /** Optional mark-to-wordmark gap override in px. */
+  gap?: number;
 }) {
   const wordmarkStyle =
     size >= 56
@@ -38,13 +54,19 @@ export function BrandMark({
   const resolvedWordmarkStyle = wordmarkFontSize
     ? { ...wordmarkStyle, fontSize: wordmarkFontSize }
     : wordmarkStyle;
-  const gap = size >= 56 ? 12 : size >= 44 ? 14 : 12;
+  const gap = gapOverride ?? (size >= 56 ? 12 : size >= 44 ? 14 : 12);
+  // trim: render the full PNG at size*512/114 so its 112px artwork is `size` tall,
+  // inside a slot exactly as big as the artwork (no transform scaling).
+  const slotWidth = trim ? Math.ceil((size * (ART_W + 2)) / TRIM_SRC_H) : size;
+  const imagePx = trim ? Math.round((size * MARK_INTRINSIC) / TRIM_SRC_H) : size;
+  const imageScale = trim ? 1 : MARK_ZOOM;
 
   return (
     <span className="inline-flex items-center" style={{ gap }}>
       <span
         className="relative inline-block shrink-0 overflow-hidden"
-        style={{ width: size, height: size }}
+        style={{ width: slotWidth, height: size }}
+        data-brand-mark-slot=""
         aria-hidden
       >
         <Image
@@ -52,20 +74,22 @@ export function BrandMark({
           alt=""
           width={MARK_INTRINSIC}
           height={MARK_INTRINSIC}
-          sizes={`${Math.ceil(size * MARK_ZOOM)}px`}
+          sizes={`${Math.ceil(imagePx * imageScale)}px`}
           quality={95}
           priority
           className="pointer-events-none absolute left-1/2 top-1/2 max-w-none"
           style={{
-            width: size,
-            height: size,
-            transform: `translate(-50%, -50%) scale(${MARK_ZOOM})`,
+            width: imagePx,
+            height: imagePx,
+            transform: trim
+              ? "translate(-50%, -50%)"
+              : `translate(-50%, -50%) scale(${MARK_ZOOM})`,
           }}
         />
       </span>
       {wordmark ? (
         <span
-          className="font-extrabold leading-none"
+          className="whitespace-nowrap font-extrabold leading-none"
           style={resolvedWordmarkStyle}
           aria-label={brand.name}
         >
