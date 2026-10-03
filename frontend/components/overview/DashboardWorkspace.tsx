@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import { Award, Bell, Briefcase, ChevronRight, Inbox, Mail, RefreshCw, Store, UserRoundCheck } from "lucide-react";
+import { Award, Bell, ChevronRight, Compass, FilePlus2, Megaphone, RefreshCw, Sparkles, Store } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import {
   DASHBOARD_WORKSPACE_HREFS,
@@ -19,7 +19,7 @@ import {
   fetchTrustSummary,
 } from "@/lib/app/marketplace-client";
 import { notificationHrefPath } from "@/lib/app/notifications-ui";
-import { fetchNotifications } from "@/lib/app/notifications-client";
+import { fetchNotifications, fetchUnreadNotificationCount } from "@/lib/app/notifications-client";
 import { useMarketplaceQuery, useMarketplaceSession } from "@/lib/hooks/useMarketplace";
 
 const FOCUS =
@@ -100,8 +100,8 @@ function SeeAll({ href, label }: { href: string; label: string }) {
   );
 }
 
-/** Jobs, proposals, gigs and invitations for the connected wallet (marketplace APIs). */
-export function MarketplaceWorkspacePanel() {
+/** One shared load of the wallet's marketplace listings for every dashboard panel. */
+export function useDashboardWorkspace() {
   const session = useMarketplaceSession();
   const query = useMarketplaceQuery(session.wallet ? `dash-workspace:${session.wallet}` : null, loadWorkspace);
   const [verifying, setVerifying] = useState(false);
@@ -116,6 +116,21 @@ export function MarketplaceWorkspacePanel() {
       setVerifying(false);
     }
   }
+  const data = query.status === "ready" ? query.data : null;
+  return { session, query, verify, verifying, data };
+}
+export type DashboardWorkspaceState = ReturnType<typeof useDashboardWorkspace>;
+
+/** Unread notification count (same endpoint as the bell); null when unavailable. */
+export function useUnreadNotificationCount(): number | null {
+  const session = useMarketplaceSession();
+  const query = useMarketplaceQuery(session.wallet ? `dash-unread:${session.wallet}` : "dash-unread", fetchUnreadNotificationCount);
+  return query.status === "ready" ? query.data.unreadCount : null;
+}
+
+/** Jobs, proposals, gigs and invitations for the connected wallet (marketplace APIs). */
+export function MarketplaceWorkspacePanel({ ws }: { ws: DashboardWorkspaceState }) {
+  const { session, query, verify, verifying } = ws;
   let body: ReactNode;
   if (!session.wallet) {
     body = <p className="text-sm text-ink-soft">{MARKETPLACE_COPY.connectWallet} Your jobs, proposals and gigs appear here.</p>;
@@ -283,9 +298,10 @@ export function ActivityPanel() {
   );
 }
 
+/** Command-center quick actions; Explore Marketplace always comes first. */
 export const QUICK_ACTIONS = [
-  { href: "/create", label: "Create contract", icon: Briefcase },
-  { href: "/marketplace/post", label: "Post a job", icon: Inbox },
-  { href: DASHBOARD_WORKSPACE_HREFS.messages, label: "Messages", icon: Mail },
-  { href: DASHBOARD_WORKSPACE_HREFS.profile, label: "Profile", icon: UserRoundCheck },
+  { href: "/", label: "Explore Marketplace", icon: Compass },
+  { href: "/marketplace/post", label: "Post Job", icon: Megaphone },
+  { href: "/marketplace/gigs/new", label: "Offer Gig", icon: Sparkles },
+  { href: "/create", label: "Create Protected Contract", icon: FilePlus2 },
 ] as const;

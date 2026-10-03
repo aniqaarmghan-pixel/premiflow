@@ -32,6 +32,13 @@ test("client playableVideoUrl matches the server gig video validation", () => {
     "not a url",
     " https://cdn.example.com/trim.mp4 ",
     `https://cdn.example.com/${"x".repeat(520)}.mp4`,
+    "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "https://youtu.be/dQw4w9WgXcQ",
+    "https://www.youtube-nocookie.com/embed/dQw4w9WgXcQ",
+    "https://vimeo.com/76979871",
+    "https://player.vimeo.com/video/76979871",
+    "https://www.youtube.com/shorts/dQw4w9WgXcQ",
+    "https://evil.example/youtube.com/watch?v=dQw4w9WgXcQ",
   ];
   for (const s of samples) {
     assert.equal(playableVideoUrl(s), serverAccepts(s), s);

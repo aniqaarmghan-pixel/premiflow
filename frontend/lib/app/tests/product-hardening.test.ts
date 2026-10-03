@@ -163,8 +163,8 @@ test("playableVideoUrl accepts only direct https video files", () => {
 
 test("gig video player: accessible modal, no autoplay, play affordance only for valid URLs", () => {
   const modal = read("components/marketplace/MarketplaceVideoModal.tsx");
-  assert.match(modal, /playableVideoUrl\(videoUrl\)/);
-  assert.match(modal, /if \(!src\) return null;/);
+  assert.match(modal, /parseGigVideo\(videoUrl\)/);
+  assert.match(modal, /if \(!video\) return null;/);
   assert.match(modal, /role="dialog"/);
   assert.match(modal, /aria-modal="true"/);
   assert.match(modal, /aria-labelledby=\{titleId\}/);
@@ -184,7 +184,7 @@ test("gig video player: accessible modal, no autoplay, play affordance only for 
   const button = parts.indexOf("<GigVideoButton ");
   assert.ok(link > 0 && linkEnd > link && button > linkEnd);
   const media = read("components/marketplace/MarketplaceGigMedia.tsx");
-  assert.match(media, /const playable = playableVideoUrl\(videoUrl\);/);
+  assert.match(media, /const video = parseGigVideo\(videoUrl\);/);
   const home = read("components/marketplace/MarketplaceHome.tsx");
   assert.doesNotMatch(home, /<Play\b/);
 });
@@ -254,7 +254,7 @@ test("reputation copy uses verified reviews only; greeting never shows a wallet"
 
 test("dashboard renders only real data from existing hooks and APIs", () => {
   const overview = read("components/overview/OverviewPage.tsx");
-  for (const marker of ["<CommandHeader />", "<MarketplaceWorkspacePanel />", "<ActivityPanel />", "<ReputationPanel />", "upcomingDeadlines(offers)"]) {
+  for (const marker of ["<CommandHeader context={roleContext} />", "<MarketplaceWorkspacePanel ws={ws} />", "<ActivityPanel />", "<ReputationPanel />", "upcomingDeadlines(offers)"]) {
     assert.ok(overview.includes(marker), marker);
   }
   assert.match(overview, /useReducedMotion/);

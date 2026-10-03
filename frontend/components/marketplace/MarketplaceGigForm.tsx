@@ -17,6 +17,8 @@ import {
   splitSkills,
 } from "@/lib/app/marketplace";
 import { createGig, editGig, fetchGigDetail, type GigInput } from "@/lib/app/marketplace-client";
+import { GIG_VIDEO_HELP, gigVideoKindLabel, parseGigVideo } from "@/lib/app/video-embed";
+import { GigVideoPreview } from "./MarketplaceVideoModal";
 import { lockedCreatePayment } from "@/lib/app/premiflow";
 import { useMarketplaceQuery, useMarketplaceSession } from "@/lib/hooks/useMarketplace";
 import { uiAmountToBaseUnits } from "@/lib/streampay-v2";
@@ -266,14 +268,17 @@ export function MarketplaceGigForm({ gigId }: { gigId?: string }) {
             <Field label="Gallery image URLs (one per line, up to 6)">
               <Textarea value={current.media} rows={3} onChange={(e) => update({ media: e.target.value })} />
             </Field>
-            <Field label="Video URL (direct .mp4 or .webm)">
+            <Field label="Video (YouTube, Vimeo or direct .mp4 / .webm)">
               <Input
                 value={current.videoUrl}
                 maxLength={500}
-                placeholder="https://"
+                inputMode="url"
+                placeholder="https://www.youtube.com/watch?v=..."
+                aria-describedby="gig-video-help"
                 onChange={(e) => update({ videoUrl: e.target.value })}
               />
             </Field>
+            <VideoFieldHelp title={current.title} videoUrl={current.videoUrl} coverUrl={current.coverUrl} />
           </Card>
 
           <Card className="min-w-0 space-y-3 p-4">
@@ -355,6 +360,28 @@ export function MarketplaceGigForm({ gigId }: { gigId?: string }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Live preview + guidance for the gig video field (same rules as the gig API). */
+function VideoFieldHelp({ title, videoUrl, coverUrl }: { title: string; videoUrl: string; coverUrl: string }) {
+  const value = videoUrl.trim();
+  const video = value ? parseGigVideo(value) : null;
+  return (
+    <div className="min-w-0 space-y-2">
+      <p id="gig-video-help" className="text-xs text-ink-faint" aria-live="polite">
+        {!value
+          ? GIG_VIDEO_HELP
+          : video
+            ? `${gigVideoKindLabel(video)} link recognised. Buyers press play themselves; nothing autoplays.`
+            : `This link cannot be played. ${GIG_VIDEO_HELP}`}
+      </p>
+      {video ? (
+        <div className="max-w-md">
+          <GigVideoPreview title={title.trim() || "Gig video preview"} videoUrl={video.url} posterUrl={coverUrl.trim() || null} />
+        </div>
+      ) : null}
     </div>
   );
 }

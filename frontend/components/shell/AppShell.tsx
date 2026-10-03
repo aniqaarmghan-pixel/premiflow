@@ -10,6 +10,7 @@ import {
   Briefcase,
   CheckCircle2,
   CircleHelp,
+  Compass,
   FilePlus2,
   Gavel,
   History,
@@ -46,6 +47,7 @@ import { NetworkControl } from "./NetworkControl";
 import { NotificationBell } from "./NotificationBell";
 import { SoundPreference } from "./SoundPreference";
 import { WalletControl } from "./WalletControl";
+import { DashboardBottomNav } from "./DashboardBottomNav";
 
 type NavItem = { href: string; label: string; icon: LucideIcon };
 type NavGroup = { title: string | null; items: ReadonlyArray<NavItem> };
@@ -223,7 +225,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {workspace.canSwitch ? (
           <WorkspaceSwitch mode={workspace.mode} onToggle={switchWorkspace} />
         ) : null}
-        <nav className="mt-5 flex flex-1 flex-col gap-0.5">
+        {workspace.mode !== "resolver" ? <ExploreMarketplaceLink /> : null}
+        <nav aria-label="Dashboard sections" className="mt-3 flex flex-1 flex-col gap-0.5">
           {navGroups.flatMap((group) => [
             group.title ? (
               <p
@@ -251,6 +254,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     className="absolute inset-0 rounded-xl bg-white/10 shadow-[inset_0_0_0_1px_rgba(46,230,214,.4)]"
                     transition={{ duration: 0.38, ease: [0.22, 1, 0.36, 1] }}
                   />
+                ) : null}
+                {active ? (
+                  <span aria-hidden="true" className="absolute left-0 top-1/2 z-10 h-5 w-[3px] -translate-y-1/2 rounded-full bg-cyan" />
                 ) : null}
                 <Icon size={16} className={`relative z-10 ${active ? "text-cyan" : ""}`} />
                 <span className="relative z-10">{item.label}</span>
@@ -305,7 +311,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </ClientOnly>
         </header>
-        <main className="mx-auto w-full min-w-0 max-w-6xl flex-1 overflow-x-hidden px-3 pb-28 pt-5 sm:px-6 sm:pb-24 sm:pt-6 lg:px-6 lg:pb-10 lg:pt-5 xl:px-8 2xl:max-w-7xl">
+        <main className="mx-auto w-full min-w-0 max-w-6xl flex-1 overflow-x-hidden px-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:pb-[calc(7rem+env(safe-area-inset-bottom))] sm:pt-6 lg:px-6 lg:pb-10 lg:pt-5 xl:px-8 2xl:max-w-7xl">
           {reconnecting ? (
             <div
               role="status"
@@ -332,6 +338,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <ClientOnly>
           <FloatingAssistant />
         </ClientOnly>
+        {workspace.mode !== "resolver" ? (
+          <DashboardBottomNav pathname={pathname} moreOpen={open} onMore={() => setOpen(true)} />
+        ) : null}
       </div>
 
       <AnimatePresence>
@@ -381,8 +390,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   }}
                 />
               ) : null}
-              <nav aria-label="Dashboard" className="flex flex-col">
-              {navGroups.flatMap((group) => group.items).map((item) => {
+              {workspace.mode !== "resolver" ? <ExploreMarketplaceLink onNavigate={() => setOpen(false)} /> : null}
+              <nav aria-label="Dashboard" className="mt-2 flex flex-col">
+              {navGroups.flatMap((group) => [
+                group.title ? (
+                  <p
+                    key={`dg-${group.title}`}
+                    className="px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40"
+                  >
+                    {group.title}
+                  </p>
+                ) : null,
+                ...group.items.map((item) => {
                 const active = isDashboardNavActive(item.href, pathname);
                 return (
                   <Link
@@ -390,17 +409,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     href={item.href}
                     onClick={() => setOpen(false)}
                     aria-current={active ? "page" : undefined}
-                    className={`mb-1 flex min-h-11 items-center gap-2 rounded-2xl px-3 py-2.5 text-sm ${
+                    className={`mb-1 flex min-h-11 items-center gap-2.5 rounded-2xl px-3 py-2.5 text-sm ${
                       active
                         ? "bg-white/10 text-white shadow-[inset_0_0_0_1px_rgba(46,230,214,.4)]"
                         : "text-white/75 hover:bg-white/10 hover:text-white"
                     }`}
                   >
-                    <item.icon size={16} className={active ? "text-cyan" : ""} />
+                    <item.icon size={17} className={active ? "text-cyan" : ""} />
                     {item.label}
                   </Link>
                 );
-              })}
+                }),
+              ])}
               </nav>
               <div className="mt-6 border-t border-white/10 pt-4">
                 <ClientOnly>
@@ -450,5 +470,24 @@ function SessionUnavailable({ onRetry }: { onRetry: () => void }) {
         </button>
       </div>
     </div>
+  );
+}
+
+/** First, most prominent dashboard action: the public marketplace. */
+function ExploreMarketplaceLink({ onNavigate }: { onNavigate?: () => void }) {
+  return (
+    <Link
+      href="/"
+      onClick={onNavigate}
+      className="group mt-4 flex min-h-12 min-w-0 items-center gap-3 rounded-2xl bg-[linear-gradient(135deg,#2ee6d6,#7c8cff)] px-3.5 py-2.5 text-sm font-semibold text-[#04101f] shadow-[0_14px_30px_-16px_rgba(46,230,214,.9)] transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-navy"
+    >
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-white/35">
+        <Compass size={17} aria-hidden="true" />
+      </span>
+      <span className="min-w-0">
+        <span className="block truncate">Explore Marketplace</span>
+        <span className="block truncate text-[11px] font-medium text-[#04101f]/70">Jobs, gigs and freelancers</span>
+      </span>
+    </Link>
   );
 }

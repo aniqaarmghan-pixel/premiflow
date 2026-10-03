@@ -1,3 +1,5 @@
+import { normalizeGigVideoUrl } from "./video-embed";
+
 /**
  * Optional marketplace hero media. No third-party video is bundled: leave
  * MARKETPLACE_HERO_VIDEO null for the gradient hero, or point it at a video you
@@ -38,37 +40,13 @@ export function resolveHeroVideo(config: HeroVideoConfig | null): HeroVideoConfi
   return config;
 }
 
-/** Same file types the gig API accepts for videoUrl (see parseVideoUrl on the server). */
-export const PLAYABLE_VIDEO_EXT = /\.(mp4|webm|ogg|ogv|mov|m4v)$/i;
-const PLAYABLE_VIDEO_MAX_LENGTH = 500;
+export { parseGigVideo, type GigVideo } from "./video-embed";
 
 /**
- * Client mirror of the server gig video validation: a direct https video file
- * (no credentials, no localhost, real host, known extension). Returns the
- * normalized URL, or null when the value cannot be played, so callers can hide
- * play affordances instead of showing a broken player.
+ * Normalized gig video URL (direct https file or allowlisted YouTube / Vimeo
+ * page), or null so callers hide play affordances instead of a broken player.
+ * Same rules as the gig API (see lib/app/video-embed.ts).
  */
 export function playableVideoUrl(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const raw = value.trim();
-  if (!raw || raw.length > PLAYABLE_VIDEO_MAX_LENGTH || /[\s\u0000-\u001F\u007F]/.test(raw)) return null;
-  let url: URL;
-  try {
-    url = new URL(raw);
-  } catch {
-    return null;
-  }
-  const host = url.hostname.toLowerCase();
-  if (
-    url.protocol !== "https:" ||
-    url.username ||
-    url.password ||
-    !host.includes(".") ||
-    host === "localhost" ||
-    host.endsWith(".localhost")
-  ) {
-    return null;
-  }
-  if (!PLAYABLE_VIDEO_EXT.test(url.pathname)) return null;
-  return url.toString();
+  return normalizeGigVideoUrl(value);
 }

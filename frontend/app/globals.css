@@ -723,3 +723,32 @@ body {
     transition: none;
   }
 }
+
+/* Dashboard progress bars grow in once; static for reduced motion. */
+.pf-progress {
+  transform-origin: left center;
+  animation: pf-progress-in 700ms var(--ease-out-soft, ease-out) both;
+}
+@keyframes pf-progress-in {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+.pf-rail {
+  -ms-overflow-style: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-progress {
+    animation: none;
+  }
+}
+
+/* Keep the floating assistant above the mobile dashboard bottom nav. */
+@media (max-width: 1023.98px) {
+  body:has(.pf-bottom-nav) [data-floating-assistant] {
+    bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px)) !important;
+  }
+}
