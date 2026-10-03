@@ -72,6 +72,13 @@ import {
   resolveHandoffChoice,
   type HandoffChoice,
 } from "@/lib/app/marketplace-handoff-store";
+import { linkConfirmedMarketplaceContract, resumeMarketplaceLinks } from "@/lib/app/marketplace-auto-link";
+import {
+  bindMarketplaceSource,
+  clearMarketplaceSource,
+  dropAwaitingLinks,
+  saveMarketplaceSource,
+} from "@/lib/app/marketplace-link-store";
 import { formatTokenAmount } from "@/lib/app/money";
 import {
   lockedCreatePayment,
@@ -292,6 +299,8 @@ export function CreateWizard() {
 
   function startFresh() {
     clearCreateDraft(intentStorage(), INTENT_SCOPE, draftOwner);
+    // A fresh draft is a direct Create: forget any imported marketplace source.
+    clearMarketplaceSource(intentStorage(), INTENT_SCOPE, employerKey);
     setDraft(defaultCreateDraft());
     setStep(0);
     setDraftDecidedFor(draftOwner);
@@ -310,6 +319,11 @@ export function CreateWizard() {
     intentExists: savedLoad.kind !== "none",
   });
 
+  // Retry any confirmed-but-unlinked marketplace contracts for this wallet (reload/revisit).
+  useEffect(() => {
+    if (hydrated && employerKey) void resumeMarketplaceLinks(employerKey, INTENT_SCOPE);
+  }, [hydrated, employerKey]);
+
   function chooseHandoff(choice: HandoffChoice) {
     if (!employerKey) return;
     const result = resolveHandoffChoice(intentStorage(), INTENT_SCOPE, employerKey, choice, {
@@ -317,6 +331,10 @@ export function CreateWizard() {
     });
     if (result.consumed) setHandoffDecidedFor(employerKey);
     if (result.draft) {
+      // Remember where these terms came from (ids only) so a confirmed contract can be linked.
+      if (pendingHandoff) {
+        saveMarketplaceSource(intentStorage(), INTENT_SCOPE, employerKey, pendingHandoff.handoff, Date.now());
+      }
       // Explicit replace: refills the form only; Create & Send Offer stays manual.
       setDraft(result.draft);
       setStep(0);
@@ -526,6 +544,8 @@ export function CreateWizard() {
       return;
     }
     saveCreateIntent(intentStorage(), ensured.intent);
+    // Metadata only: carry an imported marketplace source alongside this create intent.
+    bindMarketplaceSource(intentStorage(), INTENT_SCOPE, terms.employer, ensured.intent, Date.now());
     // The saved setup now holds these terms; the local draft is no longer needed.
     clearAllCreateDrafts(intentStorage(), INTENT_SCOPE, terms.employer);
     setIntentVersion((v) => v + 1);
@@ -755,6 +775,11 @@ export function CreateWizard() {
     );
     setIntentVersion((v) => v + 1);
     setCreatedAddress(progress.contractAddress);
+    // Verified on-chain: link it to its marketplace listing (best effort; server re-checks parties).
+    void linkConfirmedMarketplaceContract(intent.employer, progress.contractAddress, {
+      cluster: intent.cluster,
+      programId: intent.programId,
+    });
     if (progress.status === "PendingAcceptance") {
       // Offer is live: notify the freelancer (server re-reads chain state; idempotent key).
       void requestOfferLifecycleNotification(progress.contractAddress, "contract_offer_received");
@@ -854,6 +879,8 @@ export function CreateWizard() {
       const employer = publicKey.toBase58();
       const forget = (note: string | null) => {
         clearCreateIntent(intentStorage(), INTENT_SCOPE, employer);
+        // A discarded setup never links to a marketplace listing.
+        dropAwaitingLinks(intentStorage(), INTENT_SCOPE, employer);
         setIntentVersion((v) => v + 1);
         setSetupProgress(null);
         setSetupConflict(null);

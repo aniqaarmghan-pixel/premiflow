@@ -50,6 +50,7 @@ export async function POST(request: Request) {
       jobId: body.jobId,
       proposalId: body.proposalId,
       gigId: body.gigId,
+      packageTier: body.packageTier,
     });
     return NextResponse.json(result, { status: result.created ? 201 : 200 });
   } catch (err) {

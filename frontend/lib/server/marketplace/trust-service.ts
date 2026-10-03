@@ -426,6 +426,8 @@ export async function linkContract(
     jobId?: unknown;
     proposalId?: unknown;
     gigId?: unknown;
+    /** Gig hires: the chosen package tier, checked against the gig (not stored). */
+    packageTier?: unknown;
   },
   now = new Date()
 ): Promise<{ link: PublicContractLink; created: boolean }> {
@@ -470,6 +472,17 @@ export async function linkContract(
     if (!gig) throw new HttpError(404, "not_found", "Gig was not found.");
     if (gig.freelancerWallet !== facts.freelancer) {
       throw mismatch("The contract freelancer is not this gig's seller.");
+    }
+    // A gig hire is recorded by the buyer: the session wallet must be the on-chain employer.
+    if (wallet !== facts.employer) {
+      throw new HttpError(403, "not_employer", "Only the employer who hired this gig can link the contract.");
+    }
+    if (input.packageTier !== undefined && input.packageTier !== null && input.packageTier !== "") {
+      const tier = input.packageTier;
+      const packages = gig.packages ?? [];
+      if (typeof tier !== "string" || (packages.length > 0 && !packages.some((p) => p.tier === tier))) {
+        throw invalid("That package is not offered by this gig.");
+      }
     }
     gigTitle = { id: gig.id, title: gig.title };
     row = {

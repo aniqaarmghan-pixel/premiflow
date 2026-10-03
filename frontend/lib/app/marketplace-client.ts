@@ -259,6 +259,7 @@ export function linkMarketplaceContract(input: {
   jobId?: string;
   proposalId?: string;
   gigId?: string;
+  packageTier?: "basic" | "standard" | "premium";
 }) {
   return request<{ link: PublicContractLink; created: boolean }>("/api/marketplace/contract-links", {
     method: "POST",

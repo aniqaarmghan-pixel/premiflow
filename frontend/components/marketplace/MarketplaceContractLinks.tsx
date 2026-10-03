@@ -1,12 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Field, Input, Textarea } from "@/components/ui/Field";
 import { marketplaceErrorMessage, shortWallet } from "@/lib/app/marketplace";
+import { resumeMarketplaceLinks } from "@/lib/app/marketplace-auto-link";
 import {
   fetchContractLinks,
   fetchReviewEligibility,
@@ -23,9 +24,11 @@ type Props =
   | { source: "gig"; gigId: string; canLink: boolean };
 
 /**
- * Read-only view of PREMIFLOW contracts linked to this listing (parties only),
- * plus a form to record the link once the contract exists. The server re-reads
- * the contract from chain and checks its parties; nothing is signed here.
+ * Read-only view of PREMIFLOW contracts linked to this listing (parties only).
+ * Contracts created from this listing in Create are linked automatically after
+ * on-chain confirmation; pending links are retried here. A manual address form
+ * remains as a secondary fallback. The server re-reads the contract from chain
+ * and checks its parties; nothing is signed here.
  */
 export function MarketplaceContractLinks(props: Props) {
   const session = useMarketplaceSession();
@@ -37,13 +40,28 @@ export function MarketplaceContractLinks(props: Props) {
   const [address, setAddress] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const reload = query.reload;
+
+  useEffect(() => {
+    if (!session.wallet) return;
+    let cancelled = false;
+    void resumeMarketplaceLinks(session.wallet).then((r) => {
+      if (!cancelled && r.linked.length > 0) reload();
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.wallet]);
+
   if (!session.wallet) return null;
 
   async function verify() {
     setBusy(true);
     setNotice(null);
     try {
-      await session.ensure();
+      const wallet = await session.ensure();
+      await resumeMarketplaceLinks(wallet);
       query.reload();
     } catch (err) {
       setNotice(marketplaceErrorMessage(err));
@@ -88,7 +106,10 @@ export function MarketplaceContractLinks(props: Props) {
         </div>
       ) : null}
       {query.status === "ready" && links.length === 0 ? (
-        <p className="text-sm text-ink-soft">No linked contract yet.</p>
+        <p className="text-sm text-ink-soft">
+          No linked contract yet. A contract created from this listing appears here automatically once it is
+          confirmed on-chain.
+        </p>
       ) : null}
       {links.length > 0 ? (
         <ul className="divide-y divide-line">
@@ -98,18 +119,23 @@ export function MarketplaceContractLinks(props: Props) {
         </ul>
       ) : null}
       {canLink ? (
-        <div className="space-y-2 border-t border-line pt-3">
-          <p className="text-xs text-ink-faint">
-            After the on-chain contract exists, paste its address to link it. The server checks that the contract
-            employer and freelancer match this listing.
-          </p>
-          <Field label="Contract address">
-            <Input value={address} onChange={(e) => setAddress(e.target.value)} />
-          </Field>
-          <Button disabled={busy || address.trim() === ""} onClick={() => void link()}>
-            Link contract
-          </Button>
-        </div>
+        <details className="space-y-2 border-t border-line pt-3">
+          <summary className="cursor-pointer text-xs text-ink-faint">
+            Contract not showing? Link an existing contract manually (fallback)
+          </summary>
+          <div className="mt-2 space-y-2">
+            <p className="text-xs text-ink-faint">
+              Paste the address of a contract that already exists on-chain. The server checks that the contract
+              employer and freelancer match this listing.
+            </p>
+            <Field label="Contract address">
+              <Input value={address} onChange={(e) => setAddress(e.target.value)} />
+            </Field>
+            <Button variant="secondary" disabled={busy || address.trim() === ""} onClick={() => void link()}>
+              Link contract
+            </Button>
+          </div>
+        </details>
       ) : null}
       {notice ? (
         <p className="text-xs text-ink-soft" aria-live="polite">

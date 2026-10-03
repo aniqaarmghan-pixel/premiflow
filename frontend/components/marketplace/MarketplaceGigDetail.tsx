@@ -231,7 +231,7 @@ export function MarketplaceGigDetail({ gigId }: { gigId: string }) {
       ) : null}
       {notice ? <p className="text-sm text-ink-soft" aria-live="polite">{notice}</p> : null}
       <MarketplaceTrustSummary wallet={gig.freelancerWallet} />
-      {session.wallet ? <MarketplaceContractLinks source="gig" gigId={gig.id} canLink /> : null}
+      {session.wallet ? <MarketplaceContractLinks source="gig" gigId={gig.id} canLink={!isOwner && !looksLikeOwner} /> : null}
     </div>
   );
 }
