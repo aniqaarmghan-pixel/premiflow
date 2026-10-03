@@ -13,7 +13,10 @@ import {
   MAX_HOURLY_SESSION_SECONDS,
   MIN_HOURLY_SESSION_SECONDS,
 } from "@/lib/streampay-v2/constants";
-import { remainingFreelancerClaim } from "@/lib/streampay-v2/derived";
+import {
+  isHourlyEngagementExpired,
+  remainingFreelancerClaim,
+} from "@/lib/streampay-v2/derived";
 import type {
   ContractRole,
   ContractView,
@@ -49,6 +52,9 @@ export const HOURLY_COPY = {
   startExplain:
     "Start a work session when you begin working. PREMIFLOW uses the on-chain start and stop times to calculate recorded working time.",
   runningTitle: "Work session",
+  engagementEndedTitle: "Engagement ended",
+  engagementEndedExplain:
+    "The engagement window for this contract has ended, so no new work session can start. Any actions still available for this contract are shown below.",
   runningStatus: "Running",
   openSessionNotCollectable:
     "Current-session earnings become available after you stop this work session.",
@@ -285,11 +291,13 @@ export function canStartHourlyWork(input: {
   role: ContractRole;
   contract: ContractView;
   hourlyState: HourlyStateView | null;
+  now: number;
 }): boolean {
-  const { role, contract, hourlyState } = input;
+  const { role, contract, hourlyState, now } = input;
   if (role !== "freelancer") return false;
   if (contract.paymentMode !== "Hourly") return false;
   if (contract.status !== "Active") return false;
+  if (isHourlyEngagementExpired(contract, now)) return false;
   if (!hourlyState) return false;
   if (hasActiveHourlySession(hourlyState)) return false;
   if (hourlyState.sessionCount >= 64) return false;
@@ -409,3 +417,17 @@ export {
   MAX_HOURLY_SESSION_SECONDS,
   MIN_HOURLY_SESSION_SECONDS,
 };
+
+/** Active Hourly contract, no running session, and the engagement window has ended (same rule as the program). */
+export function isHourlyEngagementEnded(input: {
+  contract: ContractView;
+  running: boolean;
+  now: number;
+}): boolean {
+  return (
+    input.contract.paymentMode === "Hourly" &&
+    input.contract.status === "Active" &&
+    !input.running &&
+    isHourlyEngagementExpired(input.contract, input.now)
+  );
+}

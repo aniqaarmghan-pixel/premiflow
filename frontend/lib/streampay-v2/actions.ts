@@ -2,6 +2,7 @@ import { PublicKey } from "@solana/web3.js";
 
 import {
   isActivationWindowOpen,
+  isHourlyEngagementExpired,
   isReviewDeadlineActive,
   isStreamCurrentlyAccruing,
   mayAttemptCompletion,
@@ -220,7 +221,8 @@ export function availableActions(input: ActionAvailabilityInput): UiAction[] {
         if (
           !hasActiveHourlySession(input.hourlyState) &&
           remainingAuthorizedSeconds(input.hourlyState) > 0n &&
-          input.hourlyState.sessionCount < MAX_HOURLY_SESSIONS
+          input.hourlyState.sessionCount < MAX_HOURLY_SESSIONS &&
+          !isHourlyEngagementExpired(contract, now)
         ) {
           actions.add("startHourlySession");
         }

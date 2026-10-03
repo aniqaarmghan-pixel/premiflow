@@ -7,6 +7,7 @@ import {
   HOURLY_COPY,
   employerEndBlockedBySession,
   formatElapsedClock,
+  isHourlyEngagementEnded,
   formatHourlyDuration,
   formatSessionStartedAt,
   hourlyActivationCopy,
@@ -74,9 +75,11 @@ export function HourlyShowcase({
   const dash = hourlyDashboard(contract, hourlyState, hourlySession, clockNow);
   const amount = (value: bigint) => formatTokenAmount(value, decimals);
   const activation = hourlyActivationCopy(contract);
+  const engagementEnded = isHourlyEngagementEnded({ contract, running, now: clockNow });
   const idle =
     contract.status === "Active" &&
     !running &&
+    !engagementEnded &&
     Boolean(dash?.authorizedTimeRemaining);
   const endBlocked = employerEndBlockedBySession({ role, contract, hourlyState });
 
@@ -114,7 +117,11 @@ export function HourlyShowcase({
             Hourly salary
           </p>
           <h3 className="mt-1 font-display text-xl sm:text-2xl lg:text-xl">
-            {running ? HOURLY_COPY.runningTitle : presentHourlyHeadline(role, idle)}
+            {running
+              ? HOURLY_COPY.runningTitle
+              : engagementEnded
+                ? HOURLY_COPY.engagementEndedTitle
+                : presentHourlyHeadline(role, idle)}
           </h3>
         </div>
         <span
@@ -122,7 +129,7 @@ export function HourlyShowcase({
             running ? "bg-cyan/15 text-cyan" : "bg-paper-2 text-ink-soft"
           }`}
         >
-          {running ? `${HOURLY_COPY.runningStatus}` : contract.status}
+          {running ? `${HOURLY_COPY.runningStatus}` : engagementEnded ? "Ended" : contract.status}
         </span>
       </div>
 
@@ -136,6 +143,11 @@ export function HourlyShowcase({
         <p className="mt-3 text-sm font-medium text-cyan">{HOURLY_COPY.employerActive}</p>
       ) : null}
 
+      {engagementEnded ? (
+        <p role="status" className="mt-3 text-sm leading-6 text-ink-soft">
+          {HOURLY_COPY.engagementEndedExplain}
+        </p>
+      ) : null}
       {idle && role === "freelancer" ? (
         <p className={`mt-3 text-sm leading-6 ${running ? "text-white/75" : "text-ink-soft"}`}>
           {HOURLY_COPY.startExplain}
@@ -258,7 +270,7 @@ export function HourlyShowcase({
       </dl>
 
       <div className="mt-5 flex flex-wrap gap-2">
-        {canStart && onStart ? (
+        {canStart && onStart && !engagementEnded ? (
           <Button onClick={onStart} disabled={busy} aria-label="Start work">
             Start work
           </Button>

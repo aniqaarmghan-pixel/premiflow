@@ -17,6 +17,7 @@ import {
   hourlyCreateReviewLines,
   hourlyDashboard,
   hourlyFundingFromInputs,
+  isHourlyEngagementEnded,
   isHourlyWorkLogSentinel,
   parseAuthorizedTime,
   parseEngagementDuration,
@@ -36,6 +37,7 @@ import {
 import { actionLabel, clientMethodForAction, typeBlurb } from "../view-model";
 import { PREMIFLOW_RESOLVER, PREMIFLOW_TEST_TOKEN } from "../premiflow";
 import { availableActions } from "../../streampay-v2/actions";
+import { isHourlyEngagementExpired } from "../../streampay-v2/derived";
 import {
   canonicalHourlyEarned,
   engagementDurationToSeconds,
@@ -207,11 +209,11 @@ test("freelancer Start work gating and employer cannot Start", () => {
   const contract = hourlyContract();
   const idle = makeHourlyState();
   assert.equal(
-    canStartHourlyWork({ role: "freelancer", contract, hourlyState: idle }),
+    canStartHourlyWork({ role: "freelancer", contract, hourlyState: idle, now: contract.startTime + 10 }),
     true
   );
   assert.equal(
-    canStartHourlyWork({ role: "employer", contract, hourlyState: idle }),
+    canStartHourlyWork({ role: "employer", contract, hourlyState: idle, now: contract.startTime + 10 }),
     false
   );
   const actions = availableActions({
@@ -702,6 +704,7 @@ test("active session index sentinel is not a real session", () => {
       role: "freelancer",
       contract: hourlyContract(),
       hourlyState: makeHourlyState({ activeSessionIndex: HOURLY_NO_ACTIVE_SESSION }),
+      now: hourlyContract().startTime + 10,
     }),
     true
   );
@@ -760,4 +763,50 @@ test("Hourly salary workspace surfaces rate, session, balances, and gated Collec
   assert.equal(employer.includes("withdrawFreelancer"), false);
   assert.match(source, /role === "employer"/);
   assert.equal(clientMethodForAction("withdrawFreelancer"), "withdrawFreelancer");
+});
+
+test("expired Hourly engagement: Start work gated before / at / after end (now >= endTime)", () => {
+  const contract = hourlyContract();
+  const idle = makeHourlyState();
+  const end = contract.endTime;
+  const cases: Array<[number, boolean]> = [
+    [end - 1, true],
+    [end, false],
+    [end + 60, false],
+  ];
+  for (const [now, startable] of cases) {
+    assert.equal(isHourlyEngagementExpired(contract, now), !startable, `expired @${now - end}`);
+    assert.equal(
+      canStartHourlyWork({ role: "freelancer", contract, hourlyState: idle, now }),
+      startable,
+      `panel @${now - end}`
+    );
+    const actions = availableActions({ wallet: WALLET_B, contract, hourlyState: idle, now });
+    assert.equal(actions.includes("startHourlySession"), startable, `actions @${now - end}`);
+    assert.equal(
+      isHourlyEngagementEnded({ contract, running: false, now }),
+      !startable,
+      `ended state @${now - end}`
+    );
+  }
+  // Only Start work is removed; other existing actions keep their own gating.
+  const before = availableActions({ wallet: WALLET_B, contract, hourlyState: idle, now: end - 1 });
+  const after = availableActions({ wallet: WALLET_B, contract, hourlyState: idle, now: end });
+  assert.deepEqual(after, before.filter((a) => a !== "startHourlySession"));
+  const employerBefore = availableActions({ wallet: WALLET_A, contract, hourlyState: idle, now: end - 1 });
+  const employerAfter = availableActions({ wallet: WALLET_A, contract, hourlyState: idle, now: end });
+  assert.deepEqual(employerAfter, employerBefore);
+});
+
+test("Hourly panel shows Engagement ended instead of Ready to start work", () => {
+  const source = readFileSync(
+    new URL("../../../components/contracts/HourlyShowcase.tsx", import.meta.url),
+    "utf8"
+  );
+  assert.match(source, /isHourlyEngagementEnded\(\{ contract, running, now: clockNow \}\)/);
+  assert.match(source, /HOURLY_COPY\.engagementEndedTitle/);
+  assert.match(source, /canStart && onStart && !engagementEnded/);
+  assert.equal(HOURLY_COPY.engagementEndedTitle, "Engagement ended");
+  assert.match(HOURLY_COPY.engagementEndedExplain, /no new work session can start/);
+  assert.doesNotMatch(HOURLY_COPY.engagementEndedExplain, /dispute/i);
 });

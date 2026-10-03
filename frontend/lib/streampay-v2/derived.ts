@@ -345,3 +345,15 @@ export function workUnitStatusDetail(status: WorkUnitStatus): string | null {
   }
   return null;
 }
+
+/**
+ * Hourly engagement window has ended. Mirrors start_hourly_session, which
+ * requires `now < contract.end_time` (HourlyEngagementExpired, 6175), so the
+ * engagement is expired once `now >= endTime`. No new work session can start.
+ */
+export function isHourlyEngagementExpired(
+  contract: { endTime: number },
+  now: number
+): boolean {
+  return now >= contract.endTime;
+}
