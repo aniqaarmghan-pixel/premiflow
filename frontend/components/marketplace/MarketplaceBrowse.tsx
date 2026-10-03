@@ -24,7 +24,10 @@ export function MarketplaceBrowse() {
   const query = useMarketplaceQuery(`open-jobs${qs}`, () => searchJobs(qs));
   return (
     <div className="pf-fade-in min-w-0 space-y-4">
-      <MarketplaceHeader title={MARKETPLACE_COPY.browseTitle} subtitle={MARKETPLACE_COPY.browseSubtitle} />
+      <MarketplaceHeader
+        hero
+        eyebrow="Find work"
+        art="development" title={MARKETPLACE_COPY.browseTitle} subtitle={MARKETPLACE_COPY.browseSubtitle} />
       <SearchFilters
         tokenName={locked.tokenName}
         onApply={(form) => {

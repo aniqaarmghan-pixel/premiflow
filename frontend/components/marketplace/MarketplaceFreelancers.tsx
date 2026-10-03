@@ -25,6 +25,9 @@ export function MarketplaceFreelancers() {
   return (
     <div className="pf-fade-in min-w-0 space-y-4">
       <MarketplaceHeader
+        hero
+        eyebrow="Hire talent"
+        art="design"
         title="Freelancers"
         subtitle="Public marketplace profiles. Sorting by price uses the hourly rate a freelancer chose to show."
       />

@@ -24,7 +24,10 @@ export function MarketplaceGigBrowse() {
   const query = useMarketplaceQuery(`gigs${qs}`, () => searchGigs(qs));
   return (
     <div className="pf-fade-in min-w-0 space-y-4">
-      <MarketplaceHeader title={GIG_COPY.browseTitle} subtitle={GIG_COPY.browseSubtitle} />
+      <MarketplaceHeader
+        hero
+        eyebrow="Gigs"
+        art="video" title={GIG_COPY.browseTitle} subtitle={GIG_COPY.browseSubtitle} />
       <SearchFilters
         tokenName={locked.tokenName}
         amountNoun="Price"

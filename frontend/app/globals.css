@@ -624,3 +624,102 @@ body {
     transition: none;
   }
 }
+
+/* ------------------------------------------------------------------
+   Final polish: aurora hero fallback, media cards, mobile rails,
+   calmer dashboard. Reduced motion makes all of it static.
+   ------------------------------------------------------------------ */
+.pf-aurora {
+  position: absolute;
+  inset: -20%;
+  overflow: hidden;
+  filter: blur(60px) saturate(130%);
+  opacity: 0.75;
+}
+.pf-aurora > span {
+  position: absolute;
+  border-radius: 9999px;
+  mix-blend-mode: screen;
+  will-change: transform;
+}
+.pf-aurora > span:nth-child(1) {
+  left: 5%;
+  top: 10%;
+  width: 46%;
+  height: 52%;
+  background: radial-gradient(circle, rgba(46, 230, 214, 0.55), transparent 65%);
+  animation: pf-aurora-a 26s ease-in-out infinite alternate;
+}
+.pf-aurora > span:nth-child(2) {
+  right: 0%;
+  top: 0%;
+  width: 52%;
+  height: 58%;
+  background: radial-gradient(circle, rgba(139, 123, 255, 0.55), transparent 65%);
+  animation: pf-aurora-b 32s ease-in-out infinite alternate;
+}
+.pf-aurora > span:nth-child(3) {
+  left: 30%;
+  bottom: 0%;
+  width: 50%;
+  height: 50%;
+  background: radial-gradient(circle, rgba(79, 140, 255, 0.5), transparent 65%);
+  animation: pf-aurora-c 38s ease-in-out infinite alternate;
+}
+@keyframes pf-aurora-a {
+  to {
+    transform: translate3d(18%, 12%, 0) scale(1.15);
+  }
+}
+@keyframes pf-aurora-b {
+  to {
+    transform: translate3d(-16%, 14%, 0) scale(0.9);
+  }
+}
+@keyframes pf-aurora-c {
+  to {
+    transform: translate3d(10%, -16%, 0) scale(1.1);
+  }
+}
+
+/* Media-first gig card: play affordance grows on hover/focus. */
+.pf-play {
+  transition:
+    transform 320ms var(--ease-out-soft),
+    background-color 320ms ease;
+}
+.pf-card:hover .pf-play,
+.pf-card:focus-within .pf-play {
+  transform: scale(1.08);
+  background-color: rgba(255, 255, 255, 0.28);
+}
+
+/* Horizontal chip rail on small screens (no visible scrollbar). */
+.pf-rail {
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+.pf-rail::-webkit-scrollbar {
+  display: none;
+}
+
+/* Dashboard: calm, flat surface for dense information. */
+.pf-dashboard {
+  background: var(--paper);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-aurora > span,
+  .pf-aurora > span:nth-child(1),
+  .pf-aurora > span:nth-child(2),
+  .pf-aurora > span:nth-child(3) {
+    animation: none !important;
+    transform: none;
+  }
+  .pf-play,
+  .pf-card:hover .pf-play,
+  .pf-card:focus-within .pf-play {
+    transform: none;
+    transition: none;
+  }
+}

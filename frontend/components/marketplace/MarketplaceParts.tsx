@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
+import { Aurora } from "@/components/site/Aurora";
+import { CategoryArt } from "@/components/site/CategoryArt";
 import { CloudOff, Play, RefreshCw, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
@@ -79,7 +81,58 @@ export function MarketplaceNav({ className = "" }: { className?: string }) {
   );
 }
 
-export function MarketplaceHeader({ title, subtitle }: { title: string; subtitle?: string }) {
+export function MarketplaceHeader({
+  title,
+  subtitle,
+  hero = false,
+  eyebrow = "Marketplace",
+  art,
+}: {
+  title: string;
+  subtitle?: string;
+  /** Public discovery pages: full-bleed midnight band that matches the homepage hero. */
+  hero?: boolean;
+  eyebrow?: string;
+  art?: string;
+}) {
+  if (hero) {
+    return (
+      <header className="min-w-0">
+        <div className="pf-midnight relative isolate -mt-24 ml-[calc(50%-50vw)] w-screen overflow-hidden pb-12 pt-28 sm:pb-14 lg:-mt-[104px] lg:pt-[136px]">
+          <Aurora className="-z-10 opacity-60" />
+          <div aria-hidden="true" className="pf-grid-fade absolute inset-0 -z-10" />
+          <div className="mx-auto flex w-full max-w-6xl min-w-0 items-end justify-between gap-8 px-4 sm:px-6 lg:px-8 2xl:max-w-7xl">
+            <div className="min-w-0 max-w-2xl">
+              <p className="pf-hero-in text-[11px] font-semibold uppercase tracking-[0.2em] text-aqua sm:text-xs">{eyebrow}</p>
+              <h1
+                className="pf-hero-in mt-2 break-words font-display text-3xl font-semibold tracking-[-0.03em] sm:text-5xl"
+                style={{ "--pf-d": "80ms" } as CSSProperties}
+              >
+                <span className="pf-gradient-text">{title}</span>
+              </h1>
+              {subtitle ? (
+                <p
+                  className="pf-hero-in mt-3 text-sm leading-6 text-white/70 sm:text-base"
+                  style={{ "--pf-d": "160ms" } as CSSProperties}
+                >
+                  {subtitle}
+                </p>
+              ) : null}
+            </div>
+            {art ? (
+              <div
+                className="pf-hero-in hidden w-48 shrink-0 overflow-hidden rounded-[24px] border border-white/10 shadow-[0_30px_60px_-30px_rgba(0,0,0,.8)] md:block"
+                style={{ "--pf-d": "240ms" } as CSSProperties}
+              >
+                <CategoryArt slug={art} className="block aspect-[4/3] h-full w-full" />
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <MarketplaceNav className="mt-6" />
+      </header>
+    );
+  }
   return (
     <header className="min-w-0">
       <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan sm:text-xs">
@@ -109,7 +162,11 @@ export function JobSummaryCard({ job, footer }: { job: PublicJob; footer?: React
         aria-hidden="true"
         className="absolute inset-y-0 left-0 w-1 bg-[linear-gradient(180deg,#2ee6d6,#4f8cff_60%,#8b7bff)] opacity-70 transition-opacity group-hover:opacity-100"
       />
-      <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+      <div className="flex min-w-0 items-start gap-3">
+        <span className="hidden size-12 shrink-0 overflow-hidden rounded-2xl sm:block">
+          <CategoryArt slug={jobCategory(job) ?? "none"} className="pf-zoom block h-full w-full" />
+        </span>
+      <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-2">
         <Link
           href={`/marketplace/jobs/${job.id}`}
           className="min-w-0 break-words text-base font-semibold leading-snug text-ink underline-offset-2 hover:underline [overflow-wrap:anywhere]"
@@ -117,6 +174,7 @@ export function JobSummaryCard({ job, footer }: { job: PublicJob; footer?: React
           {job.title}
         </Link>
         <StatusPill>{JOB_STATUS_LABELS[job.status]}</StatusPill>
+      </div>
       </div>
       <p className="mt-1.5 line-clamp-2 break-words text-sm leading-6 text-ink-soft [overflow-wrap:anywhere]">
         {job.description}
@@ -321,10 +379,16 @@ export function GigSummaryCard({
             className="pf-zoom h-16 w-16 rounded-full border-2 border-white/70 object-cover shadow-lg sm:h-20 sm:w-20"
           />
         ) : (
-          <span aria-hidden="true" className="pf-zoom font-display text-4xl font-semibold text-white/85">
-            {(seller?.displayName || gig.title).slice(0, 1).toUpperCase()}
-          </span>
+          <CategoryArt slug={primary} className="pf-zoom absolute inset-0 h-full w-full" />
         )}
+        {hasVideo ? (
+          <span
+            aria-hidden="true"
+            className="pf-play absolute left-1/2 top-1/2 flex size-14 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white/15 backdrop-blur-md"
+          >
+            <Play size={20} className="ml-0.5 fill-white text-white" />
+          </span>
+        ) : null}
         <span
           aria-hidden="true"
           className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-[linear-gradient(180deg,transparent,rgba(4,10,20,.55))]"

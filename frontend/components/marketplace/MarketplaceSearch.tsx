@@ -60,7 +60,10 @@ export function MarketplaceSearch() {
 
   return (
     <div className="pf-fade-in min-w-0 space-y-4">
-      <MarketplaceHeader title="Search" subtitle="Jobs, gigs and freelancer profiles in one place." />
+      <MarketplaceHeader
+        hero
+        eyebrow="Search"
+        art="ai" title="Search" subtitle="Jobs, gigs and freelancer profiles in one place." />
       <SearchFilters
         key={base}
         initial={form}

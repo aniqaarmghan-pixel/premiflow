@@ -6,8 +6,6 @@ import { useEffect, useState } from "react";
 import { LayoutDashboard, LogIn, Menu, Search, X } from "lucide-react";
 
 import { BrandMark } from "@/components/brand/BrandMark";
-import { ClientOnly } from "@/components/shell/ClientOnly";
-import { WalletControl } from "@/components/shell/WalletControl";
 import {
   DASHBOARD_HREF,
   PUBLIC_NAV,
@@ -20,8 +18,9 @@ import { SiteFooter } from "./SiteFooter";
 
 /**
  * Public marketplace shell: premium top navbar, no dashboard sidebar and no
- * sign-in gate. Browsing never needs a wallet; the wallet button only appears
- * for signed-in accounts and never opens on its own.
+ * sign-in gate. Browsing never needs a wallet, so the navbar offers Sign in /
+ * Join / Dashboard only; a wallet is requested next to post, hire or contract
+ * actions (WalletActionPrompt) and inside the dashboard.
  */
 export function PublicShell({
   children,
@@ -109,11 +108,6 @@ export function PublicShell({
               <span className="hidden h-10 w-28 rounded-full border border-white/10 bg-white/5 sm:block" aria-hidden="true" />
             ) : signedIn ? (
               <>
-                <ClientOnly>
-                  <span className="hidden md:inline-flex">
-                    <WalletControl />
-                  </span>
-                </ClientOnly>
                 <Link
                   href={DASHBOARD_HREF}
                   className="hidden h-10 items-center gap-2 rounded-full bg-[linear-gradient(135deg,#12c2b8,#4f8cff_60%,#8b7bff)] px-4 text-sm font-semibold shadow-[0_14px_30px_-16px_rgba(46,230,214,.8)] transition hover:brightness-110 sm:inline-flex"

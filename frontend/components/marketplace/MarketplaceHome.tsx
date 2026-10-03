@@ -3,22 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type CSSProperties, type ReactNode } from "react";
-import {
-  ArrowRight,
-  Blocks,
-  Bot,
-  Briefcase,
-  CheckCircle2,
-  Clapperboard,
-  Code,
-  LockKeyhole,
-  Megaphone,
-  Palette,
-  PenLine,
-  Search,
-  ShieldCheck,
-  type LucideIcon,
-} from "lucide-react";
+import { ArrowRight, CheckCircle2, LockKeyhole, Play, Search, ShieldCheck } from "lucide-react";
 
 import {
   FEATURED_NOTE,
@@ -29,6 +14,8 @@ import {
 import { MARKETPLACE_CATEGORIES } from "@/lib/app/marketplace-categories";
 import { fetchFreelancers, searchGigs, searchJobs } from "@/lib/app/marketplace-client";
 import { useMarketplaceQuery } from "@/lib/hooks/useMarketplace";
+import { Aurora } from "@/components/site/Aurora";
+import { CategoryArt } from "@/components/site/CategoryArt";
 import { Reveal } from "@/components/site/Reveal";
 
 import { MarketplaceHeroVideo } from "./MarketplaceHeroVideo";
@@ -47,28 +34,6 @@ const SEARCH_SCOPES = [
   { value: "jobs", label: "Jobs" },
   { value: "freelancers", label: "Freelancers" },
 ] as const;
-
-const CATEGORY_ICONS: Record<string, LucideIcon> = {
-  development: Code,
-  web3: Blocks,
-  design: Palette,
-  ai: Bot,
-  video: Clapperboard,
-  marketing: Megaphone,
-  writing: PenLine,
-  business: Briefcase,
-};
-
-const CATEGORY_TONES: Record<string, string> = {
-  development: "from-[#0b2545] via-[#13315c] to-[#12c2b8]",
-  web3: "from-[#1b1145] via-[#4f3cc9] to-[#12c2b8]",
-  design: "from-[#3b0d3a] via-[#a23b72] to-[#f2a65a]",
-  ai: "from-[#06283d] via-[#1363df] to-[#47b5ff]",
-  video: "from-[#2b0f0f] via-[#b23a48] to-[#fcb9b2]",
-  marketing: "from-[#0f3d2e] via-[#1f8a70] to-[#bfdb38]",
-  writing: "from-[#2d2a32] via-[#5c5470] to-[#a9a4c2]",
-  business: "from-[#1d2b3a] via-[#3c6e71] to-[#9fc2c4]",
-};
 
 function delay(ms: number): CSSProperties {
   return { "--pf-d": `${ms}ms` } as CSSProperties;
@@ -272,18 +237,12 @@ export function MarketplaceHome() {
     <div className="min-w-0">
       {/* Hero: cinematic, optional owned video (config null by default), poster/gradient fallback. */}
       <section className="pf-midnight relative isolate overflow-hidden pb-20 pt-28 sm:pt-32 lg:pb-28 lg:pt-40">
+        {/* Animated CSS aurora is the default backdrop; an owned video/poster layers on top when configured. */}
+        <Aurora className="-z-10" />
         <div aria-hidden="true" className="absolute inset-0 -z-10">
           <MarketplaceHeroVideo />
         </div>
         <div aria-hidden="true" className="pf-grid-fade absolute inset-0 -z-10" />
-        <div
-          aria-hidden="true"
-          className="absolute -left-40 top-24 -z-10 size-[28rem] rounded-full bg-[radial-gradient(circle,rgba(46,230,214,.22),transparent_65%)] blur-2xl"
-        />
-        <div
-          aria-hidden="true"
-          className="absolute -right-32 bottom-0 -z-10 size-[30rem] rounded-full bg-[radial-gradient(circle,rgba(139,123,255,.25),transparent_65%)] blur-2xl"
-        />
         <Container className="grid min-w-0 items-center gap-12 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
           <div className="min-w-0">
             <p
@@ -306,13 +265,16 @@ export function MarketplaceHome() {
             <div className="pf-hero-in" style={delay(260)}>
               <HeroSearch />
             </div>
-            <div className="pf-hero-in mt-5 flex min-w-0 flex-wrap items-center gap-2" style={delay(340)}>
-              <span className="text-xs font-semibold text-white/45">Popular:</span>
+            <div
+              className="pf-hero-in pf-rail -mx-4 mt-5 flex min-w-0 items-center gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0"
+              style={delay(340)}
+            >
+              <span className="shrink-0 text-xs font-semibold text-white/45">Popular:</span>
               {MARKETPLACE_CATEGORIES.slice(0, 6).map((c) => (
                 <Link
                   key={c.slug}
                   href={searchPageHref({ category: c.slug })}
-                  className="pf-chip rounded-full border border-white/15 bg-white/5 px-3 py-1 text-xs font-semibold hover:border-white/35 hover:bg-white/10"
+                  className="pf-chip shrink-0 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold hover:border-white/35 hover:bg-white/10"
                 >
                   <span className="text-white/85">{c.label}</span>
                 </Link>
@@ -340,24 +302,14 @@ export function MarketplaceHome() {
           </Reveal>
           <div className="mt-10 grid min-w-0 grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
             {MARKETPLACE_CATEGORIES.map((c, i) => {
-              const Icon = CATEGORY_ICONS[c.slug] ?? Briefcase;
               return (
                 <Reveal key={c.slug} delay={Math.min(i, 7) * 60}>
                   <Link
                     href={searchPageHref({ category: c.slug })}
                     className="pf-card group relative flex aspect-[4/3] min-w-0 flex-col justify-end overflow-hidden rounded-[22px] border border-line p-4 shadow-[var(--shadow)] sm:p-5"
                   >
-                    <span
-                      aria-hidden="true"
-                      className={`pf-zoom absolute inset-0 bg-gradient-to-br ${CATEGORY_TONES[c.slug] ?? CATEGORY_TONES.development}`}
-                    />
-                    <span aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(180deg,transparent_30%,rgba(4,10,20,.65))]" />
-                    <span
-                      aria-hidden="true"
-                      className="absolute right-4 top-4 flex size-10 items-center justify-center rounded-2xl bg-white/15 text-white backdrop-blur-sm"
-                    >
-                      <Icon size={18} />
-                    </span>
+                    <CategoryArt slug={c.slug} className="pf-zoom absolute inset-0 h-full w-full" />
+                    <span aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(180deg,transparent_35%,rgba(4,10,20,.7))]" />
                     <span className="relative block font-semibold text-white sm:text-lg">{c.label}</span>
                     <span className="relative mt-1 hidden text-xs leading-5 text-white/75 sm:block">{c.blurb}</span>
                   </Link>
@@ -365,6 +317,57 @@ export function MarketplaceHome() {
               );
             })}
           </div>
+        </Container>
+      </section>
+
+      {/* Media: show-the-work band (decorative original art, no stock media). */}
+      <section className="pf-midnight relative overflow-hidden py-16 sm:py-24" aria-labelledby="pf-media">
+        <Aurora className="opacity-40" />
+        <Container className="relative grid min-w-0 items-center gap-10 lg:grid-cols-2">
+          <Reveal>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-aqua">Media-first gigs</p>
+            <h2 id="pf-media" className="mt-2 font-display text-2xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">
+              Show the work before the work starts.
+            </h2>
+            <p className="mt-3 max-w-md text-sm leading-6 text-white/65 sm:text-base">
+              Gigs carry a cover image and an optional video, so employers can see the style and scope at a glance,
+              then hire with the terms prefilled.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link
+                href="/marketplace/gigs"
+                className="inline-flex min-h-11 items-center gap-2 rounded-full bg-white px-5 text-sm font-semibold transition hover:bg-white/90"
+              >
+                <span className="text-ink">Browse gigs</span>
+                <ArrowRight size={16} aria-hidden="true" className="text-ink" />
+              </Link>
+              <Link
+                href="/marketplace/gigs/new"
+                className="inline-flex min-h-11 items-center rounded-full border border-white/30 px-5 text-sm font-semibold transition hover:bg-white/10"
+              >
+                <span className="text-white">Offer a gig</span>
+              </Link>
+            </div>
+          </Reveal>
+          <Reveal delay={120}>
+            <div aria-hidden="true" className="grid grid-cols-3 grid-rows-2 gap-3">
+              {["video", "design", "web3"].map((slug, i) => (
+                <div
+                  key={slug}
+                  className={`pf-card group relative overflow-hidden rounded-[20px] border border-white/10 ${
+                    i === 0 ? "col-span-2 row-span-2" : "aspect-square"
+                  }`}
+                >
+                  <CategoryArt slug={slug} className="pf-zoom absolute inset-0 h-full w-full" />
+                  {i === 0 ? (
+                    <span className="pf-play absolute left-1/2 top-1/2 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white/15 backdrop-blur-md">
+                      <Play size={22} className="ml-1 fill-white text-white" />
+                    </span>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </Reveal>
         </Container>
       </section>
 
