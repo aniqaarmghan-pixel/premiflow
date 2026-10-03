@@ -14,6 +14,7 @@ import { Input, Select } from "@/components/ui/Field";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { Tabs } from "@/components/ui/Tabs";
 import {
+  ENDED_STREAMS_FILTER_LABEL,
   buildContractsListHref,
   contractsListEmptyCopy,
   filterContractsByListQuery,
@@ -27,6 +28,7 @@ import {
   withResolverCases,
 } from "@/lib/app/resolver-cases";
 import { useContracts } from "@/lib/hooks/ContractsProvider";
+import { useNow } from "@/lib/hooks/useNow";
 import { useResolverCases } from "@/lib/hooks/useResolverCases";
 import { useUnreadMessageCounts } from "@/lib/hooks/useUnreadMessageCounts";
 import type { ContractStatus } from "@/lib/streampay-v2";
@@ -53,6 +55,7 @@ export function ContractsPage() {
   const { status, error, grouped, decimalsByMint, refresh } = useContracts();
   const [lookup, setLookup] = useState("");
   const resolver = useResolverCases();
+  const { now } = useNow(30_000);
 
   const query = useMemo(() => parseContractsListQuery(params), [params]);
 
@@ -61,8 +64,8 @@ export function ContractsPage() {
     [grouped, resolver.cases]
   );
   const list = useMemo(
-    () => filterContractsByListQuery(groupedWithResolving, query),
-    [groupedWithResolving, query]
+    () => filterContractsByListQuery(groupedWithResolving, query, now),
+    [groupedWithResolving, query, now]
   );
   const resolvingView = query.role === "resolving";
 
@@ -109,7 +112,7 @@ export function ContractsPage() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-cyan">
             Contracts
           </p>
-          <h1 className="mt-0.5 font-display text-[1.65rem] tracking-tight sm:text-3xl">
+          <h1 className="mt-0.5 font-display text-[1.65rem] tracking-tight sm:text-3xl lg:text-[1.75rem]">
             Your work and hires
           </h1>
         </div>
@@ -153,6 +156,7 @@ export function ContractsPage() {
           >
             <option value="all">All statuses</option>
             <option value="review">Pending reviews</option>
+            <option value="ended">{ENDED_STREAMS_FILTER_LABEL}</option>
             {STATUSES.map((s) => (
               <option key={s} value={s}>
                 {presentStatus(s)}

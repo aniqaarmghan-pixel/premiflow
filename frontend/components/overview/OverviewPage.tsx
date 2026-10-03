@@ -131,7 +131,7 @@ export function OverviewPage() {
     );
   }
 
-  const summary = dashboardSummaryForWallets(accountWallets, grouped);
+  const summary = dashboardSummaryForWallets(accountWallets, grouped, now);
   const mintKeys = [...new Set(grouped.all.map((c) => c.tokenMint.toBase58()))];
   const sharedDecimals =
     mintKeys.length === 1 ? decimalsByMint[mintKeys[0]] : undefined;
@@ -162,17 +162,19 @@ export function OverviewPage() {
     hiring: grouped.hiring,
     offersWaiting: offers.waitingForFreelancer.length,
     workspace: ws.data,
+    now,
   });
   const workingSteps = freelancerPipeline({
     working: grouped.working,
     offersToAnswer: offers.awaitingYourResponse.length,
     workspace: ws.data,
+    now,
   });
 
   return (
     <PageFade>
       <CommandHeader context={roleContext} />
-      <div className="mt-5 grid min-w-0 gap-3 lg:grid-cols-12">
+      <div className="mt-5 grid min-w-0 gap-3 lg:mt-4 lg:grid-cols-12">
         <div className="min-w-0 lg:col-span-8">
           <AttentionPanel items={attention} />
         </div>
@@ -180,14 +182,14 @@ export function OverviewPage() {
           <DeadlinesPanel items={upcomingDeadlines(offers)} />
         </div>
       </div>
-      <div className="mt-5 grid min-w-0 gap-3 lg:grid-cols-12">
-        <Card className="relative overflow-hidden p-4 sm:p-5 lg:col-span-8">
+      <div className="mt-5 grid min-w-0 gap-3 lg:mt-4 lg:grid-cols-12">
+        <Card className="relative overflow-hidden p-4 sm:p-5 lg:col-span-8 lg:p-4">
           <div className="pointer-events-none absolute -right-8 -top-10 h-40 w-40 rounded-full bg-accent/15 blur-3xl" />
           <div className="flex items-center gap-2 text-accent">
             <ShieldCheck size={15} />
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em]">Protected value</p>
           </div>
-          <h2 className="mt-1.5 font-display text-xl sm:text-2xl">Balances that stay in motion</h2>
+          <h2 className="mt-1.5 font-display text-xl sm:text-2xl lg:text-xl">Balances that stay in motion</h2>
           <p className="mt-1.5 text-sm text-ink-faint">
             Derived from fetched contract accounts for this wallet. Not a live bank balance.
           </p>
@@ -225,10 +227,10 @@ export function OverviewPage() {
             </dl>
           ) : null}
         </Card>
-        <Card className="flex flex-col justify-between overflow-hidden bg-[linear-gradient(180deg,#07111f,#0c1b2e)] p-4 sm:p-5 text-white lg:col-span-4">
+        <Card className="flex flex-col justify-between overflow-hidden bg-[linear-gradient(180deg,#07111f,#0c1b2e)] p-4 sm:p-5 text-white lg:col-span-4 lg:p-4">
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan">Roles</p>
-            <h2 className="mt-1.5 font-display text-xl sm:text-2xl">One wallet, both sides</h2>
+            <h2 className="mt-1.5 font-display text-xl sm:text-2xl lg:text-xl">One wallet, both sides</h2>
             <p className="mt-1.5 text-sm leading-5 text-white/65">
               Hiring and working are per contract. You may employ someone and also work for someone
               else from the same address. {ROLE_TOTAL_LABELS.note}
@@ -273,6 +275,14 @@ export function OverviewPage() {
           value={summary.streamingActive}
           tone="blue"
         />
+        {summary.streamingEnded > 0 ? (
+          <Link
+            href={OVERVIEW_DASHBOARD_HREFS.endedStreams}
+            className="col-span-full inline-flex min-h-9 items-center rounded-full border border-gold/30 bg-gold/10 px-3 text-xs font-semibold text-gold lg:col-span-12"
+          >
+            {summary.streamingEnded} streaming {summary.streamingEnded === 1 ? "contract has" : "contracts have"} ended - final pay awaiting collection
+          </Link>
+        ) : null}
         <Bento
           className="lg:col-span-3"
           href={OVERVIEW_DASHBOARD_HREFS.allContracts}
@@ -283,7 +293,7 @@ export function OverviewPage() {
         />
       </div>
 
-      <div className="mt-5 grid min-w-0 gap-3 lg:grid-cols-12">
+      <div className="mt-5 grid min-w-0 gap-3 lg:mt-4 lg:grid-cols-12">
         <div className="min-w-0 lg:col-span-7">
           <ContractProgressPanel items={progressItems} />
         </div>
@@ -539,11 +549,11 @@ function CommandHeader({ context }: { context: RoleContext | null }) {
   const { user } = useAccountSession();
   const name = greetingName(user);
   return (
-    <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(135deg,#050b18_0%,#0a1830_45%,#121a3d_75%,#1d1546_100%)] px-4 py-5 text-white shadow-[0_30px_60px_-40px_rgba(46,230,214,.45)] sm:rounded-[28px] sm:px-6 sm:py-6">
+    <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(135deg,#050b18_0%,#0a1830_45%,#121a3d_75%,#1d1546_100%)] px-4 py-5 text-white shadow-[0_30px_60px_-40px_rgba(46,230,214,.45)] sm:rounded-[28px] sm:px-6 sm:py-6 lg:px-5 lg:py-4">
       <div aria-hidden="true" className="pointer-events-none absolute -left-24 -top-20 h-64 w-64 rounded-full bg-cyan/20 blur-3xl" />
       <div aria-hidden="true" className="pointer-events-none absolute -right-16 -bottom-24 h-64 w-64 rounded-full bg-violet/25 blur-3xl" />
       <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(46,230,214,.6),rgba(167,139,250,.6),transparent)]" />
-      <div className="relative flex min-w-0 flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+      <div className="relative flex min-w-0 flex-col gap-5 lg:flex-row lg:items-end lg:justify-between lg:gap-4">
         <div className="min-w-0">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan">Command center</p>
@@ -569,10 +579,10 @@ function CommandHeader({ context }: { context: RoleContext | null }) {
               </span>
             ) : null}
           </div>
-          <h1 className="mt-2 break-words font-display text-[1.45rem] leading-tight sm:text-[1.9rem] [overflow-wrap:anywhere]">
+          <h1 className="mt-2 break-words font-display text-[1.45rem] leading-tight sm:text-[1.9rem] lg:text-[1.65rem] [overflow-wrap:anywhere]">
             {name ? `Welcome back, ${name}` : "Welcome back"}
           </h1>
-          <p className="mt-1.5 max-w-xl text-sm leading-6 text-white/65">
+          <p className="mt-1.5 max-w-xl text-sm leading-6 text-white/65 lg:mt-1 lg:leading-5">
             {context && context.mode !== "new"
               ? `${context.detail}. Everything below is loaded from your contracts and marketplace activity.`
               : "Everything below is loaded from your contracts and marketplace activity. Nothing is estimated."}
@@ -584,7 +594,7 @@ function CommandHeader({ context }: { context: RoleContext | null }) {
               <li key={href} className="min-w-0">
                 <Link
                   href={href}
-                  className={`flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-full px-4 text-[13px] font-semibold transition ${NAV_CARD_FOCUS} ${
+                  className={`flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-full px-4 text-[13px] lg:min-h-10 lg:px-3.5 font-semibold transition ${NAV_CARD_FOCUS} ${
                     i === 0
                       ? "bg-[linear-gradient(135deg,#2ee6d6,#7c8cff)] text-[#04101f] shadow-[0_12px_30px_-14px_rgba(46,230,214,.9)] hover:brightness-105"
                       : "border border-white/15 bg-white/5 text-white hover:bg-white/10"
@@ -791,7 +801,7 @@ function MoneyTile({
         {icon}
         {label}
       </p>
-      <p className="mt-1.5 font-display text-xl tracking-tight tabular-nums text-ink sm:text-3xl">
+      <p className="mt-1.5 font-display text-xl tracking-tight tabular-nums text-ink sm:text-3xl lg:text-2xl">
         {value}
       </p>
       <p className="mt-1 text-xs text-ink-faint">{hint}</p>
@@ -835,7 +845,7 @@ function Bento({
         key={value}
         initial={reduceMotion ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mt-2 font-display text-2xl sm:text-3xl"
+        className="mt-2 font-display text-2xl sm:text-3xl lg:text-[1.65rem]"
       >
         <CountUp value={value} />
       </motion.p>

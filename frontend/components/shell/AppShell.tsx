@@ -206,8 +206,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="pf-dashboard min-h-screen min-w-0 lg:grid lg:grid-cols-[224px_minmax(0,1fr)] 2xl:grid-cols-[248px_minmax(0,1fr)]">
-      <aside className="pf-sidebar hidden bg-navy px-3.5 pt-5 text-white lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col lg:self-start lg:overflow-hidden">
+    <div className="pf-dashboard min-h-screen min-w-0 lg:grid lg:grid-cols-[216px_minmax(0,1fr)] 2xl:grid-cols-[240px_minmax(0,1fr)]">
+      <aside className="pf-sidebar hidden bg-navy px-3.5 pt-5 text-white lg:px-3 lg:pt-4 lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col lg:self-start lg:overflow-hidden">
         <Link href={DASHBOARD_HREF} className="shrink-0 px-2">
           <BrandMark light size={44} />
           <p
@@ -235,7 +235,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             group.title ? (
               <p
                 key={`g-${group.title}`}
-                className="px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35"
+                className="px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35 lg:pt-3"
               >
                 {group.title}
               </p>
@@ -269,7 +269,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             }),
           ])}
         </nav>
-        <div className="mt-auto shrink-0 space-y-3 rounded-2xl bg-white/5 px-3 py-3 text-[11px] leading-5 text-white/50">
+        <div className="mt-auto shrink-0 space-y-3 rounded-2xl bg-white/5 px-3 py-3 lg:space-y-2 lg:py-2.5 text-[11px] leading-5 text-white/50">
           <p>Value stays in the contract until work is verified.</p>
           <ClientOnly>
             <SoundPreference compact />
@@ -279,7 +279,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex min-w-0 flex-col">
-        <header className="sticky top-0 z-30 flex min-w-0 items-center justify-between gap-2 border-b border-line/80 bg-[color-mix(in_srgb,var(--paper)_82%,white)] px-3 py-2.5 backdrop-blur-md sm:gap-3 sm:px-4 sm:py-3">
+        <header className="sticky top-0 z-30 flex min-w-0 items-center justify-between gap-2 border-b border-line/80 bg-[color-mix(in_srgb,var(--paper)_82%,white)] px-3 py-2.5 backdrop-blur-md sm:gap-3 sm:px-4 sm:py-3 lg:py-2">
           <div className="flex min-w-0 items-center gap-1.5 sm:gap-2 lg:hidden">
             <button
               type="button"
@@ -316,7 +316,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           </ClientOnly>
         </header>
-        <main className="mx-auto w-full min-w-0 max-w-6xl flex-1 overflow-x-hidden px-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:pb-[calc(7rem+env(safe-area-inset-bottom))] sm:pt-6 lg:px-6 lg:pb-10 lg:pt-5 xl:px-8 2xl:max-w-7xl">
+        <main className="mx-auto w-full min-w-0 max-w-6xl flex-1 overflow-x-hidden px-3 pb-[calc(7.5rem+env(safe-area-inset-bottom))] pt-5 sm:px-6 sm:pb-[calc(7rem+env(safe-area-inset-bottom))] sm:pt-6 lg:px-6 lg:pb-8 lg:pt-4 2xl:max-w-7xl xl:px-8 2xl:max-w-7xl">
           {reconnecting ? (
             <div
               role="status"

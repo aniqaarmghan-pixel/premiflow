@@ -49,7 +49,7 @@ test("Activity uses account wallet-set status while assistant keeps connected-wa
   const assistant = read("components/copilot/FloatingAssistant.tsx");
   assert.match(
     assistant,
-    /statusLabel: roleAwareStatusLabel\(publicKey, contract\)/
+    /statusLabel: roleAwareStatusLabel\(publicKey, contract, now\)/
   );
   assert.doesNotMatch(assistant, /presentStatus\(contract\.status\)/);
 });

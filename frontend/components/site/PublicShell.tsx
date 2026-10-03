@@ -71,7 +71,7 @@ export function PublicShell({
             : "border-b border-transparent bg-transparent"
         }`}
       >
-        <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 lg:h-[72px] lg:px-8">
+        <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 lg:h-[68px] lg:px-8">
           <Link href="/" aria-label="PREMIFLOW marketplace home" className="shrink-0">
             {/* ~8% larger on phones (no overflow at 360px), ~35% larger from sm up. */}
             <span className="inline-flex sm:hidden">

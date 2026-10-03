@@ -54,7 +54,7 @@ export function ActivityPage() {
   return (
     <PageFade>
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan">Activity</p>
-      <h1 className="mt-1 font-display text-[1.65rem] tracking-tight sm:text-3xl">Deterministic timeline</h1>
+      <h1 className="mt-1 font-display text-[1.65rem] tracking-tight sm:text-3xl lg:text-[1.75rem]">Deterministic timeline</h1>
       <p className="mt-2 max-w-2xl text-sm text-ink-soft">
         This is not an indexer. It only lists timestamps already stored on loaded contract
         accounts. Program events such as WorkUnitStaleRevisionVoided are not retrieved.

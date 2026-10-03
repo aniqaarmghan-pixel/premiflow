@@ -111,7 +111,7 @@ export function MarketplaceHeader({
             <div className="min-w-0 max-w-2xl">
               <p className="pf-hero-in text-[11px] font-semibold uppercase tracking-[0.2em] text-aqua sm:text-xs">{eyebrow}</p>
               <h1
-                className="pf-hero-in mt-2 break-words font-display text-3xl font-semibold tracking-[-0.03em] sm:text-5xl"
+                className="pf-hero-in mt-2 break-words font-display text-3xl font-semibold tracking-[-0.03em] sm:text-5xl lg:text-[2.6rem]"
                 style={{ "--pf-d": "80ms" } as CSSProperties}
               >
                 <span className="pf-gradient-text">{title}</span>

@@ -52,7 +52,7 @@ export function Modal({
             initial={reduceMotion ? false : { y: 24, opacity: 0, scale: 0.98 }}
             animate={{ y: 0, opacity: 1, scale: 1 }}
             exit={{ y: 16, opacity: 0 }}
-            className="relative z-10 w-full max-w-lg max-h-[86dvh] min-w-0 overflow-auto overscroll-contain rounded-[24px] border border-line bg-card p-4 shadow-[var(--shadow)] sm:p-5"
+            className="relative z-10 w-full max-w-lg max-h-[86dvh] min-w-0 overflow-auto overscroll-contain rounded-[24px] border border-line bg-card p-4 shadow-[var(--shadow)] sm:p-5 lg:p-4"
           >
             <div className="mb-3 flex items-start justify-between gap-4">
               <h2 id={titleId} className="min-w-0 break-words font-display text-xl text-ink [overflow-wrap:anywhere]">
@@ -63,7 +63,7 @@ export function Modal({
               </Button>
             </div>
             <div className="text-sm text-ink-soft">{children}</div>
-            {footer ? <div className="mt-5 flex flex-wrap justify-end gap-2 max-sm:flex-col-reverse max-sm:items-stretch">{footer}</div> : null}
+            {footer ? <div className="mt-5 lg:mt-4 flex flex-wrap justify-end gap-2 max-sm:flex-col-reverse max-sm:items-stretch">{footer}</div> : null}
           </motion.div>
         </motion.div>
       ) : null}

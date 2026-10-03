@@ -113,7 +113,7 @@ export function MarketplaceSearch() {
           so freelancers can find you.
         </EmptyState>
       ) : (
-        <div className="min-w-0 space-y-8">
+        <div className="min-w-0 space-y-8 lg:space-y-6">
           {sections.gigs.length ? (
             <section className="min-w-0 space-y-3">
               <h2 className="font-display text-lg">Gigs</h2>

@@ -510,20 +510,27 @@ export type DashboardSummary = {
   availableToWithdraw: bigint;
   availableRefund: bigint;
   streamingActive: number;
+  /** Active Streaming past end_time (final pay awaiting collection); 0 without a clock. */
+  streamingEnded: number;
 };
 
 export function dashboardSummary(
   wallet: PublicKey,
-  grouped: GroupedContracts
+  grouped: GroupedContracts,
+  now?: number
 ): DashboardSummary {
   let pendingReviews = 0;
   let availableToWithdraw = 0n;
   let availableRefund = 0n;
   let streamingActive = 0;
+  let streamingEnded = 0;
   let active = 0;
 
   for (const contract of grouped.all) {
-    if (contract.status === "Active") active += 1;
+    // Ended streams are on-chain Active but no longer actively streaming.
+    const ended = now !== undefined && isStreamEnded(contract, now);
+    if (ended) streamingEnded += 1;
+    if (contract.status === "Active" && !ended) active += 1;
     pendingReviews += contract.openReviewCount;
     if (roleForContract(wallet, contract) === "freelancer") {
       availableToWithdraw += remainingFreelancerClaim(contract);
@@ -531,7 +538,7 @@ export function dashboardSummary(
     if (roleForContract(wallet, contract) === "employer") {
       availableRefund += remainingEmployerRefund(contract);
     }
-    if (contract.paymentMode === "Streaming" && contract.status === "Active") {
+    if (contract.paymentMode === "Streaming" && contract.status === "Active" && !ended) {
       streamingActive += 1;
     }
   }
@@ -544,6 +551,7 @@ export function dashboardSummary(
     availableToWithdraw,
     availableRefund,
     streamingActive,
+    streamingEnded,
   };
 }
 
@@ -553,16 +561,21 @@ export function dashboardSummary(
  */
 export function dashboardSummaryForWallets(
   wallets: readonly PublicKey[],
-  grouped: GroupedContracts
+  grouped: GroupedContracts,
+  now?: number
 ): DashboardSummary {
   let pendingReviews = 0;
   let availableToWithdraw = 0n;
   let availableRefund = 0n;
   let streamingActive = 0;
+  let streamingEnded = 0;
   let active = 0;
 
   for (const contract of grouped.all) {
-    if (contract.status === "Active") active += 1;
+    // Ended streams are on-chain Active but no longer actively streaming.
+    const ended = now !== undefined && isStreamEnded(contract, now);
+    if (ended) streamingEnded += 1;
+    if (contract.status === "Active" && !ended) active += 1;
 
     pendingReviews += contract.openReviewCount;
 
@@ -576,7 +589,8 @@ export function dashboardSummaryForWallets(
 
     if (
       contract.paymentMode === "Streaming" &&
-      contract.status === "Active"
+      contract.status === "Active" &&
+      !ended
     ) {
       streamingActive += 1;
     }
@@ -590,6 +604,7 @@ export function dashboardSummaryForWallets(
     availableToWithdraw,
     availableRefund,
     streamingActive,
+    streamingEnded,
   };
 }
 

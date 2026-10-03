@@ -112,7 +112,7 @@ export function StreamShowcase({
         <HeroFlow />
       </div>
       <p
-        className={`mt-3 break-words font-display text-4xl tracking-tight tabular-nums sm:text-5xl ${
+        className={`mt-3 break-words font-display text-4xl tracking-tight tabular-nums sm:text-5xl lg:text-4xl ${
           live ? "pf-live-amount" : ""
         }`}
       >

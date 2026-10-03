@@ -13,7 +13,7 @@ export function SupportPage() {
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan">
             Help
           </p>
-          <h1 className="mt-1 font-display text-[1.65rem] tracking-tight sm:text-3xl">{SUPPORT_PAGE.title}</h1>
+          <h1 className="mt-1 font-display text-[1.65rem] tracking-tight sm:text-3xl lg:text-[1.75rem]">{SUPPORT_PAGE.title}</h1>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-ink-soft">{SUPPORT_PAGE.intro}</p>
         </header>
 

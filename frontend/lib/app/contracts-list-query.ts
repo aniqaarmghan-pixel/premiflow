@@ -1,4 +1,5 @@
 import {
+  isStreamEnded,
   remainingEmployerRefund,
   remainingFreelancerClaim,
   type ContractStatus,
@@ -16,6 +17,7 @@ export const OVERVIEW_DASHBOARD_HREFS = {
   activeContracts: "/contracts?status=active",
   pendingReviews: "/contracts?status=review",
   liveStreams: "/contracts?type=streaming&status=active",
+  endedStreams: "/contracts?status=ended",
   allContracts: "/contracts",
 } as const;
 
@@ -40,7 +42,13 @@ const PAYMENT_TYPES: readonly PaymentModeName[] = [
   "Hourly",
 ] as const;
 
-export type ContractsListStatusFilter = StatusFilter | "review";
+/**
+ * "ended" is derived: on-chain Active Streaming contracts at/after end_time
+ * (final pay awaiting freelancer collection). On-chain status is unchanged.
+ */
+export type ContractsListStatusFilter = StatusFilter | "review" | "ended";
+
+export const ENDED_STREAMS_FILTER_LABEL = "Streaming ended (awaiting collection)";
 
 export type ContractsListTypeFilter = "all" | PaymentModeName;
 
@@ -74,6 +82,7 @@ function parseStatus(raw: string | null): ContractsListStatusFilter {
   const trimmed = raw.trim();
   if (!trimmed) return "all";
   if (trimmed.toLowerCase() === "review") return "review";
+  if (trimmed.toLowerCase() === "ended") return "ended";
   if (trimmed.toLowerCase() === "active") return "Active";
   const exact = CONTRACT_STATUSES.find((s) => s === trimmed);
   if (exact) return exact;
@@ -113,6 +122,7 @@ export function parseContractsListQuery(
 function serializeStatus(status: ContractsListStatusFilter): string | null {
   if (status === "all") return null;
   if (status === "review") return "review";
+  if (status === "ended") return "ended";
   if (status === "Active") return "active";
   return status;
 }
@@ -147,13 +157,25 @@ export function buildContractsListHref(
  */
 export function filterContractsByListQuery(
   grouped: GroupedContracts,
-  query: ContractsListQuery
+  query: ContractsListQuery,
+  now?: number
 ): ContractView[] {
   // Claim filters are this wallet's party balances; resolver cases have none.
   if (query.role === "resolving" && query.claim !== "none") return [];
   const statusForRoleFilter: StatusFilter =
-    query.status === "review" || query.status === "all" ? "all" : query.status;
+    query.status === "review" || query.status === "all"
+      ? "all"
+      : query.status === "ended"
+        ? "Active"
+        : query.status;
   let list = filterContracts(grouped, query.role, statusForRoleFilter);
+
+  if (query.status === "ended") {
+    list = now === undefined ? [] : list.filter((c) => isStreamEnded(c, now));
+  } else if (query.status === "Active" && now !== undefined) {
+    // Ended streams are not "currently active"; they live under the ended filter.
+    list = list.filter((c) => !isStreamEnded(c, now));
+  }
 
   if (query.status === "review") {
     list = list.filter((c) => c.openReviewCount > 0);
@@ -199,6 +221,12 @@ export function contractsListEmptyCopy(query: ContractsListQuery): {
     return {
       title: "No pending reviews",
       body: "No loaded contracts currently have an open review.",
+    };
+  }
+  if (query.status === "ended") {
+    return {
+      title: "No ended streams awaiting collection",
+      body: "Streaming contracts appear here once their end time passes, until they are completed.",
     };
   }
   if (query.type === "Streaming" && query.status === "Active") {

@@ -70,7 +70,7 @@ function SectionHeading({
         ) : null}
         <h2
           id={id}
-          className={`mt-2 font-display text-2xl font-semibold tracking-[-0.03em] sm:text-4xl ${
+          className={`mt-2 font-display text-2xl font-semibold tracking-[-0.03em] sm:text-4xl lg:text-[2.1rem] ${
             dark ? "text-white" : "text-ink"
           }`}
         >
@@ -440,7 +440,7 @@ export function MarketplaceHome() {
         <Container className="relative grid min-w-0 items-center gap-10 lg:grid-cols-2">
           <Reveal>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-aqua">Media-first gigs</p>
-            <h2 id="pf-media" className="mt-2 font-display text-2xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">
+            <h2 id="pf-media" className="mt-2 font-display text-2xl font-semibold tracking-[-0.03em] text-white sm:text-4xl lg:text-[2.1rem]">
               Show the work before the work starts.
             </h2>
             <p className="mt-3 max-w-md text-sm leading-6 text-white/65 sm:text-base">
@@ -502,7 +502,7 @@ export function MarketplaceHome() {
         <Container className="relative grid min-w-0 gap-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)] lg:items-center">
           <Reveal>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-aqua">Protected payments</p>
-            <h2 id="pf-trust" className="mt-2 font-display text-2xl font-semibold tracking-[-0.03em] text-white sm:text-4xl">
+            <h2 id="pf-trust" className="mt-2 font-display text-2xl font-semibold tracking-[-0.03em] text-white sm:text-4xl lg:text-[2.1rem]">
               Escrow and security
             </h2>
             <p className="mt-3 max-w-md text-sm leading-6 text-white/65 sm:text-base">
@@ -530,12 +530,12 @@ export function MarketplaceHome() {
       <section className="bg-paper py-16 sm:py-24">
         <Container>
           <Reveal>
-            <div className="relative isolate overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,#040a14,#13315c_50%,#0d9488)] px-6 py-12 text-white sm:px-12 sm:py-16">
+            <div className="relative isolate overflow-hidden rounded-[32px] bg-[linear-gradient(135deg,#040a14,#13315c_50%,#0d9488)] px-6 py-12 text-white sm:px-12 sm:py-16 lg:py-12">
               <div
                 aria-hidden="true"
                 className="absolute -right-24 -top-24 -z-10 size-80 rounded-full bg-[radial-gradient(circle,rgba(139,123,255,.45),transparent_65%)] blur-2xl"
               />
-              <h2 className="max-w-2xl font-display text-3xl font-semibold tracking-[-0.03em] sm:text-5xl">Ready to start?</h2>
+              <h2 className="max-w-2xl font-display text-3xl font-semibold tracking-[-0.03em] sm:text-5xl lg:text-[2.6rem]">Ready to start?</h2>
               <p className="mt-3 max-w-xl text-sm leading-6 text-white/75 sm:text-base">
                 Post a job to receive proposals, or offer a gig so employers can hire you directly. You only connect a
                 wallet when you post, hire or fund.

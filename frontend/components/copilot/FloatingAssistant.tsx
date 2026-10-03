@@ -15,6 +15,7 @@ import {
   roleLabelForAssistant,
 } from "@/lib/app/copilot-live";
 import { useContracts } from "@/lib/hooks/ContractsProvider";
+import { useNow } from "@/lib/hooks/useNow";
 import {
   presentType,
   roleForContract,
@@ -56,6 +57,8 @@ export function FloatingAssistant() {
   const pathname = usePathname();
   const { publicKey } = useWallet();
   const { grouped } = useContracts();
+  // Clock so an ended Streaming contract reads "Streaming ended", matching cards.
+  const { now } = useNow(30_000);
   const desktop = useDesktopLauncher();
   const mounted = useSyncExternalStore(
     subscribeNoop,
@@ -81,7 +84,7 @@ export function FloatingAssistant() {
         contractAddress,
         role: roleLabelForAssistant(role),
         paymentMode: presentType(contract.paymentMode),
-        statusLabel: roleAwareStatusLabel(publicKey, contract),
+        statusLabel: roleAwareStatusLabel(publicKey, contract, now),
       };
     }
     return {
@@ -90,7 +93,7 @@ export function FloatingAssistant() {
       paymentMode: "Contract",
       statusLabel: "On-chain",
     };
-  }, [contractAddress, grouped.all, publicKey]);
+  }, [contractAddress, grouped.all, publicKey, now]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setShowWelcome(false), WELCOME_MS);

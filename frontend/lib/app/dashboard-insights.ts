@@ -5,6 +5,7 @@
  * payment math lives here. Every count maps to a real record.
  */
 import type { ContractView } from "@/lib/streampay-v2/types";
+import { isStreamEnded } from "@/lib/streampay-v2/derived";
 import type { ActionRequiredItem, OfferListItem } from "./dashboard-offers";
 import type { MarketplaceWorkspaceData } from "./dashboard-command";
 import {
@@ -128,10 +129,37 @@ export function statusDistribution(contracts: readonly ContractView[]): StatusBu
 
 export type PipelineStep = { label: string; value: number; href: string };
 
+export const PIPELINE_ENDED_LABEL = "Streaming ended";
+
+/** On-chain Active, minus Streaming contracts past end_time (derived; on-chain status unchanged). */
+function activeNowCount(list: readonly ContractView[], now?: number): number {
+  return list.filter(
+    (c) => c.status === "Active" && !(now !== undefined && isStreamEnded(c, now))
+  ).length;
+}
+
+/** Active Streaming contracts past end_time: final pay awaiting freelancer collection. */
+function endedStreamCount(list: readonly ContractView[], now?: number): number {
+  if (now === undefined) return 0;
+  return list.filter((c) => isStreamEnded(c, now)).length;
+}
+
+function endedStep(
+  list: readonly ContractView[],
+  role: "hiring" | "working",
+  now?: number
+): PipelineStep[] {
+  const value = endedStreamCount(list, now);
+  return value > 0
+    ? [{ label: PIPELINE_ENDED_LABEL, value, href: `/contracts?role=${role}&status=ended` }]
+    : [];
+}
+
 export function hiringPipeline(input: {
   hiring: readonly ContractView[];
   offersWaiting: number;
   workspace: MarketplaceWorkspaceData | null;
+  now?: number;
 }): PipelineStep[] {
   const steps: PipelineStep[] = [];
   if (input.workspace) {
@@ -139,7 +167,8 @@ export function hiringPipeline(input: {
   }
   steps.push(
     { label: "Offers sent", value: input.offersWaiting, href: "/contracts?role=hiring" },
-    { label: "Active", value: input.hiring.filter((c) => c.status === "Active").length, href: "/contracts?role=hiring" },
+    { label: "Active", value: activeNowCount(input.hiring, input.now), href: "/contracts?role=hiring" },
+    ...endedStep(input.hiring, "hiring", input.now),
     { label: "Completed", value: input.hiring.filter((c) => c.status === "Completed" || c.status === "Resolved").length, href: "/contracts?role=hiring" }
   );
   return steps;
@@ -149,6 +178,7 @@ export function freelancerPipeline(input: {
   working: readonly ContractView[];
   offersToAnswer: number;
   workspace: MarketplaceWorkspaceData | null;
+  now?: number;
 }): PipelineStep[] {
   const steps: PipelineStep[] = [];
   if (input.workspace) {
@@ -160,7 +190,8 @@ export function freelancerPipeline(input: {
   }
   steps.push(
     { label: "Offers to answer", value: input.offersToAnswer, href: "/contracts?role=working" },
-    { label: "Active", value: input.working.filter((c) => c.status === "Active").length, href: "/contracts?role=working" },
+    { label: "Active", value: activeNowCount(input.working, input.now), href: "/contracts?role=working" },
+    ...endedStep(input.working, "working", input.now),
     { label: "Completed", value: input.working.filter((c) => c.status === "Completed" || c.status === "Resolved").length, href: "/contracts?role=working" }
   );
   return steps;
