@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type CSSProperties, type ReactNode } from "react";
-import { ArrowRight, CheckCircle2, LockKeyhole, Play, Search, ShieldCheck } from "lucide-react";
+import { ArrowRight, CheckCircle2, LockKeyhole, Search, ShieldCheck } from "lucide-react";
 
 import {
   FEATURED_NOTE,
@@ -359,11 +359,6 @@ export function MarketplaceHome() {
                   }`}
                 >
                   <CategoryArt slug={slug} className="pf-zoom absolute inset-0 h-full w-full" />
-                  {i === 0 ? (
-                    <span className="pf-play absolute left-1/2 top-1/2 flex size-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/40 bg-white/15 backdrop-blur-md">
-                      <Play size={22} className="ml-1 fill-white text-white" />
-                    </span>
-                  ) : null}
                 </div>
               ))}
             </div>

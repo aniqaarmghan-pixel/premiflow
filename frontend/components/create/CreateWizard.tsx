@@ -383,6 +383,7 @@ export function CreateWizard() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- one-time draft normalization on mount (lint-only annotation; no tx logic change).
     setDraft((prev) => applyCreateDraftPatch(prev, {}));
   }, []);
 

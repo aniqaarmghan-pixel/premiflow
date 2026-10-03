@@ -13,7 +13,7 @@ import {
   type ReactNode,
 } from "react";
 
-import { useSession } from "@/lib/account-auth/client";
+import { useAccountSession } from "@/lib/account-auth/useAccountSession";
 import {
   fetchWalletContractSets,
   getStreamPayV2ReadOnlyProgram,
@@ -91,7 +91,7 @@ export function ContractsProvider({ children }: { children: ReactNode }) {
   const {
     data: accountSession,
     isPending: accountSessionPending,
-  } = useSession();
+  } = useAccountSession();
 
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);

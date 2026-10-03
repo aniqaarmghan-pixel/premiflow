@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import type { ReactNode } from "react";
 import {
   Briefcase,
@@ -20,12 +20,9 @@ import {
 import { ContractCard } from "@/components/contracts/ContractCard";
 import { WhyPremiflowTeaser } from "@/components/about/AboutPage";
 import { PageFade } from "@/components/shell/PageFade";
-import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
-import { HeroFlow } from "@/components/illustrations/HeroFlow";
-import { brand } from "@/lib/brand";
 import { OVERVIEW_DASHBOARD_HREFS } from "@/lib/app/contracts-list-query";
 import {
   ACTION_REQUIRED_COPY,
@@ -47,6 +44,34 @@ import { useResolverCases } from "@/lib/hooks/useResolverCases";
 import { AssignedDisputesSection } from "@/components/contracts/AssignedDisputesSection";
 import { useNow } from "@/lib/hooks/useNow";
 import { shortenAddress } from "@/lib/network";
+import { useAccountSession } from "@/lib/account-auth/useAccountSession";
+import { greetingName, upcomingDeadlines, type DeadlineItem } from "@/lib/app/dashboard-command";
+import {
+  ActivityPanel,
+  MarketplaceWorkspacePanel,
+  PanelCard,
+  QUICK_ACTIONS,
+  ReputationPanel,
+  useDashboardWorkspace,
+  useReviewPrompts,
+  useUnreadNotificationCount,
+} from "@/components/overview/DashboardWorkspace";
+import { CountUp, ProgressBar } from "@/components/overview/DashboardVisuals";
+import {
+  attentionQueue,
+  contractProgressItems,
+  dashboardRoleContext,
+  freelancerPipeline,
+  hiringPipeline,
+  portfolioTotals,
+  statusDistribution,
+  type AttentionItem,
+  type ContractProgressItem,
+  type PipelineStep,
+  type RoleContext,
+  type StatusBucket,
+} from "@/lib/app/dashboard-insights";
+import { AlertCircle, BarChart3, CalendarClock, Gauge, Users } from "lucide-react";
 
 const NAV_CARD_FOCUS =
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2";
@@ -63,6 +88,14 @@ export function OverviewPage() {
   const resolverCases = useResolverCases();
   const { now } = useNow(30_000);
   const router = useRouter();
+  const ws = useDashboardWorkspace();
+  const unreadNotifications = useUnreadNotificationCount();
+  const reviewPrompts = useReviewPrompts(
+    [...grouped.all]
+      .filter((c) => c.status === "Completed")
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .map((c) => c.address.toBase58())
+  );
 
   if (status === "loading" || status === "idle") {
     return (
@@ -78,12 +111,21 @@ export function OverviewPage() {
 
   if (status === "error") {
     return (
-      <EmptyState
-        kind="contracts"
-        title="Could not load contracts"
-        body={error ?? "The RPC request failed."}
-        action={{ label: "Retry", onClick: () => void refresh() }}
-      />
+      <PageFade>
+        <CommandHeader context={null} />
+        <div className="mt-5">
+          <EmptyState
+            kind="contracts"
+            title="Contracts are temporarily unavailable"
+            body={`${error ?? "The RPC request failed."} Your contracts are safe on-chain; this only affects loading them here.`}
+            action={{ label: "Retry", onClick: () => void refresh() }}
+          />
+        </div>
+        <div className="mt-5 grid min-w-0 gap-3 lg:grid-cols-2">
+          <MarketplaceWorkspacePanel ws={ws} />
+          <ActivityPanel />
+        </div>
+      </PageFade>
     );
   }
 
@@ -101,12 +143,41 @@ export function OverviewPage() {
   const recent = [...grouped.all]
     .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, 4);
+  const roleContext = dashboardRoleContext(summary);
+  const totals = portfolioTotals(grouped.all);
+  const progressItems = contractProgressItems(grouped.all, now);
+  const distribution = statusDistribution(grouped.all);
+  const attention = attentionQueue({
+    actionItems,
+    offersToAnswer: offers.awaitingYourResponse,
+    reviewContracts: pending,
+    unreadMessages: unreadNotifications,
+    pendingInvitations: ws.data ? ws.data.invitations.filter((i) => i.invitation.status === "pending").length : 0,
+    reviewPrompts,
+  });
+  const hiringSteps = hiringPipeline({
+    hiring: grouped.hiring,
+    offersWaiting: offers.waitingForFreelancer.length,
+    workspace: ws.data,
+  });
+  const workingSteps = freelancerPipeline({
+    working: grouped.working,
+    offersToAnswer: offers.awaitingYourResponse.length,
+    workspace: ws.data,
+  });
 
   return (
     <PageFade>
-      <Hero />
-      <WhyPremiflowTeaser />
-      <div className="mt-5 grid gap-3 lg:grid-cols-12">
+      <CommandHeader context={roleContext} />
+      <div className="mt-5 grid min-w-0 gap-3 lg:grid-cols-12">
+        <div className="min-w-0 lg:col-span-8">
+          <AttentionPanel items={attention} />
+        </div>
+        <div className="min-w-0 lg:col-span-4">
+          <DeadlinesPanel items={upcomingDeadlines(offers)} />
+        </div>
+      </div>
+      <div className="mt-5 grid min-w-0 gap-3 lg:grid-cols-12">
         <Card className="relative overflow-hidden p-4 sm:p-5 lg:col-span-8">
           <div className="pointer-events-none absolute -right-8 -top-10 h-40 w-40 rounded-full bg-accent/15 blur-3xl" />
           <div className="flex items-center gap-2 text-accent">
@@ -143,6 +214,13 @@ export function OverviewPage() {
               tone="violet"
             />
           </div>
+          {grouped.all.length > 0 && !mixedMints ? (
+            <dl className="mt-3 grid min-w-0 grid-cols-1 gap-2 min-[420px]:grid-cols-3">
+              <PortfolioFigure label="In escrow (live contracts)" value={formatTokenAmount(totals.inEscrow, sharedDecimals)} />
+              <PortfolioFigure label="Released to date" value={formatTokenAmount(totals.released, sharedDecimals)} />
+              <PortfolioFigure label={`Live contract value (${totals.liveCount})`} value={formatTokenAmount(totals.liveValue, sharedDecimals)} />
+            </dl>
+          ) : null}
         </Card>
         <Card className="flex flex-col justify-between overflow-hidden bg-[linear-gradient(180deg,#07111f,#0c1b2e)] p-4 sm:p-5 text-white lg:col-span-4">
           <div>
@@ -202,6 +280,29 @@ export function OverviewPage() {
         />
       </div>
 
+      <div className="mt-5 grid min-w-0 gap-3 lg:grid-cols-12">
+        <div className="min-w-0 lg:col-span-7">
+          <ContractProgressPanel items={progressItems} />
+        </div>
+        <div className="min-w-0 lg:col-span-5">
+          <StatusChartPanel buckets={distribution} />
+        </div>
+        <div className="min-w-0 lg:col-span-6">
+          <PipelinePanel title="Hiring pipeline" steps={hiringSteps} tone="aqua" />
+        </div>
+        <div className="min-w-0 lg:col-span-6">
+          <PipelinePanel title="Freelancer pipeline" steps={workingSteps} tone="violet" />
+        </div>
+        <div className="min-w-0 lg:col-span-12">
+          <MarketplaceWorkspacePanel ws={ws} />
+        </div>
+        <div className="min-w-0 lg:col-span-7">
+          <ActivityPanel />
+        </div>
+        <div className="min-w-0 lg:col-span-5">
+          <ReputationPanel />
+        </div>
+      </div>
       {actionItems.length > 0 ? <ActionRequiredSection items={actionItems} /> : null}
 
       {resolverCases.cases.length > 0 ? (
@@ -312,6 +413,9 @@ export function OverviewPage() {
           )}
         </Card>
       </section>
+      <div className="mt-6">
+        <WhyPremiflowTeaser />
+      </div>
     </PageFade>
   );
 }
@@ -428,43 +532,223 @@ function ActionRequiredSection({ items }: { items: ActionRequiredItem[] }) {
   );
 }
 
-function Hero() {
+function CommandHeader({ context }: { context: RoleContext | null }) {
+  const { user } = useAccountSession();
+  const name = greetingName(user);
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-[linear-gradient(135deg,#06101c_0%,#0b1d33_48%,#102a3d_100%)] px-3.5 py-5 text-white sm:rounded-[28px] sm:px-6 sm:py-7">
-      <div className="pointer-events-none absolute -left-16 top-0 h-56 w-56 rounded-full bg-cyan/20 blur-3xl" />
-      <div className="pointer-events-none absolute right-0 top-10 h-64 w-64 rounded-full bg-violet/20 blur-3xl" />
-      <div className="relative grid min-w-0 items-center gap-4 sm:gap-5 lg:grid-cols-[1.05fr_.95fr] lg:gap-6">
+    <div className="relative overflow-hidden rounded-[24px] border border-white/10 bg-[linear-gradient(135deg,#050b18_0%,#0a1830_45%,#121a3d_75%,#1d1546_100%)] px-4 py-5 text-white shadow-[0_30px_60px_-40px_rgba(46,230,214,.45)] sm:rounded-[28px] sm:px-6 sm:py-6">
+      <div aria-hidden="true" className="pointer-events-none absolute -left-24 -top-20 h-64 w-64 rounded-full bg-cyan/20 blur-3xl" />
+      <div aria-hidden="true" className="pointer-events-none absolute -right-16 -bottom-24 h-64 w-64 rounded-full bg-violet/25 blur-3xl" />
+      <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-px bg-[linear-gradient(90deg,transparent,rgba(46,230,214,.6),rgba(167,139,250,.6),transparent)]" />
+      <div className="relative flex min-w-0 flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan">
-            {brand.eyebrow}
-          </p>
-          <h1 className="mt-2 font-display text-[1.4rem] leading-[1.18] text-white sm:mt-2.5 sm:text-[2rem] lg:text-[2.25rem]">
-            {brand.tagline}
-          </h1>
-          <p className="mt-2 max-w-xl text-sm leading-6 text-white/70 sm:mt-2.5 sm:text-[0.95rem]">
-            {brand.description}
-          </p>
-          <div className="mt-3.5 flex flex-col gap-2.5 sm:mt-4 sm:flex-row sm:flex-wrap">
-            <Link href="/create" className="w-full sm:w-auto">
-              <Button className="w-full px-3.5 py-2.5 text-[13px] sm:w-auto sm:py-2">
-                Create contract
-              </Button>
-            </Link>
-            <Link href="/contracts" className="w-full sm:w-auto">
-              <Button
-                variant="secondary"
-                className="w-full border-white/15 bg-white/5 px-3.5 py-2.5 text-[13px] text-white hover:bg-white/10 sm:w-auto sm:py-2"
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan">Command center</p>
+            {context ? (
+              <span
+                className="inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-2.5 py-0.5 text-[11px] font-semibold text-white/90"
+                title={context.detail}
               >
-                Explore contracts
-              </Button>
-            </Link>
+                <span
+                  aria-hidden="true"
+                  className={`size-1.5 rounded-full ${
+                    context.mode === "both"
+                      ? "bg-[linear-gradient(90deg,#2ee6d6,#a78bfa)]"
+                      : context.mode === "working"
+                        ? "bg-violet"
+                        : context.mode === "hiring"
+                          ? "bg-cyan"
+                          : "bg-white/50"
+                  }`}
+                />
+                {context.label}
+                <span className="sr-only">: {context.detail}</span>
+              </span>
+            ) : null}
           </div>
+          <h1 className="mt-2 break-words font-display text-[1.45rem] leading-tight sm:text-[1.9rem] [overflow-wrap:anywhere]">
+            {name ? `Welcome back, ${name}` : "Welcome back"}
+          </h1>
+          <p className="mt-1.5 max-w-xl text-sm leading-6 text-white/65">
+            {context && context.mode !== "new"
+              ? `${context.detail}. Everything below is loaded from your contracts and marketplace activity.`
+              : "Everything below is loaded from your contracts and marketplace activity. Nothing is estimated."}
+          </p>
         </div>
-        <div className="min-w-0 overflow-hidden rounded-xl border border-white/10 bg-white/5 sm:rounded-2xl">
-          <HeroFlow dense />
-        </div>
+        <nav aria-label="Quick actions" className="min-w-0">
+          <ul className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
+            {QUICK_ACTIONS.map(({ href, label, icon: Icon }, i) => (
+              <li key={href} className="min-w-0">
+                <Link
+                  href={href}
+                  className={`flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-full px-4 text-[13px] font-semibold transition ${NAV_CARD_FOCUS} ${
+                    i === 0
+                      ? "bg-[linear-gradient(135deg,#2ee6d6,#7c8cff)] text-[#04101f] shadow-[0_12px_30px_-14px_rgba(46,230,214,.9)] hover:brightness-105"
+                      : "border border-white/15 bg-white/5 text-white hover:bg-white/10"
+                  }`}
+                >
+                  <Icon size={15} aria-hidden="true" className="shrink-0" />
+                  <span className="truncate">{label}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </nav>
       </div>
     </div>
+  );
+}
+function AttentionPanel({ items }: { items: AttentionItem[] }) {
+  return (
+    <PanelCard title="Needs your attention" icon={<AlertCircle size={15} aria-hidden="true" />}>
+      {items.length === 0 ? (
+        <p className="text-sm text-ink-soft">
+          You are all caught up. Offers, reviews, setup steps and unread updates will appear here.
+        </p>
+      ) : (
+        <ol className="space-y-2" aria-label="Today">
+          {items.map((entry) => (
+            <li key={entry.id} className="min-w-0">
+              <Link
+                href={entry.href}
+                className={`flex min-h-12 min-w-0 items-center gap-3 rounded-2xl border px-3 py-2.5 transition hover:border-accent/40 hover:bg-accent-soft/60 ${NAV_CARD_FOCUS} ${
+                  entry.overdue ? "border-gold/40 bg-gold-soft/60" : "border-line bg-paper/70"
+                }`}
+              >
+                <span
+                  aria-hidden="true"
+                  className={`size-2 shrink-0 rounded-full ${entry.overdue ? "bg-gold" : entry.kind === "offer" ? "bg-cyan" : entry.kind === "messages" ? "bg-violet" : entry.kind === "feedback" ? "bg-gold" : "bg-accent"}`}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium text-ink">{entry.title}</span>
+                  <span className="block truncate text-xs text-ink-faint">
+                    {entry.detail}
+                    {entry.due ? ` - ${entry.overdue ? "was due" : "due"} ${formatUnix(entry.due)}` : ""}
+                  </span>
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ol>
+      )}
+    </PanelCard>
+  );
+}
+function PortfolioFigure({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-2xl border border-line bg-paper/60 px-3 py-2.5">
+      <dt className="truncate text-[11px] text-ink-faint">{label}</dt>
+      <dd className="mt-0.5 truncate font-display text-lg tabular-nums text-ink">{value}</dd>
+    </div>
+  );
+}
+function ContractProgressPanel({ items }: { items: ContractProgressItem[] }) {
+  return (
+    <PanelCard title="Contract progress" icon={<Gauge size={15} aria-hidden="true" />}>
+      {items.length === 0 ? (
+        <p className="text-sm text-ink-soft">No active contracts right now. Progress appears once a contract is live.</p>
+      ) : (
+        <ul className="space-y-3">
+          {items.map((entry) => (
+            <li key={entry.address} className="min-w-0">
+              <Link href={entry.href} className={`block min-w-0 rounded-2xl px-1 py-1 ${NAV_CARD_FOCUS}`}>
+                <span className="flex min-w-0 items-center justify-between gap-3 text-sm">
+                  <span className="min-w-0 truncate font-medium text-ink">
+                    {entry.title}
+                    {entry.status === "Disputed" ? <span className="ml-2 text-xs text-gold">In dispute</span> : null}
+                  </span>
+                  <span className="shrink-0 font-mono text-[11px] text-ink-faint">{shortenAddress(entry.address)}</span>
+                </span>
+                <span className="mt-2 block">
+                  <ProgressBar value={entry.releasedPct} label={`${entry.title}: ${Math.round(entry.releasedPct)}% released`} />
+                </span>
+                <span className="mt-1 flex min-w-0 flex-wrap justify-between gap-x-3 text-xs text-ink-faint">
+                  <span>{Math.round(entry.releasedPct)}% of value released</span>
+                  {entry.stepLabel ? <span>{entry.stepLabel}</span> : null}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </PanelCard>
+  );
+}
+function StatusChartPanel({ buckets }: { buckets: StatusBucket[] }) {
+  const max = Math.max(1, ...buckets.map((b) => b.count));
+  const total = buckets.reduce((n, b) => n + b.count, 0);
+  return (
+    <PanelCard title="Contracts by stage" icon={<BarChart3 size={15} aria-hidden="true" />}>
+      {total === 0 ? (
+        <p className="text-sm text-ink-soft">No contracts loaded for your wallets yet.</p>
+      ) : (
+        <ul className="space-y-2.5" aria-label={`${total} contracts by stage`}>
+          {buckets.map((b) => (
+            <li key={b.key} className="grid min-w-0 grid-cols-[6.5rem_minmax(0,1fr)_2rem] items-center gap-2 text-xs">
+              <span className="truncate text-ink-soft">{b.label}</span>
+              <ProgressBar value={(b.count / max) * 100} label={`${b.label}: ${b.count}`} tone={b.key === "active" ? "aqua" : "violet"} />
+              <span className="text-right font-semibold tabular-nums text-ink">{b.count}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </PanelCard>
+  );
+}
+function PipelinePanel({ title, steps, tone }: { title: string; steps: PipelineStep[]; tone: "aqua" | "violet" }) {
+  return (
+    <PanelCard title={title} icon={<Users size={15} aria-hidden="true" />}>
+      <ol className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+        {steps.map((step, i) => (
+          <li key={`${step.label}-${i}`} className="min-w-0">
+            <Link
+              href={step.href}
+              aria-label={`${step.label}: ${step.value}`}
+              className={`flex h-full min-h-[76px] min-w-0 flex-col justify-between rounded-2xl border border-line px-3 py-2.5 transition hover:border-accent/40 ${NAV_CARD_FOCUS} ${
+                tone === "aqua" ? "bg-[linear-gradient(180deg,rgba(46,230,214,.08),transparent)]" : "bg-[linear-gradient(180deg,rgba(167,139,250,.10),transparent)]"
+              }`}
+            >
+              <span className="text-[11px] leading-4 text-ink-faint">{step.label}</span>
+              <span className="mt-1 font-display text-xl text-ink">
+                <CountUp value={step.value} />
+              </span>
+            </Link>
+          </li>
+        ))}
+      </ol>
+    </PanelCard>
+  );
+}
+
+function DeadlinesPanel({ items }: { items: DeadlineItem[] }) {
+  return (
+    <PanelCard title="Deadlines" icon={<CalendarClock size={15} aria-hidden="true" />}>
+      {items.length === 0 ? (
+        <p className="text-sm text-ink-soft">No acceptance deadlines pending on loaded contracts.</p>
+      ) : (
+        <ul className="space-y-2">
+          {items.map((d) => (
+            <li key={d.address} className="min-w-0">
+              <Link
+                href={d.href}
+                className={`flex min-h-11 min-w-0 items-center justify-between gap-3 rounded-2xl bg-paper px-3 py-2.5 transition hover:bg-accent-soft ${NAV_CARD_FOCUS}`}
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm font-medium text-ink">{d.title}</span>
+                  <span className="block text-xs text-ink-faint">
+                    {d.passed ? "Passed " : "Due "}
+                    {formatUnix(d.deadline)}
+                  </span>
+                </span>
+                <span className="shrink-0 font-mono text-[11px] text-ink-faint" title={d.address}>
+                  {shortenAddress(d.address)}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </PanelCard>
   );
 }
 
@@ -524,11 +808,12 @@ function Bento({
     blue: "from-accent-2/20 to-white",
     navy: "from-ink/10 to-white",
   };
+  const reduceMotion = useReducedMotion();
   return (
     <Link
       href={href}
       aria-label={`${label}: ${value}. Open matching contracts.`}
-      className={`block cursor-pointer overflow-hidden rounded-[var(--radius)] border border-line bg-gradient-to-br p-3.5 shadow-[var(--shadow)] transition hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-[0_18px_36px_-24px_rgba(18,194,184,.45)] active:translate-y-0 sm:p-4 ${NAV_CARD_FOCUS} ${tones[tone]} ${className}`}
+      className={`block cursor-pointer overflow-hidden rounded-[var(--radius)] border border-line bg-gradient-to-br p-3.5 shadow-[var(--shadow)] transition motion-safe:hover:-translate-y-0.5 hover:border-accent/40 hover:shadow-[0_18px_36px_-24px_rgba(18,194,184,.45)] active:translate-y-0 sm:p-4 ${NAV_CARD_FOCUS} ${tones[tone]} ${className}`}
     >
       <p className="flex items-center gap-2 text-[11px] font-medium text-ink-faint">
         {icon}
@@ -536,11 +821,11 @@ function Bento({
       </p>
       <motion.p
         key={value}
-        initial={{ opacity: 0, y: 8 }}
+        initial={reduceMotion ? false : { opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         className="mt-2 font-display text-2xl sm:text-3xl"
       >
-        {value}
+        <CountUp value={value} />
       </motion.p>
     </Link>
   );

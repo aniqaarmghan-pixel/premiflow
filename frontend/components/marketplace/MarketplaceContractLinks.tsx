@@ -171,13 +171,14 @@ function LinkedContract({ link, wallet }: { link: ContractLinkView; wallet: stri
         </ul>
       ) : null}
       {link.status === "Completed" && !link.reviews.some((r) => r.reviewerWallet === wallet) ? (
-        <ReviewForm contractAddress={link.contractAddress} wallet={wallet} />
+        <ContractReviewForm contractAddress={link.contractAddress} wallet={wallet} />
       ) : null}
     </li>
   );
 }
 
-function ReviewForm({ contractAddress, wallet }: { contractAddress: string; wallet: string }) {
+/** Verified review for a Completed contract; renders nothing unless the review API reports eligibility. */
+export function ContractReviewForm({ contractAddress, wallet }: { contractAddress: string; wallet: string }) {
   const session = useMarketplaceSession();
   const eligibility = useMarketplaceQuery(`review-eligibility:${contractAddress}:${wallet}`, () =>
     fetchReviewEligibility(contractAddress)

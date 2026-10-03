@@ -12,7 +12,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useSession } from "@/lib/account-auth/client";
+import { useAccountSession } from "@/lib/account-auth/useAccountSession";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import {
@@ -83,7 +83,7 @@ function TypeIcon({ type }: { type: string }) {
  */
 export function NotificationBell() {
   const router = useRouter();
-  const { data: accountSession, isPending: accountPending } = useSession();
+  const { data: accountSession, isPending: accountPending } = useAccountSession();
 
   const accountId = accountSession?.user?.id ?? null;
   const hasSession = Boolean(accountId) && !accountPending;
@@ -118,7 +118,10 @@ export function NotificationBell() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  accountIdRef.current = accountId;
+  // Keep the latest account id for async callbacks; runs before the effects below.
+  useEffect(() => {
+    accountIdRef.current = accountId;
+  }, [accountId]);
 
   const badge = formatUnreadBadge(unreadCount, { countLoaded });
   const ariaLabel = ariaLabelForBell(badge);
@@ -145,7 +148,7 @@ export function NotificationBell() {
    * Unread badge for the signed-in PREMIFLOW account.
    * Server authorization resolves all verified linked wallets.
    */
-  const refreshUnreadCount = useCallback(async () => {
+  const refreshUnreadCount = useCallback(async function refreshUnreadImpl(): Promise<void> {
     const requestAccountId = accountIdRef.current;
 
     const decision = decideUnreadRefresh({
@@ -202,7 +205,7 @@ export function NotificationBell() {
 
       if (unreadQueuedRef.current) {
         unreadQueuedRef.current = false;
-        void refreshUnreadCount();
+        void refreshUnreadImpl();
       }
     }
   }, [invalidateUnreadRequests]);
@@ -280,6 +283,7 @@ export function NotificationBell() {
   // notifications for every verified wallet linked to this account.
   useEffect(() => {
     accountIdRef.current = accountId;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- account identity change must reset inbox state in the same effect that starts the new unread load.
     resetInbox();
 
     if (accountPending) return;
@@ -317,6 +321,7 @@ export function NotificationBell() {
   // Bell open: list replace + unread sync (single-flight unread).
   useEffect(() => {
     if (!open) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- opening the panel starts the list request (sets loading state).
     void loadList("replace");
     void refreshUnreadCount();
   }, [open, accountId]); // eslint-disable-line react-hooks/exhaustive-deps -- intentional: reload when panel opens / account identity changes

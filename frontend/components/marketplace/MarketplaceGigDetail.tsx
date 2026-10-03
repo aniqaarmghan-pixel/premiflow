@@ -154,7 +154,7 @@ export function MarketplaceGigDetail({ gigId }: { gigId: string }) {
               return (
                 <label
                   key={p.tier}
-                  className={`flex min-w-0 cursor-pointer flex-col gap-1 rounded-[var(--radius)] border p-3 text-sm ${
+                  className={`flex min-h-11 min-w-0 cursor-pointer flex-col gap-1 rounded-[var(--radius)] border p-3 text-sm ${
                     active ? "border-accent ring-2 ring-accent/30" : "border-line"
                   }`}
                 >
@@ -164,6 +164,7 @@ export function MarketplaceGigDetail({ gigId }: { gigId: string }) {
                       name="gig-package"
                       value={p.tier}
                       checked={active}
+                      className="size-4 shrink-0 accent-[var(--accent,#0d9488)]"
                       onChange={() => setTier(p.tier)}
                     />
                     {PACKAGE_TIER_LABELS[p.tier]}
@@ -189,7 +190,7 @@ export function MarketplaceGigDetail({ gigId }: { gigId: string }) {
           <div className="flex flex-wrap gap-2 max-sm:flex-col max-sm:items-stretch">
             <Link
               href={`/marketplace/gigs/${encodeURIComponent(gig.id)}/edit`}
-              className="inline-flex items-center justify-center rounded-full border border-line px-4 py-2.5 text-sm font-semibold"
+              className="inline-flex min-h-11 items-center justify-center rounded-full border border-line px-4 py-2.5 text-sm font-semibold"
             >
               Edit
             </Link>
@@ -220,7 +221,7 @@ export function MarketplaceGigDetail({ gigId }: { gigId: string }) {
           </Button>
         </Card>
       ) : gig.status === "active" ? (
-        <Card className="min-w-0 space-y-3 p-4">
+        <Card className="min-w-0 space-y-3 p-4 max-sm:sticky max-sm:bottom-3 max-sm:z-20 max-sm:shadow-[0_18px_40px_-18px_rgba(4,10,20,.45)]">
           <p className="text-sm text-ink-soft">{GIG_COPY.hireNote}</p>
           <Button disabled={busy || !session.wallet} onClick={() => void hire(selectedTier)}>
             {selectedTier ? `Hire ${PACKAGE_TIER_LABELS[selectedTier]} via Create contract` : "Hire via Create contract"}

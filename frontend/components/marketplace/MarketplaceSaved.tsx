@@ -73,6 +73,7 @@ export function MarketplaceSaved() {
           error={query.status === "error" ? query.error : undefined}
           wallet={session.wallet}
           verifying={busy}
+          onRetry={query.reload}
           onVerify={() => void verify()}
         />
       )}

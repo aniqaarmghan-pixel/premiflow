@@ -15,6 +15,10 @@ export type AccountAuthFlowResult =
   | { ok: true }
   | { ok: false; kind: AccountAuthErrorKind; message: string };
 
+/** Capped exponential backoff: base, 2x base, 4x base ... never above cap. */
+export function accountAuthRetryDelayMs(attempt: number, baseMs = 800, capMs = 4000): number {
+  return Math.min(capMs, baseMs * 2 ** Math.max(0, attempt));
+}
 async function safeRefresh(refresh: () => unknown): Promise<void> {
   try {
     await refresh();
@@ -35,6 +39,8 @@ export async function runAccountAuthCall(input: {
   context?: AccountAuthContext;
   retries?: number;
   retryDelayMs?: number;
+  /** Upper bound for the exponential backoff between attempts. */
+  maxRetryDelayMs?: number;
   wait?: (ms: number) => Promise<void>;
 }): Promise<AccountAuthFlowResult> {
   const context = input.context ?? "sign_in";
@@ -64,7 +70,7 @@ export async function runAccountAuthCall(input: {
       last = { ok: false, kind, message: accountAuthFallbackMessage(kind, context) };
     }
     if (!isRetryableAccountAuthError(last.kind) || attempt === retries) break;
-    await wait(input.retryDelayMs ?? 800);
+    await wait(accountAuthRetryDelayMs(attempt, input.retryDelayMs ?? 800, input.maxRetryDelayMs ?? 4000));
   }
 
   await safeRefresh(input.refreshSession);

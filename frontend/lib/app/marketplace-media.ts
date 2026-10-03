@@ -1,3 +1,5 @@
+import { normalizeGigVideoUrl } from "./video-embed";
+
 /**
  * Optional marketplace hero media. No third-party video is bundled: leave
  * MARKETPLACE_HERO_VIDEO null for the gradient hero, or point it at a video you
@@ -36,4 +38,15 @@ export function resolveHeroVideo(config: HeroVideoConfig | null): HeroVideoConfi
     return { src: config.src, type: config.type };
   }
   return config;
+}
+
+export { parseGigVideo, type GigVideo } from "./video-embed";
+
+/**
+ * Normalized gig video URL (direct https file or allowlisted YouTube / Vimeo
+ * page), or null so callers hide play affordances instead of a broken player.
+ * Same rules as the gig API (see lib/app/video-embed.ts).
+ */
+export function playableVideoUrl(value: unknown): string | null {
+  return normalizeGigVideoUrl(value);
 }

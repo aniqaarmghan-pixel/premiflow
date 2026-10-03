@@ -1,12 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useMemo, useState, useSyncExternalStore } from "react";
 import { CheckCircle2, LockKeyhole } from "lucide-react";
 
+function subscribeNoop() {
+  return () => {};
+}
+
+function readResetLink(search: string | null) {
+  if (search === null) return { token: null, linkError: false };
+  const params = new URLSearchParams(search);
+  if (params.get("error")) return { token: null, linkError: true };
+  const resetToken = params.get("token");
+  if (!resetToken) return { token: null, linkError: true };
+  return { token: resetToken, linkError: false };
+}
+
 export default function ResetPasswordPage() {
-  const [token, setToken] = useState<string | null>(null);
-  const [linkError, setLinkError] = useState(false);
+  // null during SSR/hydration; the reset link query once on the client.
+  const search = useSyncExternalStore(
+    subscribeNoop,
+    () => window.location.search,
+    () => null
+  );
+  const { token, linkError } = useMemo(() => readResetLink(search), [search]);
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -14,24 +32,6 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [complete, setComplete] = useState(false);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-
-    if (params.get("error")) {
-      setLinkError(true);
-      return;
-    }
-
-    const resetToken = params.get("token");
-
-    if (!resetToken) {
-      setLinkError(true);
-      return;
-    }
-
-    setToken(resetToken);
-  }, []);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

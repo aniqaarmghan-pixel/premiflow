@@ -24,6 +24,7 @@ import {
   type PortfolioItem,
   type ProfileAvailability,
 } from "./store";
+import { normalizeGigVideoUrl } from "../../app/video-embed";
 
 export const PROFILE_LIMITS = {
   displayName: 60,
@@ -51,7 +52,6 @@ export const GIG_MEDIA_LIMITS = {
   packageScope: 300,
 } as const;
 
-const VIDEO_EXT = /\.(mp4|webm|ogg|ogv|mov|m4v)$/i;
 
 function boundedInt(value: unknown, field: string, min: number, max: number): number {
   const n = typeof value === "number" ? value : typeof value === "string" && /^\d{1,4}$/.test(value.trim()) ? Number(value.trim()) : NaN;
@@ -80,14 +80,21 @@ export function parseGigMedia(value: unknown): string[] {
   return out;
 }
 
-/** Direct https video file you host (mp4/webm/ogg/mov); page links are rejected. */
+/**
+ * Direct https video file (mp4/webm/ogg/mov) or an allowlisted YouTube /
+ * Vimeo page, normalized to a canonical URL. Shared with the browser via
+ * lib/app/video-embed.ts so client and server rules never drift.
+ */
 export function parseVideoUrl(value: unknown): string | null {
   const url = validateHttpsUrl(value, "Video URL");
   if (url === null) return null;
-  if (!VIDEO_EXT.test(new URL(url).pathname)) {
-    throw invalid("Video URL must link directly to an .mp4, .webm, .ogg or .mov file.");
+  const normalized = normalizeGigVideoUrl(url);
+  if (!normalized) {
+    throw invalid(
+      "Video URL must be a YouTube or Vimeo video link, or link directly to an .mp4, .webm, .ogg or .mov file."
+    );
   }
-  return url;
+  return normalized;
 }
 
 /** 0-3 packages, one per tier, returned in Basic, Standard, Premium order. */

@@ -120,6 +120,7 @@ export function ContractMessages({
     const fromQuery = shouldOpenChatFromSearch(searchParams.toString());
     const fromArm = consumeOpenContractChat(contractAddress);
     if (fromQuery || fromArm) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- consumes a one-shot open-chat request (side effect) and opens the panel.
       setChatOpen(true);
     }
   }, [contractAddress, searchParams]);
@@ -250,6 +251,7 @@ export function ContractMessages({
 
   useEffect(() => {
     if (!participant) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- guard for the async conversation loader in this effect.
       setState("unauthorized");
       return;
     }

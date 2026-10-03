@@ -1,8 +1,10 @@
 "use client";
+import { parseGigVideo } from "@/lib/app/video-embed";
+import { GigVideoPreview } from "./MarketplaceVideoModal";
 
 /**
  * Seller-owned gig media, linked by https URL only (nothing is bundled or proxied).
- * Images load lazily; the optional video never starts on its own, preloads only metadata on
+ * Images load lazily; YouTube / Vimeo links open in an accessible player; a direct file video never starts on its own, preloads only metadata on
  * demand (preload="none"), starts muted, and always shows controls, so it is safe
  * for reduced-motion users.
  */
@@ -17,7 +19,9 @@ export function MarketplaceGigMedia({
   media: string[];
   videoUrl: string | null;
 }) {
-  if (!coverUrl && media.length === 0 && !videoUrl) return null;
+  const video = parseGigVideo(videoUrl);
+  const playable = video?.kind === "file" ? video.src : null;
+  if (!coverUrl && media.length === 0 && !video) return null;
   return (
     <section aria-label="Gig media" className="min-w-0 space-y-3">
       {coverUrl ? (
@@ -31,9 +35,15 @@ export function MarketplaceGigMedia({
           className="aspect-[16/9] w-full rounded-[var(--radius)] border border-line object-cover"
         />
       ) : null}
-      {videoUrl ? (
+      {video ? (
+        <p className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent">
+          <span aria-hidden="true">&#9654;</span> Includes a video from the seller
+        </p>
+      ) : null}
+      {playable ? (
         <video
-          src={videoUrl}
+          src={playable}
+          poster={coverUrl ?? undefined}
           controls
           muted
           playsInline
@@ -42,6 +52,9 @@ export function MarketplaceGigMedia({
         >
           Your browser cannot play this video.
         </video>
+      ) : null}
+      {video && video.kind !== "file" ? (
+        <GigVideoPreview title={title} videoUrl={video.url} posterUrl={coverUrl} />
       ) : null}
       {media.length > 0 ? (
         <ul className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-3">

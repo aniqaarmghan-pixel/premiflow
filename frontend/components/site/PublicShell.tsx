@@ -135,7 +135,7 @@ export function PublicShell({
             )}
             <button
               type="button"
-              className="inline-flex size-10 items-center justify-center rounded-full text-white hover:bg-white/10 lg:hidden"
+              className="inline-flex size-11 items-center justify-center rounded-full text-white hover:bg-white/10 lg:hidden"
               aria-label={open ? "Close navigation" : "Open navigation"}
               aria-expanded={open}
               aria-controls="pf-public-menu"
