@@ -1,11 +1,19 @@
 "use client";
 
 import { useWallet } from "@solana/wallet-adapter-react";
+import type { WalletName } from "@solana/wallet-adapter-base";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Check, ChevronDown, Copy, LogOut, RefreshCw, Wallet } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
-import { walletSwitchStep } from "@/lib/app/wallet-connect";
+import {
+  WALLET_SWITCH_DISCONNECT_TIMEOUT_MS,
+  settleWithin,
+  startWalletSwitch,
+  walletSwitchAction,
+  walletSwitchStep,
+  type WalletSwitchPending,
+} from "@/lib/app/wallet-connect";
 
 import {
   isWalletUiConnected,
@@ -13,14 +21,28 @@ import {
   walletControlLabel,
 } from "@/lib/network";
 
+const READY_STATES = new Set(["Installed", "Loadable"]);
+
 export function WalletControl() {
-  const { connected, connecting, publicKey, connect, disconnect, wallet } = useWallet();
+  const { connected, connecting, disconnecting, publicKey, connect, disconnect, select, wallet } = useWallet();
   const { setVisible, visible: modalVisible } = useWalletModal();
   const modalWasOpenRef = useRef(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const connectRequestedRef = useRef(false);
+  // Active-wallet switch in progress (null = none). Refs only: one switch, one connect.
+  const switchRef = useRef<WalletSwitchPending | null>(null);
+  const switchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestRef = useRef({
+    walletName: null as string | null,
+    walletReady: false,
+    connected: false,
+    connecting: false,
+    disconnecting: false,
+    modalVisible: false,
+    connect,
+  });
   const menuId = useId();
 
   const pubkey = publicKey?.toBase58() ?? null;
@@ -71,6 +93,59 @@ export function WalletControl() {
     }
   }, [modalVisible, wallet, connected, connecting, connect]);
 
+  const walletName = wallet?.adapter?.name ?? null;
+  const walletReady = READY_STATES.has(String(wallet?.readyState));
+
+  // Latest provider state for the deferred switch connect (updated after each commit).
+  useEffect(() => {
+    latestRef.current = { walletName, walletReady, connected, connecting, disconnecting, modalVisible, connect };
+  });
+
+  useEffect(() => {
+    return () => {
+      if (switchTimerRef.current) clearTimeout(switchTimerRef.current);
+    };
+  }, []);
+
+  // Drive a pending switch. Connect happens only for the freshly selected
+  // adapter, on a later tick than the adapter swap (the provider attaches the
+  // new adapter's listeners after this child effect), and exactly once.
+  useEffect(() => {
+    function run(state: typeof latestRef.current) {
+      const action = walletSwitchAction({ pending: switchRef.current, ...state });
+      switch (action.kind) {
+        case "idle":
+          return;
+        case "wait":
+          switchRef.current = action.pending;
+          return;
+        case "arm":
+          switchRef.current = action.pending;
+          if (switchTimerRef.current) clearTimeout(switchTimerRef.current);
+          switchTimerRef.current = setTimeout(() => {
+            switchTimerRef.current = null;
+            run(latestRef.current);
+          }, 0);
+          return;
+        case "connect":
+          switchRef.current = null;
+          // Rejection / extension errors are non-fatal (provider onError reports softly).
+          void state.connect().catch(() => undefined);
+          return;
+        case "cancel":
+          switchRef.current = null;
+          // Re-select (not connect) the previous wallet so one click reconnects it.
+          if (action.restore) select(action.restore as WalletName);
+          return;
+        case "not_ready":
+        case "done":
+          switchRef.current = null;
+          return;
+      }
+    }
+    run({ walletName, walletReady, connected, connecting, disconnecting, modalVisible, connect });
+  }, [walletName, walletReady, connected, connecting, disconnecting, modalVisible, connect, select]);
+
   useEffect(() => {
     if (!menuOpen) return;
     function onPointer(event: MouseEvent) {
@@ -107,16 +182,19 @@ export function WalletControl() {
 
   async function onChangeWallet() {
     setMenuOpen(false);
-    // One active wallet per session: release the current one first, then the
-    // picked wallet replaces it and is connected explicitly.
+    if (switchRef.current) return; // a switch is already in progress
+    // The generic connect-on-select path must not race the switch.
+    connectRequestedRef.current = false;
+    const from = walletName;
+    // One active wallet per session: release the current adapter first. Bounded,
+    // because a wallet that never settles its disconnect would freeze the switch.
     if (walletSwitchStep({ connected, selected: Boolean(wallet) }) === "disconnect_then_pick") {
-      try {
-        await disconnect();
-      } catch {
-        // Already disconnected - continue to the picker.
-      }
+      await settleWithin(disconnect(), WALLET_SWITCH_DISCONNECT_TIMEOUT_MS);
     }
-    connectRequestedRef.current = true;
+    // Clear the selection so the provider tears the old adapter down (resetting
+    // its connecting/disconnecting flags); whatever is picked next is the target.
+    select(null);
+    switchRef.current = startWalletSwitch(from);
     setVisible(true);
   }
 

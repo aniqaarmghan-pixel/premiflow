@@ -103,3 +103,85 @@ export type WalletSwitchStep = "disconnect_then_pick" | "pick";
 export function walletSwitchStep(input: { connected: boolean; selected: boolean }): WalletSwitchStep {
   return input.connected || input.selected ? "disconnect_then_pick" : "pick";
 }
+
+/**
+ * Active-wallet switch (e.g. Solflare -> Phantom) as a pure state machine.
+ * The account's linked wallets are server data and are never touched here;
+ * only the single active signing adapter changes.
+ *
+ * Flow: release the current adapter (bounded wait) -> clear the selection so
+ * the provider tears the old adapter down -> user picks in the modal ->
+ * "arm" when the newly selected adapter first appears (connect is deferred to
+ * a later tick, after the provider has attached the new adapter) -> connect
+ * exactly once when that same adapter is ready and idle.
+ */
+export const WALLET_SWITCH_DISCONNECT_TIMEOUT_MS = 3_000;
+
+export type WalletSwitchPending = {
+  /** Adapter that was active when the switch started (restored on cancel, not connected). */
+  from: string | null;
+  /** The old selection has been cleared, so any selection seen afterwards is a fresh pick. */
+  sawCleared: boolean;
+  sawModal: boolean;
+  /** Adapter name armed for connect (set on the commit where it first appears). */
+  target: string | null;
+};
+
+export function startWalletSwitch(from: string | null | undefined): WalletSwitchPending {
+  return { from: from ?? null, sawCleared: false, sawModal: false, target: null };
+}
+
+export type WalletSwitchAction =
+  | { kind: "idle" }
+  | { kind: "wait"; pending: WalletSwitchPending }
+  | { kind: "arm"; pending: WalletSwitchPending }
+  | { kind: "connect"; target: string }
+  | { kind: "cancel"; restore: string | null }
+  | { kind: "not_ready"; target: string }
+  | { kind: "done" };
+
+export function walletSwitchAction(input: {
+  pending: WalletSwitchPending | null;
+  walletName: string | null | undefined;
+  walletReady: boolean;
+  connected: boolean;
+  connecting: boolean;
+  disconnecting: boolean;
+  modalVisible: boolean;
+}): WalletSwitchAction {
+  if (!input.pending) return { kind: "idle" };
+  const p: WalletSwitchPending = { ...input.pending };
+  if (input.modalVisible) p.sawModal = true;
+  const name = input.walletName ?? null;
+
+  if (name === null) {
+    p.sawCleared = true;
+    p.target = null;
+    if (!input.modalVisible && p.sawModal) return { kind: "cancel", restore: p.from };
+    return { kind: "wait", pending: p };
+  }
+  // The old adapter is still selected: never connect on a stale adapter.
+  if (!p.sawCleared) return { kind: "wait", pending: p };
+  if (input.connected) return { kind: "done" };
+  if (p.target !== name) return { kind: "arm", pending: { ...p, target: name } };
+  if (input.connecting || input.disconnecting) return { kind: "wait", pending: p };
+  if (!input.walletReady) return { kind: "not_ready", target: name };
+  return { kind: "connect", target: name };
+}
+
+/** Resolve when the promise settles or after `ms`, whichever is first; never throws. */
+export async function settleWithin(
+  promise: Promise<unknown> | undefined,
+  ms: number
+): Promise<"settled" | "timeout" | "error"> {
+  if (!promise) return "settled";
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<"timeout">((resolve) => {
+    timer = setTimeout(() => resolve("timeout"), ms);
+  });
+  try {
+    return await Promise.race([promise.then(() => "settled" as const, () => "error" as const), timeout]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}

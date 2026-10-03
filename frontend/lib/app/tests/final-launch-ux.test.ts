@@ -76,7 +76,7 @@ test("one active wallet: switching disconnects first, provider has no autoConnec
 
   const control = read("components/shell/WalletControl.tsx");
   assert.match(control, /walletSwitchStep\(/);
-  assert.match(control, /await disconnect\(\)[\s\S]*connectRequestedRef\.current = true;\s*setVisible\(true\)/);
+  assert.match(control, /settleWithin\(disconnect\(\)[\s\S]*select\(null\);[\s\S]*setVisible\(true\)/);
   // Dismissed picker clears the pending connect so Apply/Hire and the header never double-connect.
   assert.match(control, /modalWasOpenRef/);
 
