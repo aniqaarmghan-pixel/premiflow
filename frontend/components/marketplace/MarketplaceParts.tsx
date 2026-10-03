@@ -161,9 +161,31 @@ export function StatusPill({ children }: { children: ReactNode }) {
   );
 }
 
-export function JobSummaryCard({ job, footer }: { job: PublicJob; footer?: ReactNode }) {
+/**
+ * Job card. With `wholeCardLink` the title link is stretched over the whole
+ * card (real <Link>: Enter natively, Space handled), and inner links/footer
+ * sit above the overlay and stop propagation so they never double-trigger.
+ */
+export function JobSummaryCard({
+  job,
+  footer,
+  wholeCardLink = false,
+}: {
+  job: PublicJob;
+  footer?: ReactNode;
+  wholeCardLink?: boolean;
+}) {
+  const stopInner = wholeCardLink
+    ? (event: { stopPropagation: () => void }) => event.stopPropagation()
+    : undefined;
   return (
-    <article className="pf-card group relative min-w-0 overflow-hidden rounded-[20px] border border-line bg-card p-4 shadow-[var(--shadow)] sm:p-5">
+    <article
+      className={`pf-card group relative min-w-0 overflow-hidden rounded-[20px] border border-line bg-card p-4 shadow-[var(--shadow)] sm:p-5 ${
+        wholeCardLink
+          ? "cursor-pointer transition hover:border-accent/50 hover:shadow-lg focus-within:ring-2 focus-within:ring-accent focus-within:ring-offset-2"
+          : ""
+      }`}
+    >
       <span
         aria-hidden="true"
         className="absolute inset-y-0 left-0 w-1 bg-[linear-gradient(180deg,#2ee6d6,#4f8cff_60%,#8b7bff)] opacity-70 transition-opacity group-hover:opacity-100"
@@ -175,7 +197,22 @@ export function JobSummaryCard({ job, footer }: { job: PublicJob; footer?: React
       <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-2">
         <Link
           href={`/marketplace/jobs/${job.id}`}
-          className="min-w-0 break-words text-base font-semibold leading-snug text-ink underline-offset-2 hover:underline [overflow-wrap:anywhere]"
+          data-card-link={wholeCardLink ? "job" : undefined}
+          onKeyDown={
+            wholeCardLink
+              ? (event) => {
+                  if (event.key === " ") {
+                    event.preventDefault();
+                    event.currentTarget.click();
+                  }
+                }
+              : undefined
+          }
+          className={`min-w-0 break-words text-base font-semibold leading-snug text-ink underline-offset-2 hover:underline [overflow-wrap:anywhere] ${
+            wholeCardLink
+              ? "focus-visible:outline-none after:absolute after:inset-0 after:z-[1] after:rounded-[20px] after:content-['']"
+              : ""
+          }`}
         >
           {job.title}
         </Link>
@@ -188,7 +225,9 @@ export function JobSummaryCard({ job, footer }: { job: PublicJob; footer?: React
       <JobTags job={job} className="mt-3" />
       <div className="mt-4 flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
         <p className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-faint">
-          <ProfileLink wallet={job.employerWallet} prefix="Employer" />
+          <span className="relative z-[2] min-w-0" onClick={stopInner} onKeyDown={stopInner}>
+            <ProfileLink wallet={job.employerWallet} prefix="Employer" />
+          </span>
           <span className="rounded-full bg-paper-2 px-2 py-0.5 font-medium text-ink-soft">{job.paymentMode}</span>
           <span>Posted {new Date(job.createdAt).toLocaleDateString()}</span>
         </p>
@@ -196,7 +235,11 @@ export function JobSummaryCard({ job, footer }: { job: PublicJob; footer?: React
           {amountLabel(job.paymentMode)}: {formatMarketplaceAmount(job.budgetAmount)}
         </span>
       </div>
-      {footer}
+      {footer ? (
+        <div className="relative z-[2]" onClick={stopInner} onKeyDown={stopInner}>
+          {footer}
+        </div>
+      ) : null}
     </article>
   );
 }

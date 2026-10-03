@@ -207,7 +207,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="pf-dashboard min-h-screen min-w-0 lg:grid lg:grid-cols-[224px_minmax(0,1fr)] 2xl:grid-cols-[248px_minmax(0,1fr)]">
-      <aside className="pf-sidebar hidden bg-navy px-3.5 pt-5 text-white lg:sticky lg:top-0 lg:flex lg:flex-col lg:self-start lg:overflow-hidden">
+      <aside className="pf-sidebar hidden bg-navy px-3.5 pt-5 text-white lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col lg:self-start lg:overflow-hidden">
         <Link href={DASHBOARD_HREF} className="shrink-0 px-2">
           <BrandMark light size={44} />
           <p

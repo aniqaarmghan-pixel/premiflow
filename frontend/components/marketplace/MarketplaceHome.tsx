@@ -320,6 +320,120 @@ export function MarketplaceHome() {
         </Container>
       </section>
 
+      {/* Light: jobs */}
+      <section className="bg-paper py-16 sm:py-24">
+        <Container>
+          <Reveal>
+            <SectionHeading
+              eyebrow="Open work"
+              title="Latest jobs"
+              subtitle="Open work posted by employers. Reading and browsing never needs a wallet."
+              href="/marketplace/jobs"
+              cta="All jobs"
+            />
+          </Reveal>
+          <div className="mt-10">
+            {jobs.status === "ready" ? (
+              jobs.data.jobs.length ? (
+                <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+                  {jobs.data.jobs.map((job, i) => (
+                    <Reveal key={job.id} delay={(i % 2) * 80}>
+                      <JobSummaryCard job={job} wholeCardLink />
+                    </Reveal>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState title="No open jobs yet">
+                  <Link href="/marketplace/post" className="font-semibold text-accent underline">
+                    Post a job
+                  </Link>
+                </EmptyState>
+              )
+            ) : jobs.status === "error" ? (
+              <ErrorState title="Jobs could not load" error={jobs.error} onRetry={jobs.reload} />
+            ) : (
+              <SkeletonGrid count={2} />
+            )}
+          </div>
+        </Container>
+      </section>
+
+      {/* Tinted: gigs */}
+      <section className="border-y border-line bg-card-2 py-16 sm:py-24">
+        <Container>
+          <Reveal>
+            <SectionHeading
+              eyebrow="Services"
+              title="Latest gigs"
+              subtitle="Services freelancers offer right now. Hiring one opens Create contract with the terms prefilled."
+              href="/marketplace/gigs"
+              cta="All gigs"
+            />
+          </Reveal>
+          <div className="mt-10">
+            {gigs.status === "ready" ? (
+              gigs.data.gigs.length ? (
+                <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {gigs.data.gigs.map((gig, i) => (
+                    <Reveal key={gig.id} delay={(i % 3) * 80}>
+                      <GigSummaryCard gig={gig} />
+                    </Reveal>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState title="No gigs yet">
+                  <Link href="/marketplace/gigs/new" className="font-semibold text-accent underline">
+                    Offer the first gig
+                  </Link>
+                </EmptyState>
+              )
+            ) : gigs.status === "error" ? (
+              <ErrorState title="Gigs could not load" error={gigs.error} onRetry={gigs.reload} />
+            ) : (
+              <SkeletonGrid count={3} tall />
+            )}
+          </div>
+        </Container>
+      </section>
+
+      {/* Tinted: freelancers */}
+      <section className="border-y border-line bg-paper-2/60 py-16 sm:py-24">
+        <Container>
+          <Reveal>
+            <SectionHeading
+              eyebrow="Talent"
+              title="Featured freelancers"
+              subtitle={FEATURED_NOTE}
+              href="/marketplace/freelancers"
+              cta="All freelancers"
+            />
+          </Reveal>
+          <div className="mt-10">
+            {people.status === "ready" ? (
+              people.data.freelancers.length ? (
+                <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {people.data.freelancers.map((f, i) => (
+                    <Reveal key={f.wallet} delay={(i % 3) * 80}>
+                      <FreelancerSummaryCard freelancer={f} />
+                    </Reveal>
+                  ))}
+                </div>
+              ) : (
+                <EmptyState title="No complete profiles yet">
+                  <Link href="/marketplace/profile" className="font-semibold text-accent underline">
+                    Complete your profile
+                  </Link>
+                </EmptyState>
+              )
+            ) : people.status === "error" ? (
+              <ErrorState title="Profiles could not load" error={people.error} onRetry={people.reload} />
+            ) : (
+              <SkeletonGrid count={3} />
+            )}
+          </div>
+        </Container>
+      </section>
+
       {/* Media: show-the-work band (decorative original art, no stock media). */}
       <section className="pf-midnight relative overflow-hidden py-16 sm:py-24" aria-labelledby="pf-media">
         <Aurora className="opacity-40" />
@@ -366,44 +480,6 @@ export function MarketplaceHome() {
         </Container>
       </section>
 
-      {/* Tinted: gigs */}
-      <section className="border-y border-line bg-card-2 py-16 sm:py-24">
-        <Container>
-          <Reveal>
-            <SectionHeading
-              eyebrow="Services"
-              title="Latest gigs"
-              subtitle="Services freelancers offer right now. Hiring one opens Create contract with the terms prefilled."
-              href="/marketplace/gigs"
-              cta="All gigs"
-            />
-          </Reveal>
-          <div className="mt-10">
-            {gigs.status === "ready" ? (
-              gigs.data.gigs.length ? (
-                <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {gigs.data.gigs.map((gig, i) => (
-                    <Reveal key={gig.id} delay={(i % 3) * 80}>
-                      <GigSummaryCard gig={gig} />
-                    </Reveal>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState title="No gigs yet">
-                  <Link href="/marketplace/gigs/new" className="font-semibold text-accent underline">
-                    Offer the first gig
-                  </Link>
-                </EmptyState>
-              )
-            ) : gigs.status === "error" ? (
-              <ErrorState title="Gigs could not load" error={gigs.error} onRetry={gigs.reload} />
-            ) : (
-              <SkeletonGrid count={3} tall />
-            )}
-          </div>
-        </Container>
-      </section>
-
       {/* Dark: how it works with the animated flow */}
       <section id="how-it-works" className="pf-midnight relative scroll-mt-20 overflow-hidden py-16 sm:py-24" aria-labelledby="pf-how">
         <div aria-hidden="true" className="pf-grid-fade absolute inset-0" />
@@ -418,82 +494,6 @@ export function MarketplaceHome() {
             />
           </Reveal>
           <EscrowFlow />
-        </Container>
-      </section>
-
-      {/* Light: jobs */}
-      <section className="bg-paper py-16 sm:py-24">
-        <Container>
-          <Reveal>
-            <SectionHeading
-              eyebrow="Open work"
-              title="Latest jobs"
-              subtitle="Open work posted by employers. Reading and browsing never needs a wallet."
-              href="/marketplace/jobs"
-              cta="All jobs"
-            />
-          </Reveal>
-          <div className="mt-10">
-            {jobs.status === "ready" ? (
-              jobs.data.jobs.length ? (
-                <div className="grid min-w-0 gap-4 lg:grid-cols-2">
-                  {jobs.data.jobs.map((job, i) => (
-                    <Reveal key={job.id} delay={(i % 2) * 80}>
-                      <JobSummaryCard job={job} />
-                    </Reveal>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState title="No open jobs yet">
-                  <Link href="/marketplace/post" className="font-semibold text-accent underline">
-                    Post a job
-                  </Link>
-                </EmptyState>
-              )
-            ) : jobs.status === "error" ? (
-              <ErrorState title="Jobs could not load" error={jobs.error} onRetry={jobs.reload} />
-            ) : (
-              <SkeletonGrid count={2} />
-            )}
-          </div>
-        </Container>
-      </section>
-
-      {/* Tinted: freelancers */}
-      <section className="border-y border-line bg-paper-2/60 py-16 sm:py-24">
-        <Container>
-          <Reveal>
-            <SectionHeading
-              eyebrow="Talent"
-              title="Featured freelancers"
-              subtitle={FEATURED_NOTE}
-              href="/marketplace/freelancers"
-              cta="All freelancers"
-            />
-          </Reveal>
-          <div className="mt-10">
-            {people.status === "ready" ? (
-              people.data.freelancers.length ? (
-                <div className="grid min-w-0 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  {people.data.freelancers.map((f, i) => (
-                    <Reveal key={f.wallet} delay={(i % 3) * 80}>
-                      <FreelancerSummaryCard freelancer={f} />
-                    </Reveal>
-                  ))}
-                </div>
-              ) : (
-                <EmptyState title="No complete profiles yet">
-                  <Link href="/marketplace/profile" className="font-semibold text-accent underline">
-                    Complete your profile
-                  </Link>
-                </EmptyState>
-              )
-            ) : people.status === "error" ? (
-              <ErrorState title="Profiles could not load" error={people.error} onRetry={people.reload} />
-            ) : (
-              <SkeletonGrid count={3} />
-            )}
-          </div>
         </Container>
       </section>
 
