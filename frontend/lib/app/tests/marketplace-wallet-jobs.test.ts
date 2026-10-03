@@ -55,7 +55,7 @@ test("connect hook drives the real wallet-adapter flow (useWallet connect/select
   assert.match(hook, /if \(!requestedRef\.current \|\| !wallet \|\| connected \|\| connecting\) return;[\s\S]*connect\(\)\.catch/);
   assert.match(hook, /setFailure\(walletConnectFailure\(err\)\)/);
   const providers = read("app/providers.tsx");
-  assert.match(providers, /<WalletProvider wallets=\{wallets\}>/);
+  assert.match(providers, /<WalletProvider wallets=\{wallets\}[ >]/);
   assert.doesNotMatch(providers, /autoConnect/);
 });
 
@@ -103,7 +103,9 @@ test("job cards are whole-card links everywhere; inner actions isolated", () => 
 test("public navbar logo is larger responsively without changing artwork", () => {
   const shell = read("components/site/PublicShell.tsx");
   assert.match(shell, /<span className="inline-flex sm:hidden">\s*<BrandMark light size=\{34\} wordmarkFontSize="1\.3rem" \/>/);
-  assert.match(shell, /<span className="hidden sm:inline-flex">\s*<BrandMark light size=\{44\} wordmarkFontSize="1\.64rem" \/>/);
+  // Tablet and xl+: stronger 50px / 1.85rem; lg (full nav in the row): 44px / 1.64rem.
+  assert.match(shell, /<span className="hidden sm:inline-flex lg:hidden xl:inline-flex">\s*<BrandMark light size=\{50\} wordmarkFontSize="1\.85rem" \/>/);
+  assert.match(shell, /<span className="hidden lg:inline-flex xl:hidden">\s*<BrandMark light size=\{44\} wordmarkFontSize="1\.64rem" \/>/);
   assert.match(shell, /h-16 w-full max-w-7xl/);
   const mark = read("components/brand/BrandMark.tsx");
   assert.match(mark, /wordmarkFontSize\?: string;/);

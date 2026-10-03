@@ -105,7 +105,7 @@ test("desktop density: no zoom, scale or root font-size hacks; mobile targets ke
   const field = read("components/ui/Field.tsx");
   assert.match(field, /min-h-11 [^"]*lg:min-h-10/);
   const shell = read("components/shell/AppShell.tsx");
-  assert.match(shell, /lg:grid-cols-\[216px_minmax\(0,1fr\)\]/);
+  assert.match(shell, /lg:grid-cols-\[224px_minmax\(0,1fr\)\]/);
   assert.match(shell, /lg:h-\[100dvh\]/);
 });
 
@@ -115,5 +115,5 @@ test("logo sizes preserved: public 44px / 1.64rem from sm up, 34 / 1.3rem mobile
   assert.match(pub, /<BrandMark light size=\{34\} wordmarkFontSize="1\.3rem" \/>/);
   assert.match(pub, /h-16 w-full max-w-7xl/);
   const shell = read("components/shell/AppShell.tsx");
-  assert.match(shell, /<BrandMark light size=\{44\} \/>/);
+  assert.match(shell, /<BrandMark light size=\{44\}/);
 });

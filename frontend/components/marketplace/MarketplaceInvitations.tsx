@@ -9,7 +9,7 @@ import { marketplaceErrorMessage } from "@/lib/app/marketplace";
 import { answerInvitation, fetchMyInvitations } from "@/lib/app/marketplace-client";
 import { useMarketplaceQuery, useMarketplaceSession } from "@/lib/hooks/useMarketplace";
 
-import { MarketplaceHeader, ProfileLink, StatusPill } from "./MarketplaceParts";
+import { Avatar, MarketplaceHeader, ProfileLink, StatusPill } from "./MarketplaceParts";
 
 const STATUS_LABELS = { pending: "Pending", accepted: "Accepted", declined: "Declined" } as const;
 
@@ -73,7 +73,10 @@ export function MarketplaceInvitations() {
                 <StatusPill>{STATUS_LABELS[invitation.status]}</StatusPill>
               </div>
               <p className="text-xs text-ink-faint">
-                <ProfileLink wallet={invitation.employerWallet} prefix="Employer" />
+                <span className="inline-flex min-w-0 items-center gap-2">
+                  <Avatar url={null} wallet={invitation.employerWallet} size={24} />
+                  <ProfileLink wallet={invitation.employerWallet} prefix="Employer" />
+                </span>
               </p>
               {invitation.message ? (
                 <p className="whitespace-pre-wrap break-words text-sm text-ink [overflow-wrap:anywhere]">

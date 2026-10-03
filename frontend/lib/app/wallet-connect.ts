@@ -56,3 +56,50 @@ export function walletConnectFailure(err: unknown): WalletConnectFailure {
   }
   return { kind: "failed", message: WALLET_CONNECT_COPY.failed };
 }
+
+/**
+ * Null-safe wallet list. The adapter context, a wallet-standard registry
+ * event or a half-initialised extension can briefly expose an undefined or
+ * sparse list; every caller iterates through this instead of `wallets.some`.
+ */
+export function safeWalletList<T>(list: readonly (T | null | undefined)[] | null | undefined): T[] {
+  if (!Array.isArray(list)) return [];
+  return list.filter((item): item is T => item != null);
+}
+
+type WalletLike = { readyState?: unknown; adapter?: { name?: unknown } | null } | null | undefined;
+
+/** Names of wallets detected as installed; tolerates missing adapters / names. */
+export function installedWalletNames(wallets: readonly WalletLike[] | null | undefined): string[] {
+  return safeWalletList(wallets)
+    .filter((w) => String(w?.readyState) === "Installed")
+    .map((w) => (typeof w?.adapter?.name === "string" ? w.adapter.name : ""))
+    .filter((name) => name.length > 0);
+}
+
+/**
+ * How the provider-level onError reports an adapter error. Nothing here is
+ * fatal: a rejection is silent (the user chose it), a missing wallet is
+ * informational, and anything else (e.g. an extension-internal TypeError
+ * wrapped in WalletConnectionError) is a warning, never a thrown/console.error
+ * crash overlay.
+ */
+export type WalletErrorReport = "silent" | "info" | "warn";
+
+export function walletErrorReport(err: unknown): WalletErrorReport {
+  const failure = walletConnectFailure(err);
+  if (failure.kind === "rejected") return "silent";
+  if (failure.kind === "not_installed") return "info";
+  return "warn";
+}
+
+/**
+ * One browser session = one active wallet. Switching wallets always
+ * disconnects the current adapter first, then opens the picker; the newly
+ * picked wallet replaces it (never two connected wallets / roles at once).
+ */
+export type WalletSwitchStep = "disconnect_then_pick" | "pick";
+
+export function walletSwitchStep(input: { connected: boolean; selected: boolean }): WalletSwitchStep {
+  return input.connected || input.selected ? "disconnect_then_pick" : "pick";
+}

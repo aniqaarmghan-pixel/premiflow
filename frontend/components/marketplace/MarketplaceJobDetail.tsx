@@ -38,7 +38,7 @@ import { STREAMPAY_PROGRAM_ID } from "@/lib/streampay-v2/constants";
 import { PublicKey } from "@solana/web3.js";
 
 import { WalletActionPrompt } from "@/components/site/WalletActionPrompt";
-import { JobTags, MarketplaceHeader, ProfileLink, StatusPill } from "./MarketplaceParts";
+import { Avatar, JobTags, MarketplaceHeader, ProfileLink, StatusPill } from "./MarketplaceParts";
 import { MarketplaceContractLinks } from "./MarketplaceContractLinks";
 import { MarketplaceJobInvites } from "./MarketplaceJobInvites";
 import { MarketplaceSaveToggle } from "./MarketplaceSaveToggle";
@@ -186,7 +186,10 @@ export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
           <span>
             {amountLabel(job.paymentMode)}: {formatMarketplaceAmount(job.budgetAmount)}
           </span>
-          <ProfileLink wallet={job.employerWallet} prefix="Employer" />
+          <span className="inline-flex min-w-0 items-center gap-2">
+            <Avatar url={null} wallet={job.employerWallet} size={24} />
+            <ProfileLink wallet={job.employerWallet} prefix="Employer" />
+          </span>
           <span>Posted {new Date(job.createdAt).toLocaleDateString()}</span>
         </div>
         <p className="whitespace-pre-wrap break-words text-sm leading-6 text-ink [overflow-wrap:anywhere]">
@@ -264,7 +267,10 @@ export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
                   } ${deepLink.proposalId === p.id ? "ring-2 ring-accent ring-offset-2" : ""}`}
                 >
                   <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 text-xs text-ink-faint">
-                    <ProfileLink wallet={p.freelancerWallet} prefix="Freelancer" label={p.freelancerWallet} />
+                    <span className="inline-flex min-w-0 items-center gap-2">
+                      <Avatar url={null} wallet={p.freelancerWallet} size={24} />
+                      <ProfileLink wallet={p.freelancerWallet} prefix="Freelancer" label={p.freelancerWallet} />
+                    </span>
                     <span
                       className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
                         p.status === "selected"

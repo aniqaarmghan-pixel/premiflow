@@ -164,7 +164,7 @@ export const PROFILE_COPY = {
   emptyProfile: "This wallet has not set up a marketplace profile yet.",
   editTitle: "My profile",
   editSubtitle:
-    "Your public marketplace profile, tied to your verified wallet. Avatars and portfolio links must be https URLs; nothing is uploaded.",
+    "Who you are on PREMIFLOW: your name or business, photo, headline and skills, tied to your verified wallet. Photo and portfolio links are https links; nothing is uploaded.",
   saved: "Profile saved.",
 } as const;
 

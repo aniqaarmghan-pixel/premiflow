@@ -206,10 +206,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="pf-dashboard min-h-screen min-w-0 lg:grid lg:grid-cols-[216px_minmax(0,1fr)] 2xl:grid-cols-[240px_minmax(0,1fr)]">
-      <aside className="pf-sidebar hidden bg-navy px-3.5 pt-5 text-white lg:px-3 lg:pt-4 lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col lg:self-start lg:overflow-hidden">
-        <Link href={DASHBOARD_HREF} className="shrink-0 px-2">
-          <BrandMark light size={44} />
+    <div className="pf-dashboard min-h-screen min-w-0 lg:grid lg:grid-cols-[224px_minmax(0,1fr)] 2xl:grid-cols-[240px_minmax(0,1fr)]">
+      <aside className="pf-sidebar hidden bg-navy px-3.5 pt-5 text-white lg:px-3 lg:pt-4 lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col lg:self-start lg:overflow-hidden lg:min-h-[100dvh]">
+        <Link href={DASHBOARD_HREF} className="block min-w-0 shrink-0 px-1">
+          <BrandMark light size={44} wordmarkFontSize="1.32rem" />
           <p
             className="mt-3"
             style={{

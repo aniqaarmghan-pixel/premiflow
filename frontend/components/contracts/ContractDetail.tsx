@@ -38,6 +38,7 @@ import { ContractMessages } from "@/components/contracts/ContractMessages";
 import { ContractReviewForm } from "@/components/marketplace/MarketplaceContractLinks";
 import { HourlyShowcase } from "@/components/contracts/HourlyShowcase";
 import { StreamShowcase } from "@/components/contracts/StreamShowcase";
+import { MilestoneProgressPanel } from "@/components/contracts/MilestoneProgressPanel";
 import {
   emptyDeliveryDraft,
   SubmitWorkForm,
@@ -1341,6 +1342,10 @@ export function ContractDetail({ address }: { address: string }) {
           </Card>
         ) : null}
 
+        {contract.paymentMode === "Milestone" && main.length > 0 ? (
+          <MilestoneProgressPanel contract={contract} units={main} decimals={decimals} />
+        ) : null}
+
         {workUnitsHaveOwnCards(contract.paymentMode) ? (
           <Card className="p-4 sm:p-5 lg:p-4">
             <h2 className="font-display text-xl">
@@ -1461,7 +1466,7 @@ export function ContractDetail({ address }: { address: string }) {
 
         </div>
 
-        <div className="min-w-0 space-y-4 sm:space-y-5">
+        <div className="min-w-0 space-y-4 sm:space-y-5 xl:flex xl:flex-col xl:self-stretch" data-workspace-side-panel>
         <Card id="overview" className="scroll-mt-20 p-4 sm:p-5 lg:p-4">
           <p className="text-xs uppercase tracking-[0.16em] text-ink-faint">Overview</p>
           <h2 className="mt-1 font-display text-xl">Contract details</h2>
@@ -1579,6 +1584,13 @@ export function ContractDetail({ address }: { address: string }) {
             <Row label="Open reviews" value={String(contract.openReviewCount)} />
           </div>
         </details>
+        {/* Intentional brand surface so the side panel stays full-height and balanced
+            next to a long main column (no information, purely visual). */}
+        <div
+          aria-hidden="true"
+          data-workspace-rail-fill
+          className="hidden min-h-0 flex-1 rounded-[24px] border border-line/60 bg-[radial-gradient(120%_70%_at_50%_0%,rgba(46,230,214,.10),transparent_60%),radial-gradient(120%_70%_at_50%_100%,rgba(139,123,255,.10),transparent_60%)] xl:block"
+        />
         </div>
         </div>
       </div>

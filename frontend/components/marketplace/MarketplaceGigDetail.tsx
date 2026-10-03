@@ -121,7 +121,7 @@ export function MarketplaceGigDetail({ gigId }: { gigId: string }) {
       />
       <Card className="min-w-0 space-y-3 p-4">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <Avatar url={owner?.avatarUrl ?? null} size={40} />
+          <Avatar url={owner?.avatarUrl ?? null} name={owner?.displayName} wallet={gig.freelancerWallet} size={40} />
           <div className="min-w-0">
             <ProfileLink wallet={gig.freelancerWallet} label={owner?.displayName || undefined} />
             {owner?.headline ? (

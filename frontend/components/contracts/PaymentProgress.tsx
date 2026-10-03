@@ -1,5 +1,6 @@
 import { Card } from "@/components/ui/Card";
 import { Progress } from "@/components/ui/Progress";
+import { ProtectionFeeSummary } from "@/components/contracts/ProtectionFeeSummary";
 import { formatTokenAmount } from "@/lib/app/money";
 import { financialProgress } from "@/lib/app/view-model";
 import type { ContractView } from "@/lib/streampay-v2";
@@ -60,6 +61,8 @@ export function PaymentProgress({
           </div>
         ))}
       </dl>
+      {/* Hidden while the protection fee is disabled (default). */}
+      <ProtectionFeeSummary agreedAmount={contract.totalAmount} decimals={decimals} />
     </Card>
   );
 }

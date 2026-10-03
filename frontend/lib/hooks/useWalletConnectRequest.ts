@@ -6,6 +6,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 
 import {
   WALLET_CONNECT_COPY,
+  installedWalletNames,
   walletConnectFailure,
   walletConnectStep,
   type WalletConnectFailure,
@@ -31,10 +32,11 @@ export function useWalletConnectRequest() {
   const requestedRef = useRef(false);
   const [failure, setFailure] = useState<WalletConnectFailure | null>(null);
 
-  const installed = wallets
-    .filter((w) => String(w.readyState) === "Installed")
-    .map((w) => w.adapter.name);
-  const selectedReady = Boolean(wallet && READY_STATES.has(String(wallet.readyState)));
+  // Null-safe: never call .filter/.some on a list the adapter has not built yet.
+  const installed = installedWalletNames(wallets);
+  const selectedReady = Boolean(wallet && READY_STATES.has(String(wallet?.readyState)));
+  const modalVisible = hasModal && Boolean(modal.visible);
+  const modalWasOpenRef = useRef(false);
 
   // After the user picks a wallet (modal or direct select), finish with connect().
   useEffect(() => {
@@ -42,6 +44,23 @@ export function useWalletConnectRequest() {
     requestedRef.current = false;
     connect().catch((err: unknown) => setFailure(walletConnectFailure(err)));
   }, [wallet, connected, connecting, connect]);
+
+  // Picker closed: if the user re-picked the already-selected wallet, connect
+  // it; if they dismissed it, drop the pending request so a later selection
+  // elsewhere never triggers a surprise connect from this prompt.
+  useEffect(() => {
+    if (modalVisible) {
+      modalWasOpenRef.current = true;
+      return;
+    }
+    if (!modalWasOpenRef.current) return;
+    modalWasOpenRef.current = false;
+    if (!requestedRef.current) return;
+    requestedRef.current = false;
+    if (wallet && !connected && !connecting) {
+      connect().catch((err: unknown) => setFailure(walletConnectFailure(err)));
+    }
+  }, [modalVisible, wallet, connected, connecting, connect]);
 
   function request() {
     setFailure(null);

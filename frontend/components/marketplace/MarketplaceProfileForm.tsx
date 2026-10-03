@@ -20,7 +20,13 @@ import { useMarketplaceQuery, useMarketplaceSession } from "@/lib/hooks/useMarke
 import { uiAmountToBaseUnits } from "@/lib/streampay-v2";
 import type { PublicProfile } from "@/lib/server/marketplace/catalog-service";
 
-import { MarketplaceHeader, QueryState } from "./MarketplaceParts";
+import {
+  PROFILE_PHOTO_COPY,
+  PROFILE_VS_GIG_COPY,
+  profilePhotoUrlError,
+} from "@/lib/app/profile-identity";
+
+import { Avatar, MarketplaceHeader, QueryState } from "./MarketplaceParts";
 
 type PortfolioRow = { title: string; url: string; description: string };
 type FormState = {
@@ -126,30 +132,44 @@ export function MarketplaceProfileForm() {
         />
       ) : (
         <Card className="min-w-0 space-y-3 p-4">
-          <Link href={profileHref(query.data.wallet)} className="text-sm font-medium text-accent underline">
-            View public profile
-          </Link>
+          <div className="flex min-w-0 flex-wrap items-center justify-between gap-2">
+            <Link href={profileHref(query.data.wallet)} className="text-sm font-medium text-accent underline">
+              View public profile
+            </Link>
+            <Link href="/marketplace/my-gigs" className="text-sm font-medium text-accent underline">
+              Manage my gigs
+            </Link>
+          </div>
+          <ProfileVsGigNote />
+          <ProfilePhotoField
+            url={current.avatarUrl}
+            name={current.displayName}
+            wallet={query.data.wallet}
+            onChange={(avatarUrl) => update({ avatarUrl })}
+          />
           <div className="grid min-w-0 gap-3 sm:grid-cols-2">
-            <Field label="Display name">
+            <Field label="Your name or business name">
               <Input value={current.displayName} maxLength={60} onChange={(e) => update({ displayName: e.target.value })} />
             </Field>
-            <Field label="Avatar URL (https)">
+            <Field label="Professional headline">
               <Input
-                type="url"
-                value={current.avatarUrl}
-                maxLength={500}
-                placeholder="https://"
-                onChange={(e) => update({ avatarUrl: e.target.value })}
+                value={current.headline}
+                maxLength={120}
+                placeholder="e.g. Solana smart contract engineer"
+                onChange={(e) => update({ headline: e.target.value })}
               />
             </Field>
           </div>
-          <Field label="Headline">
-            <Input value={current.headline} maxLength={120} onChange={(e) => update({ headline: e.target.value })} />
+          <Field label="About you">
+            <Textarea
+              value={current.bio}
+              maxLength={2000}
+              rows={5}
+              placeholder="Who you are, what you are great at and how you like to work."
+              onChange={(e) => update({ bio: e.target.value })}
+            />
           </Field>
-          <Field label="Bio">
-            <Textarea value={current.bio} maxLength={2000} rows={5} onChange={(e) => update({ bio: e.target.value })} />
-          </Field>
-          <Field label="Skills (comma separated, up to 15)">
+          <Field label="Skills (separate with commas, up to 15)">
             <Input value={current.skills} maxLength={600} onChange={(e) => update({ skills: e.target.value })} />
           </Field>
           <div className="grid min-w-0 gap-3 sm:grid-cols-2">
@@ -219,11 +239,98 @@ export function MarketplaceProfileForm() {
               {notice.text}
             </p>
           ) : null}
-          <Button onClick={() => void submit()} disabled={busy}>
+          <Button onClick={() => void submit()} disabled={busy || profilePhotoUrlError(current.avatarUrl) !== null}>
             Save profile
           </Button>
         </Card>
       )}
     </div>
+  );
+}
+
+function ProfileVsGigNote() {
+  return (
+    <section
+      aria-label={PROFILE_VS_GIG_COPY.title}
+      className="grid min-w-0 gap-2 rounded-2xl border border-line bg-paper p-3 text-xs leading-5 text-ink-soft sm:grid-cols-2"
+    >
+      <p className="min-w-0">
+        <span className="block font-semibold text-ink">Profile</span>
+        {PROFILE_VS_GIG_COPY.profile}
+      </p>
+      <p className="min-w-0">
+        <span className="block font-semibold text-ink">Gigs</span>
+        {PROFILE_VS_GIG_COPY.gig}
+      </p>
+    </section>
+  );
+}
+
+/** Friendly photo UX over the existing https avatarUrl field (no upload backend). */
+function ProfilePhotoField({
+  url,
+  name,
+  wallet,
+  onChange,
+}: {
+  url: string;
+  name: string;
+  wallet: string;
+  onChange: (url: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const value = url.trim();
+  const error = profilePhotoUrlError(value);
+  const showInput = editing || error !== null;
+  return (
+    <section
+      aria-labelledby="pf-profile-photo-title"
+      className="flex min-w-0 flex-col gap-3 rounded-2xl border border-line p-3 sm:flex-row sm:items-start"
+    >
+      <span className="rounded-full border-4 border-paper-2">
+        <Avatar url={value && !error ? value : null} name={name} wallet={wallet} size={72} />
+      </span>
+      <div className="min-w-0 flex-1 space-y-2">
+        <div className="min-w-0">
+          <p id="pf-profile-photo-title" className="text-sm font-semibold text-ink">
+            {PROFILE_PHOTO_COPY.title}
+          </p>
+          <p className="text-xs leading-5 text-ink-soft">{PROFILE_PHOTO_COPY.help}</p>
+        </div>
+        {showInput ? (
+          <Field label={PROFILE_PHOTO_COPY.linkLabel}>
+            <Input
+              type="url"
+              value={url}
+              maxLength={500}
+              placeholder="https://example.com/photo.jpg"
+              aria-invalid={error ? true : undefined}
+              onChange={(e) => onChange(e.target.value)}
+            />
+          </Field>
+        ) : null}
+        {error ? (
+          <p role="alert" className="text-xs text-danger">
+            {error}
+          </p>
+        ) : null}
+        <div className="flex min-w-0 flex-wrap gap-2">
+          <Button variant="secondary" onClick={() => setEditing((v) => !v)}>
+            {showInput && editing ? PROFILE_PHOTO_COPY.done : value ? PROFILE_PHOTO_COPY.change : PROFILE_PHOTO_COPY.add}
+          </Button>
+          {value ? (
+            <Button
+              variant="ghost"
+              onClick={() => {
+                onChange("");
+                setEditing(false);
+              }}
+            >
+              {PROFILE_PHOTO_COPY.remove}
+            </Button>
+          ) : null}
+        </div>
+      </div>
+    </section>
   );
 }

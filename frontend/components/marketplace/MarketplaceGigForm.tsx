@@ -19,6 +19,7 @@ import {
 import { createGig, editGig, fetchGigDetail, type GigInput } from "@/lib/app/marketplace-client";
 import { GIG_VIDEO_HELP, gigVideoKindLabel, parseGigVideo } from "@/lib/app/video-embed";
 import { GigVideoPreview } from "./MarketplaceVideoModal";
+import { PROFILE_VS_GIG_COPY, previewableImageUrls } from "@/lib/app/profile-identity";
 import { lockedCreatePayment } from "@/lib/app/premiflow";
 import { useMarketplaceQuery, useMarketplaceSession } from "@/lib/hooks/useMarketplace";
 import { uiAmountToBaseUnits } from "@/lib/streampay-v2";
@@ -253,7 +254,10 @@ export function MarketplaceGigForm({ gigId }: { gigId?: string }) {
           </Card>
 
           <Card className="min-w-0 space-y-3 p-4">
-            <h2 className="text-sm font-semibold text-ink">Media (optional)</h2>
+            <h2 className="text-sm font-semibold text-ink">Service media (optional)</h2>
+            <p className="rounded-xl bg-paper px-3 py-2 text-xs leading-5 text-ink-soft" data-testid="gig-media-service-note">
+              {PROFILE_VS_GIG_COPY.gigMediaNote}
+            </p>
             <p className="text-xs text-ink-faint">
               Link only images and video you own or have rights to. https links only; nothing is uploaded or copied.
             </p>
@@ -268,6 +272,7 @@ export function MarketplaceGigForm({ gigId }: { gigId?: string }) {
             <Field label="Gallery image URLs (one per line, up to 6)">
               <Textarea value={current.media} rows={3} onChange={(e) => update({ media: e.target.value })} />
             </Field>
+            <GigImagePreview coverUrl={current.coverUrl} media={current.media} />
             <Field label="Video (YouTube, Vimeo or direct .mp4 / .webm)">
               <Input
                 value={current.videoUrl}
@@ -382,6 +387,30 @@ function VideoFieldHelp({ title, videoUrl, coverUrl }: { title: string; videoUrl
           <GigVideoPreview title={title.trim() || "Gig video preview"} videoUrl={video.url} posterUrl={coverUrl.trim() || null} />
         </div>
       ) : null}
+    </div>
+  );
+}
+
+/** Thumbnails for https cover / gallery links the gig API accepts (preview only). */
+function GigImagePreview({ coverUrl, media }: { coverUrl: string; media: string }) {
+  const urls = previewableImageUrls([coverUrl, ...media.split(/\r?\n/)], 7);
+  if (urls.length === 0) return null;
+  return (
+    <div className="min-w-0" aria-label="Service image preview">
+      <p className="text-xs text-ink-faint">Preview of your service images</p>
+      <ul className="mt-2 grid min-w-0 grid-cols-3 gap-2 sm:grid-cols-4">
+        {urls.map((url, i) => (
+          <li key={`${url}-${i}`} className="relative aspect-[4/3] min-w-0 overflow-hidden rounded-xl border border-line bg-paper-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={url} alt="" loading="lazy" referrerPolicy="no-referrer" className="h-full w-full object-cover" />
+            {i === 0 && url === coverUrl.trim() ? (
+              <span className="absolute left-1.5 top-1.5 rounded-full bg-black/55 px-2 py-0.5 text-[10px] font-semibold text-white">
+                Cover
+              </span>
+            ) : null}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

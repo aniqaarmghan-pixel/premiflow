@@ -5,6 +5,8 @@ import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { Check, ChevronDown, Copy, LogOut, RefreshCw, Wallet } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 
+import { walletSwitchStep } from "@/lib/app/wallet-connect";
+
 import {
   isWalletUiConnected,
   shortenAddress,
@@ -13,7 +15,8 @@ import {
 
 export function WalletControl() {
   const { connected, connecting, publicKey, connect, disconnect, wallet } = useWallet();
-  const { setVisible } = useWalletModal();
+  const { setVisible, visible: modalVisible } = useWalletModal();
+  const modalWasOpenRef = useRef(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -43,14 +46,30 @@ export function WalletControl() {
       return;
     }
 
-    void connect()
-      .catch(() => {
-        // Wallet adapter surfaces connection errors through its own state/UI.
-      })
-      .finally(() => {
-        connectRequestedRef.current = false;
-      });
+    // Consume the request synchronously so no second effect re-connects.
+    connectRequestedRef.current = false;
+    void connect().catch(() => {
+      // Non-fatal: reported by the provider onError; rejection keeps the UI usable.
+    });
   }, [wallet, connected, connecting, connect]);
+
+  // Picker dismissed without choosing: drop the pending connect so a later
+  // selection elsewhere (Apply / Hire prompt) is not connected twice.
+  useEffect(() => {
+    if (modalVisible) {
+      modalWasOpenRef.current = true;
+      return;
+    }
+    if (!modalWasOpenRef.current) return;
+    modalWasOpenRef.current = false;
+    const pending = connectRequestedRef.current;
+    connectRequestedRef.current = false;
+    if (pending && wallet && !connected && !connecting) {
+      void connect().catch(() => {
+        // Non-fatal: reported by the provider onError, the button stays usable.
+      });
+    }
+  }, [modalVisible, wallet, connected, connecting, connect]);
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -86,8 +105,18 @@ export function WalletControl() {
     }
   }
 
-  function onChangeWallet() {
+  async function onChangeWallet() {
     setMenuOpen(false);
+    // One active wallet per session: release the current one first, then the
+    // picked wallet replaces it and is connected explicitly.
+    if (walletSwitchStep({ connected, selected: Boolean(wallet) }) === "disconnect_then_pick") {
+      try {
+        await disconnect();
+      } catch {
+        // Already disconnected - continue to the picker.
+      }
+    }
+    connectRequestedRef.current = true;
     setVisible(true);
   }
 
@@ -161,7 +190,7 @@ export function WalletControl() {
             <button
               type="button"
               role="menuitem"
-              onClick={onChangeWallet}
+              onClick={() => void onChangeWallet()}
               className="flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-sm text-ink hover:bg-paper-2 sm:min-h-10"
             >
               <RefreshCw size={16} />

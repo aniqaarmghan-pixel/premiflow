@@ -49,7 +49,7 @@ export function MarketplaceProfileView({ wallet }: { wallet: string }) {
       <MarketplaceHeader title={profile?.displayName || "Marketplace profile"} />
       <Card className="min-w-0 space-y-3 p-4">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
-          <Avatar url={profile?.avatarUrl ?? null} size={64} />
+          <Avatar url={profile?.avatarUrl ?? null} name={profile?.displayName} wallet={query.data.wallet} size={64} />
           <div className="min-w-0 flex-1">
             {profile?.headline ? (
               <p className="break-words font-semibold text-ink [overflow-wrap:anywhere]">{profile.headline}</p>

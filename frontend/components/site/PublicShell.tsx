@@ -72,12 +72,16 @@ export function PublicShell({
         }`}
       >
         <div className="mx-auto flex h-16 w-full max-w-7xl items-center gap-3 px-4 sm:px-6 lg:h-[68px] lg:px-8">
-          <Link href="/" aria-label="PREMIFLOW marketplace home" className="shrink-0">
-            {/* ~8% larger on phones (no overflow at 360px), ~35% larger from sm up. */}
+          <Link href="/" aria-label="PREMIFLOW marketplace home" className="min-w-max shrink-0">
+            {/* Phone unchanged. Tablet and xl+: ~50px mark / 1.85rem wordmark. At lg the
+                full nav shares the row, so 44px / 1.64rem keeps it balanced and unclipped. */}
             <span className="inline-flex sm:hidden">
               <BrandMark light size={34} wordmarkFontSize="1.3rem" />
             </span>
-            <span className="hidden sm:inline-flex">
+            <span className="hidden sm:inline-flex lg:hidden xl:inline-flex">
+              <BrandMark light size={50} wordmarkFontSize="1.85rem" />
+            </span>
+            <span className="hidden lg:inline-flex xl:hidden">
               <BrandMark light size={44} wordmarkFontSize="1.64rem" />
             </span>
           </Link>

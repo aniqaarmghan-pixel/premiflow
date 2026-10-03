@@ -10,6 +10,7 @@ import { CloudOff, Play, RefreshCw, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { profileInitials } from "@/lib/app/profile-identity";
 import {
   EMPTY_SEARCH,
   GIG_STATUS_LABELS,
@@ -339,15 +340,42 @@ export function ProfileLink({
   );
 }
 
-/** https-only avatar URL (validated server-side); never proxied or uploaded. */
-export function Avatar({ url, size = 48 }: { url: string | null; size?: number }) {
-  if (!url) {
+/**
+ * Profile photo: https-only avatar URL (validated server-side); never proxied
+ * or uploaded. Missing or broken links fall back to initials from the stored
+ * display name (or wallet), never to invented data.
+ */
+export function Avatar({
+  url,
+  size = 48,
+  name,
+  wallet,
+}: {
+  url: string | null;
+  size?: number;
+  name?: string | null;
+  wallet?: string | null;
+}) {
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
+  if (!url || failedUrl === url) {
+    const initials = profileInitials(name, wallet);
+    if (!initials) {
+      return (
+        <span
+          aria-hidden="true"
+          className="inline-block shrink-0 rounded-full bg-paper-2"
+          style={{ width: size, height: size }}
+        />
+      );
+    }
     return (
       <span
         aria-hidden="true"
-        className="inline-block shrink-0 rounded-full bg-paper-2"
-        style={{ width: size, height: size }}
-      />
+        className="inline-flex shrink-0 select-none items-center justify-center rounded-full bg-[linear-gradient(135deg,#0d9488,#4f8cff_60%,#8b7bff)] font-semibold leading-none text-white"
+        style={{ width: size, height: size, fontSize: Math.max(9, Math.round(size * 0.38)) }}
+      >
+        {initials}
+      </span>
     );
   }
   return (
@@ -359,6 +387,7 @@ export function Avatar({ url, size = 48 }: { url: string | null; size?: number }
       height={size}
       referrerPolicy="no-referrer"
       loading="lazy"
+      onError={() => setFailedUrl(url)}
       className="shrink-0 rounded-full bg-paper-2 object-cover"
       style={{ width: size, height: size }}
     />
@@ -473,7 +502,7 @@ export function GigSummaryCard({
       </div>
       <div className="flex min-w-0 flex-1 flex-col gap-2 p-4">
         <p className="flex min-w-0 items-center gap-2 text-xs text-ink-faint">
-          <Avatar url={seller?.avatarUrl ?? null} size={22} />
+          <Avatar url={seller?.avatarUrl ?? null} name={seller?.displayName} wallet={gig.freelancerWallet} size={22} />
           <ProfileLink wallet={gig.freelancerWallet} label={seller?.displayName || undefined} />
         </p>
         <Link
@@ -509,7 +538,7 @@ export function FreelancerSummaryCard({ freelancer }: { freelancer: FreelancerCa
       <div className="flex min-w-0 flex-1 flex-col gap-3 px-4 pb-4">
         <div className="-mt-7 flex min-w-0 items-end gap-3">
           <span className="rounded-full border-4 border-card bg-card">
-            <Avatar url={freelancer.avatarUrl} size={56} />
+            <Avatar url={freelancer.avatarUrl} name={freelancer.displayName} wallet={freelancer.wallet} size={56} />
           </span>
           <span
             className={`mb-1 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
