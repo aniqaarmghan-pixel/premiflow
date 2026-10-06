@@ -12,6 +12,7 @@ import {
   searchPageHref,
 } from "@/lib/app/marketplace";
 import { MARKETPLACE_CATEGORIES } from "@/lib/app/marketplace-categories";
+import { WHY_PREMIFLOW } from "@/lib/app/differentiation";
 import { fetchFreelancers, searchGigs, searchJobs } from "@/lib/app/marketplace-client";
 import { useMarketplaceQuery } from "@/lib/hooks/useMarketplace";
 import { Aurora } from "@/components/site/Aurora";
@@ -475,6 +476,79 @@ export function MarketplaceHome() {
                   <CategoryArt slug={slug} className="pf-zoom absolute inset-0 h-full w-full" />
                 </div>
               ))}
+            </div>
+          </Reveal>
+        </Container>
+      </section>
+
+      {/* Why PREMIFLOW: four payment models and the protected contract lifecycle */}
+      <section className="bg-paper py-14 sm:py-20" aria-labelledby="pf-why">
+        <Container>
+          <Reveal>
+            <SectionHeading id="pf-why" eyebrow={WHY_PREMIFLOW.eyebrow} title={WHY_PREMIFLOW.title} subtitle={WHY_PREMIFLOW.subtitle} />
+          </Reveal>
+          <div className="mt-8 grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            {WHY_PREMIFLOW.modes
+              .filter((m) => m.featured)
+              .map((m) => (
+                <Reveal key={m.key} className="min-w-0 sm:col-span-2 lg:row-span-2">
+                  <article className="pf-midnight relative flex h-full min-w-0 flex-col overflow-hidden rounded-[22px] border border-white/10 p-5 text-white shadow-[var(--shadow)] sm:p-6">
+                    <span className="inline-flex w-fit items-center rounded-full border border-white/15 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-aqua">
+                      Built for ongoing work
+                    </span>
+                    <h3 className="mt-3 font-display text-2xl font-semibold tracking-[-0.02em] sm:text-3xl">{m.title}</h3>
+                    <p className="mt-2 max-w-xl text-sm leading-6 text-white/80">{m.summary}</p>
+                    {m.points ? (
+                      <ul className="mt-4 space-y-2 text-sm text-white/85">
+                        {m.points.map((p) => (
+                          <li key={p} className="flex items-start gap-2">
+                            <CheckCircle2 size={16} aria-hidden="true" className="mt-0.5 shrink-0 text-aqua" />
+                            <span>{p}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    <p className="mt-auto pt-4 text-xs text-white/60">Fits: {m.fit}</p>
+                  </article>
+                </Reveal>
+              ))}
+            {WHY_PREMIFLOW.modes
+              .filter((m) => !m.featured)
+              .map((m, i) => (
+                <Reveal key={m.key} delay={(i + 1) * 60} className="min-w-0">
+                  <article className="pf-card flex h-full min-w-0 flex-col rounded-[20px] border border-line bg-card p-4 shadow-[var(--shadow)]">
+                    <h3 className="font-semibold text-ink">{m.title}</h3>
+                    <p className="mt-1 text-sm leading-6 text-ink-soft">{m.summary}</p>
+                    <p className="mt-auto pt-3 text-xs text-ink-faint">Fits: {m.fit}</p>
+                  </article>
+                </Reveal>
+              ))}
+            <Reveal delay={240} className="min-w-0">
+              <article className="pf-card flex h-full min-w-0 flex-col rounded-[20px] border border-line bg-card p-4 shadow-[var(--shadow)]">
+                <h3 className="font-semibold text-ink">{WHY_PREMIFLOW.trials.title}</h3>
+                <p className="mt-1 text-sm leading-6 text-ink-soft">{WHY_PREMIFLOW.trials.body}</p>
+              </article>
+            </Reveal>
+          </div>
+          <Reveal delay={120}>
+            <div className="mt-3 flex min-w-0 flex-col gap-3 rounded-[20px] border border-line bg-card p-4 shadow-[var(--shadow)] sm:p-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex min-w-0 items-start gap-3">
+                <span aria-hidden="true" className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-accent-soft text-accent">
+                  <LockKeyhole size={16} />
+                </span>
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-ink">{WHY_PREMIFLOW.lifecycle.title}</h3>
+                  <p className="mt-0.5 text-sm leading-6 text-ink-soft">{WHY_PREMIFLOW.lifecycle.body}</p>
+                </div>
+              </div>
+              <ol className="flex min-w-0 flex-wrap items-center gap-1.5 text-xs font-semibold text-ink">
+                {WHY_PREMIFLOW.lifecycle.steps.map((step, i) => (
+                  <li key={step} className="flex items-center gap-1.5">
+                    {i > 0 ? <ArrowRight size={12} aria-hidden="true" className="text-ink-faint" /> : null}
+                    <span className="rounded-full border border-line px-2.5 py-1">{step}</span>
+                  </li>
+                ))}
+              </ol>
             </div>
           </Reveal>
         </Container>

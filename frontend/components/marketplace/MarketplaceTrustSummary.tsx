@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { ShieldCheck } from "lucide-react";
 
 import { Card } from "@/components/ui/Card";
+import { VERIFIED_REPUTATION_COPY, verifiedBadgeLabel } from "@/lib/app/differentiation";
 import { shortWallet } from "@/lib/app/marketplace";
 import { fetchTrustSummary } from "@/lib/app/marketplace-client";
 import { useMarketplaceQuery } from "@/lib/hooks/useMarketplace";
@@ -21,13 +23,15 @@ export function MarketplaceTrustSummary({ wallet }: { wallet: string }) {
   const s = query.data.summary;
   return (
     <Card className="min-w-0 space-y-3 p-4">
-      <h2 className="text-sm font-semibold">Verified work</h2>
+      <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+        <ShieldCheck size={15} aria-hidden="true" className="text-accent" />
+        {VERIFIED_REPUTATION_COPY.title}
+      </h2>
       {s.reviewCount === 0 ? (
-        <p className="text-sm text-ink-soft">
-          No verified reviews yet. Reviews appear only after a completed PREMIFLOW contract.
-        </p>
+        <p className="text-sm text-ink-soft">{VERIFIED_REPUTATION_COPY.empty}</p>
       ) : (
         <>
+          <p className="text-xs font-medium text-ok">{VERIFIED_REPUTATION_COPY.line}</p>
           <p className="text-sm text-ink">
             Average score {s.averageScore?.toFixed(1)} / 5 from {s.reviewCount} verified{" "}
             {s.reviewCount === 1 ? "review" : "reviews"} across {s.completedContracts} completed{" "}
@@ -55,5 +59,25 @@ export function MarketplaceTrustSummary({ wallet }: { wallet: string }) {
         </>
       )}
     </Card>
+  );
+}
+
+/**
+ * Compact badge from the same verified trust summary. Renders nothing while
+ * loading, on error, or when there are no verified reviews.
+ */
+export function VerifiedReputationBadge({ wallet, className = "" }: { wallet: string; className?: string }) {
+  const query = useMarketplaceQuery(`trust:${wallet}`, () => fetchTrustSummary(wallet));
+  const label = query.status === "ready" ? verifiedBadgeLabel(query.data.summary) : null;
+  if (!label) return null;
+  return (
+    <span
+      title={VERIFIED_REPUTATION_COPY.line}
+      className={`inline-flex max-w-full items-center gap-1 rounded-full bg-[color-mix(in_srgb,var(--ok)_12%,white)] px-2 py-0.5 text-[11px] font-semibold text-ok ${className}`}
+    >
+      <ShieldCheck size={12} aria-hidden="true" className="shrink-0" />
+      <span className="truncate">{label}</span>
+      <span className="sr-only"> {VERIFIED_REPUTATION_COPY.line}</span>
+    </span>
   );
 }

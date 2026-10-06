@@ -21,6 +21,7 @@ import {
 import { ContractCard } from "@/components/contracts/ContractCard";
 import { WhyPremiflowTeaser } from "@/components/about/AboutPage";
 import { PageFade } from "@/components/shell/PageFade";
+import { GetStartedCard } from "@/components/overview/GetStartedCard";
 import { Card } from "@/components/ui/Card";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
@@ -178,6 +179,12 @@ export function OverviewPage() {
   return (
     <PageFade>
       <CommandHeader context={roleContext} />
+      <GetStartedCard
+        mode={roleContext.mode}
+        wallet={ws.session.wallet}
+        workspace={ws.data}
+        hiringContracts={grouped.hiring.length}
+      />
       <div className="mt-5 grid min-w-0 gap-3 lg:mt-4 lg:grid-cols-12">
         <div className="min-w-0 lg:col-span-8">
           <AttentionPanel items={attention} />

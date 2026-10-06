@@ -33,7 +33,7 @@ import { WalletActionPrompt } from "@/components/site/WalletActionPrompt";
 import { Avatar, MarketplaceHeader, ProfileLink, SkillList, StatusPill } from "./MarketplaceParts";
 import { MarketplaceContractLinks } from "./MarketplaceContractLinks";
 import { MarketplaceSaveToggle } from "./MarketplaceSaveToggle";
-import { MarketplaceTrustSummary } from "./MarketplaceTrustSummary";
+import { MarketplaceTrustSummary, VerifiedReputationBadge } from "./MarketplaceTrustSummary";
 
 export function MarketplaceGigDetail({ gigId }: { gigId: string }) {
   const router = useRouter();
@@ -127,6 +127,7 @@ export function MarketplaceGigDetail({ gigId }: { gigId: string }) {
             {owner?.headline ? (
               <p className="break-words text-xs text-ink-faint [overflow-wrap:anywhere]">{owner.headline}</p>
             ) : null}
+            <VerifiedReputationBadge wallet={gig.freelancerWallet} className="mt-1" />
           </div>
           <StatusPill>{GIG_STATUS_LABELS[gig.status]}</StatusPill>
         </div>

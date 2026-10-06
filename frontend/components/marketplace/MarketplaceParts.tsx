@@ -48,6 +48,7 @@ import type {
 import type { PublicJob } from "@/lib/server/marketplace/service";
 import { playableVideoUrl } from "@/lib/app/marketplace-media";
 import { GigVideoButton } from "./MarketplaceVideoModal";
+import { VerifiedReputationBadge } from "./MarketplaceTrustSummary";
 
 /** Discovery + management tabs. Label color lives on an inner span so no global anchor rule can mute it. */
 export function MarketplaceNav({ className = "" }: { className?: string }) {
@@ -565,6 +566,7 @@ export function FreelancerSummaryCard({ freelancer }: { freelancer: FreelancerCa
               {freelancer.headline}
             </p>
           ) : null}
+          <VerifiedReputationBadge wallet={freelancer.wallet} className="mt-1.5" />
         </div>
         <SkillList skills={freelancer.skills.slice(0, 5)} />
         <div className="mt-auto flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-xs">

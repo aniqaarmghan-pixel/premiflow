@@ -20,7 +20,7 @@ import {
   SkillList,
   StatusPill,
 } from "./MarketplaceParts";
-import { MarketplaceTrustSummary } from "./MarketplaceTrustSummary";
+import { MarketplaceTrustSummary, VerifiedReputationBadge } from "./MarketplaceTrustSummary";
 
 export function MarketplaceProfileView({ wallet }: { wallet: string }) {
   const session = useMarketplaceSession();
@@ -55,6 +55,7 @@ export function MarketplaceProfileView({ wallet }: { wallet: string }) {
               <p className="break-words font-semibold text-ink [overflow-wrap:anywhere]">{profile.headline}</p>
             ) : null}
             <p className="break-all text-xs text-ink-faint">{query.data.wallet}</p>
+            <VerifiedReputationBadge wallet={query.data.wallet} className="mt-1" />
           </div>
           {profile ? <StatusPill>{AVAILABILITY_LABELS[profile.availability]}</StatusPill> : null}
         </div>
