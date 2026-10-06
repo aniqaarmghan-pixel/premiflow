@@ -93,9 +93,33 @@ test("verified reputation wording and hidden state without reviews", () => {
 test("verified reputation shows on profile, freelancer cards and gig owner area", () => {
   const parts = read("components/marketplace/MarketplaceParts.tsx");
   const card = parts.slice(parts.indexOf("export function FreelancerSummaryCard"), parts.indexOf("export function SkeletonGrid"));
-  assert.match(card, /<VerifiedReputationBadge wallet=\{freelancer\.wallet\}/);
+  assert.match(card, /<VerifiedReputationBadge wallet=\{freelancer\.wallet\} summary=\{freelancer\.reputation\}/);
+  assert.doesNotMatch(parts, /fetchTrustSummary/);
+  assert.doesNotMatch(card, /useMarketplaceQuery|trust:/);
   assert.match(read("components/marketplace/MarketplaceProfileView.tsx"), /<VerifiedReputationBadge wallet=\{query\.data\.wallet\}/);
   assert.match(read("components/marketplace/MarketplaceGigDetail.tsx"), /<VerifiedReputationBadge wallet=\{gig\.freelancerWallet\}/);
+});
+
+test("freelancer cards use preloaded reputation; list API attaches summaries", () => {
+  const badge = read("components/marketplace/MarketplaceTrustSummary.tsx");
+  const badgeFn = badge.slice(badge.indexOf("export function VerifiedReputationBadge"));
+  assert.match(badgeFn, /summary === undefined/);
+  assert.match(badgeFn, /shouldFetch \? `trust:\$\{wallet\}` : null/);
+
+  const catalog = read("lib/server/marketplace/catalog-service.ts");
+  assert.match(catalog, /reputation: FreelancerReputation/);
+  assert.match(catalog, /withFreelancerReputation/);
+  assert.match(catalog, /compactTrustByWallets/);
+
+  const freelancersRoute = read("app/api/marketplace/freelancers/route.ts");
+  assert.match(freelancersRoute, /marketplaceTrustContext/);
+  assert.match(freelancersRoute, /searchFreelancers\(ctx\.market, params, ctx\.trust\)/);
+
+  const searchRoute = read("app/api/marketplace/search/route.ts");
+  assert.match(searchRoute, /searchMarketplace\(ctx\.market, params, ctx\.trust\)/);
+
+  const store = read("lib/server/marketplace/trust-store.ts");
+  assert.match(store, /listReviewsForWallets\(wallets/);
 });
 
 test("onboarding links point to existing routes", () => {

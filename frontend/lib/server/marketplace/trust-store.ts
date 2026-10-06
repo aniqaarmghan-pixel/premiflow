@@ -74,6 +74,8 @@ export interface MarketplaceTrustStore {
   insertReview(row: MarketplaceReviewRecord): Promise<MarketplaceReviewRecord>;
   getReviewByReviewer(reviewerWallet: string, contractAddress: string): Promise<MarketplaceReviewRecord | null>;
   listReviewsFor(revieweeWallet: string, limit: number): Promise<MarketplaceReviewRecord[]>;
+  /** One scan for many reviewees; at most `limitPerWallet` newest rows each. */
+  listReviewsForWallets(wallets: readonly string[], limitPerWallet: number): Promise<MarketplaceReviewRecord[]>;
   listReviewsForContract(contractAddress: string): Promise<MarketplaceReviewRecord[]>;
 
   /** Throws DuplicateInvitationError on (job, freelancer) conflict. */
@@ -120,6 +122,20 @@ export function createMemoryMarketplaceTrustStore(): MarketplaceTrustStore {
     },
     async listReviewsFor(revieweeWallet, limit) {
       return reviews.filter((r) => r.revieweeWallet === revieweeWallet).sort(byNewest).slice(0, limit).map((r) => ({ ...r }));
+    },
+    async listReviewsForWallets(wallets, limitPerWallet) {
+      const wanted = new Set(wallets);
+      if (wanted.size === 0 || limitPerWallet <= 0) return [];
+      const counts = new Map<string, number>();
+      const out: MarketplaceReviewRecord[] = [];
+      for (const r of [...reviews].sort(byNewest)) {
+        if (!wanted.has(r.revieweeWallet)) continue;
+        const n = counts.get(r.revieweeWallet) ?? 0;
+        if (n >= limitPerWallet) continue;
+        counts.set(r.revieweeWallet, n + 1);
+        out.push({ ...r });
+      }
+      return out;
     },
     async listReviewsForContract(contractAddress) {
       return reviews.filter((r) => r.contractAddress === contractAddress).sort(byNewest).map((r) => ({ ...r }));

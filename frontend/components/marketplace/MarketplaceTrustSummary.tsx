@@ -63,12 +63,24 @@ export function MarketplaceTrustSummary({ wallet }: { wallet: string }) {
 }
 
 /**
- * Compact badge from the same verified trust summary. Renders nothing while
- * loading, on error, or when there are no verified reviews.
+ * Compact badge from verified reviews. Pass `summary` (from a list/search card)
+ * to skip the per-wallet trust fetch; omit it on profile/gig detail where the
+ * full trust panel already loads. Hidden while loading, on error, or empty.
  */
-export function VerifiedReputationBadge({ wallet, className = "" }: { wallet: string; className?: string }) {
-  const query = useMarketplaceQuery(`trust:${wallet}`, () => fetchTrustSummary(wallet));
-  const label = query.status === "ready" ? verifiedBadgeLabel(query.data.summary) : null;
+export function VerifiedReputationBadge({
+  wallet,
+  summary,
+  className = "",
+}: {
+  wallet: string;
+  summary?: { reviewCount: number; averageScore: number | null } | null;
+  className?: string;
+}) {
+  const shouldFetch = summary === undefined;
+  const query = useMarketplaceQuery(shouldFetch ? `trust:${wallet}` : null, () => fetchTrustSummary(wallet));
+  const resolved =
+    summary !== undefined ? summary : query.status === "ready" ? query.data.summary : null;
+  const label = verifiedBadgeLabel(resolved);
   if (!label) return null;
   return (
     <span

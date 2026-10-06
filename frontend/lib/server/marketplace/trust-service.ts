@@ -227,6 +227,31 @@ export async function getTrustSummary(deps: Pick<TrustDeps, "trust">, input: { w
   return deriveTrustSummary(wallet, await deps.trust.listReviewsFor(wallet, TRUST_LIMITS.reputationSample));
 }
 
+/** Compact score+count for listing cards; one batched review read for the whole page. */
+export type CompactTrust = { reviewCount: number; averageScore: number | null };
+
+export async function compactTrustByWallets(
+  trust: MarketplaceTrustStore,
+  wallets: readonly string[]
+): Promise<Map<string, CompactTrust>> {
+  const unique = [...new Set(wallets)];
+  const out = new Map<string, CompactTrust>();
+  for (const wallet of unique) out.set(wallet, { reviewCount: 0, averageScore: null });
+  if (unique.length === 0) return out;
+  const reviews = await trust.listReviewsForWallets(unique, TRUST_LIMITS.reputationSample);
+  const byWallet = new Map<string, MarketplaceReviewRecord[]>();
+  for (const r of reviews) {
+    const list = byWallet.get(r.revieweeWallet);
+    if (list) list.push(r);
+    else byWallet.set(r.revieweeWallet, [r]);
+  }
+  for (const wallet of unique) {
+    const s = deriveTrustSummary(wallet, byWallet.get(wallet) ?? []);
+    out.set(wallet, { reviewCount: s.reviewCount, averageScore: s.averageScore });
+  }
+  return out;
+}
+
 /* ---------------- invitations ---------------- */
 
 export type PublicInvitation = {

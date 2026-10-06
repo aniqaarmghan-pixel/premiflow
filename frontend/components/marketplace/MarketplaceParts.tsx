@@ -566,7 +566,7 @@ export function FreelancerSummaryCard({ freelancer }: { freelancer: FreelancerCa
               {freelancer.headline}
             </p>
           ) : null}
-          <VerifiedReputationBadge wallet={freelancer.wallet} className="mt-1.5" />
+          <VerifiedReputationBadge wallet={freelancer.wallet} summary={freelancer.reputation} className="mt-1.5" />
         </div>
         <SkillList skills={freelancer.skills.slice(0, 5)} />
         <div className="mt-auto flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-xs">

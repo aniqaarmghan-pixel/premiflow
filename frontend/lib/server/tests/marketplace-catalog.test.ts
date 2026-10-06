@@ -148,17 +148,17 @@ test("catalog profile: owner-only by session wallet; body wallet is ignored", as
   assert.equal(again.updatedAt, later.toISOString());
 });
 
-test("catalog profile: no rating or reputation fields anywhere", async () => {
+test("catalog profile: no self-entered rating fields; listing reputation is verified-only", async () => {
   const store = createMemoryMarketplaceStore();
   const saved = await saveMyProfile(store, { sessionWallet: FREELANCER, body: { rating: 5, reputation: 99 } });
   assert.ok(!("rating" in saved) && !("reputation" in saved));
+  // Profile rows, schema and forms stay free of self-entered scores. FreelancerCard
+  // may carry compact verified reputation from completed contracts (trust store).
   const files = [
     "lib/server/db/schema.ts",
     "drizzle/0009_marketplace_profiles_gigs.sql",
     "lib/server/marketplace/store.ts",
-    "lib/server/marketplace/catalog-service.ts",
     "lib/server/marketplace/catalog-validation.ts",
-    "components/marketplace/MarketplaceProfileView.tsx",
     "components/marketplace/MarketplaceProfileForm.tsx",
   ];
   const forbidden = /\b(rating|ratings|reputation|review_score|stars)\b/i;
@@ -170,6 +170,10 @@ test("catalog profile: no rating or reputation fields anywhere", async () => {
     assert.ok(src.length > 0, file);
     assert.doesNotMatch(src, forbidden, file);
   }
+  const catalog = read("lib/server/marketplace/catalog-service.ts");
+  assert.match(catalog, /FreelancerReputation/);
+  assert.match(catalog, /withFreelancerReputation/);
+  assert.doesNotMatch(catalog.replace(/export type FreelancerCard[\s\S]*?updatedAt: string;[\s\S]*?reputation: FreelancerReputation;[\s\S]*?\};/, ""), /\brating\b/i);
 });
 
 /* ---------------- gigs ---------------- */

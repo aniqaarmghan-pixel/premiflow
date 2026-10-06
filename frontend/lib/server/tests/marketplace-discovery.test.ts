@@ -148,7 +148,18 @@ test("discovery freelancers: safe fields, featured = complete profiles, rate sor
   const all = await searchFreelancers(store, qs(""));
   assert.deepEqual(all.map((f) => f.wallet), [w3, w2, w1]);
   for (const card of all) {
-    assert.deepEqual(Object.keys(card).sort(), ["availability", "avatarUrl", "displayName", "headline", "rateAmount", "skills", "updatedAt", "wallet"]);
+    assert.deepEqual(Object.keys(card).sort(), [
+      "availability",
+      "avatarUrl",
+      "displayName",
+      "headline",
+      "rateAmount",
+      "reputation",
+      "skills",
+      "updatedAt",
+      "wallet",
+    ]);
+    assert.deepEqual(card.reputation, { reviewCount: 0, averageScore: null });
     assert.ok(!("bio" in card) && !("portfolio" in card) && !("createdAt" in card));
   }
   assert.deepEqual((await searchFreelancers(store, qs("featured=1"))).map((f) => f.wallet), [w2, w1]);

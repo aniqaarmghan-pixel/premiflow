@@ -1,7 +1,8 @@
 /**
  * Marketplace Phase 2: profiles, gigs and search. Off-chain only; nothing here
  * moves funds. Identity always comes from the signed wallet session, never
- * from the request body. There are deliberately no ratings or reputation.
+ * from the request body. Listing cards may carry compact verified-review scores
+ * from the trust store (completed PREMIFLOW contracts only).
  */
 import type { MarketplaceCategorySlug } from "@/lib/app/marketplace-categories";
 import { randomId } from "../crypto";
@@ -29,6 +30,8 @@ import type {
   PortfolioItem,
   ProfileAvailability,
 } from "./store";
+import { compactTrustByWallets } from "./trust-service";
+import type { MarketplaceTrustStore } from "./trust-store";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 export const PROFILE_PAGE_JOBS_LIMIT = 50;
@@ -156,6 +159,14 @@ export type GigCard = PublicGig & { seller: ProfileSummary | null };
  * Safe public listing fields. Bio, portfolio and timestamps other than
  * updatedAt stay on the full profile page.
  */
+/** Compact verified-review score for listing cards (no recent review bodies). */
+export type FreelancerReputation = {
+  reviewCount: number;
+  averageScore: number | null;
+};
+
+export const EMPTY_FREELANCER_REPUTATION: FreelancerReputation = { reviewCount: 0, averageScore: null };
+
 export type FreelancerCard = {
   wallet: string;
   displayName: string;
@@ -165,6 +176,8 @@ export type FreelancerCard = {
   rateAmount: string | null;
   availability: ProfileAvailability;
   updatedAt: string;
+  /** Verified reviews only; filled by list/search when a trust store is available. */
+  reputation: FreelancerReputation;
 };
 
 export const SEARCH_TYPES = ["all", "jobs", "gigs", "freelancers"] as const;
@@ -189,6 +202,7 @@ export function toFreelancerCard(row: MarketplaceProfileRecord): FreelancerCard 
     rateAmount: row.rateAmount,
     availability: row.availability,
     updatedAt: row.updatedAt.toISOString(),
+    reputation: EMPTY_FREELANCER_REPUTATION,
   };
 }
 
@@ -209,22 +223,39 @@ export async function withSellers(store: MarketplaceStore, rows: MarketplaceGigR
 }
 
 /** Public. ?featured=1 keeps complete profiles (name, headline, skills), newest update first. */
+async function withFreelancerReputation(
+  trust: MarketplaceTrustStore | null | undefined,
+  cards: FreelancerCard[]
+): Promise<FreelancerCard[]> {
+  if (!trust || cards.length === 0) return cards;
+  const byWallet = await compactTrustByWallets(
+    trust,
+    cards.map((c) => c.wallet)
+  );
+  return cards.map((c) => ({
+    ...c,
+    reputation: byWallet.get(c.wallet) ?? EMPTY_FREELANCER_REPUTATION,
+  }));
+}
+
 export async function searchFreelancers(
   store: MarketplaceStore,
-  params: URLSearchParams
+  params: URLSearchParams,
+  trust?: MarketplaceTrustStore | null
 ): Promise<FreelancerCard[]> {
   const featured = params.get("featured");
   if (featured !== null && featured !== "1" && featured !== "0") {
     throw new HttpError(400, "invalid_marketplace_input", "featured must be 1 or 0.");
   }
   const rows = await store.searchProfiles(parseSearchParams(params), { completeOnly: featured === "1" });
-  return rows.map(toFreelancerCard);
+  return withFreelancerReputation(trust, rows.map(toFreelancerCard));
 }
 
 /** Public unified search over open jobs, active gigs and public profiles. */
 export async function searchMarketplace(
   store: MarketplaceStore,
-  params: URLSearchParams
+  params: URLSearchParams,
+  trust?: MarketplaceTrustStore | null
 ): Promise<UnifiedSearchResult> {
   const typeRaw = params.get("type") ?? "all";
   if (!(SEARCH_TYPES as readonly string[]).includes(typeRaw)) {
@@ -243,7 +274,7 @@ export async function searchMarketplace(
     type,
     jobs: jobs.map(toPublicJob),
     gigs: await withSellers(store, gigs),
-    freelancers: profiles.map(toFreelancerCard),
+    freelancers: await withFreelancerReputation(trust, profiles.map(toFreelancerCard)),
   };
 }
 

@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 
 import type { MessagingDatabase } from "./client";
 import {
@@ -70,6 +70,25 @@ export function createDrizzleMarketplaceTrustStore(db: MessagingDatabase): Marke
         .orderBy(desc(marketplaceReviews.createdAt))
         .limit(limit);
       return rows.map(asReview);
+    },
+    async listReviewsForWallets(wallets, limitPerWallet) {
+      const unique = [...new Set(wallets)];
+      if (unique.length === 0 || limitPerWallet <= 0) return [];
+      const rows = await db
+        .select()
+        .from(marketplaceReviews)
+        .where(inArray(marketplaceReviews.revieweeWallet, unique))
+        .orderBy(desc(marketplaceReviews.createdAt))
+        .limit(Math.min(unique.length * limitPerWallet, 5_000));
+      const counts = new Map<string, number>();
+      const out: MarketplaceReviewRecord[] = [];
+      for (const row of rows) {
+        const n = counts.get(row.revieweeWallet) ?? 0;
+        if (n >= limitPerWallet) continue;
+        counts.set(row.revieweeWallet, n + 1);
+        out.push(asReview(row));
+      }
+      return out;
     },
     async listReviewsForContract(contractAddress) {
       const rows = await db
