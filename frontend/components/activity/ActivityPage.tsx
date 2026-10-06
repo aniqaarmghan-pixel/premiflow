@@ -37,15 +37,35 @@ export function ActivityPage() {
         ? "Hiring & Working"
         : roleLabel(accountRole);
     const prefix = `${presentType(contract.paymentMode)} · ${role}`;
-    if (contract.createdAt) stamps.push({ at: contract.createdAt, label: `${prefix} created`, href });
-    if (contract.acceptedAt) stamps.push({ at: contract.acceptedAt, label: `${prefix} accepted`, href });
-    if (contract.startTime) stamps.push({ at: contract.startTime, label: `${prefix} started`, href });
-    if (contract.completedAt) stamps.push({ at: contract.completedAt, label: `${prefix} completed`, href });
-    if (contract.terminatedAt) stamps.push({ at: contract.terminatedAt, label: `${prefix} terminated`, href });
-    if (contract.disputedAt) stamps.push({ at: contract.disputedAt, label: `${prefix} disputed`, href });
+    if (contract.createdAt) stamps.push({ at: contract.createdAt, label: `${prefix} ? Offer created`, href });
+    if (contract.acceptedAt) stamps.push({ at: contract.acceptedAt, label: `${prefix} ? Offer accepted`, href });
+    if (contract.startTime) stamps.push({ at: contract.startTime, label: `${prefix} ? Work started`, href });
+    if (contract.completedAt) stamps.push({ at: contract.completedAt, label: `${prefix} ? Contract completed`, href });
+    if (contract.terminatedAt) {
+      // Plain status-aware wording from real data (roleAware handles Streaming ended).
+      const endLabel = roleAwareStatusLabelForWallets(accountWallets, contract, now);
+      const plain =
+        endLabel === "Completed"
+          ? "Contract completed"
+          : endLabel === "Cancelled"
+            ? "Contract cancelled"
+            : endLabel === "Declined"
+              ? "Offer declined"
+              : endLabel === "Resolved"
+                ? "Dispute resolved"
+                : endLabel === "Expired"
+                  ? "Offer expired"
+                  : endLabel === "Activation rejected"
+                    ? "Activation rejected"
+                    : endLabel === "Streaming ended"
+                      ? "Streaming ended"
+                      : `Contract closed (${endLabel})`;
+      stamps.push({ at: contract.terminatedAt, label: `${prefix} ? ${plain}`, href });
+    }
+    if (contract.disputedAt) stamps.push({ at: contract.disputedAt, label: `${prefix} ? Dispute opened`, href });
     stamps.push({
       at: contract.createdAt,
-      label: `${prefix}: ${roleAwareStatusLabelForWallets(accountWallets, contract, now)}`,
+      label: `${prefix} ? ${roleAwareStatusLabelForWallets(accountWallets, contract, now)}`,
       href,
     });
   }
@@ -54,17 +74,17 @@ export function ActivityPage() {
   return (
     <PageFade>
       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan">Activity</p>
-      <h1 className="mt-1 font-display text-[1.65rem] tracking-tight sm:text-3xl lg:text-[1.75rem]">Deterministic timeline</h1>
+      <h1 className="mt-1 font-display text-[1.65rem] tracking-tight sm:text-3xl lg:text-[1.75rem]">Contract timeline</h1>
       <p className="mt-2 max-w-2xl text-sm text-ink-soft">
-        This is not an indexer. It only lists timestamps already stored on loaded contract
-        accounts. Program events such as WorkUnitStaleRevisionVoided are not retrieved.
+        Key dates from your loaded contracts ? created, accepted, started, completed, and similar
+        milestones. Live program logs are not listed here.
       </p>
       {stamps.length === 0 ? (
         <div className="mt-6">
           <EmptyState
             kind="activity"
             title="Nothing on-chain yet"
-            body="Create or accept a contract to see lifecycle stamps."
+            body="Create or accept a contract to see activity here."
           />
         </div>
       ) : (

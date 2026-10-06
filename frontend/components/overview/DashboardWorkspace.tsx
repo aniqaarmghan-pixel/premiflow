@@ -150,7 +150,12 @@ export function MarketplaceWorkspacePanel({ ws }: { ws: DashboardWorkspaceState 
   const { session, query, verify, verifying } = ws;
   let body: ReactNode;
   if (!session.wallet) {
-    body = <p className="text-sm text-ink-soft">{MARKETPLACE_COPY.connectWallet} Your jobs, proposals and gigs appear here.</p>;
+    body = (
+      <p className="text-sm text-ink-soft">
+        {MARKETPLACE_COPY.walletNotConnected} {MARKETPLACE_COPY.walletNotConnectedHint} Your jobs,
+        proposals and gigs appear here once a wallet is connected.
+      </p>
+    );
   } else if (query.status === "error" && query.error.status === 401) {
     body = (
       <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

@@ -287,7 +287,11 @@ export function QueryState({
   onRetry?: () => void;
 }) {
   if (!wallet) {
-    return <Card className="p-4 text-sm text-ink-soft">{MARKETPLACE_COPY.connectWallet}</Card>;
+    return (
+      <Card className="p-4 text-sm text-ink-soft">
+        {MARKETPLACE_COPY.walletNotConnected} {MARKETPLACE_COPY.walletNotConnectedHint}
+      </Card>
+    );
   }
   if (status === "error" && error?.status === 401) {
     return (

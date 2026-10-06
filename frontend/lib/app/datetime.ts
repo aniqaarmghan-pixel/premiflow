@@ -17,10 +17,17 @@ export function formatDuration(totalSeconds: number): string {
   const d = Math.floor(seconds / 86_400);
   const h = Math.floor((seconds % 86_400) / 3600);
   const m = Math.floor((seconds % 3600) / 60);
-  if (d > 0) return `${d}d ${h}h`;
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m`;
-  return `${seconds}s`;
+  // Prefer plain language for exact day/hour boundaries (e.g. 86400 -> "1 day").
+  if (d > 0 && h === 0 && m === 0 && seconds % 86_400 === 0) {
+    return d === 1 ? "1 day" : `${d} days`;
+  }
+  if (d === 0 && h > 0 && m === 0 && seconds % 3600 === 0) {
+    return h === 1 ? "1 hour" : `${h} hours`;
+  }
+  if (d > 0) return h > 0 ? `${d}d ${h}h` : d === 1 ? "1 day" : `${d} days`;
+  if (h > 0) return m > 0 ? `${h}h ${m}m` : h === 1 ? "1 hour" : `${h} hours`;
+  if (m > 0) return m === 1 ? "1 minute" : `${m} minutes`;
+  return seconds === 1 ? "1 second" : `${seconds} seconds`;
 }
 
 /**

@@ -256,11 +256,11 @@ export function MarketplaceHome() {
               className="pf-hero-in mt-5 font-display text-[2.4rem] font-semibold leading-[1.05] tracking-[-0.04em] sm:text-6xl lg:text-7xl"
               style={delay(90)}
             >
-              <span className="pf-gradient-text">Hire talent and get hired, with escrow built in.</span>
+              <span className="pf-gradient-text">Solana-protected freelance contracts.</span>
             </h1>
             <p className="pf-hero-in mt-5 max-w-2xl text-base leading-7 text-white/70 sm:text-lg" style={delay(180)}>
-              Browse jobs, services and freelancer profiles. When you agree on terms, the contract is created and
-              funded on-chain from the employer&apos;s own wallet.
+              Hire or get hired with escrow on Solana. Choose Fixed, Milestone, Streaming, or Hourly ? funds stay
+              protected until the work is approved.
             </p>
             <div className="pf-hero-in" style={delay(260)}>
               <HeroSearch />

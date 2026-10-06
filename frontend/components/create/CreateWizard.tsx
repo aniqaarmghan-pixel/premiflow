@@ -80,6 +80,7 @@ import {
   saveMarketplaceSource,
 } from "@/lib/app/marketplace-link-store";
 import { formatTokenAmount } from "@/lib/app/money";
+import { formatDuration, formatReviewPeriod } from "@/lib/app/datetime";
 import {
   lockedCreatePayment,
   paymentTokenLabel,
@@ -1547,7 +1548,7 @@ export function CreateWizard() {
               <dd>
                 {draft.paymentMode === "Hourly"
                   ? `${draft.engagementDurationValue || "—"} ${draft.engagementDurationUnit}`
-                  : `${draft.durationSeconds}s`}
+                  : formatDuration(draft.durationSeconds)}
               </dd>
             </div>
           </dl>
@@ -1739,7 +1740,7 @@ function ReviewPanel({
           : "Scheduled",
     ],
     ["Trial", draft.trialEnabled ? formatTokenAmount(trialAmount, draft.decimals) : "Disabled"],
-    ["Review period", `${draft.reviewDuration}s`],
+    ["Review period", formatReviewPeriod(draft.reviewDuration)],
     ["Revisions", String(draft.maxRevisions)],
     ["Title", draft.title || "—"],
   ];
@@ -1747,7 +1748,7 @@ function ReviewPanel({
     rows.splice(2, 0, ["Token", paymentTokenLabel(draft.mint)]);
   } else {
     rows.splice(2, 0, ["Token", paymentTokenLabel(draft.mint)]);
-    rows.push(["Duration", `${draft.durationSeconds}s`]);
+    rows.push(["Duration", formatDuration(draft.durationSeconds)]);
   }
 
   return (

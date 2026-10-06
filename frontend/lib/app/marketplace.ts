@@ -65,7 +65,11 @@ export const MARKETPLACE_COPY = {
   emptyProposals: "No proposals yet.",
   verifyWallet: "Verify wallet",
   verifyWalletNote: "Verify your connected wallet to see and manage your marketplace activity.",
-  connectWallet: "Connect your wallet to continue.",
+  /** Used only where a chain signature is required (apply / hire). */
+  connectWallet: "A connected wallet is required to sign this action.",
+  /** Signed-in account, no active signing wallet ? page itself is not a chain action. */
+  walletNotConnected: "Wallet not connected.",
+  walletNotConnectedHint: "Connect a wallet when you are ready to sign on-chain actions.",
   selectionNote:
     "Selecting a proposal fills the job and declines the other submitted proposals. No funds move until you create and fund the contract on-chain.",
   handoffNote:

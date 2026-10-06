@@ -705,6 +705,8 @@ body {
 
 /* Dashboard: calm, flat surface for dense information. */
 .pf-dashboard {
+  --ink-faint: #5a6b82;
+  --ink-soft: #2f3f55;
   background: var(--paper);
 }
 

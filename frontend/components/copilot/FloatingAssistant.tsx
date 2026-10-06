@@ -66,7 +66,8 @@ export function FloatingAssistant() {
     () => false
   );
   const [open, setOpen] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(true);
+  // Collapsed by default ? the welcome bubble must not cover dashboard cards.
+  const [showWelcome, setShowWelcome] = useState(false);
 
   const contractAddress = useMemo(
     () => contractAddressFromPath(pathname),

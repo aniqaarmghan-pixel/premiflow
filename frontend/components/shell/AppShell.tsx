@@ -59,14 +59,19 @@ const NAV_GROUPS: ReadonlyArray<NavGroup> = [
     items: [{ href: "/dashboard", label: "Overview", icon: LayoutDashboard }],
   },
   {
-    title: "Work",
+    title: "Hire",
     items: [
       { href: "/marketplace/post", label: "Post a job", icon: Megaphone },
-      { href: "/marketplace/gigs/new", label: "Offer a gig", icon: Sparkles },
       { href: "/marketplace/my-jobs", label: "My Jobs", icon: Briefcase },
+      { href: "/marketplace/invitations", label: "Invitations", icon: MailOpen },
+    ],
+  },
+  {
+    title: "Work",
+    items: [
+      { href: "/marketplace/gigs/new", label: "Offer a gig", icon: Sparkles },
       { href: "/marketplace/my-proposals", label: "My Proposals", icon: Send },
       { href: "/marketplace/my-gigs", label: "My Gigs", icon: Package },
-      { href: "/marketplace/invitations", label: "Invitations", icon: MailOpen },
       { href: "/marketplace/saved", label: "Saved", icon: Bookmark },
     ],
   },
@@ -75,22 +80,22 @@ const NAV_GROUPS: ReadonlyArray<NavGroup> = [
     items: [
       { href: "/contracts", label: "Contracts", icon: ScrollText },
       { href: "/create", label: "Create contract", icon: FilePlus2 },
-      { href: "/activity", label: "Messages & Activity", icon: Activity },
+      { href: "/activity", label: "Activity", icon: Activity },
     ],
   },
   {
-    title: "You",
+    title: "Account",
     items: [
-      { href: "/dashboard/reviews", label: "Reviews", icon: BadgeCheck },
       { href: "/marketplace/profile", label: "Profile", icon: UserRound },
+      { href: "/dashboard/reviews", label: "Reviews", icon: BadgeCheck },
+      { href: "/support", label: "Help & Support", icon: CircleHelp },
     ],
   },
   {
-    title: "PREMIFLOW",
+    title: "Discover",
     items: [
       { href: "/", label: "Marketplace", icon: Store },
       { href: "/about", label: "About", icon: Info },
-      { href: "/support", label: "Help & Support", icon: CircleHelp },
     ],
   },
 ];

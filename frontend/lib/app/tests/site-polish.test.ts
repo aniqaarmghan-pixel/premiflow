@@ -71,7 +71,8 @@ test("reduced motion: aurora and play affordance are static; dashboard surface i
     assert.ok(reduce.includes(sel), sel);
   }
   assert.match(css, /\.pf-aurora > span:nth-child\(1\) \{[^}]*animation: pf-aurora-a 26s/);
-  assert.match(css, /\.pf-dashboard \{\s*background: var\(--paper\);/);
+  assert.match(css, /\.pf-dashboard \{[^}]*background: var\(--paper\);/s);
+  assert.match(css, /\.pf-dashboard \{[^}]*--ink-faint:/s);
   assert.match(read("components/shell/AppShell.tsx"), /className="pf-dashboard /);
 });
 

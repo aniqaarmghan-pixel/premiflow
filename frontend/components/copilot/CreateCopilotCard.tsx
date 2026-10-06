@@ -17,6 +17,7 @@ import {
 import type { CopilotCreateProposal, CopilotCreateResponse } from "@/lib/app/copilot-schemas";
 import { presentType } from "@/lib/app/view-model";
 import type { CreateWizardDraft } from "@/lib/app/validation";
+import { formatReviewPeriod } from "@/lib/app/datetime";
 
 export function CreateCopilotCard({
   draft,
@@ -163,8 +164,8 @@ function ProposalTerms({ proposal }: { proposal: CopilotCreateProposal }) {
           ? `${proposal.engagementDurationValue} ${proposal.engagementDurationUnit ?? "days"}`
           : "Review in wizard",
     ],
-    ["Review window", `${proposal.reviewDuration}s`],
-    ["Activation review", `${proposal.activationReviewDuration}s`],
+    ["Review window", formatReviewPeriod(proposal.reviewDuration)],
+    ["Activation review", formatReviewPeriod(proposal.activationReviewDuration)],
     ["Revisions", String(proposal.maxRevisions)],
   ];
   if (proposal.paymentMode === "Milestone" && proposal.milestones.length > 0) {

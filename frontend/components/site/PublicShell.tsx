@@ -67,7 +67,7 @@ export function PublicShell({
           !isHome
             ? "border-b border-white/10 bg-[var(--midnight)]"
             : solid
-            ? "pf-glass border-b border-white/10 shadow-[0_12px_40px_-24px_rgba(0,0,0,.7)]"
+            ? "border-b border-white/15 bg-[var(--midnight)]/92 shadow-[0_12px_40px_-24px_rgba(0,0,0,.75)] backdrop-blur-xl backdrop-saturate-150"
             : "border-b border-transparent bg-transparent"
         }`}
       >

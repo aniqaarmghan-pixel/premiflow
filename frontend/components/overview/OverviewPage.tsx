@@ -38,7 +38,8 @@ import {
   type OfferListItem,
 } from "@/lib/app/dashboard-offers";
 import { formatUnix } from "@/lib/app/datetime";
-import { formatTokenAmount } from "@/lib/app/money";
+import { formatFriendlyTokenAmount, formatTokenAmount } from "@/lib/app/money";
+import { findPaymentToken } from "@/lib/app/premiflow";
 import { dashboardSummaryForWallets, presentType } from "@/lib/app/view-model";
 import { useContracts } from "@/lib/hooks/ContractsProvider";
 import { useResolverCases } from "@/lib/hooks/useResolverCases";
@@ -135,7 +136,10 @@ export function OverviewPage() {
   const mintKeys = [...new Set(grouped.all.map((c) => c.tokenMint.toBase58()))];
   const sharedDecimals =
     mintKeys.length === 1 ? decimalsByMint[mintKeys[0]] : undefined;
+  const sharedSymbol =
+    mintKeys.length === 1 ? findPaymentToken(mintKeys[0])?.symbol : undefined;
   const mixedMints = mintKeys.length > 1;
+  const money = (base: bigint) => formatFriendlyTokenAmount(base, sharedDecimals, sharedSymbol);
   const streaming = liveStreamContracts(grouped.all, now);
   // Direct wallet vs contract.freelancer / contract.employer on each contract;
   // PendingAcceptance only, all four modes. Freelancer wins when both.
@@ -198,7 +202,7 @@ export function OverviewPage() {
               href={OVERVIEW_DASHBOARD_HREFS.availableToWithdraw}
               icon={<Wallet size={15} />}
               label="Available to withdraw"
-              value={formatTokenAmount(summary.availableToWithdraw, sharedDecimals)}
+              value={money(summary.availableToWithdraw)}
               hint={
                 mixedMints
                   ? "sum of base units; contracts use more than one mint"
@@ -210,7 +214,7 @@ export function OverviewPage() {
               href={OVERVIEW_DASHBOARD_HREFS.availableRefund}
               icon={<ShieldCheck size={15} />}
               label="Available refund"
-              value={formatTokenAmount(summary.availableRefund, sharedDecimals)}
+              value={money(summary.availableRefund)}
               hint={
                 mixedMints
                   ? "sum of base units; contracts use more than one mint"
@@ -221,9 +225,9 @@ export function OverviewPage() {
           </div>
           {grouped.all.length > 0 && !mixedMints ? (
             <dl className="mt-3 grid min-w-0 grid-cols-1 gap-2 min-[420px]:grid-cols-3">
-              <PortfolioFigure label="In escrow (live contracts)" value={formatTokenAmount(totals.inEscrow, sharedDecimals)} />
-              <PortfolioFigure label="Released to date" value={formatTokenAmount(totals.released, sharedDecimals)} />
-              <PortfolioFigure label={`Live contract value (${totals.liveCount})`} value={formatTokenAmount(totals.liveValue, sharedDecimals)} />
+              <PortfolioFigure label="In escrow (live contracts)" value={money(totals.inEscrow)} />
+              <PortfolioFigure label="Released to date" value={money(totals.released)} />
+              <PortfolioFigure label={`Live contract value (${totals.liveCount})`} value={money(totals.liveValue)} />
             </dl>
           ) : null}
         </Card>
@@ -406,7 +410,7 @@ export function OverviewPage() {
           )}
         </Card>
         <Card className="p-4">
-          <h2 className="font-display text-xl">Lifecycle stamps</h2>
+          <h2 className="font-display text-xl">Contract history</h2>
           <p className="mt-1 text-xs text-ink-faint">
             Only timestamps currently stored on the contract account. Not a full event history.
           </p>
@@ -659,7 +663,7 @@ function AttentionPanel({ items }: { items: AttentionItem[] }) {
 function PortfolioFigure({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0 rounded-2xl border border-line bg-paper/60 px-3 py-2.5">
-      <dt className="truncate text-[11px] text-ink-faint">{label}</dt>
+      <dt className="truncate text-[11px] font-medium text-ink-soft">{label}</dt>
       <dd className="mt-0.5 truncate font-display text-lg tabular-nums text-ink">{value}</dd>
     </div>
   );
