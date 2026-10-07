@@ -12,6 +12,7 @@ pub mod constants;
 pub mod enums;
 pub mod errors;
 pub mod events;
+pub mod fees;
 pub mod hourly;
 pub mod instructions;
 pub mod state;

@@ -396,6 +396,19 @@ Ok(())
         v2::instructions::claim_employer_refund::handle_claim_employer_refund(ctx)
     }
 
+    /// Program upgrade authority creates the singleton platform fee config.
+    pub fn initialize_fee_config(
+        ctx: Context<InitializeFeeConfig>,
+        args: FeeConfigArgs,
+    ) -> Result<()> {
+        v2::instructions::fee_admin::handle_initialize_fee_config(ctx, args)
+    }
+
+    /// Fee admin updates fee bps (capped), treasury authority, or admin.
+    pub fn update_fee_config(ctx: Context<UpdateFeeConfig>, args: FeeConfigArgs) -> Result<()> {
+        v2::instructions::fee_admin::handle_update_fee_config(ctx, args)
+    }
+
     /// Employer or freelancer freezes contested economics. No SPL transfer.
     pub fn open_dispute(ctx: Context<OpenDispute>) -> Result<()> {
         v2::instructions::open_dispute::handle_open_dispute(ctx)

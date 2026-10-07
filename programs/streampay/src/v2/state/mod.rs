@@ -10,11 +10,13 @@
 //!   Fixed/Milestone/Streaming contracts never allocate these.
 
 pub mod contract;
+pub mod fee_config;
 pub mod hourly_session;
 pub mod hourly_state;
 pub mod work_unit;
 
 pub use contract::*;
+pub use fee_config::*;
 pub use hourly_session::*;
 pub use hourly_state::*;
 pub use work_unit::*;

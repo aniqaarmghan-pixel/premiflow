@@ -1,3 +1,5 @@
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
+import { deriveFeeConfigPda } from "./pda";
 import { SystemProgram } from "@solana/web3.js";
 import type { PublicKey } from "@solana/web3.js";
 
@@ -71,6 +73,9 @@ export function withdrawFreelancerAccounts(params: {
   tokenMint: PublicKey;
   contractEscrow: PublicKey;
   freelancerTokenAccount: PublicKey;
+  /** Required by the program when the contract has fee_bps > 0. */
+  feeConfig?: PublicKey | null;
+  treasuryTokenAccount?: PublicKey | null;
 }) {
   return {
     freelancer: params.freelancer,
@@ -79,6 +84,8 @@ export function withdrawFreelancerAccounts(params: {
     contractEscrow: params.contractEscrow,
     freelancerTokenAccount: params.freelancerTokenAccount,
     tokenProgram: TOKEN_PROGRAM_ID,
+    feeConfig: params.feeConfig ?? null,
+    treasuryTokenAccount: params.treasuryTokenAccount ?? null,
   };
 }
 
@@ -172,6 +179,25 @@ export function toCreateHourlyContractArgs(request: CreateHourlyContractRequest)
   };
 }
 
+/**
+ * Fee accounts for withdraw: only passed when the contract carries a fee
+ * (fee_bps > 0). Treasury token account is the treasury owner's ATA for the mint.
+ */
+async function resolveWithdrawFeeAccounts(
+  program: StreamPayV2Program,
+  contract: PublicKey,
+  mint: PublicKey
+): Promise<{ feeConfig: PublicKey | null; treasuryTokenAccount: PublicKey | null }> {
+  const raw = await program.account.contract.fetch(contract);
+  if (!raw.feeBps) return { feeConfig: null, treasuryTokenAccount: null };
+  const feeConfig = deriveFeeConfigPda(program.programId).address;
+  const cfg = await program.account.feeConfig.fetch(feeConfig);
+  return {
+    feeConfig,
+    treasuryTokenAccount: getAssociatedTokenAddressSync(mint, cfg.treasury, true),
+  };
+}
+
 export class StreamPayV2Client {
   constructor(readonly program: StreamPayV2Program) {}
 
@@ -208,6 +234,7 @@ export class StreamPayV2Client {
         contractEscrow: pdas.escrow.address,
         trialWorkUnit,
         fixedWorkUnit,
+        feeConfig: deriveFeeConfigPda(this.program.programId).address,
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       })
@@ -709,6 +736,11 @@ export class StreamPayV2Client {
       mint: contract.tokenMint,
       destination: freelancerTokenAccount,
     });
+    const fee = await resolveWithdrawFeeAccounts(
+      this.program,
+      params.contract,
+      contract.tokenMint
+    );
     const withdraw = this.program.methods.withdrawFreelancer().accountsPartial(
       withdrawFreelancerAccounts({
         freelancer,
@@ -716,6 +748,7 @@ export class StreamPayV2Client {
         tokenMint: contract.tokenMint,
         contractEscrow: escrow,
         freelancerTokenAccount,
+        ...fee,
       })
     );
     // One-click Collect (Active Streaming): materialize accrual first, same tx.

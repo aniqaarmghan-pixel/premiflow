@@ -219,7 +219,7 @@ pub fn handle_create_hourly_contract(
         contract.metadata_hash = args.metadata_hash;
         contract.bump = ctx.bumps.contract;
         contract.escrow_bump = ctx.bumps.contract_escrow;
-        contract.reserved = [0u8; 19];
+        contract.reserved = [0u8; 1];
         contract.metadata_uri = args.metadata_uri;
     }
 

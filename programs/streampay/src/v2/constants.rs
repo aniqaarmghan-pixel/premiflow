@@ -36,6 +36,11 @@ pub const HOURLY_STATE_SEED: &[u8] = b"hourly_state";
 /// `session_index` is a little-endian `u32`, same width as `WorkUnit::index`.
 pub const HOURLY_SESSION_SEED: &[u8] = b"hourly_session";
 
+/// Singleton platform fee configuration.
+///
+/// Full seeds: `[FEE_CONFIG_SEED]`
+pub const FEE_CONFIG_SEED: &[u8] = b"fee_config";
+
 /// Current on-chain layout version written to `Contract::version` and
 /// `WorkUnit::version`. Bump only on a layout change.
 pub const V2_LAYOUT_VERSION: u8 = 1;

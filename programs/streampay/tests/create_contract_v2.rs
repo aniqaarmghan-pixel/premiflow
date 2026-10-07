@@ -198,6 +198,7 @@ impl Env {
         let instruction = Instruction {
             program_id: self.program_id,
             accounts: streampay_program::accounts::CreateContract {
+                fee_config: ::streampay::v2::fees::fee_config_pda().0,
                 employer: self.employer_pk,
                 freelancer: *freelancer,
                 token_mint: self.token_mint,
@@ -400,7 +401,7 @@ fn create_streaming_contract_succeeds() {
     assert_eq!(contract.bump, contract_bump);
     assert_eq!(contract.escrow_bump, escrow_bump);
 
-    assert_eq!(contract.reserved, [0u8; 19]);
+    assert_eq!(contract.reserved, [0u8; 1]);
 
     // Escrow holds exactly the full amount, and the employer paid exactly that.
     assert_eq!(env.token_balance(&escrow_pda), total_amount);

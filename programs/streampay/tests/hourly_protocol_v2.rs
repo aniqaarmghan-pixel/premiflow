@@ -417,6 +417,8 @@ impl Env {
         let ix = Instruction {
             program_id: self.program_id,
             accounts: streampay_program::accounts::WithdrawFreelancer {
+                fee_config: None,
+                treasury_token_account: None,
                 freelancer: self.freelancer_pk,
                 contract,
                 token_mint: self.token_mint,
@@ -600,6 +602,7 @@ fn create_contract_still_rejects_hourly_mode() {
     let ix = Instruction {
         program_id: env.program_id,
         accounts: streampay_program::accounts::CreateContract {
+            fee_config: ::streampay::v2::fees::fee_config_pda().0,
             employer: env.employer_pk,
             freelancer: env.freelancer_pk,
             token_mint: env.token_mint,

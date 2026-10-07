@@ -416,3 +416,45 @@ pub struct HourlyContractEnded {
     pub employer_refundable_amount: u64,
     pub released_amount: u64,
 }
+
+/// Fee reserve deposited with a Fixed / Milestone contract.
+#[event]
+pub struct PlatformFeeReserved {
+    pub contract: Pubkey,
+    pub employer: Pubkey,
+    pub mint: Pubkey,
+    pub fee_bps: u16,
+    pub principal: u64,
+    pub fee_reserve: u64,
+    pub employer_total: u64,
+}
+
+/// Earned platform fee moved from escrow to the treasury.
+#[event]
+pub struct PlatformFeePaid {
+    pub contract: Pubkey,
+    pub treasury_token_account: Pubkey,
+    pub mint: Pubkey,
+    pub amount: u64,
+    pub fee_paid: u64,
+    pub principal_released: u64,
+}
+
+/// Unearned platform fee returned to the employer with a refund.
+#[event]
+pub struct PlatformFeeRefunded {
+    pub contract: Pubkey,
+    pub employer: Pubkey,
+    pub mint: Pubkey,
+    pub amount: u64,
+    pub principal_refunded: u64,
+}
+
+/// FeeConfig created or updated.
+#[event]
+pub struct FeeConfigUpdated {
+    pub fee_config: Pubkey,
+    pub admin: Pubkey,
+    pub treasury: Pubkey,
+    pub fee_bps: u16,
+}

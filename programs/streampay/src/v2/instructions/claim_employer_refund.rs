@@ -2,13 +2,18 @@
 //!
 //! Withdraw-all-available of `employer_refundable_amount - refunded_amount`.
 //! Active contracts have no refund path. Does not recompute settlement.
+//!
+//! Platform fee: the refund also returns the unearned share of the fee
+//! reserve, `fees::fee_refund_due` (cumulative `reserve - fee_on(total - R)`),
+//! in the same transfer. No treasury account is involved.
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{transfer_checked, Mint, Token, TokenAccount, TransferChecked};
 
 use crate::v2::constants::{CONTRACT_ESCROW_SEED, CONTRACT_SEED};
 use crate::v2::errors::StreamPayV2Error;
-use crate::v2::events::EmployerRefundClaimed;
+use crate::v2::events::{EmployerRefundClaimed, PlatformFeeRefunded};
+use crate::v2::fees;
 use crate::v2::state::Contract;
 
 #[derive(Accounts)]
@@ -66,8 +71,8 @@ pub fn handle_claim_employer_refund(ctx: Context<ClaimEmployerRefund>) -> Result
     );
 
     let refundable = contract.employer_refundable_amount;
-    let new_refunded = contract
-        .refunded_amount
+    let old_refunded = contract.refunded_amount;
+    let new_refunded = old_refunded
         .checked_add(available)
         .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
     require!(
@@ -77,6 +82,26 @@ pub fn handle_claim_employer_refund(ctx: Context<ClaimEmployerRefund>) -> Result
     let remaining = refundable
         .checked_sub(new_refunded)
         .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+
+    let fee_refund = if contract.fee_bps == 0 {
+        0
+    } else {
+        fees::fee_refund_due(
+            contract.total_amount,
+            old_refunded,
+            new_refunded,
+            contract.fee_reserve,
+            contract.fee_bps,
+        )
+        .ok_or(StreamPayV2Error::ArithmeticOverflow)?
+    };
+    let transfer_amount = available
+        .checked_add(fee_refund)
+        .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+    require!(
+        escrow_amount >= transfer_amount,
+        StreamPayV2Error::InsufficientEscrowBalance
+    );
 
     // Accounting before the CPI. A failed transfer aborts the whole
     // transaction, so this update cannot persist without tokens leaving escrow.
@@ -108,9 +133,19 @@ pub fn handle_claim_employer_refund(ctx: Context<ClaimEmployerRefund>) -> Result
             },
             &[signer_seeds],
         ),
-        available,
+        transfer_amount,
         decimals,
     )?;
+
+    if fee_refund > 0 {
+        emit!(PlatformFeeRefunded {
+            contract: contract_key,
+            employer,
+            mint,
+            amount: fee_refund,
+            principal_refunded: new_refunded,
+        });
+    }
 
     emit!(EmployerRefundClaimed {
         contract: contract_key,

@@ -174,6 +174,14 @@ pub struct Contract {
     pub bump: u8,
     pub escrow_bump: u8,
 
+    /// Platform fee in bps snapshotted from FeeConfig at creation. Fixed /
+    /// Milestone only; zero for Streaming, Hourly and legacy contracts.
+    pub fee_bps: u16,
+    /// Fee deposited on top of principal: `fees::fee_on(total_amount, fee_bps)`.
+    pub fee_reserve: u64,
+    /// Cumulative fee moved to the treasury: `fees::fee_on(withdrawn_amount)`.
+    pub fee_paid: u64,
+
     /// Upgrade headroom. Adding a field means shrinking this, which leaves
     /// account size and every client offset unchanged.
     ///
@@ -186,8 +194,10 @@ pub struct Contract {
     /// Phase 7 layout: two u64 settlement fields after `stream_released_amount`;
     /// reserved 84 → 68. Phase 9 consumed 49 more bytes for `resolver` (32),
     /// `contested_amount` (8), `disputed_at` (8) and `dispute_initiator` (1);
-    /// reserved 68 → 19. `INIT_SPACE` remains 621.
-    pub reserved: [u8; 19],
+    /// reserved 68 → 19. Platform fee consumed 18 more for `fee_bps` (2),
+    /// `fee_reserve` (8) and `fee_paid` (8); reserved 19 → 1. Legacy
+    /// accounts read these as zero (no fee). `INIT_SPACE` remains 621.
+    pub reserved: [u8; 1],
 
     // -----------------------------------------------------------------
     // Variable length. Must remain the final field.

@@ -207,6 +207,7 @@ impl Env {
         let ix = Instruction {
             program_id: self.program_id,
             accounts: streampay_program::accounts::CreateContract {
+                fee_config: ::streampay::v2::fees::fee_config_pda().0,
                 employer: self.employer_pk,
                 freelancer: self.freelancer_pk,
                 token_mint: self.token_mint,
@@ -593,6 +594,7 @@ fn reject_trial_without_trial_account() {
     let ix = Instruction {
         program_id: env.program_id,
         accounts: streampay_program::accounts::CreateContract {
+            fee_config: ::streampay::v2::fees::fee_config_pda().0,
             employer: env.employer_pk,
             freelancer: env.freelancer_pk,
             token_mint: env.token_mint,

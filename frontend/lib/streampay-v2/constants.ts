@@ -75,3 +75,6 @@ export const WORK_UNIT_ACCOUNT = {
   versionOffset: 8,
   contractOffset: 9,
 } as const;
+
+/** Rust `FEE_CONFIG_SEED` = b"fee_config" */
+export const FEE_CONFIG_SEED = new TextEncoder().encode("fee_config");

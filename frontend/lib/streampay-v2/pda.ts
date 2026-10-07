@@ -4,6 +4,7 @@ import { u32ToLeBytes, u64ToLeBytes } from "./bytes";
 import {
   CONTRACT_ESCROW_SEED,
   CONTRACT_SEED,
+  FEE_CONFIG_SEED,
   HOURLY_SESSION_SEED,
   HOURLY_STATE_SEED,
   STREAMPAY_PROGRAM_ID,
@@ -123,4 +124,10 @@ export function deriveContractAddresses(
     trialWorkUnit: deriveTrialWorkUnitPda(contract.address, programId),
     fixedWorkUnit: deriveFixedWorkUnitPda(contract.address, programId),
   };
+}
+
+export function deriveFeeConfigPda(
+  programId: PublicKey = STREAMPAY_PROGRAM_ID
+): Pda {
+  return findPda([FEE_CONFIG_SEED], programId);
 }

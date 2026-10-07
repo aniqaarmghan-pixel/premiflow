@@ -24,12 +24,14 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 
 use crate::v2::constants::{
-    CONTRACT_ESCROW_SEED, CONTRACT_SEED, MAX_CHECKPOINTS, TRIAL_UNIT_SEED, V2_LAYOUT_VERSION,
+    CONTRACT_ESCROW_SEED, CONTRACT_SEED, FEE_CONFIG_SEED, MAX_CHECKPOINTS, TRIAL_UNIT_SEED, V2_LAYOUT_VERSION,
     WORK_UNIT_SEED,
 };
 use crate::v2::enums::{ContractStatus, DisputeParty, PaymentMode, StartMode};
+use crate::v2::fees;
+use crate::v2::instructions::fee_admin::read_fee_bps;
 use crate::v2::errors::StreamPayV2Error;
-use crate::v2::events::{ContractCreated, TrialConfigured};
+use crate::v2::events::{ContractCreated, PlatformFeeReserved, TrialConfigured};
 use crate::v2::instructions::create_shared::{
     fund_contract_escrow, prove_on_activation_end_fits, validate_common_offer_terms,
     validate_parties_and_resolver,
@@ -341,6 +343,12 @@ pub struct CreateContract<'info> {
     )]
     pub fixed_work_unit: Option<Box<Account<'info, WorkUnit>>>,
 
+    /// CHECK: Canonical FeeConfig PDA (seeds-constrained, so it cannot be
+    /// swapped). Read in the handler: uninitialized means no platform fee;
+    /// otherwise its `fee_bps` is snapshotted for Fixed / Milestone.
+    #[account(seeds = [FEE_CONFIG_SEED], bump)]
+    pub fee_config: UncheckedAccount<'info>,
+
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
@@ -422,7 +430,7 @@ pub fn handle_create_contract(
         contract.metadata_hash = args.metadata_hash;
         contract.bump = ctx.bumps.contract;
         contract.escrow_bump = ctx.bumps.contract_escrow;
-        contract.reserved = [0u8; 19];
+        contract.reserved = [0u8; 1];
         contract.metadata_uri = args.metadata_uri;
     }
 
@@ -479,14 +487,45 @@ pub fn handle_create_contract(
         );
     }
 
+    // Platform fee: Fixed / Milestone only. The employer funds principal plus
+    // the fee reserve; the freelancer's principal is unchanged.
+    let fee_bps = if matches!(payment_mode, PaymentMode::Fixed | PaymentMode::Milestone) {
+        read_fee_bps(&ctx.accounts.fee_config.to_account_info())?
+    } else {
+        0
+    };
+    let fee_reserve =
+        fees::fee_reserve_for(total_amount, fee_bps).ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+    let funding_total = total_amount
+        .checked_add(fee_reserve)
+        .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+    {
+        let contract = &mut ctx.accounts.contract;
+        contract.fee_bps = fee_bps;
+        contract.fee_reserve = fee_reserve;
+        contract.fee_paid = 0;
+    }
+
     fund_contract_escrow(
         ctx.accounts.token_program.to_account_info(),
         ctx.accounts.employer_token_account.to_account_info(),
         &ctx.accounts.token_mint,
         &mut ctx.accounts.contract_escrow,
         ctx.accounts.employer.to_account_info(),
-        total_amount,
+        funding_total,
     )?;
+
+    if fee_bps > 0 {
+        emit!(PlatformFeeReserved {
+            contract: contract_key,
+            employer: employer_key,
+            mint: token_mint_key,
+            fee_bps,
+            principal: total_amount,
+            fee_reserve,
+            employer_total: funding_total,
+        });
+    }
 
     emit!(ContractCreated {
         contract: contract_key,

@@ -303,6 +303,21 @@ pub enum StreamPayV2Error {
 
     #[msg("The employer activation window has not yet closed.")]
     ApprovalWindowNotExpired,
+
+    // -----------------------------------------------------------------
+    // Platform fee.
+    // -----------------------------------------------------------------
+    #[msg("Platform fee basis points exceed the permitted maximum.")]
+    InvalidFeeBps,
+
+    #[msg("This payment requires the platform fee config and treasury account.")]
+    FeeConfigRequired,
+
+    #[msg("The treasury token account is invalid for this contract.")]
+    InvalidTreasuryAccount,
+
+    #[msg("Only the fee admin may perform this action.")]
+    UnauthorizedFeeAdmin,
 }
 
 #[cfg(test)]
@@ -482,6 +497,14 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::InvalidHourlyRate), 6166);
         assert_eq!(u32::from(StreamPayV2Error::HourlyOpenSessionBlocksClose), 6178);
         assert_eq!(u32::from(StreamPayV2Error::ApprovalWindowNotExpired), 6179);
+    }
+
+    #[test]
+    fn v2_platform_fee_error_codes_are_pinned() {
+        assert_eq!(u32::from(StreamPayV2Error::InvalidFeeBps), 6180);
+        assert_eq!(u32::from(StreamPayV2Error::FeeConfigRequired), 6181);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidTreasuryAccount), 6182);
+        assert_eq!(u32::from(StreamPayV2Error::UnauthorizedFeeAdmin), 6183);
     }
 
     #[test]
