@@ -50,6 +50,8 @@ import { playableVideoUrl } from "@/lib/app/marketplace-media";
 import { GigVideoButton } from "./MarketplaceVideoModal";
 import { VerifiedReputationBadge } from "./MarketplaceTrustSummary";
 import {
+  DEMO_ASSET_NOTE,
+  DEMO_ASSET_NOTE_TITLE,
   DEMO_BADGE_LABEL,
   DEVNET_DEMO_NOTICE,
   isDemoListing,
@@ -188,6 +190,15 @@ export function DemoBadge({ className = "" }: { className?: string }) {
   );
 }
 
+/** Muted caption beside demo amounts: the label is a Devnet test asset, not official USDT. */
+export function DemoAssetNote({ className = "" }: { className?: string }) {
+  return (
+    <span title={DEMO_ASSET_NOTE_TITLE} className={`text-[10px] font-medium leading-none text-ink-faint ${className}`}>
+      {DEMO_ASSET_NOTE}
+    </span>
+  );
+}
+
 export function StatusPill({ children }: { children: ReactNode }) {
   return (
     <span className="shrink-0 rounded-full bg-paper-2 px-2 py-0.5 text-xs font-semibold text-ink-soft">
@@ -270,8 +281,11 @@ export function JobSummaryCard({
           <span className="rounded-full bg-paper-2 px-2 py-0.5 font-medium text-ink-soft">{job.paymentMode}</span>
           <span>Posted {new Date(job.createdAt).toLocaleDateString()}</span>
         </p>
-        <span className="rounded-full bg-[color-mix(in_srgb,var(--accent)_14%,white)] px-3 py-1 text-sm font-semibold text-ink">
-          {amountLabel(job.paymentMode)}: {formatMarketplaceAmount(job.budgetAmount, { demo })}
+        <span className="flex flex-col items-end gap-1">
+          <span className="rounded-full bg-[color-mix(in_srgb,var(--accent)_14%,white)] px-3 py-1 text-sm font-semibold text-ink">
+            {amountLabel(job.paymentMode)}: {formatMarketplaceAmount(job.budgetAmount, { demo })}
+          </span>
+          {demo ? <DemoAssetNote /> : null}
         </span>
       </div>
       {footer ? (
@@ -582,7 +596,10 @@ export function GigSummaryCard({
         </p>
         <div className="mt-auto flex min-w-0 flex-wrap items-baseline justify-between gap-2 border-t border-line pt-3">
           <span className="text-xs uppercase tracking-wide text-ink-faint">{gig.paymentMode}</span>
-          <span className="text-base font-semibold text-ink">{gigPriceLabel(gig, { demo })}</span>
+          <span className="flex flex-col items-end gap-1">
+            <span className="text-base font-semibold text-ink">{gigPriceLabel(gig, { demo })}</span>
+            {demo ? <DemoAssetNote /> : null}
+          </span>
         </div>
         {footer}
       </div>
@@ -634,7 +651,10 @@ export function FreelancerSummaryCard({ freelancer }: { freelancer: FreelancerCa
             View profile
           </Link>
           {freelancer.rateAmount ? (
-            <span className="font-semibold text-ink">{formatMarketplaceAmount(freelancer.rateAmount, { demo })} / hour</span>
+            <span className="flex flex-col items-end gap-1">
+              <span className="font-semibold text-ink">{formatMarketplaceAmount(freelancer.rateAmount, { demo })} / hour</span>
+              {demo ? <DemoAssetNote /> : null}
+            </span>
           ) : (
             <span className="text-ink-faint">Rate on request</span>
           )}

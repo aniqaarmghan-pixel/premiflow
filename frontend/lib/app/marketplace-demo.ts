@@ -10,8 +10,11 @@ import { ACTIVE_CLUSTER_ID, type PremiflowClusterId } from "@/lib/cluster";
 export const DEMO_SKILL_TAG = "devnet demo";
 export const DEMO_BADGE_LABEL = "Demo";
 export const DEVNET_DEMO_NOTICE = "Devnet demo marketplace \u2014 sample listings and profiles.";
-/** Short, clearly non-production label for the Devnet test token on demo cards. The mint is unchanged. */
-export const DEMO_TOKEN_LABEL = "Devnet test token";
+/** Display-only label for the Devnet test token on seeded demo cards. The mint, decimals and math are unchanged. */
+export const DEMO_TOKEN_LABEL = "Demo USDT";
+/** Muted caption next to demo amounts so nobody mistakes them for official USDT. */
+export const DEMO_ASSET_NOTE = "Devnet test asset";
+export const DEMO_ASSET_NOTE_TITLE = "Not official USDT: a Devnet test token with no real value.";
 
 export function isDemoSkill(skill: string): boolean {
   return skill.trim().toLowerCase() === DEMO_SKILL_TAG;
