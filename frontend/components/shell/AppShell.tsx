@@ -33,6 +33,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 
 import { brand } from "@/lib/brand";
+import { RESOLVER_WORKSPACE_COPY } from "@/lib/app/resolver-workspace";
 import { useAccountSession } from "@/lib/account-auth/useAccountSession";
 import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
 import { RESOLVER_NAV, type WorkspaceMode } from "@/lib/app/resolver-workspace";
@@ -101,6 +102,7 @@ const NAV_GROUPS: ReadonlyArray<NavGroup> = [
 ];
 
 const RESOLVER_ICONS: Record<string, LucideIcon> = {
+  "/admin": LayoutDashboard,
   "/resolver": Gavel,
   "/resolver/assigned": Inbox,
   "/resolver/resolved": CheckCircle2,
@@ -207,7 +209,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     workspace.mode === "resolver" ? [{ title: null, items: RESOLVER_NAV_ITEMS }] : NAV_GROUPS;
   const switchWorkspace = () => {
     const next = workspace.toggle();
-    router.push(next === "resolver" ? "/resolver" : DASHBOARD_HREF);
+    router.push(next === "resolver" ? "/admin" : DASHBOARD_HREF);
   };
 
   return (
@@ -454,7 +456,9 @@ function WorkspaceSwitch({ mode, onToggle }: { mode: WorkspaceMode; onToggle: ()
     >
       <ArrowLeftRight size={14} className="shrink-0" aria-hidden="true" />
       <span className="min-w-0 truncate">
-        {mode === "resolver" ? "Switch to contracts workspace" : "Switch to resolver workspace"}
+        {mode === "resolver"
+          ? RESOLVER_WORKSPACE_COPY.switchToContracts
+          : RESOLVER_WORKSPACE_COPY.switchToResolver}
       </span>
     </button>
   );

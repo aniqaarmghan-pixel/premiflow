@@ -1,4 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
+import type { NotificationStore } from "../stores";
+import { notifyStatementSubmitted } from "../notifications/statement-submitted";
 
 import {
   DISPUTE_CATEGORIES,
@@ -560,7 +562,7 @@ export async function updateCaseNotes(
 }
 
 export async function upsertOwnStatement(
-  stores: { cases: CaseStore; rates?: RateLimitStore },
+  stores: { cases: CaseStore; rates?: RateLimitStore; notifications?: NotificationStore },
   reader: ContractFactsReader,
   input: {
     contractAddress: string;
@@ -626,6 +628,20 @@ export async function upsertOwnStatement(
     actorWallet: input.sessionWallet,
     now,
   });
+  // First submission only: notify the other party and the designated
+  // resolver. Edits never notify; unique keys also make retries idempotent.
+  // A notification failure never blocks saving the statement.
+  if (!previous && stores.notifications) {
+    try {
+      await notifyStatementSubmitted(
+        stores.notifications,
+        { contractAddress, role, facts },
+        now
+      );
+    } catch {
+      // best effort
+    }
+  }
   const statements = await stores.cases.listStatements(existing.id);
   const workflowStatus = workflowFromStatements(statements);
   if (existing.workflowStatus !== workflowStatus) {

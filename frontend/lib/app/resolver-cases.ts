@@ -33,7 +33,7 @@ export const RESOLVER_UX_COPY = {
   freelancerHint: "Added to the freelancer settlement.",
   employerHint: "Becomes employer-refundable.",
   decimalsLoading: "Loading token decimals. Settlement controls appear once exact amounts are available.",
-  reviewSettlement: "Review settlement",
+  reviewSettlement: "Resolve dispute",
   settlementNoTransfer:
     "Recording a settlement does not move tokens. Afterwards the freelancer collects and the employer claims their refund.",
   partyClaimGuidance:

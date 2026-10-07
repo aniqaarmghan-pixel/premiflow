@@ -28,7 +28,7 @@ export const READINESS_LABEL: Record<CaseReadiness, string> = {
 
 export const RESOLVER_WORKSPACE_COPY = {
   notAdmin:
-    "You only see disputes where this wallet is the designated resolver. This is not an admin console; the program enforces every settlement.",
+    "Resolution Desk shows only disputes where the connected wallet is the on-chain designated resolver. Only that wallet can sign Resolve dispute; the program enforces every settlement.",
   connect: "Connect the resolver wallet to see disputes assigned to it.",
   loadError: "Could not load assigned disputes. Try again shortly.",
   none: "No disputes are assigned to this wallet.",
@@ -44,8 +44,8 @@ export const RESOLVER_WORKSPACE_COPY = {
   txHistoryLoading: "Loading on-chain transactions...",
   txHistoryEmpty: "No on-chain transactions found for your assigned contracts.",
   txHistoryError: "On-chain transaction history could not be loaded right now. Dispute timestamps below are still accurate.",
-  switchToResolver: "Switch to resolver workspace",
-  switchToContracts: "Switch to contracts workspace",
+  switchToResolver: "Admin Center",
+  switchToContracts: "Back to contracts",
 } as const;
 
 type StatementLike = { body?: string | null } | null | undefined;
@@ -243,14 +243,15 @@ export function canSwitchWorkspace(resolverCaseCount: number): boolean {
 }
 
 export const RESOLVER_NAV = [
-  { href: "/resolver", label: "Resolver Dashboard" },
+  { href: "/admin", label: "Admin Center" },
+  { href: "/resolver", label: "Resolution Desk" },
   { href: "/resolver/assigned", label: "Assigned Disputes" },
   { href: "/resolver/resolved", label: "Resolved Cases" },
-  { href: "/resolver/activity", label: "Resolver Activity" },
-  { href: "/support", label: "Help & Support" },
+  { href: "/resolver/activity", label: "Resolution Activity" },
+  { href: "/support", label: "Help Desk" },
 ] as const;
 
 export function isNavActive(href: string, pathname: string): boolean {
-  if (href === "/" || href === "/resolver") return pathname === href;
+  if (href === "/" || href === "/resolver" || href === "/admin") return pathname === href;
   return pathname.startsWith(href);
 }

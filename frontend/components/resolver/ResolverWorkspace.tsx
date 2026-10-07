@@ -26,10 +26,10 @@ import { explorerTxUrl } from "@/lib/network";
 import type { ContractView } from "@/lib/streampay-v2";
 
 const TITLES: Record<ResolverWorkspaceView, string> = {
-  dashboard: "Resolver Dashboard",
+  dashboard: "Resolution Desk",
   assigned: "Assigned Disputes",
   resolved: "Resolved Cases",
-  activity: "Resolver Activity",
+  activity: "Resolution Activity",
 };
 
 function short(value: string): string {

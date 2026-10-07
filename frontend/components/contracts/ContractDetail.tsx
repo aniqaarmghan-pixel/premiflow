@@ -390,8 +390,11 @@ export function ContractDetail({ address }: { address: string }) {
     if (
       publicKey &&
       (publicKey.equals(contract.employer) ||
-        publicKey.equals(contract.freelancer))
+        publicKey.equals(contract.freelancer) ||
+        publicKey.equals(contract.resolver))
     ) {
+      // A connected resolver wallet presents only resolver actions, never
+      // party/marketplace actions from linked account wallets.
       return publicKey;
     }
 
@@ -462,9 +465,16 @@ export function ContractDetail({ address }: { address: string }) {
 
   // Existing detail components require one ContractRole rather than the
   // account-level "both" role. Transaction authority does NOT use this value.
-  const role = displayPartyWallet
-    ? roleForContract(displayPartyWallet, contract)
-    : "none";
+  // The connected designated resolver wallet (not a party) sees the resolver
+  // view, including the Resolve dispute control. Signing authority stays with
+  // that wallet; the program enforces has_one = resolver.
+  const connectedIsResolver =
+    publicKey != null && !connectedPartyWallet && publicKey.equals(contract.resolver);
+  const role = connectedIsResolver
+    ? "resolver"
+    : displayPartyWallet
+      ? roleForContract(displayPartyWallet, contract)
+      : "none";
 
   const other = displayPartyWallet
     ? counterparty(displayPartyWallet, contract)
