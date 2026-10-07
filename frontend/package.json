@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "test": "tsx --test lib/streampay-v2/tests/*.test.ts lib/app/tests/*.test.ts lib/server/tests/*.test.ts"
+    "test": "tsx --test lib/streampay-v2/tests/*.test.ts lib/app/tests/*.test.ts lib/server/tests/*.test.ts",
+    "seed:demo": "tsx scripts/seed-devnet-demo.ts"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.71",
