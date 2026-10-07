@@ -8,7 +8,6 @@ import { isWalletAddress, validateGigInput, validateProfileInput } from "../mark
 import { MARKETPLACE_CATEGORIES } from "@/lib/app/marketplace-categories";
 import { DEVNET_CLUSTER } from "@/lib/cluster";
 import {
-  DEMO_NAME_SUFFIX,
   DEMO_SEED_FLAG,
   DEMO_SKILL_TAG,
   applyDemoSeed,
@@ -123,22 +122,22 @@ test("demo seed: ids and wallets are unique, deterministic and well-formed", () 
   assert.ok(a.jobs.every((j) => a.employerWallets.includes(j.employerWallet)));
 });
 
-test("demo seed: every record is clearly labeled as Devnet demo data", () => {
+test("demo seed: every record is disclosed (demo tag + short trailing note); names stay clean", () => {
   const data = buildDemoSeedData(NOW);
   for (const p of data.profiles) {
-    assert.ok(p.displayName.endsWith(DEMO_NAME_SUFFIX), p.displayName);
-    assert.match(p.bio, /^Devnet demo profile: a fictional freelancer/);
-    assert.match(p.bio, /Not a real person/);
+    assert.doesNotMatch(p.displayName, /\(demo\)/i, p.displayName);
+    assert.doesNotMatch(p.bio, /^Devnet demo/);
+    assert.match(p.bio, /\n\nDevnet demo profile: fictional, not a real person\.$/);
     assert.equal(p.skills[0], DEMO_SKILL_TAG);
   }
   for (const g of data.gigs) {
-    assert.match(g.description, /^Devnet demo gig: fictional sample listing/);
-    assert.match(g.description, /no real payment/);
+    assert.doesNotMatch(g.description, /^Devnet demo/);
+    assert.match(g.description, /\n\nDevnet demo gig: fictional sample, not a real offer\.$/);
     assert.equal(g.skills[0], DEMO_SKILL_TAG);
   }
   for (const j of data.jobs) {
-    assert.match(j.description, /^Devnet demo job: fictional sample posting/);
-    assert.match(j.description, /Not a real client/);
+    assert.doesNotMatch(j.description, /^Devnet demo/);
+    assert.match(j.description, /\n\nDevnet demo job: fictional sample, not a real client\.$/);
     assert.equal(j.skills[0], DEMO_SKILL_TAG);
   }
 });
@@ -285,4 +284,21 @@ test("demo seed: manual npm script only; never runs on build, start or install",
   assert.match(script, /process\.env\.DATABASE_URL/);
   assert.doesNotMatch(script, /console\.\w+\([^;]*DATABASE_URL/);
   assert.doesNotMatch(script, /loadEnvFile|dotenv/);
+});
+
+test("demo seed: re-running updates legacy '(demo)' names and long leading notes in place", async () => {
+  const { store } = fakeStore();
+  const data = buildDemoSeedData(NOW);
+  const legacy = data.profiles[0];
+  await store.upsertProfile({
+    ...legacy,
+    displayName: `${legacy.displayName} (demo)`,
+    bio: `Devnet demo profile: a fictional freelancer created to explore PREMIFLOW on Solana Devnet.\n\n${legacy.bio}`,
+  });
+  const report = await applyDemoSeed(store, data, NOW);
+  assert.deepEqual(report.profiles, { created: 9, updated: 1 });
+  const saved = await store.getProfile(legacy.wallet);
+  assert.equal(saved?.displayName, legacy.displayName);
+  assert.doesNotMatch(saved?.displayName ?? "", /\(demo\)/);
+  assert.equal(saved?.bio, legacy.bio);
 });

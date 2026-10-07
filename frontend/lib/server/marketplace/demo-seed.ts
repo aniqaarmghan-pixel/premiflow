@@ -1,7 +1,8 @@
 /**
  * Devnet demo marketplace seed: 10 freelancer profiles, 10 gigs and 10 jobs.
  *
- * Every record is fictional and clearly labeled "Devnet demo". IDs and wallet
+ * Every record is fictional and carries the "devnet demo" skill tag (shown as
+ * a small Demo badge in the UI) plus a short trailing note. IDs and wallet
  * addresses are deterministic, so seeding twice updates the same rows instead
  * of duplicating them. Demo wallet addresses are hashes mapped onto the
  * ed25519 curve: no private key is generated, stored or known by anyone, so
@@ -14,6 +15,7 @@ import { PublicKey } from "@solana/web3.js";
 
 import { DEVNET_CLUSTER, getActiveCluster } from "@/lib/cluster";
 import type { MarketplaceCategorySlug } from "@/lib/app/marketplace-categories";
+import { DEMO_SKILL_TAG } from "@/lib/app/marketplace-demo";
 
 import { JOB_DESCRIPTION_MAX, JOB_TITLE_MAX } from "./service";
 import {
@@ -34,19 +36,17 @@ import type {
 } from "./store";
 
 export const DEMO_SEED_FLAG = "PREMIFLOW_ALLOW_DEMO_SEED";
-export const DEMO_SKILL_TAG = "devnet demo";
-export const DEMO_NAME_SUFFIX = "(demo)";
+/** Shared with the UI, which shows a small "Demo" badge instead of this skill chip. */
+export { DEMO_SKILL_TAG };
 
 const DEMO_LABEL = "premiflow-devnet-demo:v1";
 /** Fixed namespace for deterministic (RFC 4122 v5) demo record IDs. */
 const DEMO_UUID_NAMESPACE = "3b8f5c1e-9a24-4d7b-8f61-2c0e7d9a4b15";
 
-const PROFILE_NOTE =
-  "Devnet demo profile: a fictional freelancer created to explore PREMIFLOW on Solana Devnet. Not a real person, and no real work history.";
-const GIG_NOTE =
-  "Devnet demo gig: fictional sample listing for exploring PREMIFLOW on Solana Devnet. Not a real offer; no real payment is taken.";
-const JOB_NOTE =
-  "Devnet demo job: fictional sample posting for exploring PREMIFLOW on Solana Devnet. Not a real client; no real payment will be made.";
+/* Short trailing notes: card previews show the real summary first; the Demo badge discloses. */
+const PROFILE_NOTE = "Devnet demo profile: fictional, not a real person.";
+const GIG_NOTE = "Devnet demo gig: fictional sample, not a real offer.";
+const JOB_NOTE = "Devnet demo job: fictional sample, not a real client.";
 
 /* ---------------- deterministic ids and addresses ---------------- */
 
@@ -487,10 +487,10 @@ export function buildDemoSeedData(now: Date = new Date()): DemoSeedData {
 
   const profiles = PROFILES.map((p, i): MarketplaceProfileRecord => {
     const input = validateProfileInput({
-      displayName: `${p.name} ${DEMO_NAME_SUFFIX}`,
+      displayName: p.name,
       avatarUrl: null,
       headline: p.headline,
-      bio: `${PROFILE_NOTE}\n\n${p.body}\n\nLocation: ${p.location}`,
+      bio: `${p.body}\n\nLocation: ${p.location}\n\n${PROFILE_NOTE}`,
       skills: [DEMO_SKILL_TAG, ...p.skills],
       rateAmount: units(p.rate),
       availability: p.availability,
@@ -513,7 +513,7 @@ export function buildDemoSeedData(now: Date = new Date()): DemoSeedData {
     }));
     const input = validateGigInput({
       title: g.title,
-      description: `${GIG_NOTE}\n\n${g.body}`,
+      description: `${g.body}\n\n${GIG_NOTE}`,
       skills: [DEMO_SKILL_TAG, ...g.skills],
       paymentMode: g.paymentMode,
       priceAmount: g.price != null ? units(g.price) : undefined,
@@ -537,7 +537,7 @@ export function buildDemoSeedData(now: Date = new Date()): DemoSeedData {
   });
 
   const jobs = JOBS.map((j, i): MarketplaceJobRecord => {
-    const description = `${JOB_NOTE}\n\n${j.body}\n\nLocation: ${j.location}`;
+    const description = `${j.body}\n\nLocation: ${j.location}\n\n${JOB_NOTE}`;
     if (j.title.length > JOB_TITLE_MAX || description.length > JOB_DESCRIPTION_MAX) {
       throw new Error(`Demo job text is too long: ${j.key}`);
     }

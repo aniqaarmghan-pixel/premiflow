@@ -49,6 +49,13 @@ import type { PublicJob } from "@/lib/server/marketplace/service";
 import { playableVideoUrl } from "@/lib/app/marketplace-media";
 import { GigVideoButton } from "./MarketplaceVideoModal";
 import { VerifiedReputationBadge } from "./MarketplaceTrustSummary";
+import {
+  DEMO_BADGE_LABEL,
+  DEVNET_DEMO_NOTICE,
+  isDemoListing,
+  showDevnetDemoNotice,
+  withoutDemoTag,
+} from "@/lib/app/marketplace-demo";
 
 /** Discovery + management tabs. Label color lives on an inner span so no global anchor rule can mute it. */
 export function MarketplaceNav({ className = "" }: { className?: string }) {
@@ -126,6 +133,7 @@ export function MarketplaceHeader({
                   {subtitle}
                 </p>
               ) : null}
+              {showDevnetDemoNotice() ? <DevnetDemoNotice className="pf-hero-in mt-4" /> : null}
             </div>
             {art ? (
               <div
@@ -155,6 +163,31 @@ export function MarketplaceHeader({
   );
 }
 
+/** The single Devnet demo disclosure for public marketplace pages (hero header). */
+export function DevnetDemoNotice({ className = "" }: { className?: string }) {
+  return (
+    <p
+      role="note"
+      className={`inline-flex max-w-full items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3 py-1 text-[11px] font-medium text-white/75 backdrop-blur-sm sm:text-xs ${className}`}
+    >
+      <span aria-hidden="true" className="size-1.5 shrink-0 rounded-full bg-aqua" />
+      <span className="min-w-0">{DEVNET_DEMO_NOTICE}</span>
+    </p>
+  );
+}
+
+/** Small disclosure on seeded Devnet demo records (detected by the demo skill tag). */
+export function DemoBadge({ className = "" }: { className?: string }) {
+  return (
+    <span
+      title="Sample data for the Devnet demo marketplace"
+      className={`inline-flex shrink-0 items-center rounded-full border border-line bg-paper-2 px-1.5 py-0.5 text-[10px] font-semibold uppercase leading-none tracking-[0.12em] text-ink-faint ${className}`}
+    >
+      {DEMO_BADGE_LABEL}
+    </span>
+  );
+}
+
 export function StatusPill({ children }: { children: ReactNode }) {
   return (
     <span className="shrink-0 rounded-full bg-paper-2 px-2 py-0.5 text-xs font-semibold text-ink-soft">
@@ -180,6 +213,7 @@ export function JobSummaryCard({
   const stopInner = wholeCardLink
     ? (event: { stopPropagation: () => void }) => event.stopPropagation()
     : undefined;
+  const demo = isDemoListing(job);
   return (
     <article
       className={`pf-card group relative min-w-0 overflow-hidden rounded-[20px] border border-line bg-card p-4 shadow-[var(--shadow)] sm:p-5 ${
@@ -218,13 +252,16 @@ export function JobSummaryCard({
         >
           {job.title}
         </Link>
-        <StatusPill>{JOB_STATUS_LABELS[job.status]}</StatusPill>
+        <span className="flex shrink-0 items-center gap-1.5">
+          {demo ? <DemoBadge /> : null}
+          <StatusPill>{JOB_STATUS_LABELS[job.status]}</StatusPill>
+        </span>
       </div>
       </div>
       <p className="mt-1.5 line-clamp-2 break-words text-sm leading-6 text-ink-soft [overflow-wrap:anywhere]">
         {job.description}
       </p>
-      <JobTags job={job} className="mt-3" />
+      <JobTags job={job} className="mt-3" showDemoBadge={false} />
       <div className="mt-4 flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
         <p className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-faint">
           <span className="relative z-[2] min-w-0" onClick={stopInner} onKeyDown={stopInner}>
@@ -234,7 +271,7 @@ export function JobSummaryCard({
           <span>Posted {new Date(job.createdAt).toLocaleDateString()}</span>
         </p>
         <span className="rounded-full bg-[color-mix(in_srgb,var(--accent)_14%,white)] px-3 py-1 text-sm font-semibold text-ink">
-          {amountLabel(job.paymentMode)}: {formatMarketplaceAmount(job.budgetAmount)}
+          {amountLabel(job.paymentMode)}: {formatMarketplaceAmount(job.budgetAmount, { demo })}
         </span>
       </div>
       {footer ? (
@@ -246,10 +283,20 @@ export function JobSummaryCard({
   );
 }
 /** Category chip (explicit, else keyword-derived) plus job skills. */
-export function JobTags({ job, className = "" }: { job: PublicJob; className?: string }) {
+export function JobTags({
+  job,
+  className = "",
+  showDemoBadge = true,
+}: {
+  job: PublicJob;
+  className?: string;
+  /** Cards show the Demo badge in their header instead. */
+  showDemoBadge?: boolean;
+}) {
   const category = jobCategory(job);
-  const skills = (job.skills ?? []).slice(0, 6);
-  if (!category && skills.length === 0) return null;
+  const demo = showDemoBadge && isDemoListing(job);
+  const skills = withoutDemoTag(job.skills).slice(0, 6);
+  if (!category && !demo && skills.length === 0) return null;
   return (
     <div className={`flex min-w-0 flex-wrap items-center gap-1.5 ${className}`}>
       {category ? (
@@ -257,6 +304,7 @@ export function JobTags({ job, className = "" }: { job: PublicJob; className?: s
           {categoryLabelOf(category)}
         </span>
       ) : null}
+      {demo ? <DemoBadge /> : null}
       <SkillList skills={skills} />
     </div>
   );
@@ -399,11 +447,19 @@ export function Avatar({
   );
 }
 
+/** Skill chips. The Devnet demo tag never renders as a chip; it becomes a small Demo badge. */
 export function SkillList({ skills }: { skills: string[] }) {
-  if (skills.length === 0) return null;
+  const demo = isDemoListing({ skills });
+  const visible = withoutDemoTag(skills);
+  if (visible.length === 0 && !demo) return null;
   return (
     <ul className="flex min-w-0 flex-wrap gap-1.5" aria-label="Skills">
-      {skills.map((skill) => (
+      {demo ? (
+        <li className="flex items-center">
+          <DemoBadge />
+        </li>
+      ) : null}
+      {visible.map((skill) => (
         <li
           key={skill}
           className="rounded-full border border-line px-2 py-0.5 text-xs text-ink-soft [overflow-wrap:anywhere]"
@@ -448,6 +504,7 @@ export function GigSummaryCard({
   const cover = gig.coverUrl ?? null;
   const hasVideo = playableVideoUrl(gig.videoUrl) !== null;
   const delivery = gigDeliveryLabel(gig.deliveryDays);
+  const demo = isDemoListing(gig);
   return (
     <article className="pf-card group flex min-w-0 flex-col overflow-hidden rounded-[20px] border border-line bg-card shadow-[var(--shadow)]">
       <div className="relative">
@@ -509,6 +566,7 @@ export function GigSummaryCard({
         <p className="flex min-w-0 items-center gap-2 text-xs text-ink-faint">
           <Avatar url={seller?.avatarUrl ?? null} name={seller?.displayName} wallet={gig.freelancerWallet} size={22} />
           <ProfileLink wallet={gig.freelancerWallet} label={seller?.displayName || undefined} />
+          {demo ? <DemoBadge className="ml-auto" /> : null}
         </p>
         <Link
           href={gigHref(gig.id)}
@@ -516,7 +574,7 @@ export function GigSummaryCard({
         >
           {gig.title}
         </Link>
-        <SkillList skills={gig.skills.slice(0, 4)} />
+        <SkillList skills={withoutDemoTag(gig.skills).slice(0, 4)} />
         <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-faint">
           <span>{DELIVERY_TERMS[gig.paymentMode]}</span>
           {delivery ? <span>{delivery}</span> : null}
@@ -524,7 +582,7 @@ export function GigSummaryCard({
         </p>
         <div className="mt-auto flex min-w-0 flex-wrap items-baseline justify-between gap-2 border-t border-line pt-3">
           <span className="text-xs uppercase tracking-wide text-ink-faint">{gig.paymentMode}</span>
-          <span className="text-base font-semibold text-ink">{gigPriceLabel(gig)}</span>
+          <span className="text-base font-semibold text-ink">{gigPriceLabel(gig, { demo })}</span>
         </div>
         {footer}
       </div>
@@ -534,6 +592,7 @@ export function GigSummaryCard({
 /** Public profile card: safe listing fields only. */
 export function FreelancerSummaryCard({ freelancer }: { freelancer: FreelancerCardData }) {
   const available = freelancer.availability === "available";
+  const demo = isDemoListing(freelancer);
   return (
     <article className="pf-card group relative flex min-w-0 flex-col overflow-hidden rounded-[20px] border border-line bg-card shadow-[var(--shadow)]">
       <div
@@ -553,6 +612,7 @@ export function FreelancerSummaryCard({ freelancer }: { freelancer: FreelancerCa
             <span aria-hidden="true" className={`size-1.5 rounded-full ${available ? "bg-ok" : "bg-ink-faint"}`} />
             {AVAILABILITY_LABELS[freelancer.availability]}
           </span>
+          {demo ? <DemoBadge className="mb-1 ml-auto" /> : null}
         </div>
         <div className="min-w-0">
           <Link
@@ -568,13 +628,13 @@ export function FreelancerSummaryCard({ freelancer }: { freelancer: FreelancerCa
           ) : null}
           <VerifiedReputationBadge wallet={freelancer.wallet} summary={freelancer.reputation} className="mt-1.5" />
         </div>
-        <SkillList skills={freelancer.skills.slice(0, 5)} />
+        <SkillList skills={withoutDemoTag(freelancer.skills).slice(0, 5)} />
         <div className="mt-auto flex min-w-0 flex-wrap items-center justify-between gap-2 border-t border-line pt-3 text-xs">
           <Link href={profileHref(freelancer.wallet)} className="font-semibold text-accent">
             View profile
           </Link>
           {freelancer.rateAmount ? (
-            <span className="font-semibold text-ink">{formatMarketplaceAmount(freelancer.rateAmount)} / hour</span>
+            <span className="font-semibold text-ink">{formatMarketplaceAmount(freelancer.rateAmount, { demo })} / hour</span>
           ) : (
             <span className="text-ink-faint">Rate on request</span>
           )}

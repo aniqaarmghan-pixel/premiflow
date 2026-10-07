@@ -74,6 +74,33 @@ body {
   box-sizing: border-box;
 }
 
+/* Fixed public navbar (PublicShell header: h-16 / sm:h-[72px] / lg:h-[76px] / xl:h-20).
+   Anchor targets on public pages land just below it at every breakpoint; explicit
+   scroll-mt-* utilities still win because this sits in the base layer. */
+:root {
+  --pf-public-nav-h: 64px;
+}
+@media (min-width: 40rem) {
+  :root {
+    --pf-public-nav-h: 72px;
+  }
+}
+@media (min-width: 64rem) {
+  :root {
+    --pf-public-nav-h: 76px;
+  }
+}
+@media (min-width: 80rem) {
+  :root {
+    --pf-public-nav-h: 80px;
+  }
+}
+@layer base {
+  #pf-main [id] {
+    scroll-margin-top: calc(var(--pf-public-nav-h) + 16px);
+  }
+}
+
 /* Layered so Tailwind text-* utilities on links (active nav tabs) still win. */
 @layer base {
   a {

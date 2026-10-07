@@ -3,6 +3,7 @@
  * on-chain Create flow, signed by the employer; nothing here sends a transaction.
  */
 import { lockedCreatePayment } from "@/lib/app/premiflow";
+import { DEMO_TOKEN_LABEL } from "@/lib/app/marketplace-demo";
 import { uiAmountToBaseUnits } from "@/lib/streampay-v2";
 import {
   applyCreateDraftPatch,
@@ -100,9 +101,10 @@ export function amountLabel(mode: PublicJob["paymentMode"]): string {
   return mode === "Hourly" ? "Hourly rate" : "Budget";
 }
 
-export function formatMarketplaceAmount(base: string): string {
+/** `demo`: display-only short Devnet label for seeded demo cards; mint and decimals are unchanged. */
+export function formatMarketplaceAmount(base: string, opts: { demo?: boolean } = {}): string {
   const locked = lockedCreatePayment();
-  return `${baseUnitsToUi(base, locked.decimals)} ${locked.tokenName}`;
+  return `${baseUnitsToUi(base, locked.decimals)} ${opts.demo ? DEMO_TOKEN_LABEL : locked.tokenName}`;
 }
 
 export const JOB_STATUS_LABELS: Record<PublicJob["status"], string> = {
@@ -351,9 +353,12 @@ export function gigDeliveryLabel(days: number | null | undefined): string | null
 }
 
 /** Card price: "From X" when several packages exist, else the single price. */
-export function gigPriceLabel(gig: Pick<PublicGig, "paymentMode" | "priceAmount" | "packages">): string {
+export function gigPriceLabel(
+  gig: Pick<PublicGig, "paymentMode" | "priceAmount" | "packages">,
+  opts: { demo?: boolean } = {}
+): string {
   const packages = gig.packages ?? [];
-  const amount = formatMarketplaceAmount(gig.priceAmount);
+  const amount = formatMarketplaceAmount(gig.priceAmount, opts);
   return packages.length > 1 ? `From ${amount}` : `${amountLabel(gig.paymentMode)} ${amount}`;
 }
 
