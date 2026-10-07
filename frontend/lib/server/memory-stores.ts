@@ -1,4 +1,5 @@
 import type {
+  CaseFileEvidenceRecord,
   AuthChallengeRecord,
   AuthStore,
   CaseEventRecord,
@@ -140,6 +141,7 @@ export function createMemoryCaseStore(): CaseStore {
   const cases: ResolutionCaseRecord[] = [];
   const statements: PartyStatementRecord[] = [];
   const evidence: EvidenceSnapshotRecord[] = [];
+  const fileEvidence: CaseFileEvidenceRecord[] = [];
   const events: CaseEventRecord[] = [];
   return {
     async getCaseByContract(contractAddress) {
@@ -227,6 +229,30 @@ export function createMemoryCaseStore(): CaseStore {
     async insertEvent(row) {
       const saved = { ...row };
       events.push(saved);
+      return { ...saved };
+    },
+    async listFileEvidence(caseId) {
+      return fileEvidence
+        .filter((row) => row.caseId === caseId)
+        .sort((a, b) => a.submittedAt.getTime() - b.submittedAt.getTime() || a.id.localeCompare(b.id))
+        .map((row) => ({ ...row }));
+    },
+    async getFileEvidenceById(id) {
+      const row = fileEvidence.find((item) => item.id === id);
+      return row ? { ...row } : null;
+    },
+    async getFileEvidenceByAttachment(attachmentId) {
+      const row = fileEvidence.find((item) => item.attachmentId === attachmentId);
+      return row ? { ...row } : null;
+    },
+    async insertFileEvidence(row) {
+      if (fileEvidence.some((item) => item.attachmentId === row.attachmentId)) {
+        const error = new Error("duplicate case file evidence");
+        (error as Error & { code?: string }).code = "23505";
+        throw error;
+      }
+      const saved = { ...row };
+      fileEvidence.push(saved);
       return { ...saved };
     },
   };

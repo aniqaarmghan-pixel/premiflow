@@ -165,7 +165,7 @@ test("Hourly create wizard uses createHourlyContract and existing modes use crea
   assert.match(source, /: await client\.createContract\(/);
   assert.doesNotMatch(source, /type="mint"|editable mint|Resolver wallet/);
   // Condensed Payment step shows a read-only configured token label (not a mint input).
-  assert.match(source, /paymentTokenLabel\(draft\.mint\)/);
+  assert.match(source, /paymentTokenDisplayLabel\(draft\.mint\)/);
   assert.match(source, />Token</);
   const hourlyFields = source.slice(
     source.indexOf("function HourlyPaymentFields"),

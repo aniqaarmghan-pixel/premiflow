@@ -25,7 +25,6 @@ import {
   AI_CASE_SUMMARY_COPY,
   CASE_PREPARATION_COPY,
   CASE_WORKSPACE_COPY,
-  COMING_LATER_EVIDENCE,
   DISPUTE_CATEGORIES,
   EVIDENCE_COPY,
   MESSAGE_EVIDENCE_COPY,
@@ -34,6 +33,7 @@ import {
   RESOLUTION_CENTER_COPY,
   RESOLUTION_CENTER_TITLE,
   RESOLVER_EXPLANATION,
+  SUBMITTED_EVIDENCE_COPY,
   SUPPORT_VS_DISPUTE_COPY,
   type DisputeCategoryId,
   type EvidenceFact,
@@ -60,6 +60,8 @@ import {
 import { ensureMessagingSession } from "@/lib/app/messaging-session";
 import { supportTopicHref } from "@/lib/app/support";
 import { Card } from "@/components/ui/Card";
+import { CaseAiSummary } from "@/components/contracts/CaseAiSummary";
+import { CaseFileEvidence } from "@/components/contracts/CaseFileEvidence";
 import { Address } from "@/components/ui/Address";
 import { Button } from "@/components/ui/Button";
 import { Field, Input, Select, Textarea } from "@/components/ui/Field";
@@ -509,65 +511,6 @@ export function ResolutionCenter({
         </Card>
       ) : null}
 
-      {canSettle && resolverView && disputed ? (
-        <Card className="border-gold/40 p-4 sm:p-5 lg:p-4">
-          <h3 className="font-display text-lg lg:text-base">{RESOLVER_UX_COPY.settlementHeading}</h3>
-          <p className="mt-1 text-sm leading-6 text-ink-soft">{RESOLVER_UX_COPY.settlementBody}</p>
-          {decimals == null ? (
-            <p className="mt-2 text-sm text-ink-soft">{RESOLVER_UX_COPY.decimalsLoading}</p>
-          ) : (
-            <div className="mt-3 space-y-3">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <Field
-                  label="Freelancer allocation"
-                  hint={RESOLVER_UX_COPY.freelancerHint}
-                  error={awardUi.trim() && employerDraft == null ? allocation.error : undefined}
-                >
-                  <Input
-                    inputMode="decimal"
-                    value={awardUi}
-                    onChange={(e) => onFreelancerAllocationChange(e.target.value)}
-                  />
-                </Field>
-                <Field
-                  label="Employer allocation"
-                  hint={RESOLVER_UX_COPY.employerHint}
-                  error={employerError}
-                >
-                  <Input
-                    inputMode="decimal"
-                    value={employerValue}
-                    onChange={(e) => onEmployerAllocationChange(e.target.value)}
-                  />
-                </Field>
-              </div>
-              <div className="flex flex-wrap gap-2 max-sm:flex-col max-sm:items-stretch">
-                <Button variant="secondary" onClick={() => setAllocation(contract.contestedAmount)}>
-                  All to freelancer
-                </Button>
-                <Button variant="secondary" onClick={() => setAllocation(0n)}>
-                  All to employer
-                </Button>
-              </div>
-              {settlementCheck?.ok ? (
-                <dl className="grid gap-2 sm:grid-cols-2">
-                  {resolverSettlementSummary(settlementCheck, decimals).map((row) => (
-                    <Row key={row.label} label={row.label} value={row.value} />
-                  ))}
-                </dl>
-              ) : null}
-              <Button
-                disabled={!settlementCheck?.ok || Boolean(employerError) || !onReviewSettlement}
-                onClick={() => onReviewSettlement?.()}
-              >
-                {RESOLVER_UX_COPY.reviewSettlement}
-              </Button>
-              <p className="text-xs text-ink-faint">{RESOLVER_UX_COPY.settlementNoTransfer}</p>
-            </div>
-          )}
-        </Card>
-      ) : null}
-
       {resolverView && resolved ? (
         <Card className="p-4 sm:p-5 lg:p-4">
           <h3 className="font-display text-lg lg:text-base">{RESOLVER_UX_COPY.settlementRecorded}</h3>
@@ -751,93 +694,6 @@ export function ResolutionCenter({
             </dl>
           </>
         ) : null}
-        {caseRecord && (disputed || resolved) ? (
-          <div className="mt-5">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-faint">
-              Submitted message snapshots
-            </p>
-
-            {caseRecord.evidence.length > 0 ? (
-              <div className="mt-3 space-y-3">
-                {caseRecord.evidence.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-2xl border border-line bg-paper px-3 py-3"
-                  >
-                    <div className="flex flex-wrap items-center justify-between gap-2">
-                      <p className="text-xs font-semibold text-ink">
-                        Message snapshot
-                      </p>
-
-                      <time
-                        className="text-[11px] text-ink-faint"
-                        dateTime={item.submittedAt}
-                      >
-                        Submitted {new Date(item.submittedAt).toLocaleString()}
-                      </time>
-                    </div>
-
-                    <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-ink-soft [overflow-wrap:anywhere]">
-                      {item.bodySnapshot}
-                    </p>
-
-                    <dl className="mt-3 grid gap-2 text-xs text-ink-faint sm:grid-cols-2">
-                      <div>
-                        <dt className="font-semibold">Original sender</dt>
-                        <dd className="mt-1 break-all">
-                          {item.senderWalletSnapshot}
-                        </dd>
-                      </div>
-
-                      <div>
-                        <dt className="font-semibold">Submitted by</dt>
-                        <dd className="mt-1 break-all">
-                          {item.submittedByRole}: {item.submittedBy}
-                        </dd>
-                      </div>
-
-                      <div>
-                        <dt className="font-semibold">Original message time</dt>
-                        <dd className="mt-1">
-                          {new Date(item.createdAtSnapshot).toLocaleString()}
-                        </dd>
-                      </div>
-
-                      <div>
-                        <dt className="font-semibold">Snapshot rule</dt>
-                        <dd className="mt-1">
-                          Immutable case copy — not live chat access
-                        </dd>
-                      </div>
-                    </dl>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="mt-2 text-sm leading-6 text-ink-soft">
-                No contract-message snapshots have been submitted to this case.
-              </p>
-            )}
-
-            <p className="mt-3 text-sm leading-6 text-ink-soft">
-              The resolver can read these submitted snapshots but does not receive
-              access to the private employer/freelancer message thread.
-            </p>
-          </div>
-        ) : null}
-
-        <p className="mt-5 text-xs font-semibold uppercase tracking-[0.16em] text-ink-faint">
-          {EVIDENCE_COPY.comingLater}
-        </p>
-        <p className="mt-2 text-sm leading-6 text-ink-soft">{EVIDENCE_COPY.nextPhase}</p>
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-6 text-ink-soft">
-          {COMING_LATER_EVIDENCE.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-        <p className="mt-3 text-sm leading-6 text-ink-soft">
-          {MESSAGE_EVIDENCE_COPY.actionLabel}: {MESSAGE_EVIDENCE_COPY.body}
-        </p>
       </Card>
 
       {disputed || resolved ? (
@@ -891,25 +747,172 @@ export function ResolutionCenter({
 
       {disputed || resolved ? (
         <Card className="p-4 sm:p-5 lg:p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-faint">
-            {AI_CASE_SUMMARY_COPY.comingLater}
-          </p>
-          <h3 className="mt-1 font-display text-xl">{AI_CASE_SUMMARY_COPY.heading}</h3>
-          <p className="mt-2 text-sm leading-6 text-ink-soft">{AI_CASE_SUMMARY_COPY.body}</p>
-          <p className="mt-2 text-sm leading-6 text-ink-soft">
-            {PREMIFLOW_ASSISTANT.name} will not decide who wins, allocate escrow, replace the
-            designated resolver, or sign resolve_dispute.
+          <h3 className="font-display text-xl">{SUBMITTED_EVIDENCE_COPY.heading}</h3>
+          <p className="mt-1 text-sm text-ink-faint">{SUBMITTED_EVIDENCE_COPY.intro}</p>
+          {caseRecord && (disputed || resolved) ? (
+            <div className="mt-5">
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-faint">
+                Submitted message snapshots
+              </p>
+
+              {caseRecord.evidence.length > 0 ? (
+                <div className="mt-3 space-y-3">
+                  {caseRecord.evidence.map((item) => (
+                    <div
+                      key={item.id}
+                      className="rounded-2xl border border-line bg-paper px-3 py-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-xs font-semibold text-ink">
+                          Message snapshot
+                        </p>
+
+                        <time
+                          className="text-[11px] text-ink-faint"
+                          dateTime={item.submittedAt}
+                        >
+                          Submitted {new Date(item.submittedAt).toLocaleString()}
+                        </time>
+                      </div>
+
+                      <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-ink-soft [overflow-wrap:anywhere]">
+                        {item.bodySnapshot}
+                      </p>
+
+                      <dl className="mt-3 grid gap-2 text-xs text-ink-faint sm:grid-cols-2">
+                        <div>
+                          <dt className="font-semibold">Original sender</dt>
+                          <dd className="mt-1 break-all">
+                            {item.senderWalletSnapshot}
+                          </dd>
+                        </div>
+
+                        <div>
+                          <dt className="font-semibold">Submitted by</dt>
+                          <dd className="mt-1 break-all">
+                            {item.submittedByRole}: {item.submittedBy}
+                          </dd>
+                        </div>
+
+                        <div>
+                          <dt className="font-semibold">Original message time</dt>
+                          <dd className="mt-1">
+                            {new Date(item.createdAtSnapshot).toLocaleString()}
+                          </dd>
+                        </div>
+
+                        <div>
+                          <dt className="font-semibold">Snapshot rule</dt>
+                          <dd className="mt-1">
+                            Immutable case copy — not live chat access
+                          </dd>
+                        </div>
+                      </dl>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-sm leading-6 text-ink-soft">
+                  No contract-message snapshots have been submitted to this case.
+                </p>
+              )}
+
+              <p className="mt-3 text-sm leading-6 text-ink-soft">
+                The resolver can read these submitted snapshots but does not receive
+                access to the private employer/freelancer message thread.
+              </p>
+            </div>
+          ) : null}
+          {caseRecord ? (
+            <CaseFileEvidence
+              address={address}
+              caseRecord={caseRecord}
+              canSubmit={
+                disputed &&
+                caseState === "ready" &&
+                (caseRecord.viewerRole === "employer" || caseRecord.viewerRole === "freelancer")
+              }
+              participantWallet={connectedWallet}
+              onSubmitted={() => void loadCase("get")}
+            />
+          ) : null}
+          <p className="mt-3 text-sm leading-6 text-ink-soft">
+            {MESSAGE_EVIDENCE_COPY.actionLabel}: {MESSAGE_EVIDENCE_COPY.body}
           </p>
         </Card>
       ) : null}
 
-      {disputed && role === "resolver" ? (
-        <Card className="border-gold/40 bg-[linear-gradient(180deg,rgba(214,176,90,0.10),transparent)] p-4 sm:p-5 lg:p-4">
-          <h3 className="font-display text-xl">Decision</h3>
-          <p className="mt-2 text-sm leading-6 text-ink-soft">
-            You remain the decision-maker. Category and notes do not set a financial split.
-          </p>
-          <p className="mt-2 text-sm leading-6 text-ink-soft">{RESOLVER_EXPLANATION.definition}</p>
+      {disputed || resolved ? (
+        <Card className="p-4 sm:p-5 lg:p-4">
+          <section aria-label={AI_CASE_SUMMARY_COPY.label}>
+            <CaseAiSummary address={address} enabled={caseState === "ready" && caseRecord != null} />
+            <p className="mt-3 text-xs leading-5 text-ink-faint">
+              {PREMIFLOW_ASSISTANT.name} will not decide who wins, allocate escrow, replace the
+              designated resolver, or sign resolve_dispute.
+            </p>
+          </section>
+        </Card>
+      ) : null}
+
+      {canSettle && resolverView && disputed ? (
+        <Card className="border-gold/40 p-4 sm:p-5 lg:p-4">
+          <h3 className="font-display text-lg lg:text-base">{RESOLVER_UX_COPY.settlementHeading}</h3>
+          <p className="mt-1 text-sm leading-6 text-ink-soft">{RESOLVER_UX_COPY.settlementBody}</p>
+          {decimals == null ? (
+            <p className="mt-2 text-sm text-ink-soft">{RESOLVER_UX_COPY.decimalsLoading}</p>
+          ) : (
+            <div className="mt-3 space-y-3">
+              <p className="text-sm font-semibold text-ink">
+                {RESOLVER_UX_COPY.totalLabel}: {formatTokenAmount(contract.contestedAmount, decimals)}
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field
+                  label={RESOLVER_UX_COPY.freelancerReceives}
+                  hint={RESOLVER_UX_COPY.freelancerHint}
+                  error={awardUi.trim() && employerDraft == null ? allocation.error : undefined}
+                >
+                  <Input
+                    inputMode="decimal"
+                    value={awardUi}
+                    onChange={(e) => onFreelancerAllocationChange(e.target.value)}
+                  />
+                </Field>
+                <Field
+                  label={RESOLVER_UX_COPY.employerReceives}
+                  hint={RESOLVER_UX_COPY.employerHint}
+                  error={employerError}
+                >
+                  <Input
+                    inputMode="decimal"
+                    value={employerValue}
+                    onChange={(e) => onEmployerAllocationChange(e.target.value)}
+                  />
+                </Field>
+              </div>
+              <div className="flex flex-wrap gap-2 max-sm:flex-col max-sm:items-stretch">
+                <Button variant="secondary" onClick={() => setAllocation(contract.contestedAmount)}>
+                  All to freelancer
+                </Button>
+                <Button variant="secondary" onClick={() => setAllocation(0n)}>
+                  All to employer
+                </Button>
+              </div>
+              {settlementCheck?.ok ? (
+                <dl className="grid gap-2 sm:grid-cols-2">
+                  {resolverSettlementSummary(settlementCheck, decimals).map((row) => (
+                    <Row key={row.label} label={row.label} value={row.value} />
+                  ))}
+                </dl>
+              ) : null}
+              <Button
+                disabled={!settlementCheck?.ok || Boolean(employerError) || !onReviewSettlement}
+                onClick={() => onReviewSettlement?.()}
+              >
+                {RESOLVER_UX_COPY.reviewSettlement}
+              </Button>
+              <p className="text-xs text-ink-faint">{RESOLVER_UX_COPY.settlementNoTransfer}</p>
+            </div>
+          )}
         </Card>
       ) : null}
 

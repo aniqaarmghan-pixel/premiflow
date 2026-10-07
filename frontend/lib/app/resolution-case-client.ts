@@ -1,4 +1,7 @@
-import type { PublicResolutionCase } from "@/lib/server/cases/service";
+import type { PublicCaseFileEvidence, PublicResolutionCase } from "@/lib/server/cases/service";
+import type { CaseSummary } from "@/lib/server/cases/ai-summary";
+
+export type CaseSummaryView = CaseSummary;
 import type { DisputeCategoryId } from "@/lib/app/resolution-center";
 
 export type ApiError = {
@@ -100,4 +103,20 @@ export function addMessageToResolutionEvidence(
       body: JSON.stringify({ messageId }),
     }
   );
+}
+
+/** Bind the uploader's pending `case_evidence` attachment into an immutable case record. */
+export function submitCaseFileEvidence(address: string, attachmentId: string) {
+  return request<{ evidence: PublicCaseFileEvidence; created: boolean }>(
+    `/api/contracts/${address}/case/evidence/files`,
+    { method: "POST", body: JSON.stringify({ attachmentId }) }
+  );
+}
+
+/** Neutral, informational AI case summary (submitted case material only). */
+export function fetchCaseSummary(address: string) {
+  return request<{ summary: CaseSummaryView }>(`/api/contracts/${address}/case/summary`, {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
 }

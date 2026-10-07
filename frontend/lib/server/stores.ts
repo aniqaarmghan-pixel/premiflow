@@ -167,7 +167,25 @@ export interface CaseStore {
   ): Promise<EvidenceSnapshotRecord | null>;
   insertEvidence(row: EvidenceSnapshotRecord): Promise<EvidenceSnapshotRecord>;
   insertEvent(row: CaseEventRecord): Promise<CaseEventRecord>;
+  /** Immutable file evidence (optional so lightweight test stores still type-check). */
+  listFileEvidence?(caseId: string): Promise<CaseFileEvidenceRecord[]>;
+  getFileEvidenceById?(id: string): Promise<CaseFileEvidenceRecord | null>;
+  getFileEvidenceByAttachment?(attachmentId: string): Promise<CaseFileEvidenceRecord | null>;
+  insertFileEvidence?(row: CaseFileEvidenceRecord): Promise<CaseFileEvidenceRecord>;
 }
+
+export type CaseFileEvidenceRecord = {
+  id: string;
+  caseId: string;
+  contractAddress: string;
+  attachmentId: string;
+  submittedBy: string;
+  submittedByRole: PartyStatementRole;
+  displayFilename: string;
+  contentType: string;
+  byteSize: number;
+  submittedAt: Date;
+};
 
 export type WorkSubmissionKind = "trial" | "fixed" | "milestone";
 
@@ -208,7 +226,7 @@ export interface SubmissionStore {
   listByContract(contractAddress: string): Promise<WorkSubmissionWithLinks[]>;
 }
 
-export type AttachmentContextKind = "message" | "work_submission";
+export type AttachmentContextKind = "message" | "work_submission" | "case_evidence";
 export type AttachmentStatus = "pending" | "active" | "deleted";
 
 export type AttachmentRecord = {
@@ -239,6 +257,8 @@ export type WorkSubmissionAttachmentBinding = {
 };
 
 export interface AttachmentStore {
+  /** pending -> active for a file bound into an immutable case evidence record. */
+  activateCaseEvidence?(id: string): Promise<AttachmentRecord | null>;
   insertPending(row: AttachmentRecord): Promise<AttachmentRecord>;
   getById(id: string): Promise<AttachmentRecord | null>;
   listByIds(ids: string[]): Promise<AttachmentRecord[]>;

@@ -368,7 +368,7 @@ export const contractAttachments = pgTable(
     ),
     check(
       "contract_attachments_context_enum",
-      sql`${table.context} in ('message', 'work_submission')`
+      sql`${table.context} in ('message', 'work_submission', 'case_evidence')`
     ),
     check(
       "contract_attachments_status_enum",
@@ -505,7 +505,8 @@ export const notifications = pgTable(
         'marketplace_invitation_declined',
         'marketplace_gig_hired',
         'marketplace_review_eligible',
-        'marketplace_review_received'
+        'marketplace_review_received',
+        'support_ticket_updated'
       )`
     ),
     check(
@@ -828,6 +829,104 @@ export const marketplaceContractLinks = pgTable(
     check(
       "marketplace_contract_links_target",
       sql`(${table.source} = 'job' and ${table.jobId} is not null and ${table.proposalId} is not null and ${table.gigId} is null) or (${table.source} = 'gig' and ${table.gigId} is not null and ${table.jobId} is null)`
+    ),
+  ]
+);
+
+/**
+ * Immutable Resolution Case file evidence. Points at a private
+ * `case_evidence` attachment; never at the message thread.
+ */
+export const caseFileEvidence = pgTable(
+  "case_file_evidence",
+  {
+    id: uuid("id").primaryKey(),
+    caseId: uuid("case_id")
+      .notNull()
+      .references(() => resolutionCases.id, { onDelete: "cascade" }),
+    contractAddress: text("contract_address").notNull(),
+    attachmentId: uuid("attachment_id")
+      .notNull()
+      .references(() => contractAttachments.id, { onDelete: "restrict" }),
+    submittedBy: text("submitted_by").notNull(),
+    submittedByRole: text("submitted_by_role").notNull(),
+    displayFilename: text("display_filename").notNull(),
+    contentType: text("content_type").notNull(),
+    byteSize: integer("byte_size").notNull(),
+    submittedAt: timestamp("submitted_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    uniqueIndex("case_file_evidence_attachment_uidx").on(table.attachmentId),
+    index("case_file_evidence_case_idx").on(table.caseId, table.submittedAt),
+    check(
+      "case_file_evidence_submitter_role_enum",
+      sql`${table.submittedByRole} in ('employer', 'freelancer')`
+    ),
+    check(
+      "case_file_evidence_byte_size",
+      sql`${table.byteSize} between 1 and 10485760`
+    ),
+  ]
+);
+
+/** PREMIFLOW Help Desk tickets (account-scoped; no settlement authority). */
+export const supportTickets = pgTable(
+  "support_tickets",
+  {
+    id: uuid("id").primaryKey(),
+    userId: text("user_id").notNull(),
+    requesterEmail: text("requester_email"),
+    category: text("category").notNull(),
+    subject: text("subject").notNull(),
+    description: text("description").notNull(),
+    contractAddress: text("contract_address"),
+    status: text("status").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index("support_tickets_user_idx").on(table.userId, table.updatedAt),
+    index("support_tickets_status_idx").on(table.status, table.updatedAt),
+    check(
+      "support_tickets_category_enum",
+      sql`${table.category} in ('account', 'wallet', 'marketplace', 'contract', 'payment', 'technical', 'other')`
+    ),
+    check(
+      "support_tickets_status_enum",
+      sql`${table.status} in ('open', 'in_progress', 'resolved')`
+    ),
+    check(
+      "support_tickets_subject_len",
+      sql`char_length(${table.subject}) between 3 and 160`
+    ),
+    check(
+      "support_tickets_description_len",
+      sql`char_length(${table.description}) between 10 and 4000`
+    ),
+  ]
+);
+
+export const supportTicketMessages = pgTable(
+  "support_ticket_messages",
+  {
+    id: uuid("id").primaryKey(),
+    ticketId: uuid("ticket_id")
+      .notNull()
+      .references(() => supportTickets.id, { onDelete: "cascade" }),
+    authorRole: text("author_role").notNull(),
+    authorUserId: text("author_user_id").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+  },
+  (table) => [
+    index("support_ticket_messages_ticket_idx").on(table.ticketId, table.createdAt),
+    check(
+      "support_ticket_messages_author_role_enum",
+      sql`${table.authorRole} in ('user', 'admin')`
+    ),
+    check(
+      "support_ticket_messages_body_len",
+      sql`char_length(${table.body}) between 1 and 4000`
     ),
   ]
 );

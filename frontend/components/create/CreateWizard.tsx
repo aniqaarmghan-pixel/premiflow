@@ -90,8 +90,9 @@ import {
 import { formatDuration, formatReviewPeriod } from "@/lib/app/datetime";
 import {
   lockedCreatePayment,
-  paymentTokenLabel,
+  paymentTokenDisplayLabel,
 } from "@/lib/app/premiflow";
+import { DevnetAssetNote } from "@/components/ui/DevnetAssetNote";
 import {
   CONTRACT_TYPE_DECISION_HEADING,
   CONTRACT_TYPE_GUIDES,
@@ -1110,7 +1111,8 @@ export function CreateWizard() {
                 <div className="rounded-xl border border-line bg-card px-3 py-2.5">
                   <p className="text-xs text-ink-faint">Token</p>
                   <p className="text-sm font-medium text-ink">
-                    {paymentTokenLabel(draft.mint)}
+                    {paymentTokenDisplayLabel(draft.mint)}
+                    <DevnetAssetNote mint={draft.mint} className="ml-2 align-middle" />
                     {tokenBalanceUi != null ? (
                       <span className="ml-2 font-normal text-ink-faint">
                         · balance {tokenBalanceUi}
@@ -1773,9 +1775,9 @@ function ReviewPanel({
     ["Title", draft.title || "—"],
   ];
   if (draft.paymentMode === "Hourly") {
-    rows.splice(2, 0, ["Token", paymentTokenLabel(draft.mint)]);
+    rows.splice(2, 0, ["Token", paymentTokenDisplayLabel(draft.mint)]);
   } else {
-    rows.splice(2, 0, ["Token", paymentTokenLabel(draft.mint)]);
+    rows.splice(2, 0, ["Token", paymentTokenDisplayLabel(draft.mint)]);
     rows.push(["Duration", formatDuration(draft.durationSeconds)]);
   }
 
@@ -1805,7 +1807,8 @@ function ReviewPanel({
       </dl>
       <div className="mt-3 rounded-xl border border-line" aria-label="Payment summary">
         <p className="px-3 pt-2 text-[11px] uppercase tracking-wide text-ink-faint">
-          Payment summary ({paymentTokenLabel(draft.mint)})
+          Payment summary ({paymentTokenDisplayLabel(draft.mint)})
+          <DevnetAssetNote mint={draft.mint} className="ml-2 normal-case tracking-normal" />
         </p>
         <dl className="divide-y divide-line">
           {feeRows.map(([label, value]) => (
@@ -1883,7 +1886,7 @@ function HourlyPaymentFields({
       <Field
         label="Hourly rate"
         error={errors.hourlyRateUi}
-        hint={`Per hour in ${paymentTokenLabel(draft.mint)}.`}
+        hint={`Per hour in ${paymentTokenDisplayLabel(draft.mint)}.`}
       >
         <Input
           value={draft.hourlyRateUi}

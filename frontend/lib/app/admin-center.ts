@@ -19,15 +19,15 @@ export const ADMIN_DESKS: readonly AdminDesk[] = [
   {
     id: "help",
     title: "Help Desk",
-    href: "/support",
-    body: "Answer account, wallet and product questions for PREMIFLOW users.",
+    href: "/admin/help-desk",
+    body: "Support tickets from PREMIFLOW users: list, filter by status, reply and resolve. No access to private contract messages.",
     authority: "No escrow settlement authority. Help Desk cannot move, release or refund funds.",
   },
   {
     id: "resolution",
     title: "Resolution Desk",
     href: "/resolver",
-    body: "Assigned disputed contracts: contract facts, employer and freelancer statements, submitted message evidence, the disputed amount and the settlement allocation.",
+    body: "Assigned disputed contracts: contract facts, employer and freelancer statements, submitted message evidence and files, a neutral AI case summary, the disputed amount and the settlement allocation.",
     authority:
       "Resolve dispute is available only when the connected wallet is the contract's on-chain designated resolver. The program enforces the signature.",
   },

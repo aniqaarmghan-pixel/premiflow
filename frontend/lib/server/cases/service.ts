@@ -11,6 +11,7 @@ import type { ContractStatus } from "@/lib/streampay-v2";
 import { randomId } from "../crypto";
 import { RATE_LIMITS, consumeRateLimit } from "../rate-limit";
 import type {
+  CaseFileEvidenceRecord,
   CaseStore,
   EvidenceSnapshotRecord,
   DisputeOpener,
@@ -100,6 +101,41 @@ export type PublicEvidenceSnapshot = {
   submittedAt: string;
 };
 
+export type PublicCaseFileEvidence = {
+  id: string;
+  contractAddress: string;
+  filename: string;
+  contentType: string;
+  byteSize: number;
+  submittedBy: string;
+  submittedByRole: PartyStatementRole;
+  submittedAt: string;
+  downloadPath: string;
+};
+
+export function toPublicFileEvidence(row: CaseFileEvidenceRecord): PublicCaseFileEvidence {
+  return {
+    id: row.id,
+    contractAddress: row.contractAddress,
+    filename: row.displayFilename,
+    contentType: row.contentType,
+    byteSize: row.byteSize,
+    submittedBy: row.submittedBy,
+    submittedByRole: row.submittedByRole,
+    submittedAt: row.submittedAt.toISOString(),
+    downloadPath: `/api/contracts/${row.contractAddress}/case/evidence/files/${row.id}/download`,
+  };
+}
+
+async function withFileEvidence(
+  store: CaseStore,
+  view: PublicResolutionCase
+): Promise<PublicResolutionCase> {
+  if (!store.listFileEvidence) return view;
+  const rows = await store.listFileEvidence(view.id);
+  return { ...view, fileEvidence: rows.map(toPublicFileEvidence) };
+}
+
 export type PublicResolutionCase = {
   id: string;
   contractAddress: string;
@@ -128,6 +164,8 @@ export type PublicResolutionCase = {
   employerStatement: PublicPartyStatement | null;
   freelancerStatement: PublicPartyStatement | null;
   evidence: PublicEvidenceSnapshot[];
+  /** Immutable submitted files (metadata + case-scoped download path). */
+  fileEvidence: PublicCaseFileEvidence[];
   viewerRole: PartyStatementRole | "resolver";
   payoutState: ChainPayoutState;
 };
@@ -276,6 +314,7 @@ function presentCase(
     updatedAt: row.updatedAt.toISOString(),
     ...statementsByRole(statements),
     evidence: evidence.map(toPublicEvidence),
+    fileEvidence: [],
     viewerRole,
     payoutState,
   };
@@ -308,7 +347,7 @@ function safeChainPatch(
   return patch;
 }
 
-async function recordEvent(
+export async function recordEvent(
   store: CaseStore,
   input: {
     caseId: string;
@@ -328,7 +367,7 @@ async function recordEvent(
   });
 }
 
-function isUniqueViolation(err: unknown): boolean {
+export function isUniqueViolation(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
   const code = (err as { code?: string }).code;
   return code === "23505";
@@ -435,7 +474,7 @@ export async function createOrRecoverResolutionCase(
 
   const statements = await stores.cases.listStatements(saved.id);
   const evidence = await stores.cases.listEvidence(saved.id);
-  return presentCase(saved, facts, statements, viewerRole, evidence);
+  return withFileEvidence(stores.cases, presentCase(saved, facts, statements, viewerRole, evidence));
 }
 
 async function recoverExisting(
@@ -467,7 +506,7 @@ async function recoverExisting(
   });
   const statements = await store.listStatements(saved.id);
   const evidence = await store.listEvidence(saved.id);
-  return presentCase(saved, facts, statements, viewerRole, evidence);
+  return withFileEvidence(store, presentCase(saved, facts, statements, viewerRole, evidence));
 }
 
 export async function getResolutionCase(
@@ -504,7 +543,7 @@ export async function getResolutionCase(
   }
   const statements = await store.listStatements(saved.id);
   const evidence = await store.listEvidence(saved.id);
-  return presentCase(saved, facts, statements, viewerRole, evidence);
+  return withFileEvidence(store, presentCase(saved, facts, statements, viewerRole, evidence));
 }
 
 export async function updateCaseNotes(
@@ -558,7 +597,7 @@ export async function updateCaseNotes(
   });
   const statements = await stores.cases.listStatements(saved.id);
   const evidence = await stores.cases.listEvidence(saved.id);
-  return presentCase(saved, facts, statements, viewerRole, evidence);
+  return withFileEvidence(stores.cases, presentCase(saved, facts, statements, viewerRole, evidence));
 }
 
 export async function upsertOwnStatement(
@@ -649,7 +688,7 @@ export async function upsertOwnStatement(
   }
   const saved = (await stores.cases.getCaseById(existing.id)) ?? existing;
   const evidence = await stores.cases.listEvidence(saved.id);
-  return presentCase(saved, facts, statements, role, evidence);
+  return withFileEvidence(stores.cases, presentCase(saved, facts, statements, role, evidence));
 }
 
 export async function addMessageEvidence(
@@ -757,13 +796,13 @@ export async function addMessageEvidence(
   const statements = await stores.cases.listStatements(existing.id);
   const evidence = await stores.cases.listEvidence(existing.id);
 
-  return presentCase(
+  return withFileEvidence(stores.cases, presentCase(
     current,
     facts,
     statements,
     role,
     evidence
-  );
+  ));
 }
 
 export function categoryDeterminesAward(): boolean {

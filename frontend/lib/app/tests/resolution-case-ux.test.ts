@@ -55,7 +55,8 @@ test("DB failure after chain success is a case-workspace recovery failure, not a
   assert.match(center, /CASE_WORKSPACE_RECOVERY_FAILED/);
   assert.match(center, /recoverResolutionCase/);
   assert.doesNotMatch(center, /type=["']file["']/);
-  assert.match(center, /EVIDENCE_COPY\.nextPhase/);
+  assert.match(center, /CaseFileEvidence/);
+  assert.doesNotMatch(center, /Coming later|comingLater/);
 });
 
 test("both dispute-opening paths attempt case recovery after confirmed chain success", () => {
@@ -101,7 +102,7 @@ test("party workspace copy covers statements, evidence next phase, and on-chain 
   assert.match(PARTY_STATEMENTS_COPY.ready, /does not block resolve_dispute/i);
   assert.match(PARTY_STATEMENTS_COPY.ownOnly, /only your statement/i);
   assert.match(PARTY_STATEMENTS_COPY.resolverCannot, /resolver cannot write/i);
-  assert.equal(EVIDENCE_COPY.nextPhase, "Evidence submission is coming in the next Resolution phase.");
+  assert.equal(EVIDENCE_COPY.heading, "Contract facts");
   assert.match(CASE_WORKSPACE_COPY.contestedHint, /on-chain Contract account/i);
   assert.match(CASE_WORKSPACE_COPY.snapshotHint, /authoritative/i);
 });

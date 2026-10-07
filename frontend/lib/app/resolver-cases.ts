@@ -27,9 +27,12 @@ export const RESOLVER_UX_COPY = {
   assignedHeading: "Dispute assigned to you",
   assignedBody: "You are the designated resolver for this contract.",
   accountingHeading: "Contract, parties and accounting",
-  settlementHeading: "Record settlement",
+  settlementHeading: "Settlement decision",
   settlementBody:
     "Split the amount under dispute between the freelancer and the employer. Your wallet signs resolve_dispute and the program re-checks that you are the designated resolver.",
+  totalLabel: "Total = disputed remainder",
+  freelancerReceives: "Freelancer receives",
+  employerReceives: "Employer receives (refund)",
   freelancerHint: "Added to the freelancer settlement.",
   employerHint: "Becomes employer-refundable.",
   decimalsLoading: "Loading token decimals. Settlement controls appear once exact amounts are available.",

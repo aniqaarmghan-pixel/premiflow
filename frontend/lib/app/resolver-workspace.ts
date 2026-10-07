@@ -45,7 +45,7 @@ export const RESOLVER_WORKSPACE_COPY = {
   txHistoryEmpty: "No on-chain transactions found for your assigned contracts.",
   txHistoryError: "On-chain transaction history could not be loaded right now. Dispute timestamps below are still accurate.",
   switchToResolver: "Admin Center",
-  switchToContracts: "Back to contracts",
+  exitAdmin: "Exit Admin Center",
 } as const;
 
 type StatementLike = { body?: string | null } | null | undefined;
@@ -238,17 +238,22 @@ export function resolveWorkspaceMode(input: WorkspaceSnapshot): WorkspaceMode {
   return input.partyContractCount === 0 ? "resolver" : "party";
 }
 
-export function canSwitchWorkspace(resolverCaseCount: number): boolean {
-  return resolverCaseCount > 0;
+export function canSwitchWorkspace(resolverCaseCount: number, appAdmin = false): boolean {
+  return resolverCaseCount > 0 || appAdmin;
 }
 
+export const ADMIN_HELP_DESK_HREF = "/admin/help-desk";
+export const ADMIN_EXIT_HREF = "/dashboard";
+
+/** Admin mode navigation only: no marketplace or party items. */
 export const RESOLVER_NAV = [
   { href: "/admin", label: "Admin Center" },
+  { href: ADMIN_HELP_DESK_HREF, label: "Help Desk" },
   { href: "/resolver", label: "Resolution Desk" },
   { href: "/resolver/assigned", label: "Assigned Disputes" },
   { href: "/resolver/resolved", label: "Resolved Cases" },
   { href: "/resolver/activity", label: "Resolution Activity" },
-  { href: "/support", label: "Help Desk" },
+  { href: ADMIN_EXIT_HREF, label: "Exit Admin Center" },
 ] as const;
 
 export function isNavActive(href: string, pathname: string): boolean {

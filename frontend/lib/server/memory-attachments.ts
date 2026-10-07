@@ -32,6 +32,12 @@ export function createMemoryAttachmentStore(): AttachmentStore {
       const set = new Set(ids);
       return rows.filter((row) => set.has(row.id)).map(clone);
     },
+    async activateCaseEvidence(id) {
+      const row = rows.find((item) => item.id === id);
+      if (!row || row.context !== "case_evidence" || row.status === "deleted") return null;
+      row.status = "active";
+      return clone(row);
+    },
     async markDeleted(id, now) {
       const row = rows.find((item) => item.id === id);
       if (!row || row.status === "deleted") return null;

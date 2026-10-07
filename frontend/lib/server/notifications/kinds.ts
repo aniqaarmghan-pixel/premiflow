@@ -29,6 +29,8 @@ export const NOTIFICATION_KINDS = [
   "marketplace_gig_hired",
   "marketplace_review_eligible",
   "marketplace_review_received",
+  // Help Desk (account support tickets)
+  "support_ticket_updated",
 ] as const;
 
 export type NotificationKind = (typeof NOTIFICATION_KINDS)[number];

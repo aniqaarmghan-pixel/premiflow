@@ -1,6 +1,7 @@
 "use client";
 
 import { PageFade } from "@/components/shell/PageFade";
+import { SupportTickets } from "@/components/support/SupportTickets";
 import { Card } from "@/components/ui/Card";
 import { PREMIFLOW_ASSISTANT } from "@/lib/app/resolution-center";
 import { SUPPORT_PAGE, SUPPORT_TOPICS } from "@/lib/app/support";
@@ -26,6 +27,8 @@ export function SupportPage() {
           <p className="mt-2 text-sm leading-6 text-ink-soft">{SUPPORT_PAGE.assistantBody}</p>
           <p className="mt-3 text-sm leading-6 text-ink-soft">{SUPPORT_PAGE.assistantWillNot}</p>
         </Card>
+
+        <SupportTickets />
 
         {SUPPORT_TOPICS.map((topic) => (
           <section key={topic.id} id={topic.id}>

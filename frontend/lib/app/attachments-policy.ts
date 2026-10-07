@@ -8,7 +8,7 @@ export const MESSAGE_ATTACHMENT_MAX = 5;
 export const WORK_ATTACHMENT_MAX = 10;
 export const ATTACHMENT_FILENAME_MAX = 180;
 
-export type AttachmentContext = "message" | "work_submission";
+export type AttachmentContext = "message" | "work_submission" | "case_evidence";
 
 export type AttachmentAiPolicy = {
   autoReadAttachments: false;
@@ -127,7 +127,7 @@ export function formatByteSize(bytes: number): string {
 }
 
 export function maxFilesForContext(context: AttachmentContext): number {
-  return context === "message" ? MESSAGE_ATTACHMENT_MAX : WORK_ATTACHMENT_MAX;
+  return context === "work_submission" ? WORK_ATTACHMENT_MAX : MESSAGE_ATTACHMENT_MAX;
 }
 
 /** Human label for the shared per-file size cap (keep in sync with ATTACHMENT_MAX_BYTES). */

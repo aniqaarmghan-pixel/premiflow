@@ -166,11 +166,12 @@ test("workspace mode: resolver workspace needs resolver cases; switch keeps part
   const labels = RESOLVER_NAV.map((i) => i.label);
   assert.deepEqual(labels, [
     "Admin Center",
+    "Help Desk",
     "Resolution Desk",
     "Assigned Disputes",
     "Resolved Cases",
     "Resolution Activity",
-    "Help Desk",
+    "Exit Admin Center",
   ]);
   assert.ok(!labels.some((l) => /Create contract|Hiring|Working/.test(l)));
   assert.equal(isNavActive("/resolver", "/resolver/assigned"), false);

@@ -1,4 +1,6 @@
 import { getDb } from "./db/client";
+import { createDrizzleSupportStore } from "./db/support-store";
+import type { SupportStore } from "./support/store";
 import { createDrizzleMarketplaceStore } from "./db/marketplace-store";
 import type { MarketplaceStore } from "./marketplace/store";
 import { createDrizzleMarketplaceTrustStore } from "./db/marketplace-trust-store";
@@ -55,6 +57,11 @@ export function productionMarketplaceStore(): MarketplaceStore {
 /** Phase 5 trust/hiring store (reviews, invitations, shortlist, contract links). */
 export function productionMarketplaceTrustStore(): MarketplaceTrustStore {
   return createDrizzleMarketplaceTrustStore(getDb());
+}
+
+/** PREMIFLOW Help Desk tickets (account-scoped; admin access is server-checked). */
+export function productionSupportStore(): SupportStore {
+  return createDrizzleSupportStore(getDb());
 }
 
 export function productionBlobStorage(): BlobStorage {

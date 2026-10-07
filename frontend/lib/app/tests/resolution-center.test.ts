@@ -115,8 +115,7 @@ test("category and description persist off-chain and do not choose a settlement 
   assert.match(CASE_PREPARATION_COPY.notStored, /Resolution Case/i);
   assert.match(CASE_PREPARATION_COPY.pageOnly, /not submitted as evidence/i);
   assert.match(PARTY_STATEMENTS_COPY.ready, /does not block resolve_dispute/i);
-  assert.match(EVIDENCE_COPY.comingLater, /coming later/i);
-  assert.match(EVIDENCE_COPY.nextPhase, /next Resolution phase/i);
+  assert.equal(Object.prototype.hasOwnProperty.call(EVIDENCE_COPY, "comingLater"), false);
 });
 
 test("resolver remains the final decision-maker and AI cannot decide settlement", () => {

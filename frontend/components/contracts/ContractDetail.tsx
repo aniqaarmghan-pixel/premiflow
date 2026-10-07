@@ -1,6 +1,7 @@
 "use client";
 
 import { browserSignatureStorage, recordResolveSignature } from "@/lib/app/resolve-signature-store";
+import { DevnetAssetNote } from "@/components/ui/DevnetAssetNote";
 import { ACTIVE_CLUSTER_ID } from "@/lib/cluster";
 
 import {
@@ -1196,6 +1197,7 @@ export function ContractDetail({ address }: { address: string }) {
         ) ? (
           <Card className="p-4 sm:p-5 lg:p-4">
             <h2 className="font-display text-xl">Settlement</h2>
+            <DevnetAssetNote mint={contract.tokenMint} className="mt-1" />
             <p className="mt-1 text-sm text-ink-soft">
               {contract.status === "Resolved"
                 ? "The resolver recorded settlement accounting. Tokens move only when Collect pay or Claim refund is sent."
@@ -1480,6 +1482,7 @@ export function ContractDetail({ address }: { address: string }) {
         <Card id="overview" className="scroll-mt-20 p-4 sm:p-5 lg:p-4">
           <p className="text-xs uppercase tracking-[0.16em] text-ink-faint">Overview</p>
           <h2 className="mt-1 font-display text-xl">Contract details</h2>
+          <DevnetAssetNote mint={contract.tokenMint} className="mt-1" />
           {metadata?.description ? (
             <p className="mt-3 text-sm leading-6 text-ink-soft">{metadata.description}</p>
           ) : (

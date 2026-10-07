@@ -84,7 +84,8 @@ test("demo token label: short Devnet label on demo cards; mint and default label
     assert.ok(label.endsWith(locked.tokenName), label);
     assert.doesNotMatch(label, /USDT|Devnet test/);
   }
-  assert.doesNotMatch(read("lib/app/premiflow.ts"), /USDT/);
+  // Devnet display symbol is "Demo USDT"; name, mint and decimals are unchanged.
+  assert.match(read("lib/app/premiflow.ts"), /symbol: "Demo USDT"/);
 
   const src = parts();
   assert.match(src, /formatMarketplaceAmount\(job\.budgetAmount, \{ demo \}\)/);

@@ -70,17 +70,27 @@ export const CASE_PREPARATION_COPY = {
 } as const;
 
 export const EVIDENCE_COPY = {
-  heading: "Evidence & case history",
+  heading: "Contract facts",
   availableNow: "Available now from the contract account",
-  comingLater: "Coming later",
-  nextPhase: "Evidence submission is coming in the next Resolution phase.",
   noInventedHistory: "Only account-derived facts are shown. Event history is not invented.",
 } as const;
 
-export const COMING_LATER_EVIDENCE = [
-  "File-attachment evidence snapshots",
-  "AI case summaries",
-] as const;
+export const SUBMITTED_EVIDENCE_COPY = {
+  heading: "Submitted evidence",
+  intro:
+    "Only material a party deliberately submitted to this Resolution Case. Every record is immutable and shows who submitted it and when.",
+} as const;
+
+export const CASE_FILE_EVIDENCE_COPY = {
+  heading: "Submitted files",
+  action: "Add file evidence",
+  empty: "No files have been submitted to this case.",
+  immutable: "Immutable case record: it cannot be edited or removed, including by the resolver.",
+  rules:
+    "PDF, images, Office docs, ZIP, CSV or text, up to 10 MiB. Executable, script and HTML/SVG files are rejected.",
+  access:
+    "The other party and the designated resolver can open submitted files. The resolver never receives the private message thread.",
+} as const;
 
 export const MESSAGE_EVIDENCE_COPY = {
   comingLater: false,
@@ -100,9 +110,18 @@ export const PARTY_STATEMENTS_COPY = {
 } as const;
 
 export const AI_CASE_SUMMARY_COPY = {
-  heading: "AI case summary",
-  comingLater: "Coming later",
-  body: "PREMIFLOW Assistant is not active. No AI summary is generated for this case.",
+  heading: "AI case summary — informational only",
+  label: "AI case summary — informational only",
+  body:
+    "Organizes only deliberately submitted case material: party statements, submitted message snapshots, file-evidence details and contract facts. It never reads the private message thread.",
+  disclaimer:
+    "Informational only. The AI does not choose a winner, recommend an award or percentage, change any control, sign, or move funds. The designated resolver decides.",
+  generate: "Generate summary",
+  regenerate: "Refresh summary",
+  unavailable: "Available once the Resolution Case is loaded.",
+  error: "The summary could not be generated right now. Try again shortly.",
+  sourceModel: "Organized by PREMIFLOW Assistant from submitted case material only.",
+  sourceFallback: "Deterministic summary of submitted case material (no AI provider used).",
 } as const;
 
 export const PREMIFLOW_ASSISTANT = {
@@ -221,7 +240,7 @@ export const RESOLUTION_CASE_PERSISTENCE = {
 } as const;
 
 export const CASE_WORKSPACE_COPY = {
-  heading: "Resolution Case",
+  heading: "Case overview",
   chainStatus: "On-chain contract status",
   workflowStatus: "Case workspace status",
   contractAddress: "Contract address",

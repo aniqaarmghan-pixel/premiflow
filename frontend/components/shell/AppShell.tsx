@@ -17,6 +17,8 @@ import {
   Inbox,
   Info,
   LayoutDashboard,
+  LifeBuoy,
+  LogOut,
   MailOpen,
   Megaphone,
   Menu,
@@ -36,7 +38,7 @@ import { brand } from "@/lib/brand";
 import { RESOLVER_WORKSPACE_COPY } from "@/lib/app/resolver-workspace";
 import { useAccountSession } from "@/lib/account-auth/useAccountSession";
 import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
-import { RESOLVER_NAV, type WorkspaceMode } from "@/lib/app/resolver-workspace";
+import { ADMIN_EXIT_HREF, RESOLVER_NAV, type WorkspaceMode } from "@/lib/app/resolver-workspace";
 import { DASHBOARD_HREF, isDashboardNavActive, shellKind } from "@/lib/app/site-routes";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
 import { BrandMark } from "@/components/brand/BrandMark";
@@ -107,7 +109,8 @@ const RESOLVER_ICONS: Record<string, LucideIcon> = {
   "/resolver/assigned": Inbox,
   "/resolver/resolved": CheckCircle2,
   "/resolver/activity": History,
-  "/support": CircleHelp,
+  "/admin/help-desk": LifeBuoy,
+  "/dashboard": LogOut,
 };
 
 const RESOLVER_NAV_ITEMS = RESOLVER_NAV.map((item) => ({
@@ -131,6 +134,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const drawerRef = useRef<HTMLDivElement>(null);
   useDialogFocus(open, drawerRef, () => setOpen(false));
   const workspace = useWorkspace();
+  // "Exit Admin Center" navigates to the dashboard; leave admin mode there.
+  useEffect(() => {
+    if (workspace.mode === "resolver" && pathname === ADMIN_EXIT_HREF) workspace.toggle();
+  }, [pathname, workspace]);
 
   const user = session?.user ?? null;
   const kind = shellKind(pathname);
@@ -230,7 +237,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </p>
         </Link>
         <div className="shrink-0">
-          {workspace.canSwitch ? (
+          {workspace.canSwitch && workspace.mode !== "resolver" ? (
             <WorkspaceSwitch mode={workspace.mode} onToggle={switchWorkspace} />
           ) : null}
           {workspace.mode !== "resolver" ? <ExploreMarketplaceLink /> : null}
@@ -393,7 +400,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <X size={18} />
                 </button>
               </div>
-              {workspace.canSwitch ? (
+              {workspace.canSwitch && workspace.mode !== "resolver" ? (
                 <WorkspaceSwitch
                   mode={workspace.mode}
                   onToggle={() => {
@@ -457,7 +464,7 @@ function WorkspaceSwitch({ mode, onToggle }: { mode: WorkspaceMode; onToggle: ()
       <ArrowLeftRight size={14} className="shrink-0" aria-hidden="true" />
       <span className="min-w-0 truncate">
         {mode === "resolver"
-          ? RESOLVER_WORKSPACE_COPY.switchToContracts
+          ? RESOLVER_WORKSPACE_COPY.exitAdmin
           : RESOLVER_WORKSPACE_COPY.switchToResolver}
       </span>
     </button>

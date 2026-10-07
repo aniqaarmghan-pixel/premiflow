@@ -469,7 +469,9 @@ test("migration 0012: additive, journaled, constrained, not applied by tests", (
   assert.doesNotMatch(sql, /\b(DROP TABLE|DROP COLUMN|TRUNCATE|DELETE FROM|UPDATE )\b/);
   const drops = sql.match(/DROP [A-Z ]+/g) ?? [];
   assert.deepEqual(drops, ["DROP CONSTRAINT IF EXISTS "]);
-  for (const kind of NOTIFICATION_KINDS) assert.match(sql, new RegExp(`'${kind}'`), kind);
+  // Newer kinds land in later additive migrations; the latest constraint lists all.
+  const latestKinds = readFileSync("drizzle/0013_admin_support_case_file_evidence.sql", "utf8");
+  for (const kind of NOTIFICATION_KINDS) assert.match(latestKinds, new RegExp(`'${kind}'`), kind);
   const schema = readFileSync("lib/server/db/schema.ts", "utf8");
   for (const kind of NOTIFICATION_KINDS) assert.match(schema, new RegExp(`'${kind}'`), kind);
   const strip = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/.*$/gm, "").replace(/--.*$/gm, "");
@@ -483,9 +485,11 @@ test("migration 0012: additive, journaled, constrained, not applied by tests", (
   const journal = JSON.parse(readFileSync("drizzle/meta/_journal.json", "utf8")) as {
     entries: { idx: number; tag: string; when: number }[];
   };
-  const last = journal.entries.at(-1)!;
-  assert.deepEqual([last.idx, last.tag], [12, "0012_marketplace_trust_hiring"]);
-  assert.ok(last.when > journal.entries.at(-2)!.when);
+  const entry = journal.entries.find((e) => e.idx === 12)!;
+  assert.equal(entry.tag, "0012_marketplace_trust_hiring");
+  // Later additive migrations (e.g. 0013) may follow; the journal stays ordered.
+  const whens = journal.entries.map((e) => e.when);
+  assert.deepEqual([...whens].sort((a, b) => a - b), whens);
 });
 
 test("trust routes: session wallet only, chain-verified, no wallet from the body", () => {

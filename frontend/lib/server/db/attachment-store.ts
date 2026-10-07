@@ -53,6 +53,20 @@ export function createDrizzleAttachmentStore(db: MessagingDatabase): AttachmentS
         .where(inArray(contractAttachments.id, ids));
       return rows.map(asAttachment);
     },
+    async activateCaseEvidence(id) {
+      const rows = await db
+        .update(contractAttachments)
+        .set({ status: "active" })
+        .where(
+          and(
+            eq(contractAttachments.id, id),
+            eq(contractAttachments.context, "case_evidence"),
+            inArray(contractAttachments.status, ["pending", "active"])
+          )
+        )
+        .returning();
+      return rows[0] ? asAttachment(rows[0]) : null;
+    },
     async markDeleted(id, now) {
       const rows = await db
         .update(contractAttachments)

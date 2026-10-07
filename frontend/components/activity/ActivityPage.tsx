@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { PageFade } from "@/components/shell/PageFade";
 import { Card } from "@/components/ui/Card";
+import { DevnetAssetNote } from "@/components/ui/DevnetAssetNote";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { formatUnix } from "@/lib/app/datetime";
+import { isDevnetTestAsset } from "@/lib/app/premiflow";
 import { presentType, roleLabel } from "@/lib/app/view-model";
 import { accountRoleForContract } from "@/lib/app/account-wallet-identity";
 import { roleAwareStatusLabelForWallets } from "@/lib/app/dashboard-offers";
@@ -79,6 +81,10 @@ export function ActivityPage() {
         Key dates from your loaded contracts ? created, accepted, started, completed, and similar
         milestones. Live program logs are not listed here.
       </p>
+      <DevnetAssetNote
+        mint={grouped.all.find((c) => isDevnetTestAsset(c.tokenMint))?.tokenMint}
+        className="mt-2"
+      />
       {stamps.length === 0 ? (
         <div className="mt-6">
           <EmptyState

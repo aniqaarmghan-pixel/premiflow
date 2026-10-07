@@ -14,11 +14,14 @@ import {
   workspaceSnapshot,
   writeWorkspaceMode,
 } from "@/lib/app/workspace-store";
+import { useAppAdmin } from "@/lib/hooks/useAppAdmin";
 
 /** Party vs resolver workspace for the connected wallet (local preference). */
 export function useWorkspace() {
   const { publicKey } = useWallet();
   const wallet = publicKey?.toBase58() ?? null;
+  // Server-computed admin flag (navigation only; APIs re-check server-side).
+  const appAdmin = useAppAdmin();
   const snapshot = useSyncExternalStore(
     subscribeWorkspace,
     () => (wallet ? workspaceSnapshot(wallet) : "||"),
@@ -33,7 +36,7 @@ export function useWorkspace() {
   };
   return {
     mode,
-    canSwitch: canSwitchWorkspace(parsed.resolverCaseCount),
+    canSwitch: wallet != null && canSwitchWorkspace(parsed.resolverCaseCount, appAdmin),
     resolverCaseCount: parsed.resolverCaseCount,
     toggle,
   };

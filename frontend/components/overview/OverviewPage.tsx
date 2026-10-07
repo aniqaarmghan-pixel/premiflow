@@ -41,6 +41,7 @@ import {
 import { formatUnix } from "@/lib/app/datetime";
 import { formatFriendlyTokenAmount, formatTokenAmount } from "@/lib/app/money";
 import { findPaymentToken } from "@/lib/app/premiflow";
+import { DevnetAssetNote } from "@/components/ui/DevnetAssetNote";
 import { dashboardSummaryForWallets, presentType } from "@/lib/app/view-model";
 import { useContracts } from "@/lib/hooks/ContractsProvider";
 import { useResolverCases } from "@/lib/hooks/useResolverCases";
@@ -204,6 +205,7 @@ export function OverviewPage() {
           <p className="mt-1.5 text-sm text-ink-faint">
             Derived from fetched contract accounts for this wallet. Not a live bank balance.
           </p>
+          {mintKeys.length === 1 ? <DevnetAssetNote mint={mintKeys[0]} className="mt-1.5" /> : null}
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <MoneyTile
               href={OVERVIEW_DASHBOARD_HREFS.availableToWithdraw}

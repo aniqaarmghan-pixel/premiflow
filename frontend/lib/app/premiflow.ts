@@ -14,7 +14,7 @@ import { STREAMPAY_PROGRAM_ID } from "@/lib/streampay-v2/constants";
  *
  * Production / durable test tokens should create Metaplex Token Metadata (or the
  * Token-2022 metadata extension) for the mint so wallets can display name + symbol
- * (e.g. "PFT"). Prefer creating metadata once at mint setup time — never mid-payment.
+ * (e.g. "Demo USDT"). Prefer creating metadata once at mint setup time — never mid-payment.
  */
 const TEST_TOKEN_MINT = "9JTBN7QLcoam7LkN44YDhtMQsYt4zKLW7KUE4FscgZtx";
 
@@ -69,12 +69,19 @@ function requirePubkey(raw: string, label: string): PublicKey {
 export const PREMIFLOW_TEST_TOKEN: SupportedPaymentToken = {
   id: "premiflow-test-token",
   name: "PREMIFLOW Test Token",
-  symbol: "PFT",
+  // Display-only Devnet label. Mint, decimals and logic are unchanged.
+  symbol: "Demo USDT",
   mint: requirePubkey(TEST_TOKEN_MINT, "PREMIFLOW test token mint"),
   decimals: 6,
   cluster: "devnet",
   testToken: true,
 };
+
+/** Devnet token display: never implies official USDT or real value. */
+export const DEVNET_TEST_ASSET_COPY = {
+  label: "Devnet test asset",
+  tooltip: "Not official USDT: a Devnet test token with no real value.",
+} as const;
 
 export const SUPPORTED_PAYMENT_TOKENS: readonly SupportedPaymentToken[] = [
   PREMIFLOW_TEST_TOKEN,
@@ -145,6 +152,18 @@ export function findPaymentToken(mint: string | PublicKey): SupportedPaymentToke
 export function findResolver(address: string | PublicKey): SupportedResolver | null {
   const raw = typeof address === "string" ? address.trim() : address.toBase58();
   return SUPPORTED_RESOLVERS.find((item) => item.address.toBase58() === raw) ?? null;
+}
+
+/** True only for the configured Devnet test mint (never custom/other tokens). */
+export function isDevnetTestAsset(mint: string | PublicKey | null | undefined): boolean {
+  if (!mint) return false;
+  const raw = typeof mint === "string" ? mint.trim() : mint.toBase58();
+  return raw === PREMIFLOW_TEST_TOKEN.mint.toBase58();
+}
+
+/** User-facing token label: "Demo USDT" for the Devnet test mint; other tokens unchanged. */
+export function paymentTokenDisplayLabel(mint: string | PublicKey): string {
+  return isDevnetTestAsset(mint) ? PREMIFLOW_TEST_TOKEN.symbol : paymentTokenLabel(mint);
 }
 
 export function paymentTokenLabel(mint: string | PublicKey): string {

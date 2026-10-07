@@ -184,7 +184,7 @@ export function toPublicAttachment(row: AttachmentRecord): PublicAttachment {
 }
 
 function parseContext(raw: unknown): AttachmentContext {
-  if (raw === "message" || raw === "work_submission") return raw;
+  if (raw === "message" || raw === "work_submission" || raw === "case_evidence") return raw;
   throw new AttachmentValidationError("Attachment context is invalid.");
 }
 
@@ -193,7 +193,8 @@ export function assertCanUploadAttachment(
   parties: ContractParties,
   context: AttachmentContext
 ): void {
-  if (context === "message") {
+  // Case evidence files: either party, bound later only by its uploader.
+  if (context === "message" || context === "case_evidence") {
     if (!isAuthorizedMessageWallet(wallet, parties)) {
       throw new AttachmentAccessError("Not a participant on this contract.");
     }
@@ -216,7 +217,7 @@ export function assertCanReadAttachment(
     if (row.uploaderWallet !== wallet) {
       throw new AttachmentAccessError("Pending upload is only available to the uploader.");
     }
-    if (row.context === "message") {
+    if (row.context === "message" || row.context === "case_evidence") {
       if (!isAuthorizedMessageWallet(wallet, parties)) {
         throw new AttachmentAccessError("Not a participant on this contract.");
       }
@@ -232,7 +233,7 @@ export function assertCanReadAttachment(
     throw new AttachmentAccessError("Attachment was not found.");
   }
 
-  if (row.context === "message") {
+  if (row.context === "message" || row.context === "case_evidence") {
     if (!isAuthorizedMessageWallet(wallet, parties)) {
       throw new AttachmentAccessError("Not a participant on this contract.");
     }

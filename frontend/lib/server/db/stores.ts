@@ -5,6 +5,7 @@ import {
   authChallenges,
   caseEvents,
   caseEvidenceSnapshots,
+  caseFileEvidence,
   contractMessages,
   contractWorkSubmissionLinks,
   contractWorkSubmissions,
@@ -17,6 +18,7 @@ import {
 } from "./schema";
 import { randomId } from "../crypto";
 import type {
+  CaseFileEvidenceRecord,
   AuthStore,
   CaseStore,
   EvidenceSnapshotRecord,
@@ -296,6 +298,36 @@ export function createDrizzleCaseStore(db: MessagingDatabase): CaseStore {
       const [saved] = await db.insert(caseEvents).values(row).returning();
       return saved;
     },
+    async listFileEvidence(caseId) {
+      const rows = await db
+        .select()
+        .from(caseFileEvidence)
+        .where(eq(caseFileEvidence.caseId, caseId))
+        .orderBy(caseFileEvidence.submittedAt, caseFileEvidence.id);
+      return rows.map(asFileEvidence);
+    },
+    async getFileEvidenceById(id) {
+      const [row] = await db.select().from(caseFileEvidence).where(eq(caseFileEvidence.id, id));
+      return row ? asFileEvidence(row) : null;
+    },
+    async getFileEvidenceByAttachment(attachmentId) {
+      const [row] = await db
+        .select()
+        .from(caseFileEvidence)
+        .where(eq(caseFileEvidence.attachmentId, attachmentId));
+      return row ? asFileEvidence(row) : null;
+    },
+    async insertFileEvidence(row) {
+      const [saved] = await db.insert(caseFileEvidence).values(row).returning();
+      return asFileEvidence(saved);
+    },
+  };
+}
+
+function asFileEvidence(row: typeof caseFileEvidence.$inferSelect): CaseFileEvidenceRecord {
+  return {
+    ...row,
+    submittedByRole: row.submittedByRole as CaseFileEvidenceRecord["submittedByRole"],
   };
 }
 

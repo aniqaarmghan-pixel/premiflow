@@ -53,8 +53,8 @@ test("Resolve dispute is visible for the connected designated resolver only", ()
   }
 });
 
-test("Coming later evidence / AI sections are kept and nothing auto-decides", () => {
+test("Coming later placeholders are gone and nothing auto-decides", () => {
   const rc = read("components/contracts/ResolutionCenter.tsx");
-  assert.match(rc, /Coming later|comingLater/i);
+  assert.doesNotMatch(rc, /Coming later|comingLater/i);
   assert.doesNotMatch(read("lib/app/admin-center.ts"), /suggestedAward|autoResolve/);
 });
