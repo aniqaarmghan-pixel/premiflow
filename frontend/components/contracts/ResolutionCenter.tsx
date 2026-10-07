@@ -13,6 +13,13 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { useWallet } from "@solana/wallet-adapter-react";
 
 import { presentResolver } from "@/lib/app/dispute-ux";
+import {
+  DISPUTE_PROOF_HEADING,
+  DISPUTE_PROOF_NOTE,
+  EXPLORER_LINK_LABEL,
+  disputeProof,
+  type DisputeProof,
+} from "@/lib/app/dispute-proof";
 import { formatTokenAmount } from "@/lib/app/money";
 import {
   AI_CASE_SUMMARY_COPY,
@@ -420,6 +427,15 @@ export function ResolutionCenter({
           ))}
         </ol>
       </Card>
+
+      <DisputeProofCard
+        proof={disputeProof(contract, decimals, {
+          category: caseRecord?.disputeCategory ?? null,
+          evidenceCount: caseRecord ? caseRecord.evidence.length : null,
+          openSignature: caseRecord?.openSignature ?? openSignature,
+          resolveSignature: shownResolveSignature,
+        })}
+      />
 
       {resolverView && (disputed || resolved) ? (
         <Card className="p-4 sm:p-5 lg:p-4">
@@ -929,6 +945,38 @@ function FactValue({ fact }: { fact: EvidenceFact }) {
     </a>
   ) : (
     <>{fact.value}</>
+  );
+}
+
+function DisputeProofCard({ proof }: { proof: DisputeProof | null }) {
+  if (!proof) return null;
+  return (
+    <Card className="p-4 sm:p-5 lg:p-4">
+      <h3 className="font-display text-lg lg:text-base">{DISPUTE_PROOF_HEADING}</h3>
+      <p className="mt-1 text-xs leading-5 text-ink-faint">{DISPUTE_PROOF_NOTE}</p>
+      <dl className="mt-3 grid gap-2 sm:grid-cols-2">
+        {proof.rows.map((row) => (
+          <Row key={row.label} label={row.label} value={row.value} />
+        ))}
+      </dl>
+      {proof.links.length > 0 ? (
+        <ul className="mt-3 space-y-1 text-sm">
+          {proof.links.map((link) => (
+            <li key={link.label}>
+              <span className="text-ink-soft">{link.label}: </span>
+              <a
+                href={explorerTxUrl(link.signature)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-medium text-accent underline-offset-2 hover:underline"
+              >
+                {EXPLORER_LINK_LABEL} {"\u2197"}
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </Card>
   );
 }
 

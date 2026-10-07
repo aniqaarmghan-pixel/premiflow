@@ -46,10 +46,14 @@ export const NETWORK = {
   activeClusterId: ACTIVE_CLUSTER_ID,
 } as const;
 
-export function explorerTxUrl(signature: string): string {
-  const cluster = NETWORK.explorerCluster;
+/** Pure Solana Explorer tx URL for a given explorer cluster (e.g. "devnet"). */
+export function explorerTxUrlFor(signature: string, cluster: string): string {
   const query = cluster && cluster !== "mainnet" ? `?cluster=${cluster}` : "";
   return `https://explorer.solana.com/tx/${signature}${query}`;
+}
+
+export function explorerTxUrl(signature: string): string {
+  return explorerTxUrlFor(signature, NETWORK.explorerCluster);
 }
 
 export function explorerAddressUrl(address: string): string {
