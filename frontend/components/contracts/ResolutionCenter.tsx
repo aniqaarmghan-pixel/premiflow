@@ -235,6 +235,32 @@ export function ResolutionCenter({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address, contract.status, role, recoverGeneration]);
 
+  // Keep the shared Resolution Case fresh while different participants
+  // work in separate browser sessions. This is a silent refresh so it
+  // never replaces a party's in-progress statement draft.
+  useEffect(() => {
+    if (caseState !== "ready" || (!disputed && !resolved)) return;
+
+    let cancelled = false;
+
+    const refreshSharedCase = () => {
+      void fetchResolutionCase(address)
+        .then((result) => {
+          if (!cancelled) setCaseRecord(result.case);
+        })
+        .catch(() => undefined);
+    };
+
+    const intervalId = window.setInterval(refreshSharedCase, 10_000);
+    window.addEventListener("focus", refreshSharedCase);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(intervalId);
+      window.removeEventListener("focus", refreshSharedCase);
+    };
+  }, [address, caseState, disputed, resolved]);
+
   async function onVerifyWallet() {
     if (!connectedWallet) return;
     setVerifyBusy(true);
@@ -302,13 +328,28 @@ export function ResolutionCenter({
 
   if (!showOpenGuidance && !disputed && !resolved) return null;
 
+  // Statement ownership/editing must use the server-verified case role.
+  // The broader contract UI role may be "both" when a PREMIFLOW account
+  // has multiple linked participant wallets.
+  const statementViewerRole = caseRecord?.viewerRole ?? null;
   const ownStatement =
-    caseRecord && role === "employer"
+    caseRecord && statementViewerRole === "employer"
       ? caseRecord.employerStatement
-      : caseRecord && role === "freelancer"
+      : caseRecord && statementViewerRole === "freelancer"
         ? caseRecord.freelancerStatement
         : null;
-  const canEditStatement = canEditPartyStatementForRole(role);
+  const canEditStatement =
+    statementViewerRole != null
+      ? canEditPartyStatementForRole(statementViewerRole)
+      : false;
+
+  // A party may need to establish/refresh its signed Resolution Case session
+  // before the server can return a verified viewerRole.
+  const canAttemptStatementVerification = canEditPartyStatementForRole(role);
+  const statementNeedsVerification =
+    canAttemptStatementVerification &&
+    (caseState === "unauthenticated" || caseState === "forbidden");
+
   const resolverView = role === "resolver";
   // Case record first, then this session's sync result, then the local fallback.
   const shownResolveSignature = caseResolveSignature ?? serverResolveSignature ?? resolveSignature;
@@ -830,6 +871,19 @@ export function ResolutionCenter({
               {ownStatement ? (
                 <p className="text-xs text-ink-faint">Last submitted {ownStatement.submittedAt}</p>
               ) : null}
+            </div>
+          ) : statementNeedsVerification ? (
+            <div className="mt-4 rounded-xl border border-line-soft p-4">
+              <p className="text-sm text-ink-soft">
+                Verify your connected contract wallet to write your party statement.
+              </p>
+              <Button
+                className="mt-3"
+                disabled={verifyBusy || !connectedWallet}
+                onClick={() => void onVerifyWallet()}
+              >
+                {verifyBusy ? "Verifying..." : "Verify wallet to write statement"}
+              </Button>
             </div>
           ) : null}
         </Card>
