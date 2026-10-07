@@ -19,6 +19,7 @@ import {
   deriveContractAddresses,
   deriveContractEscrowPda,
   deriveFeeConfigPda,
+  deriveHourlyStatePda,
   deriveWorkUnitPda,
 } from "../pda";
 import { getStreamPayV2Program } from "../program";
@@ -29,7 +30,7 @@ import {
   deriveEmployerSourceAta,
   deriveFreelancerDestinationAta,
 } from "../tokens";
-import type { CreateContractRequest } from "../types";
+import type { CreateContractRequest, CreateHourlyContractRequest } from "../types";
 import { STREAMPAY_PROGRAM_ID } from "../constants";
 
 const EMPLOYER = Keypair.generate().publicKey;
@@ -167,6 +168,46 @@ test("createContract hands the wallet one unmodified program instruction with th
     [pdas.escrow.address, false, true],
     // Optional accounts that are None use the program ID placeholder.
     [STREAMPAY_PROGRAM_ID, false, false],
+    [STREAMPAY_PROGRAM_ID, false, false],
+    [deriveFeeConfigPda(STREAMPAY_PROGRAM_ID).address, false, false],
+    [TOKEN_PROGRAM_ID, false, false],
+    [SystemProgram.programId, false, false],
+  ]);
+});
+
+test("createHourlyContract passes the canonical feeConfig PDA for the Hourly fee reserve", async () => {
+  const h = harness(EMPLOYER);
+  const request: CreateHourlyContractRequest = {
+    contractId: 43n,
+    hourlyRate: 10_000_000n,
+    authorizedSeconds: 7_200n,
+    acceptanceDeadline: 2_000_000_000,
+    durationSeconds: 86_400,
+    reviewDuration: 3_600,
+    activationReviewDuration: 3_600,
+    maxRevisions: 2,
+    trialAmount: 0n,
+    resolver: RESOLVER,
+    metadataUri: "https://premiflow.app/test-metadata",
+    metadataHash: new Uint8Array(32),
+  };
+  const tx = await capture(h, () =>
+    h.client.createHourlyContract({ request, freelancer: FREELANCER, tokenMint: MINT })
+  );
+  assertHandoffBasics(tx, EMPLOYER);
+  assert.equal(tx.instructions.length, 1);
+  const [ix] = tx.instructions;
+  assert.deepEqual([...ix!.data.subarray(0, 8)], discriminator("create_hourly_contract"));
+  const pdas = deriveContractAddresses(EMPLOYER, FREELANCER, 43n, STREAMPAY_PROGRAM_ID);
+  assertKeys(ix!.keys, [
+    [EMPLOYER, true, true],
+    [FREELANCER, false, false],
+    [MINT, false, false],
+    [deriveEmployerSourceAta(EMPLOYER, MINT), false, true],
+    [pdas.contract.address, false, true],
+    [pdas.escrow.address, false, true],
+    [deriveHourlyStatePda(pdas.contract.address, STREAMPAY_PROGRAM_ID).address, false, true],
+    // No trial: optional trial unit uses the program ID placeholder.
     [STREAMPAY_PROGRAM_ID, false, false],
     [deriveFeeConfigPda(STREAMPAY_PROGRAM_ID).address, false, false],
     [TOKEN_PROGRAM_ID, false, false],

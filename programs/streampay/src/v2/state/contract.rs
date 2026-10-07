@@ -174,8 +174,8 @@ pub struct Contract {
     pub bump: u8,
     pub escrow_bump: u8,
 
-    /// Platform fee in bps snapshotted from FeeConfig at creation. Fixed /
-    /// Milestone only; zero for Streaming, Hourly and legacy contracts.
+    /// Platform fee in bps snapshotted from FeeConfig at creation for every
+    /// payment mode; zero for legacy contracts or when no FeeConfig exists.
     pub fee_bps: u16,
     /// Fee deposited on top of principal: `fees::fee_on(total_amount, fee_bps)`.
     pub fee_reserve: u64,

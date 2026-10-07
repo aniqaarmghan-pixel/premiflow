@@ -243,6 +243,7 @@ impl Env {
         let ix = Instruction {
             program_id: self.program_id,
             accounts: streampay_program::accounts::CreateHourlyContract {
+                fee_config: ::streampay::v2::fees::fee_config_pda().0,
                 employer: self.employer_pk,
                 freelancer: self.freelancer_pk,
                 token_mint: self.token_mint,
@@ -1062,4 +1063,215 @@ fn start_rejected_before_activation() {
     env.create_hourly(&args).expect("create");
     env.accept(1).expect("accept");
     assert_rejected(env.start(1), E_INVALID_STATE, "start before activation");
+}
+
+// ---------------------------------------------------------------------------
+// Platform fee (Hourly): reserve on the derived total; fee earned only on
+// recorded hourly principal that is withdrawn; unearned returns on refund.
+// ---------------------------------------------------------------------------
+
+use anchor_lang::AccountSerialize;
+use ::streampay::FeeConfig;
+
+const FEE_BPS: u16 = 300;
+const E_NOTHING_TO_WITHDRAW_FEE: u32 = 6139;
+const FEE_START: u64 = 1_000 * TOKEN;
+
+struct Fee {
+    treasury_ata: Address,
+}
+
+fn fee3(x: u64) -> u64 {
+    ::streampay::v2::fees::fee_on(x, FEE_BPS).unwrap()
+}
+
+fn install_fee_config(env: &mut Env) -> Fee {
+    let treasury_owner = Keypair::new().pubkey();
+    let treasury_ata = CreateAccount::new(&mut env.svm, &env.employer, &env.token_mint)
+        .owner(&treasury_owner)
+        .send()
+        .unwrap();
+    let (pda, bump) = ::streampay::v2::fees::fee_config_pda();
+    let cfg = FeeConfig {
+        admin: Keypair::new().pubkey(),
+        treasury: treasury_owner,
+        fee_bps: FEE_BPS,
+        bump,
+        reserved: [0u8; 32],
+    };
+    let mut data = Vec::new();
+    cfg.try_serialize(&mut data).unwrap();
+    env.svm.airdrop(&pda, 10_000_000).unwrap();
+    let mut acc = env.svm.get_account(&pda).unwrap();
+    acc.data = data;
+    acc.owner = env.program_id;
+    env.svm.set_account(pda, acc).unwrap();
+    Fee { treasury_ata }
+}
+
+impl Env {
+    fn withdraw_fee(&mut self, id: u64, fee: &Fee) -> TransactionResult {
+        self.svm.expire_blockhash();
+        let contract = self.contract_pda(id);
+        let ix = Instruction {
+            program_id: self.program_id,
+            accounts: streampay_program::accounts::WithdrawFreelancer {
+                fee_config: Some(::streampay::v2::fees::fee_config_pda().0),
+                treasury_token_account: Some(fee.treasury_ata),
+                freelancer: self.freelancer_pk,
+                contract,
+                token_mint: self.token_mint,
+                contract_escrow: self.escrow_pda(&contract),
+                freelancer_token_account: self.freelancer_token_account,
+                token_program: TOKEN_ID,
+            }
+            .to_account_metas(None),
+            data: streampay_program::instruction::WithdrawFreelancer {}.data(),
+        };
+        self.send_freelancer(ix)
+    }
+
+    fn resolve_as(&mut self, resolver: &Keypair, id: u64, award: u64) -> TransactionResult {
+        self.svm.expire_blockhash();
+        let ix = Instruction {
+            program_id: self.program_id,
+            accounts: streampay_program::accounts::ResolveDispute {
+                resolver: resolver.pubkey(),
+                contract: self.contract_pda(id),
+            }
+            .to_account_metas(None),
+            data: streampay_program::instruction::ResolveDispute {
+                freelancer_contested_award: award,
+            }
+            .data(),
+        };
+        let message = Message::new(&[ix], Some(&resolver.pubkey()));
+        let tx = Transaction::new(&[resolver], message, self.svm.latest_blockhash());
+        self.svm.send_transaction(tx)
+    }
+
+    fn bal(&self, a: &Address) -> u64 {
+        self.token_balance(a)
+    }
+
+    fn assert_fee_conserved(&self, id: u64, fee: &Fee) {
+        let contract = self.contract_pda(id);
+        let f = self.bal(&self.freelancer_token_account);
+        assert_eq!(self.bal(&fee.treasury_ata), fee3(f));
+        assert_eq!(self.bal(&self.employer_token_account), FEE_START - f - fee3(f));
+        assert_eq!(self.bal(&self.escrow_pda(&contract)), 0);
+        let c = self.read_contract(&contract);
+        assert_eq!(c.fee_paid, fee3(c.withdrawn_amount));
+    }
+}
+
+fn fee_env(id: u64, authorized: u64) -> (Env, Fee, Address) {
+    let mut env = setup(FEE_START);
+    let fee = install_fee_config(&mut env);
+    env.offer_and_activate(id, authorized, 200_000, 0);
+    let contract = env.contract_pda(id);
+    (env, fee, contract)
+}
+
+#[test]
+fn fee_hourly_full_settlement() {
+    let (mut env, fee, contract) = fee_env(1, 7_200);
+    let main = earned(7_200);
+    let c = env.read_contract(&contract);
+    assert_eq!((c.fee_bps, c.fee_reserve, c.total_amount), (FEE_BPS, fee3(main), main));
+    assert_eq!(env.bal(&env.escrow_pda(&contract)), main + fee3(main));
+    assert_eq!(env.bal(&env.employer_token_account), FEE_START - main - fee3(main));
+
+    env.svm.expire_blockhash();
+    env.start(1).expect("start");
+    env.warp(env.now() + 7_200);
+    env.svm.expire_blockhash();
+    env.stop(1).expect("stop");
+    env.withdraw_fee(1, &fee).expect("withdraw");
+    assert_eq!(env.bal(&env.freelancer_token_account), main);
+    assert_eq!(env.bal(&fee.treasury_ata), fee3(main));
+    let c = env.read_contract(&contract);
+    assert_eq!(c.fee_paid, c.fee_reserve);
+    env.assert_fee_conserved(1, &fee);
+}
+
+#[test]
+fn fee_hourly_open_session_pays_no_fee_then_partial_end_refund() {
+    let (mut env, fee, contract) = fee_env(1, 7_200);
+    env.svm.expire_blockhash();
+    env.start(1).expect("start");
+    env.warp(env.now() + 3_600);
+    // An open session is not yet recorded principal: nothing to withdraw, no fee.
+    assert_rejected(env.withdraw_fee(1, &fee), E_NOTHING_TO_WITHDRAW_FEE, "open session");
+    assert_eq!(env.bal(&fee.treasury_ata), 0);
+
+    env.svm.expire_blockhash();
+    env.stop(1).expect("stop");
+    env.withdraw_fee(1, &fee).expect("withdraw recorded");
+    assert_eq!(env.bal(&env.freelancer_token_account), earned(3_600));
+    assert_eq!(env.bal(&fee.treasury_ata), fee3(earned(3_600)));
+
+    env.svm.expire_blockhash();
+    env.end(1).expect("end");
+    env.svm.expire_blockhash();
+    env.refund(1).expect("refund unused + unearned fee");
+    env.assert_fee_conserved(1, &fee);
+    let c = env.read_contract(&contract);
+    assert!(c.fee_paid < c.fee_reserve);
+}
+
+#[test]
+fn fee_hourly_dispute_split() {
+    let mut env = setup(FEE_START);
+    let fee = install_fee_config(&mut env);
+    let resolver = Keypair::new();
+    env.svm.airdrop(&resolver.pubkey(), 1_000_000_000).unwrap();
+    let mut args = hourly_args(1, 7_200, 200_000, 0, env.now());
+    args.resolver = resolver.pubkey();
+    env.create_hourly(&args).expect("create");
+    env.accept(1).expect("accept");
+    env.approve(1).expect("approve");
+    let contract = env.contract_pda(1);
+
+    env.start(1).expect("start");
+    env.warp(env.now() + 1_800);
+    env.svm.expire_blockhash();
+    env.stop(1).expect("stop");
+    env.svm.expire_blockhash();
+    env.open_dispute(1).expect("dispute");
+    let c = env.read_contract(&contract);
+    assert!(c.contested_amount > 0);
+    env.resolve_as(&resolver, 1, c.contested_amount / 3).expect("resolve");
+    env.withdraw_fee(1, &fee).expect("withdraw award");
+    env.svm.expire_blockhash();
+    env.refund(1).expect("refund remainder");
+    let f = env.bal(&env.freelancer_token_account);
+    assert_eq!(f, earned(1_800) + c.contested_amount / 3);
+    env.assert_fee_conserved(1, &fee);
+}
+
+#[test]
+fn fee_hourly_rounding_tiny_base_units() {
+    let mut env = setup(FEE_START);
+    let fee = install_fee_config(&mut env);
+    let mut args = hourly_args(1, 3_600, 200_000, 0, env.now());
+    args.hourly_rate = 33;
+    env.create_hourly(&args).expect("create tiny");
+    env.accept(1).expect("accept");
+    env.approve(1).expect("approve");
+    let contract = env.contract_pda(1);
+    let main = canonical_hourly_earned(33, 3_600).unwrap();
+    let c = env.read_contract(&contract);
+    assert_eq!(c.fee_reserve, fee3(main));
+    assert_eq!(c.fee_reserve, 0);
+    env.start(1).expect("start");
+    env.warp(env.now() + 3_600);
+    env.svm.expire_blockhash();
+    env.stop(1).expect("stop");
+    // No fee due, so no fee accounts are required.
+    env.svm.expire_blockhash();
+    env.withdraw(1).expect("withdraw tiny");
+    assert_eq!(env.bal(&env.freelancer_token_account), main);
+    assert_eq!(env.bal(&fee.treasury_ata), 0);
+    env.assert_fee_conserved(1, &fee);
 }

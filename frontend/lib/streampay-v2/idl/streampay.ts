@@ -968,7 +968,7 @@ export type Streampay = {
           "name": "feeConfig",
           "docs": [
             "swapped). Read in the handler: uninitialized means no platform fee;",
-            "otherwise its `fee_bps` is snapshotted for Fixed / Milestone."
+            "otherwise its `fee_bps` is snapshotted for Fixed / Milestone / Streaming."
           ],
           "pda": {
             "seeds": [
@@ -1159,6 +1159,31 @@ export type Streampay = {
               {
                 "kind": "account",
                 "path": "contract"
+              }
+            ]
+          }
+        },
+        {
+          "name": "feeConfig",
+          "docs": [
+            "no platform fee; otherwise its `fee_bps` is snapshotted."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
               }
             ]
           }
@@ -4726,8 +4751,8 @@ export type Streampay = {
           {
             "name": "feeBps",
             "docs": [
-              "Platform fee in bps snapshotted from FeeConfig at creation. Fixed /",
-              "Milestone only; zero for Streaming, Hourly and legacy contracts."
+              "Platform fee in bps snapshotted from FeeConfig at creation for every",
+              "payment mode; zero for legacy contracts or when no FeeConfig exists."
             ],
             "type": "u16"
           },

@@ -290,6 +290,7 @@ export class StreamPayV2Client {
         contractEscrow: pdas.escrow.address,
         hourlyState,
         trialWorkUnit,
+        feeConfig: deriveFeeConfigPda(this.program.programId).address,
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       })

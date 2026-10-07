@@ -4,7 +4,9 @@
 //! `total_amount` is derived on-chain:
 //! `main_amount = canonical_hourly_earned(hourly_rate, authorized_seconds)`
 //! `total_amount = main_amount + trial_amount`
-//! The employer funds exactly that derived total. The caller cannot supply it.
+//! The employer funds that derived total plus the platform fee reserve
+//! `fees::fee_on(total_amount, fee_bps)`. The caller cannot supply either.
+//! The fee is earned only as recorded (approved) hourly principal is withdrawn.
 //!
 //! `payment_mode` is always Hourly. `start_mode` is always OnActivation.
 //! Activation later does not start a session.
@@ -13,11 +15,15 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{Mint, Token, TokenAccount};
 
 use crate::v2::constants::{
-    CONTRACT_ESCROW_SEED, CONTRACT_SEED, HOURLY_STATE_SEED, TRIAL_UNIT_SEED, V2_LAYOUT_VERSION,
+    CONTRACT_ESCROW_SEED, CONTRACT_SEED, FEE_CONFIG_SEED, HOURLY_STATE_SEED, TRIAL_UNIT_SEED, V2_LAYOUT_VERSION,
 };
 use crate::v2::enums::{ContractStatus, DisputeParty, PaymentMode, StartMode};
 use crate::v2::errors::StreamPayV2Error;
-use crate::v2::events::{ContractCreated, HourlyContractCreated, TrialConfigured};
+use crate::v2::events::{
+    ContractCreated, HourlyContractCreated, PlatformFeeReserved, TrialConfigured,
+};
+use crate::v2::fees;
+use crate::v2::instructions::fee_admin::read_fee_bps;
 use crate::v2::hourly::canonical_hourly_earned;
 use crate::v2::instructions::create_shared::{
     fund_contract_escrow, prove_on_activation_end_fits, validate_common_offer_terms,
@@ -145,6 +151,11 @@ pub struct CreateHourlyContract<'info> {
     )]
     pub trial_work_unit: Option<Box<Account<'info, WorkUnit>>>,
 
+    /// CHECK: Canonical FeeConfig PDA (seeds-constrained). Uninitialized means
+    /// no platform fee; otherwise its `fee_bps` is snapshotted.
+    #[account(seeds = [FEE_CONFIG_SEED], bump)]
+    pub fee_config: UncheckedAccount<'info>,
+
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
@@ -256,14 +267,41 @@ pub fn handle_create_hourly_contract(
         );
     }
 
+    // Platform fee reserve on top of the derived principal.
+    let fee_bps = read_fee_bps(&ctx.accounts.fee_config.to_account_info())?;
+    let fee_reserve = fees::fee_reserve_for(terms.total_amount, fee_bps)
+        .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+    let funding_total = terms
+        .total_amount
+        .checked_add(fee_reserve)
+        .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+    {
+        let contract = &mut ctx.accounts.contract;
+        contract.fee_bps = fee_bps;
+        contract.fee_reserve = fee_reserve;
+        contract.fee_paid = 0;
+    }
+
     fund_contract_escrow(
         ctx.accounts.token_program.to_account_info(),
         ctx.accounts.employer_token_account.to_account_info(),
         &ctx.accounts.token_mint,
         &mut ctx.accounts.contract_escrow,
         ctx.accounts.employer.to_account_info(),
-        terms.total_amount,
+        funding_total,
     )?;
+
+    if fee_bps > 0 {
+        emit!(PlatformFeeReserved {
+            contract: contract_key,
+            employer: employer_key,
+            mint: token_mint_key,
+            fee_bps,
+            principal: terms.total_amount,
+            fee_reserve,
+            employer_total: funding_total,
+        });
+    }
 
     emit!(ContractCreated {
         contract: contract_key,

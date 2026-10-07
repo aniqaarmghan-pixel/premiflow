@@ -1,4 +1,4 @@
-//! Platform fee accounting for Fixed and Milestone contracts.
+//! Platform fee accounting for Fixed, Milestone, Streaming and Hourly contracts.
 //!
 //! Business rule: the employer pays the platform fee on top of the agreed
 //! principal; the freelancer always receives 100% of the principal. The fee is

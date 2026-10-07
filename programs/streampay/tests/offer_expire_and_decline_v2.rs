@@ -261,6 +261,7 @@ impl Env {
         let ix = Instruction {
             program_id: self.program_id,
             accounts: streampay_program::accounts::CreateHourlyContract {
+                fee_config: ::streampay::v2::fees::fee_config_pda().0,
                 employer: self.employer_pk,
                 freelancer: self.freelancer_pk,
                 token_mint: self.token_mint,

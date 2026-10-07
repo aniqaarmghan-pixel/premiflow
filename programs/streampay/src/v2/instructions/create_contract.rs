@@ -345,7 +345,7 @@ pub struct CreateContract<'info> {
 
     /// CHECK: Canonical FeeConfig PDA (seeds-constrained, so it cannot be
     /// swapped). Read in the handler: uninitialized means no platform fee;
-    /// otherwise its `fee_bps` is snapshotted for Fixed / Milestone.
+    /// otherwise its `fee_bps` is snapshotted for Fixed / Milestone / Streaming.
     #[account(seeds = [FEE_CONFIG_SEED], bump)]
     pub fee_config: UncheckedAccount<'info>,
 
@@ -487,9 +487,14 @@ pub fn handle_create_contract(
         );
     }
 
-    // Platform fee: Fixed / Milestone only. The employer funds principal plus
-    // the fee reserve; the freelancer's principal is unchanged.
-    let fee_bps = if matches!(payment_mode, PaymentMode::Fixed | PaymentMode::Milestone) {
+    // Platform fee: Fixed / Milestone / Streaming (Hourly snapshots in
+    // `create_hourly_contract`). The employer funds principal plus the fee
+    // reserve; the freelancer's principal is unchanged. Streaming earns the fee
+    // only as accrued principal is materialized and withdrawn.
+    let fee_bps = if matches!(
+        payment_mode,
+        PaymentMode::Fixed | PaymentMode::Milestone | PaymentMode::Streaming
+    ) {
         read_fee_bps(&ctx.accounts.fee_config.to_account_info())?
     } else {
         0

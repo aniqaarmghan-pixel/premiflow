@@ -1,4 +1,4 @@
-//! Platform fee foundation tests (Fixed / Milestone): funding reserve,
+//! Platform fee tests (Fixed / Milestone / Streaming): funding reserve,
 //! proportional fee on release, unearned fee refund, treasury validation.
 //!
 
@@ -933,22 +933,131 @@ fn fee_rounding_one_base_unit_and_odd_amount() {
 }
 
 #[test]
-fn fee_not_applied_to_streaming_or_without_config() {
+fn fee_not_applied_without_config() {
     let mut env = setup(START);
     activate_fixed(&mut env, 1, 100, 0);
     assert_eq!(env.c(1).fee_bps, 0);
     assert_eq!(env.escrow_amount(1), 100);
-
-    let _fee = install_fee_config(&mut env, BPS);
     activate_streaming(&mut env, 2, 1_000);
-    assert_eq!(env.c(2).fee_bps, 0);
-    assert_eq!(env.c(2).fee_reserve, 0);
+    assert_eq!((env.c(2).fee_bps, env.c(2).fee_reserve), (0, 0));
     assert_eq!(env.escrow_amount(2), 1_000);
     // Legacy no-fee contract keeps working with no fee accounts.
     env.submit_work(1, 0).unwrap();
     env.approve_work(1, 0).unwrap();
     env.withdraw(1).unwrap();
     assert_eq!(env.freelancer_bal(), 100);
+}
+
+// ---------------------------------------------------------------------------
+// Streaming: fee follows materialized (released) accrual that is withdrawn.
+// ---------------------------------------------------------------------------
+
+fn fee3(x: u64) -> u64 {
+    ::streampay::v2::fees::fee_on(x, BPS).unwrap()
+}
+
+/// Employer paid exactly principal-to-freelancer + fee-on-that; escrow empty.
+fn assert_fee_conserved(env: &Env, id: u64, fee: &Fee) {
+    let f = env.freelancer_bal();
+    assert_eq!(env.token_balance(&fee.treasury_ata), fee3(f));
+    assert_eq!(env.employer_bal(), START - f - fee3(f));
+    assert_eq!(env.escrow_amount(id), 0);
+    let c = env.c(id);
+    assert_eq!(c.fee_paid, fee3(c.withdrawn_amount));
+}
+
+#[test]
+fn fee_streaming_full_settlement() {
+    let mut env = setup(START);
+    let fee = install_fee_config(&mut env, BPS);
+    let start = activate_streaming(&mut env, 1, 1_000);
+    let c = env.c(1);
+    assert_eq!((c.fee_bps, c.fee_reserve, c.total_amount), (300, 30, 1_000));
+    assert_eq!(env.employer_bal(), START - 1_030);
+    assert_eq!(env.escrow_amount(1), 1_030);
+
+    // Time alone pays nothing: no release, nothing withdrawable, no fee.
+    env.warp(start + DURATION / 2);
+    assert_rejected(env.withdraw_fee(1, &fee), E_NOTHING_TO_WITHDRAW, "unreleased accrual");
+    assert_eq!(env.token_balance(&fee.treasury_ata), 0);
+
+    env.warp(start + DURATION);
+    env.release_stream(1).unwrap();
+    env.withdraw_fee(1, &fee).unwrap();
+    assert_eq!(env.freelancer_bal(), 1_000);
+    assert_eq!(env.token_balance(&fee.treasury_ata), 30);
+    assert_eq!(env.c(1).fee_paid, 30);
+    assert_fee_conserved(&env, 1, &fee);
+}
+
+#[test]
+fn fee_streaming_partial_settlement_then_cancel_refund() {
+    let mut env = setup(START);
+    let fee = install_fee_config(&mut env, BPS);
+    let start = activate_streaming(&mut env, 1, 1_000);
+    env.warp(start + DURATION / 2);
+    env.release_stream(1).unwrap();
+    let released = env.c(1).released_amount;
+    assert!(released > 0 && released < 1_000);
+    env.withdraw_fee(1, &fee).unwrap();
+    assert_eq!(env.freelancer_bal(), released);
+    assert_eq!(env.token_balance(&fee.treasury_ata), fee3(released));
+
+    env.cancel(1).unwrap();
+    let c = env.c(1);
+    if c.freelancer_settlement_amount > c.withdrawn_amount {
+        env.withdraw_fee(1, &fee).unwrap();
+    }
+    env.refund(1).unwrap();
+    assert_fee_conserved(&env, 1, &fee);
+    assert!(env.token_balance(&fee.treasury_ata) < 30, "unearned fee returned");
+}
+
+#[test]
+fn fee_streaming_dispute_split() {
+    let mut env = setup(START);
+    let fee = install_fee_config(&mut env, BPS);
+    let start = activate_streaming(&mut env, 1, 1_000);
+    env.warp(start + DURATION / 3);
+    env.open_as_employer(1).unwrap();
+    let contested = env.c(1).contested_amount;
+    assert!(contested > 0);
+    env.resolve(1, contested / 2).unwrap();
+    env.withdraw_fee(1, &fee).unwrap();
+    env.refund(1).unwrap();
+    assert!(env.freelancer_bal() > 0 && env.freelancer_bal() < 1_000);
+    assert_fee_conserved(&env, 1, &fee);
+}
+
+#[test]
+fn fee_streaming_rounding_tiny_amounts() {
+    let mut env = setup(START);
+    let fee = install_fee_config(&mut env, BPS);
+    // 33 base units: reserve floors to zero, no fee accounts needed.
+    let s1 = activate_streaming(&mut env, 1, 33);
+    assert_eq!(env.c(1).fee_reserve, 0);
+    assert_eq!(env.escrow_amount(1), 33);
+    env.warp(s1 + DURATION);
+    env.release_stream(1).unwrap();
+    env.withdraw(1).unwrap();
+    assert_eq!(env.freelancer_bal(), 33);
+
+    // 101 base units: reserve 3, chunked releases sum exactly to it.
+    let s2 = activate_streaming(&mut env, 2, 101);
+    assert_eq!(env.c(2).fee_reserve, 3);
+    let base_f = env.freelancer_bal();
+    for step in 1..=6 {
+        env.warp(s2 + DURATION * step / 6);
+        env.release_stream(2).unwrap();
+        let c = env.c(2);
+        if c.released_amount > c.withdrawn_amount {
+            env.withdraw_fee(2, &fee).unwrap();
+        }
+        assert_eq!(env.c(2).fee_paid, fee3(env.c(2).withdrawn_amount));
+    }
+    assert_eq!(env.freelancer_bal() - base_f, 101);
+    assert_eq!(env.token_balance(&fee.treasury_ata), 3);
+    assert_eq!(env.escrow_amount(2), 0);
 }
 
 #[test]
