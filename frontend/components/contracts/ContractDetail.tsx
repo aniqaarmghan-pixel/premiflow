@@ -1407,7 +1407,7 @@ export function ContractDetail({ address }: { address: string }) {
         </div>
 
         <div id="payment" className="scroll-mt-20">
-          <PaymentProgress contract={contract} decimals={decimals} />
+          <PaymentProgress contract={contract} decimals={decimals} role={role} />
         </div>
 
         {actions.includes("acceptContract") ? (

@@ -1,39 +1,51 @@
 import { formatTokenAmount } from "@/lib/app/money";
 import {
-  PROTECTION_FEE_CONFIG,
-  protectionFeeBreakdown,
-  type ProtectionFeeConfig,
-} from "@/lib/app/protection-fee";
+  EMPLOYER_FEE_NOTE,
+  FREELANCER_FEE_NOTE,
+  agreedAmountLabel,
+  contractFeeSummary,
+  feeRowLabel,
+} from "@/lib/app/platform-fee";
+import type { ContractView } from "@/lib/streampay-v2";
 
 /**
- * Optional review / summary rows: Freelancer receives / fee / Employer total.
- * Renders nothing while the fee is disabled (the default), so today no fee
- * is shown anywhere. Display only; never feeds a transaction.
+ * Contract amount / PREMIFLOW fee / total funded, from the contract's on-chain
+ * fee fields. Renders nothing for contracts without a fee (feeBps = 0), so
+ * older contracts never show a charged fee. Display only.
  */
 export function ProtectionFeeSummary({
-  agreedAmount,
+  contract,
   decimals,
-  config = PROTECTION_FEE_CONFIG,
+  role,
 }: {
-  agreedAmount: bigint;
+  contract: Pick<ContractView, "totalAmount" | "feeBps" | "feeReserve" | "paymentMode" | "trialAmount">;
   decimals?: number;
-  config?: ProtectionFeeConfig;
+  role?: string;
 }) {
-  const breakdown = protectionFeeBreakdown(agreedAmount, config);
-  if (!breakdown.enabled) return null;
-  const rows = [
-    { label: "Freelancer receives", value: breakdown.freelancerReceives },
-    { label: breakdown.label, value: breakdown.fee },
-    { label: "Employer total", value: breakdown.employerTotal },
-  ];
+  const summary = contractFeeSummary(contract);
+  if (!summary.charged) return null;
+  const freelancer = role === "freelancer";
+  const rows = freelancer
+    ? [{ label: "You receive (agreed amount)", value: summary.agreedAmount }]
+    : [
+        {
+          label: agreedAmountLabel(contract.paymentMode, contract.trialAmount > 0n),
+          value: summary.agreedAmount,
+        },
+        { label: feeRowLabel(summary.feeBps), value: summary.fee },
+        { label: "Total funded by employer", value: summary.employerTotal },
+      ];
   return (
-    <dl className="mt-3 grid gap-2 rounded-2xl border border-line p-3 text-sm" aria-label="Fee summary">
-      {rows.map((row) => (
-        <div key={row.label} className="flex min-w-0 items-center justify-between gap-3">
-          <dt className="text-ink-soft">{row.label}</dt>
-          <dd className="font-medium tabular-nums text-ink">{formatTokenAmount(row.value, decimals)}</dd>
-        </div>
-      ))}
-    </dl>
+    <div className="mt-3 rounded-2xl border border-line p-3 text-sm" aria-label="Fee summary">
+      <dl className="grid gap-2">
+        {rows.map((row) => (
+          <div key={row.label} className="flex min-w-0 items-center justify-between gap-3">
+            <dt className="text-ink-soft">{row.label}</dt>
+            <dd className="font-medium tabular-nums text-ink">{formatTokenAmount(row.value, decimals)}</dd>
+          </div>
+        ))}
+      </dl>
+      <p className="mt-2 text-xs text-ink-faint">{freelancer ? FREELANCER_FEE_NOTE : EMPLOYER_FEE_NOTE}</p>
+    </div>
   );
 }

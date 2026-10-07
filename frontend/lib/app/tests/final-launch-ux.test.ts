@@ -243,11 +243,10 @@ test("protection fee is disabled by default and never changes payment amounts", 
   for (const f of [
     "lib/streampay-v2/send.ts",
     "lib/streampay-v2/instructions.ts",
-    "components/create/CreateWizard.tsx",
   ]) {
     assert.doesNotMatch(read(f), /protection-fee|ProtectionFee/, f);
   }
   const summary = read("components/contracts/ProtectionFeeSummary.tsx");
-  assert.match(summary, /if \(!breakdown\.enabled\) return null;/);
+  assert.match(summary, /if \(!summary\.charged\) return null;/);
   assert.match(read("docs/PROTECTION_FEE.md"), /Devnet redeploy/);
 });

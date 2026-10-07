@@ -30,6 +30,14 @@ function field(raw: Record<string, unknown>, ...names: string[]): unknown {
   throw new Error(`missing account field: ${names.join(" | ")}`);
 }
 
+/** Fields absent from older layouts / IDLs read as undefined (no fee). */
+function optionalField(raw: Record<string, unknown>, ...names: string[]): unknown {
+  for (const name of names) {
+    if (name in raw && raw[name] !== undefined) return raw[name];
+  }
+  return undefined;
+}
+
 function asRecord(value: unknown, label: string): Record<string, unknown> {
   if (typeof value !== "object" || value === null) {
     throw new Error(`${label} is not an object`);
@@ -70,6 +78,9 @@ export function decodeContract(
     ),
     resolver: toPublicKey(field(raw, "resolver") as PublicKey | string),
     contestedAmount: bnToBigInt(field(raw, "contestedAmount", "contested_amount") as never),
+    feeBps: Number(optionalField(raw, "feeBps", "fee_bps") ?? 0),
+    feeReserve: bnToBigInt((optionalField(raw, "feeReserve", "fee_reserve") ?? 0) as never),
+    feePaid: bnToBigInt((optionalField(raw, "feePaid", "fee_paid") ?? 0) as never),
     disputedAt: i64ToNumber(field(raw, "disputedAt", "disputed_at") as never),
     disputeInitiator: decodeDisputeParty(
       field(raw, "disputeInitiator", "dispute_initiator")

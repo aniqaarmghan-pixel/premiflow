@@ -8,9 +8,11 @@ import type { ContractView } from "@/lib/streampay-v2";
 export function PaymentProgress({
   contract,
   decimals,
+  role,
 }: {
   contract: ContractView;
   decimals?: number;
+  role?: string;
 }) {
   const progress = financialProgress(contract);
   const streaming = contract.paymentMode === "Streaming";
@@ -61,8 +63,8 @@ export function PaymentProgress({
           </div>
         ))}
       </dl>
-      {/* Hidden while the protection fee is disabled (default). */}
-      <ProtectionFeeSummary agreedAmount={contract.totalAmount} decimals={decimals} />
+      {/* Hidden for contracts without an on-chain fee (feeBps = 0). */}
+      <ProtectionFeeSummary contract={contract} decimals={decimals} role={role} />
     </Card>
   );
 }

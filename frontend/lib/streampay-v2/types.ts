@@ -73,6 +73,10 @@ export type ContractView = {
   employerRefundableAmount: bigint;
   resolver: PublicKey;
   contestedAmount: bigint;
+  /** Platform fee snapshot (0 / undefined for contracts without a fee). */
+  feeBps?: number;
+  feeReserve?: bigint;
+  feePaid?: bigint;
   disputedAt: number;
   disputeInitiator: DisputeParty;
   acceptanceDeadline: number;

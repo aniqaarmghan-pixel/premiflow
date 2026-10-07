@@ -33,3 +33,16 @@ A real implementation needs a protocol and payment review, program changes
 escrow math, and a Devnet redeploy plus migration plan for existing
 contracts. Only after that should `PROTECTION_FEE_CONFIG` be wired to the
 trusted value and the display rows switched on.
+
+## Platform fee UX (Monetization V1)
+
+The program now reserves a PREMIFLOW fee (intended 3%) on top of the agreed
+amount for every mode. `lib/app/platform-fee.ts` drives display only:
+
+- Create review: Agreed amount / PREMIFLOW fee (3%) / Total employer funds,
+  using bigint base-unit math from `lib/streampay-v2/fees.ts`. Hourly uses the
+  maximum funded budget (+ trial); Streaming uses the full stream principal.
+- Contract payment card: from on-chain `feeBps` / `feeReserve`. Contracts with
+  `feeBps = 0` show no fee. Freelancers see the agreed amount they receive and
+  a note that the employer pays the fee separately.
+- `protection-fee.ts` remains the disabled legacy readiness config.

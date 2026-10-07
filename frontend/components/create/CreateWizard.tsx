@@ -80,6 +80,13 @@ import {
   saveMarketplaceSource,
 } from "@/lib/app/marketplace-link-store";
 import { formatTokenAmount } from "@/lib/app/money";
+import {
+  EMPLOYER_FEE_NOTE,
+  INTENDED_PLATFORM_FEE_BPS,
+  agreedAmountLabel,
+  createFeeSummary,
+  feeRowLabel,
+} from "@/lib/app/platform-fee";
 import { formatDuration, formatReviewPeriod } from "@/lib/app/datetime";
 import {
   lockedCreatePayment,
@@ -1394,6 +1401,7 @@ export function CreateWizard() {
                 errors={errors}
                 mainAmount={mainAmount}
                 trialAmount={trialParsed ?? 0n}
+                fundedPrincipal={totalParsed}
               />
             ) : null}
           </motion.div>
@@ -1535,6 +1543,14 @@ export function CreateWizard() {
                     ? formatTokenAmount(hourlyPreview.mainAmount, draft.decimals)
                     : "—"
                   : draft.totalAmountUi || "—"}
+              </dd>
+            </div>
+            <div className="flex justify-between gap-2">
+              <dt className="text-white/45">Employer funds (incl. 3% fee)</dt>
+              <dd>
+                {totalParsed != null
+                  ? formatTokenAmount(createFeeSummary(totalParsed).employerTotal, draft.decimals)
+                  : "\u2014"}
               </dd>
             </div>
             <div className="flex justify-between gap-2">
@@ -1715,13 +1731,25 @@ function ReviewPanel({
   errors,
   mainAmount,
   trialAmount,
+  fundedPrincipal,
 }: {
   draft: CreateWizardDraft;
   errors: Record<string, string>;
   mainAmount: bigint;
   trialAmount: bigint;
+  /** Full escrowed principal: total (incl. trial); Hourly = max budget + trial. */
+  fundedPrincipal: bigint | null;
 }) {
   const issueCount = Object.keys(errors).length;
+  const fee = fundedPrincipal != null ? createFeeSummary(fundedPrincipal) : null;
+  const feeRows: [string, string][] = [
+    [
+      agreedAmountLabel(draft.paymentMode, draft.trialEnabled),
+      fee ? formatTokenAmount(fee.agreedAmount, draft.decimals) : "\u2014",
+    ],
+    [feeRowLabel(fee?.feeBps ?? INTENDED_PLATFORM_FEE_BPS), fee ? formatTokenAmount(fee.fee, draft.decimals) : "\u2014"],
+    ["Total employer funds", fee ? formatTokenAmount(fee.employerTotal, draft.decimals) : "\u2014"],
+  ];
   const rows: [string, string][] = [
     ["Contract", presentType(draft.paymentMode)],
     [
@@ -1775,6 +1803,20 @@ function ReviewPanel({
           </div>
         ))}
       </dl>
+      <div className="mt-3 rounded-xl border border-line" aria-label="Payment summary">
+        <p className="px-3 pt-2 text-[11px] uppercase tracking-wide text-ink-faint">
+          Payment summary ({paymentTokenLabel(draft.mint)})
+        </p>
+        <dl className="divide-y divide-line">
+          {feeRows.map(([label, value]) => (
+            <div key={label} className="flex items-start justify-between gap-3 px-3 py-2 text-sm">
+              <dt className="text-ink-faint">{label}</dt>
+              <dd className="max-w-[60%] text-right font-medium text-ink">{value}</dd>
+            </div>
+          ))}
+        </dl>
+        <p className="px-3 pb-2 text-xs text-ink-soft">{EMPLOYER_FEE_NOTE}</p>
+      </div>
       {draft.paymentMode === "Hourly" ? (
         <ul className="mt-2 space-y-1 text-xs text-ink-soft">
           <HourlyReviewLines draft={draft} mainAmount={mainAmount} trialAmount={trialAmount} />
