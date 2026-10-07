@@ -94,7 +94,7 @@ test("app shell: public pages skip the account gate; dashboard sidebar holds the
   for (const href of DASHBOARD_NAV_HREFS) {
     assert.ok(shell.includes(`href: "${href}"`), href);
   }
-  assert.match(shell, /router\.push\(next === "resolver" \? "\/resolver" : DASHBOARD_HREF\)/);
+  assert.match(shell, /router\.push\(next === "resolver" \? "\/admin" : DASHBOARD_HREF\)/);
   assert.equal(isDashboardNavActive("/dashboard", "/dashboard"), true);
   assert.equal(isDashboardNavActive("/dashboard", "/dashboard/reviews"), false);
   assert.equal(isDashboardNavActive("/", "/dashboard"), false);
