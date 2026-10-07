@@ -40,11 +40,16 @@ test("withdrawFreelancer account map always includes classic tokenProgram", () =
   assert.deepEqual(Object.keys(map).sort(), [
     "contract",
     "contractEscrow",
+    "feeConfig",
     "freelancer",
     "freelancerTokenAccount",
     "tokenMint",
     "tokenProgram",
+    "treasuryTokenAccount",
   ]);
+  // Fee accounts are explicit keys; null when the contract carries no fee.
+  assert.equal(map.feeConfig, null);
+  assert.equal(map.treasuryTokenAccount, null);
   assert.match(instructionsSrc, /withdrawFreelancerAccounts\(/);
   assert.doesNotMatch(
     methodSource("withdrawFreelancer"),

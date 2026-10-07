@@ -15,7 +15,12 @@ import {
 
 import { StreamPayV2Client } from "../instructions";
 import idlJson from "../idl/streampay.json";
-import { deriveContractAddresses, deriveContractEscrowPda, deriveWorkUnitPda } from "../pda";
+import {
+  deriveContractAddresses,
+  deriveContractEscrowPda,
+  deriveFeeConfigPda,
+  deriveWorkUnitPda,
+} from "../pda";
 import { getStreamPayV2Program } from "../program";
 import { describeWalletHandoff } from "../send";
 import {
@@ -163,6 +168,7 @@ test("createContract hands the wallet one unmodified program instruction with th
     // Optional accounts that are None use the program ID placeholder.
     [STREAMPAY_PROGRAM_ID, false, false],
     [STREAMPAY_PROGRAM_ID, false, false],
+    [deriveFeeConfigPda(STREAMPAY_PROGRAM_ID).address, false, false],
     [TOKEN_PROGRAM_ID, false, false],
     [SystemProgram.programId, false, false],
   ]);
@@ -266,6 +272,9 @@ test("withdrawFreelancer keeps the idempotent ATA preInstruction before the with
     [deriveContractEscrowPda(contract, STREAMPAY_PROGRAM_ID).address, false, true],
     [ata, false, true],
     [TOKEN_PROGRAM_ID, false, false],
+    // Fee-free contract: optional feeConfig / treasury use the program ID placeholder.
+    [STREAMPAY_PROGRAM_ID, false, false],
+    [STREAMPAY_PROGRAM_ID, false, false],
   ]);
 });
 
