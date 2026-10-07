@@ -93,7 +93,7 @@ export const DASHBOARD_NAV_HREFS = [
 /** Sidebar active state: roots match exactly, sections match by segment. */
 export function isDashboardNavActive(href: string, pathname: string | null | undefined): boolean {
   const path = normalizePath(pathname);
-  if (href === "/" || href === "/dashboard" || href === "/resolver") return path === href;
+  if (href === "/" || href === "/dashboard" || href === "/resolver" || href === "/admin") return path === href;
   return path === href || path.startsWith(`${href}/`);
 }
 

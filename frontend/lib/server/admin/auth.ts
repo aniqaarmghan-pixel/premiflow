@@ -33,13 +33,21 @@ type SessionUserLike = {
 function parseList(raw: string | undefined, lower: boolean): Set<string> {
   const out = new Set<string>();
   for (const part of (raw ?? "").split(",")) {
-    const value = part.trim();
+    // Trim whitespace and tolerate one pair of surrounding quotes from env tooling.
+    const value = part.trim().replace(/^(["'])(.*)\1$/, "$2").trim();
     if (value) out.add(lower ? value.toLowerCase() : value);
   }
   return out;
 }
 
-/** True only for allowlisted account ids, or verified allowlisted emails. */
+/**
+ * THE single PREMIFLOW admin authorization check, used by /api/admin/me
+ * (Admin Center + admin navigation) and every Help Desk admin API via
+ * requireAccountUser / requireAppAdmin. True only for an allowlisted account
+ * id (PREMIFLOW_ADMIN_USER_IDS), or when the authenticated account's email is
+ * VERIFIED and in PREMIFLOW_ADMIN_EMAILS (comma separated, trimmed,
+ * case-insensitive). Client flags are never consulted.
+ */
 export function isAppAdminUser(user: SessionUserLike, env: AdminEnv = process.env): boolean {
   if (!user || typeof user.id !== "string" || !user.id) return false;
   if (parseList(env.PREMIFLOW_ADMIN_USER_IDS, false).has(user.id)) return true;
@@ -52,7 +60,12 @@ export function isAppAdminUser(user: SessionUserLike, env: AdminEnv = process.en
   );
 }
 
-export type AccountUser = { userId: string; email: string | null; admin: boolean };
+export type AccountUser = {
+  userId: string;
+  email: string | null;
+  emailVerified: boolean;
+  admin: boolean;
+};
 
 /** Signed-in PREMIFLOW account, with admin computed server-side. */
 export async function requireAccountUser(
@@ -75,6 +88,7 @@ export async function requireAccountUser(
   return {
     userId: user.id,
     email: typeof user.email === "string" ? user.email : null,
+    emailVerified: user.emailVerified === true,
     admin: isAppAdminUser(user, env),
   };
 }

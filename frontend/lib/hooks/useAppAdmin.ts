@@ -2,30 +2,51 @@
 
 import { useEffect, useState } from "react";
 
+import type { AppAdminStatus } from "@/lib/app/resolver-workspace";
 import { fetchAdminMe } from "@/lib/app/support-tickets";
 
-let cached: Promise<boolean> | null = null;
+export type { AppAdminStatus };
 
-/**
- * Server-computed PREMIFLOW admin flag, used ONLY to show Admin Center
- * navigation. Every admin API re-checks on the server; this grants nothing.
- */
-export function useAppAdmin(): boolean {
-  const [admin, setAdmin] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    cached ??= fetchAdminMe()
+// Cached per signed-in account so switching accounts never reuses a stale flag.
+const cache = new Map<string, Promise<boolean>>();
+
+function adminFlag(userId: string): Promise<boolean> {
+  let pending = cache.get(userId);
+  if (!pending) {
+    pending = fetchAdminMe()
       .then((result) => result.admin === true)
       .catch(() => {
-        cached = null;
+        cache.delete(userId);
         return false;
       });
-    void cached.then((value) => {
-      if (alive) setAdmin(value);
+    cache.set(userId, pending);
+  }
+  return pending;
+}
+
+/**
+ * Server-computed PREMIFLOW admin status for the signed-in account, used ONLY
+ * to choose navigation (the dedicated Admin workspace). Every admin API
+ * re-checks on the server, and it never grants escrow/settlement authority.
+ * Fails closed: an error reads as "user".
+ */
+export function useAppAdminStatus(userId: string | null | undefined): AppAdminStatus {
+  const [resolved, setResolved] = useState<{ userId: string; admin: boolean } | null>(null);
+  useEffect(() => {
+    if (!userId) return;
+    let alive = true;
+    void adminFlag(userId).then((admin) => {
+      if (alive) setResolved({ userId, admin });
     });
     return () => {
       alive = false;
     };
-  }, []);
-  return admin;
+  }, [userId]);
+  if (!userId) return "user";
+  if (!resolved || resolved.userId !== userId) return "loading";
+  return resolved.admin ? "admin" : "user";
+}
+
+export function useAppAdmin(userId: string | null | undefined): boolean {
+  return useAppAdminStatus(userId) === "admin";
 }

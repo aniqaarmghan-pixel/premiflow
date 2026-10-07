@@ -171,7 +171,6 @@ test("workspace mode: resolver workspace needs resolver cases; switch keeps part
     "Assigned Disputes",
     "Resolved Cases",
     "Resolution Activity",
-    "Exit Admin Center",
   ]);
   assert.ok(!labels.some((l) => /Create contract|Hiring|Working/.test(l)));
   assert.equal(isNavActive("/resolver", "/resolver/assigned"), false);

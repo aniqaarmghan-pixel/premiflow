@@ -38,7 +38,15 @@ import { brand } from "@/lib/brand";
 import { RESOLVER_WORKSPACE_COPY } from "@/lib/app/resolver-workspace";
 import { useAccountSession } from "@/lib/account-auth/useAccountSession";
 import { useDialogFocus } from "@/lib/hooks/useDialogFocus";
-import { ADMIN_EXIT_HREF, RESOLVER_NAV, type WorkspaceMode } from "@/lib/app/resolver-workspace";
+import {
+  ADMIN_HOME_HREF,
+  ADMIN_NAV,
+  RESOLVER_DESK_NAV,
+  RESOLVER_EXIT_HREF,
+  adminEntryRedirect,
+  deskShellKind,
+} from "@/lib/app/resolver-workspace";
+import { useAppAdminStatus } from "@/lib/hooks/useAppAdmin";
 import { DASHBOARD_HREF, isDashboardNavActive, shellKind } from "@/lib/app/site-routes";
 import { useWorkspace } from "@/lib/hooks/useWorkspace";
 import { BrandMark } from "@/components/brand/BrandMark";
@@ -113,11 +121,17 @@ const RESOLVER_ICONS: Record<string, LucideIcon> = {
   "/dashboard": LogOut,
 };
 
-const RESOLVER_NAV_ITEMS = RESOLVER_NAV.map((item) => ({
-  href: item.href as string,
-  label: item.label as string,
-  icon: RESOLVER_ICONS[item.href] ?? CircleHelp,
-}));
+const deskNavItems = (items: ReadonlyArray<{ href: string; label: string }>): NavItem[] =>
+  items.map((item) => ({
+    href: item.href,
+    label: item.label,
+    icon: RESOLVER_ICONS[item.href] ?? CircleHelp,
+  }));
+
+/** Dedicated admin workspace: Admin Center, Help Desk and Resolution Desk pages only. */
+const ADMIN_NAV_ITEMS = deskNavItems(ADMIN_NAV);
+/** Non-admin designated resolver wallet: resolution pages only (no admin links). */
+const RESOLVER_DESK_NAV_ITEMS = deskNavItems(RESOLVER_DESK_NAV);
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -134,9 +148,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const drawerRef = useRef<HTMLDivElement>(null);
   useDialogFocus(open, drawerRef, () => setOpen(false));
   const workspace = useWorkspace();
-  // "Exit Admin Center" navigates to the dashboard; leave admin mode there.
+  // "Exit Resolution Desk" (non-admin resolver wallets) lands on the dashboard; leave resolver mode there.
   useEffect(() => {
-    if (workspace.mode === "resolver" && pathname === ADMIN_EXIT_HREF) workspace.toggle();
+    if (workspace.mode === "resolver" && pathname === RESOLVER_EXIT_HREF) workspace.toggle();
   }, [pathname, workspace]);
 
   const user = session?.user ?? null;
@@ -152,6 +166,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
     router.replace("/sign-in");
   }, [isPending, isPublicAuthPage, isPublicSite, router, sessionStatus, user]);
+
+  // Server-computed admin status (navigation only; every admin API re-checks
+  // on the server and it grants no escrow authority). Admins enter Admin Center.
+  const adminStatus = useAppAdminStatus(user?.id ?? null);
+  useEffect(() => {
+    const target = adminEntryRedirect(pathname, adminStatus);
+    if (target) router.replace(target);
+  }, [adminStatus, pathname, router]);
 
   // Authentication and password-recovery pages are intentionally outside the authenticated
   // application shell. Visitors should not see workspace navigation,
@@ -212,17 +234,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </div>
     );
   }
+  const desk = deskShellKind({ adminStatus, workspaceMode: workspace.mode, pathname });
   const navGroups: ReadonlyArray<NavGroup> =
-    workspace.mode === "resolver" ? [{ title: null, items: RESOLVER_NAV_ITEMS }] : NAV_GROUPS;
+    desk === "admin"
+      ? [{ title: null, items: ADMIN_NAV_ITEMS }]
+      : desk === "resolver"
+        ? [{ title: null, items: RESOLVER_DESK_NAV_ITEMS }]
+        : desk === "pending"
+          ? []
+          : NAV_GROUPS;
+  // Admins land in Admin Center; hold the dashboard body while that redirect runs.
+  const holdDashboard = (desk === "admin" || desk === "pending") && pathname === DASHBOARD_HREF;
+  const homeHref = desk === "admin" ? ADMIN_HOME_HREF : DASHBOARD_HREF;
+  // Only non-admin designated resolver wallets see this switch (party desk).
   const switchWorkspace = () => {
     const next = workspace.toggle();
-    router.push(next === "resolver" ? "/admin" : DASHBOARD_HREF);
+    router.push(next === "resolver" ? "/resolver" : DASHBOARD_HREF);
   };
 
   return (
     <div className="pf-dashboard min-h-screen min-w-0 lg:grid lg:grid-cols-[224px_minmax(0,1fr)] 2xl:grid-cols-[240px_minmax(0,1fr)]">
       <aside className="pf-sidebar hidden bg-navy px-3.5 pt-5 text-white lg:px-3 lg:pt-4 lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col lg:self-start lg:overflow-hidden lg:min-h-[100dvh]">
-        <Link href={DASHBOARD_HREF} className="block min-w-0 shrink-0 px-1">
+        <Link href={homeHref} className="block min-w-0 shrink-0 px-1">
           <BrandMark light size={44} wordmarkFontSize="1.32rem" />
           <p
             className="mt-3"
@@ -237,10 +270,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </p>
         </Link>
         <div className="shrink-0">
-          {workspace.canSwitch && workspace.mode !== "resolver" ? (
-            <WorkspaceSwitch mode={workspace.mode} onToggle={switchWorkspace} />
+          {workspace.canSwitch && desk === "party" ? (
+            <WorkspaceSwitch onToggle={switchWorkspace} />
           ) : null}
-          {workspace.mode !== "resolver" ? <ExploreMarketplaceLink /> : null}
+          {desk === "party" ? <ExploreMarketplaceLink /> : null}
         </div>
         {/* Only this region scrolls; brand/switch/Explore stay pinned above it. */}
         <div className="pf-rail -mx-1 mt-1 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-1 pb-[calc(6rem+env(safe-area-inset-bottom))]">
@@ -352,12 +385,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               ) : null}
             </div>
           ) : null}
-          {children}
+          {holdDashboard ? null : children}
         </main>
         <ClientOnly>
           <FloatingAssistant />
         </ClientOnly>
-        {workspace.mode !== "resolver" ? (
+        {desk === "party" ? (
           <DashboardBottomNav pathname={pathname} moreOpen={open} onMore={() => setOpen(true)} />
         ) : null}
       </div>
@@ -400,16 +433,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   <X size={18} />
                 </button>
               </div>
-              {workspace.canSwitch && workspace.mode !== "resolver" ? (
+              {workspace.canSwitch && desk === "party" ? (
                 <WorkspaceSwitch
-                  mode={workspace.mode}
                   onToggle={() => {
                     setOpen(false);
                     switchWorkspace();
                   }}
                 />
               ) : null}
-              {workspace.mode !== "resolver" ? <ExploreMarketplaceLink onNavigate={() => setOpen(false)} /> : null}
+              {desk === "party" ? <ExploreMarketplaceLink onNavigate={() => setOpen(false)} /> : null}
               <nav aria-label="Dashboard" className="mt-2 flex flex-col">
               {navGroups.flatMap((group) => [
                 group.title ? (
@@ -454,7 +486,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   );
 }
 
-function WorkspaceSwitch({ mode, onToggle }: { mode: WorkspaceMode; onToggle: () => void }) {
+function WorkspaceSwitch({ onToggle }: { onToggle: () => void }) {
   return (
     <button
       type="button"
@@ -463,9 +495,7 @@ function WorkspaceSwitch({ mode, onToggle }: { mode: WorkspaceMode; onToggle: ()
     >
       <ArrowLeftRight size={14} className="shrink-0" aria-hidden="true" />
       <span className="min-w-0 truncate">
-        {mode === "resolver"
-          ? RESOLVER_WORKSPACE_COPY.exitAdmin
-          : RESOLVER_WORKSPACE_COPY.switchToResolver}
+        {RESOLVER_WORKSPACE_COPY.switchToResolver}
       </span>
     </button>
   );

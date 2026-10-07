@@ -35,6 +35,9 @@ export const ADMIN_DESKS: readonly AdminDesk[] = [
 
 export const ADMIN_CENTER_COPY = {
   title: "Admin Center",
+  checking: "Checking admin access...",
+  notAuthorized:
+    "This account is not an authorized PREMIFLOW admin. Admin Center and the Help Desk are available only to server-authorized admin accounts.",
   intro: "The same PREMIFLOW admin account can use the Help Desk and the Resolution Desk.",
   humanDecision:
     "PREMIFLOW does not use AI to decide disputes or allocations. The human designated resolver reviews the case and signs.",

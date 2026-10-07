@@ -81,8 +81,10 @@ import {
   postResolutionRefundAvailable,
   presentResolver,
   resolutionPreview,
+  settlementPanelOwnsResolve,
   shouldOfferOpenDispute,
   shouldRefreshAfterDisputeFailure,
+  withoutDuplicateResolveAction,
 } from "@/lib/app/dispute-ux";
 import {
   HOURLY_COPY,
@@ -979,7 +981,13 @@ export function ContractDetail({ address }: { address: string }) {
     "stopHourlySession",
     "endHourlyContract",
   ];
-  const contractButtons = actions
+  // Resolve dispute appears ONLY in the Settlement decision panel when that
+  // panel renders (connected designated resolver, Disputed). Display only:
+  // the resolveDispute transaction and resolver authorization are unchanged.
+  const contractButtons = withoutDuplicateResolveAction(
+    actions,
+    settlementPanelOwnsResolve({ canSettle: canSettleDispute, role, status: contract.status })
+  )
     .filter((a) => !UNIT_ACTIONS.includes(a) && !TRIAL_ACTIONS.includes(a))
     .filter(
       (a) =>

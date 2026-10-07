@@ -10,12 +10,13 @@ import { makeContract, RESOLVER, WALLET_A, WALLET_B, WALLET_C } from "../../stre
 
 const read = (p: string) => readFileSync(new URL(`../../../${p}`, import.meta.url), "utf8");
 
-test("Admin Center replaces the resolver workspace switch", () => {
-  assert.equal(RESOLVER_WORKSPACE_COPY.switchToResolver, "Admin Center");
+test("Admin Center is the admin home; the party switch only opens the Resolution Desk", () => {
+  assert.equal(RESOLVER_WORKSPACE_COPY.switchToResolver, "Resolution Desk");
   const shell = read("components/shell/AppShell.tsx");
   assert.doesNotMatch(shell, /Switch to resolver workspace/);
   assert.match(shell, /RESOLVER_WORKSPACE_COPY\.switchToResolver/);
-  assert.match(shell, /next === "resolver" \? "\/admin"/);
+  assert.match(shell, /next === "resolver" \? "\/resolver"/);
+  assert.match(shell, /adminEntryRedirect\(pathname, adminStatus\)/);
   assert.match(read("app/admin/page.tsx"), /AdminCenter/);
   assert.equal(isNavActive("/admin", "/admin"), true);
   assert.equal(isNavActive("/admin", "/resolver"), false);

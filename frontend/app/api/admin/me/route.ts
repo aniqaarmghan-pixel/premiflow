@@ -16,6 +16,9 @@ export async function GET(request: Request) {
     return NextResponse.json({
       admin: account.admin,
       authority: account.admin ? ADMIN_AUTHORITY : null,
+      // The signed-in account's own verification state (helps explain why an
+      // unverified email is not recognized). Never the configured allowlist.
+      emailVerified: account.emailVerified,
     });
   } catch (err) {
     if (err instanceof HttpError && err.status === 401) {

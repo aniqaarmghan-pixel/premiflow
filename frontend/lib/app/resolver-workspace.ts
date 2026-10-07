@@ -44,8 +44,8 @@ export const RESOLVER_WORKSPACE_COPY = {
   txHistoryLoading: "Loading on-chain transactions...",
   txHistoryEmpty: "No on-chain transactions found for your assigned contracts.",
   txHistoryError: "On-chain transaction history could not be loaded right now. Dispute timestamps below are still accurate.",
-  switchToResolver: "Admin Center",
-  exitAdmin: "Exit Admin Center",
+  switchToResolver: "Resolution Desk",
+  exitResolutionDesk: "Exit Resolution Desk",
 } as const;
 
 type StatementLike = { body?: string | null } | null | undefined;
@@ -242,19 +242,79 @@ export function canSwitchWorkspace(resolverCaseCount: number, appAdmin = false):
   return resolverCaseCount > 0 || appAdmin;
 }
 
+export const ADMIN_HOME_HREF = "/admin";
 export const ADMIN_HELP_DESK_HREF = "/admin/help-desk";
-export const ADMIN_EXIT_HREF = "/dashboard";
+/** Non-admin designated resolver wallets leave the Resolution Desk here. */
+export const RESOLVER_EXIT_HREF = "/dashboard";
 
-/** Admin mode navigation only: no marketplace or party items. */
-export const RESOLVER_NAV = [
-  { href: "/admin", label: "Admin Center" },
-  { href: ADMIN_HELP_DESK_HREF, label: "Help Desk" },
+const RESOLUTION_DESK_NAV = [
   { href: "/resolver", label: "Resolution Desk" },
   { href: "/resolver/assigned", label: "Assigned Disputes" },
   { href: "/resolver/resolved", label: "Resolved Cases" },
   { href: "/resolver/activity", label: "Resolution Activity" },
-  { href: ADMIN_EXIT_HREF, label: "Exit Admin Center" },
 ] as const;
+
+/**
+ * Dedicated admin workspace sidebar (server-authorized admins only). No
+ * marketplace/customer items and no exit: Admin Center is the admin's home.
+ */
+export const ADMIN_NAV = [
+  { href: ADMIN_HOME_HREF, label: "Admin Center" },
+  { href: ADMIN_HELP_DESK_HREF, label: "Help Desk" },
+  ...RESOLUTION_DESK_NAV,
+] as const;
+
+/**
+ * Designated resolver wallet on a NON-admin account: resolution pages only,
+ * never Admin Center or Help Desk links.
+ */
+export const RESOLVER_DESK_NAV = [
+  ...RESOLUTION_DESK_NAV,
+  { href: RESOLVER_EXIT_HREF, label: RESOLVER_WORKSPACE_COPY.exitResolutionDesk },
+] as const;
+
+/** Back-compat alias: the admin workspace navigation. */
+export const RESOLVER_NAV = ADMIN_NAV;
+
+export type AppAdminStatus = "loading" | "admin" | "user";
+export type DeskShell = "admin" | "resolver" | "party" | "pending";
+
+function underPath(pathname: string, root: string): boolean {
+  return pathname === root || pathname.startsWith(`${root}/`);
+}
+
+export function isResolutionDeskPath(pathname: string | null | undefined): boolean {
+  return underPath(pathname ?? "", "/resolver");
+}
+
+export function isAdminWorkspacePath(pathname: string | null | undefined): boolean {
+  return underPath(pathname ?? "", ADMIN_HOME_HREF) || isResolutionDeskPath(pathname);
+}
+
+/**
+ * Which authenticated shell to render. A server-authorized admin always gets
+ * the dedicated admin workspace (navigation only; grants no escrow authority).
+ * A non-admin designated resolver gets the resolver-only desk on /resolver*
+ * or in resolver mode. Everyone else keeps the marketplace dashboard.
+ */
+export function deskShellKind(input: {
+  adminStatus: AppAdminStatus;
+  workspaceMode: WorkspaceMode;
+  pathname: string | null | undefined;
+}): DeskShell {
+  if (input.adminStatus === "admin") return "admin";
+  if (input.adminStatus === "loading") return "pending";
+  if (input.workspaceMode === "resolver" || isResolutionDeskPath(input.pathname)) return "resolver";
+  return "party";
+}
+
+/** Authenticated workspace entry (the dashboard landing) opens Admin Center for admins. */
+export function adminEntryRedirect(
+  pathname: string | null | undefined,
+  adminStatus: AppAdminStatus
+): string | null {
+  return adminStatus === "admin" && pathname === "/dashboard" ? ADMIN_HOME_HREF : null;
+}
 
 export function isNavActive(href: string, pathname: string): boolean {
   if (href === "/" || href === "/resolver" || href === "/admin") return pathname === href;

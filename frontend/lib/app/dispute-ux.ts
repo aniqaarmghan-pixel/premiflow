@@ -216,6 +216,26 @@ export function shouldOfferResolveDispute(
   return role === "resolver" && actions.includes("resolveDispute");
 }
 
+/**
+ * True when the Settlement decision panel renders Resolve dispute: the
+ * connected wallet is the designated resolver (canSettle) on a Disputed contract.
+ */
+export function settlementPanelOwnsResolve(input: {
+  canSettle: boolean;
+  role: ContractRole;
+  status: string;
+}): boolean {
+  return input.canSettle && input.role === "resolver" && input.status === "Disputed";
+}
+
+/** Generic Actions card: drop Resolve dispute when the Settlement decision panel owns it. */
+export function withoutDuplicateResolveAction(
+  actions: readonly UiAction[],
+  panelOwnsResolve: boolean
+): UiAction[] {
+  return panelOwnsResolve ? actions.filter((a) => a !== "resolveDispute") : [...actions];
+}
+
 export function postResolutionCollectAvailable(contract: ContractView): boolean {
   return (
     contract.status === "Resolved" && remainingFreelancerClaim(contract) > 0n

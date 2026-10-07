@@ -35,20 +35,20 @@ test("Devnet token displays as Demo USDT; mint/decimals/labels unchanged", () =>
   assert.doesNotMatch(read("lib/app/premiflow.ts"), /\bPFT\b/);
 });
 
-test("Admin nav: exact items, Exit Admin Center, no Back to contracts, no marketplace/party items", () => {
+test("Admin nav: exact items, no Exit, no Back to contracts, no marketplace/party items", () => {
   assert.deepEqual(
     RESOLVER_NAV.map((i) => i.label),
-    ["Admin Center", "Help Desk", "Resolution Desk", "Assigned Disputes", "Resolved Cases", "Resolution Activity", "Exit Admin Center"]
+    ["Admin Center", "Help Desk", "Resolution Desk", "Assigned Disputes", "Resolved Cases", "Resolution Activity"]
   );
-  assert.equal(RESOLVER_NAV.find((i) => i.label === "Exit Admin Center")!.href, "/dashboard");
   assert.equal(RESOLVER_NAV.find((i) => i.label === "Help Desk")!.href, "/admin/help-desk");
   assert.equal(isNavActive("/admin", "/admin/help-desk"), false);
   assert.equal(isNavActive("/admin/help-desk", "/admin/help-desk"), true);
   assert.equal("switchToContracts" in RESOLVER_WORKSPACE_COPY, false);
+  assert.equal("exitAdmin" in RESOLVER_WORKSPACE_COPY, false);
   const shell = read("components/shell/AppShell.tsx");
-  assert.doesNotMatch(shell, /Back to contracts|switchToContracts/);
-  assert.match(shell, /workspace\.canSwitch && workspace\.mode !== "resolver"/);
-  assert.match(shell, /ADMIN_EXIT_HREF/);
+  assert.doesNotMatch(shell, /Back to contracts|switchToContracts|Exit Admin Center/);
+  assert.match(shell, /workspace\.canSwitch && desk === "party"/);
+  assert.match(shell, /RESOLVER_EXIT_HREF/);
   assert.equal(canSwitchWorkspace(0, true), true);
   assert.equal(canSwitchWorkspace(0, false), false);
   assert.equal(ADMIN_DESKS.find((d) => d.id === "help")!.href, "/admin/help-desk");

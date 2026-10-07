@@ -3,9 +3,25 @@
 import Link from "next/link";
 
 import { Card } from "@/components/ui/Card";
+import { useAccountSession } from "@/lib/account-auth/useAccountSession";
 import { ADMIN_CENTER_COPY, ADMIN_DESKS } from "@/lib/app/admin-center";
+import { useAppAdminStatus } from "@/lib/hooks/useAppAdmin";
 
 export function AdminCenter() {
+  const { data: session } = useAccountSession();
+  // Display gate only: every admin API re-checks authorization on the server.
+  const status = useAppAdminStatus(session?.user?.id ?? null);
+  if (status === "loading") {
+    return <p className="mx-auto w-full max-w-4xl text-sm text-ink-soft">{ADMIN_CENTER_COPY.checking}</p>;
+  }
+  if (status !== "admin") {
+    return (
+      <Card className="mx-auto w-full max-w-4xl p-4 sm:p-5">
+        <h1 className="font-display text-2xl">{ADMIN_CENTER_COPY.title}</h1>
+        <p className="mt-2 text-sm text-ink-soft">{ADMIN_CENTER_COPY.notAuthorized}</p>
+      </Card>
+    );
+  }
   return (
     <div className="mx-auto w-full max-w-4xl space-y-4">
       <header>
