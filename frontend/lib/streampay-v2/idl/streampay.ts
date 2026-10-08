@@ -991,6 +991,68 @@ export type Streampay = {
           }
         },
         {
+          "name": "employerSubscription",
+          "docs": [
+            "uninitialized = Free). Read in the handler; plans are never client input."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98,
+                  115,
+                  99,
+                  114,
+                  105,
+                  112,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "employer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "freelancerSubscription",
+          "docs": [
+            "the employer cannot omit it and change the freelancer's rate."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98,
+                  115,
+                  99,
+                  114,
+                  105,
+                  112,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "freelancer"
+              }
+            ]
+          }
+        },
+        {
           "name": "tokenProgram",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
@@ -1184,6 +1246,68 @@ export type Streampay = {
                   105,
                   103
                 ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "employerSubscription",
+          "docs": [
+            "uninitialized = Free). Read in the handler; plans are never client input."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98,
+                  115,
+                  99,
+                  114,
+                  105,
+                  112,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "employer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "freelancerSubscription",
+          "docs": [
+            "the employer cannot omit it and change the freelancer's rate."
+          ],
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98,
+                  115,
+                  99,
+                  114,
+                  105,
+                  112,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "freelancer"
               }
             ]
           }
@@ -2029,6 +2153,109 @@ export type Streampay = {
       "args": []
     },
     {
+      "name": "purchaseSubscription",
+      "docs": [
+        "Wallet-signed Pro / Premium purchase or renewal, paid to the treasury."
+      ],
+      "discriminator": [
+        219,
+        151,
+        184,
+        220,
+        138,
+        36,
+        203,
+        237
+      ],
+      "accounts": [
+        {
+          "name": "subscriber",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "subscription",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  117,
+                  98,
+                  115,
+                  99,
+                  114,
+                  105,
+                  112,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "subscriber"
+              }
+            ]
+          }
+        },
+        {
+          "name": "feeConfig",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "paymentMint"
+        },
+        {
+          "name": "subscriberTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "treasuryTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": {
+              "name": "purchaseSubscriptionArgs"
+            }
+          }
+        }
+      ]
+    },
+    {
       "name": "rejectActivation",
       "docs": [
         "Employer declines to activate after the trial stage. Escrow is left in place."
@@ -2437,6 +2664,58 @@ export type Streampay = {
           "type": "u64"
         }
       ]
+    },
+    {
+      "name": "setSubscriptionMint",
+      "docs": [
+        "Fee admin sets the mint accepted for subscription payments (Demo USDT)."
+      ],
+      "discriminator": [
+        83,
+        75,
+        83,
+        3,
+        176,
+        72,
+        90,
+        113
+      ],
+      "accounts": [
+        {
+          "name": "admin",
+          "signer": true,
+          "relations": [
+            "feeConfig"
+          ]
+        },
+        {
+          "name": "feeConfig",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  102,
+                  101,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "subscriptionMint"
+        }
+      ],
+      "args": []
     },
     {
       "name": "settleTrialAndEnd",
@@ -3456,6 +3735,19 @@ export type Streampay = {
       ]
     },
     {
+      "name": "subscription",
+      "discriminator": [
+        64,
+        7,
+        26,
+        135,
+        102,
+        132,
+        98,
+        33
+      ]
+    },
+    {
       "name": "workUnit",
       "discriminator": [
         172,
@@ -3640,6 +3932,19 @@ export type Streampay = {
       ]
     },
     {
+      "name": "freelancerPlatformFeePaid",
+      "discriminator": [
+        56,
+        152,
+        232,
+        146,
+        50,
+        245,
+        191,
+        134
+      ]
+    },
+    {
       "name": "freelancerWithdrawal",
       "discriminator": [
         97,
@@ -3757,6 +4062,19 @@ export type Streampay = {
       ]
     },
     {
+      "name": "platformFeeTermsFrozen",
+      "discriminator": [
+        62,
+        188,
+        180,
+        92,
+        242,
+        12,
+        126,
+        226
+      ]
+    },
+    {
       "name": "streamAccrualReleased",
       "discriminator": [
         39,
@@ -3767,6 +4085,32 @@ export type Streampay = {
         157,
         240,
         50
+      ]
+    },
+    {
+      "name": "subscriptionMintConfigured",
+      "discriminator": [
+        9,
+        140,
+        226,
+        206,
+        52,
+        173,
+        196,
+        102
+      ]
+    },
+    {
+      "name": "subscriptionPurchased",
+      "discriminator": [
+        227,
+        166,
+        27,
+        212,
+        191,
+        41,
+        220,
+        107
       ]
     },
     {
@@ -4359,6 +4703,36 @@ export type Streampay = {
       "code": 6183,
       "name": "unauthorizedFeeAdmin",
       "msg": "Only the fee admin may perform this action."
+    },
+    {
+      "code": 6184,
+      "name": "subscriptionsNotConfigured",
+      "msg": "Subscription payments are not configured."
+    },
+    {
+      "code": 6185,
+      "name": "invalidSubscriptionMint",
+      "msg": "The subscription payment mint is invalid."
+    },
+    {
+      "code": 6186,
+      "name": "invalidSubscriptionPlan",
+      "msg": "The subscription plan or term is invalid."
+    },
+    {
+      "code": 6187,
+      "name": "invalidSubscriptionAccount",
+      "msg": "The subscription account is invalid."
+    },
+    {
+      "code": 6188,
+      "name": "subscriptionTierChangeWhileActive",
+      "msg": "Change plans after the current subscription expires."
+    },
+    {
+      "code": 6189,
+      "name": "subscriptionPrepaidLimit",
+      "msg": "A renewal cannot prepay that far ahead."
     }
   ],
   "types": [
@@ -4771,7 +5145,7 @@ export type Streampay = {
             "type": "u64"
           },
           {
-            "name": "reserved",
+            "name": "freelancerFeeRate",
             "docs": [
               "Upgrade headroom. Adding a field means shrinking this, which leaves",
               "account size and every client offset unchanged.",
@@ -4787,14 +5161,12 @@ export type Streampay = {
               "`contested_amount` (8), `disputed_at` (8) and `dispute_initiator` (1);",
               "reserved 68 → 19. Platform fee consumed 18 more for `fee_bps` (2),",
               "`fee_reserve` (8) and `fee_paid` (8); reserved 19 → 1. Legacy",
-              "accounts read these as zero (no fee). `INIT_SPACE` remains 621."
+              "accounts read these as zero (no fee). `INIT_SPACE` remains 621.",
+              "Freelancer platform fee frozen at creation, in units of 10 bps",
+              "(30 = 3%). Occupies the former last reserved byte, so every",
+              "pre-subscription contract reads 0: no freelancer fee, ever."
             ],
-            "type": {
-              "array": [
-                "u8",
-                1
-              ]
-            }
+            "type": "u8"
           },
           {
             "name": "metadataUri",
@@ -5546,13 +5918,13 @@ export type Streampay = {
             "type": "u8"
           },
           {
-            "name": "reserved",
-            "type": {
-              "array": [
-                "u8",
-                32
-              ]
-            }
+            "name": "subscriptionMint",
+            "docs": [
+              "Mint accepted for subscription payments (Devnet Demo USDT). Occupies",
+              "the former 32 reserved bytes, so pre-subscription configs read the",
+              "default key: purchases disabled until the admin sets it."
+            ],
+            "type": "pubkey"
           }
         ]
       }
@@ -5600,6 +5972,48 @@ export type Streampay = {
           {
             "name": "feeBps",
             "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "freelancerPlatformFeePaid",
+      "docs": [
+        "Freelancer platform fee deducted from withdrawn principal."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasuryTokenAccount",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "freelancerFeePaid",
+            "docs": [
+              "Cumulative freelancer fee: `fee_on(principal_withdrawn)`."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "principalWithdrawn",
+            "type": "u64"
+          },
+          {
+            "name": "netToFreelancer",
+            "type": "u64"
           }
         ]
       }
@@ -6192,6 +6606,69 @@ export type Streampay = {
       }
     },
     {
+      "name": "platformFeeTermsFrozen",
+      "docs": [
+        "Both participants' plan rates, frozen onto a new contract."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employerTier",
+            "type": {
+              "defined": {
+                "name": "subscriptionTier"
+              }
+            }
+          },
+          {
+            "name": "freelancerTier",
+            "type": {
+              "defined": {
+                "name": "subscriptionTier"
+              }
+            }
+          },
+          {
+            "name": "employerFeeBps",
+            "type": "u16"
+          },
+          {
+            "name": "freelancerFeeBps",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "purchaseSubscriptionArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "tier",
+            "type": {
+              "defined": {
+                "name": "subscriptionTier"
+              }
+            }
+          },
+          {
+            "name": "term",
+            "type": {
+              "defined": {
+                "name": "subscriptionTerm"
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
       "name": "releaseTrigger",
       "docs": [
         "Why a work unit's amount became released.",
@@ -6315,6 +6792,189 @@ export type Streampay = {
           {
             "name": "accrualTime",
             "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "subscription",
+      "docs": [
+        "PDA `[SUBSCRIPTION_SEED, owner]`. Written ONLY by `purchase_subscription`,",
+        "in the same transaction that moves the plan price to the treasury, so a",
+        "browser or database can never assert a plan the wallet did not pay for."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "version",
+            "type": "u8"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "tier",
+            "docs": [
+              "Last purchased plan; effective only while `now < expires_at`."
+            ],
+            "type": {
+              "defined": {
+                "name": "subscriptionTier"
+              }
+            }
+          },
+          {
+            "name": "lastTerm",
+            "type": {
+              "defined": {
+                "name": "subscriptionTerm"
+              }
+            }
+          },
+          {
+            "name": "startedAt",
+            "docs": [
+              "Start of the current uninterrupted subscription period."
+            ],
+            "type": "i64"
+          },
+          {
+            "name": "expiresAt",
+            "type": "i64"
+          },
+          {
+            "name": "totalPaid",
+            "docs": [
+              "Cumulative plan payments in subscription-mint base units."
+            ],
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "reserved",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "subscriptionMintConfigured",
+      "docs": [
+        "Subscription payment mint configured by the fee admin."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "feeConfig",
+            "type": "pubkey"
+          },
+          {
+            "name": "subscriptionMint",
+            "type": "pubkey"
+          }
+        ]
+      }
+    },
+    {
+      "name": "subscriptionPurchased",
+      "docs": [
+        "Wallet-signed plan purchase or renewal paid to the treasury."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "subscriber",
+            "type": "pubkey"
+          },
+          {
+            "name": "subscription",
+            "type": "pubkey"
+          },
+          {
+            "name": "tier",
+            "type": {
+              "defined": {
+                "name": "subscriptionTier"
+              }
+            }
+          },
+          {
+            "name": "term",
+            "type": {
+              "defined": {
+                "name": "subscriptionTerm"
+              }
+            }
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasuryTokenAccount",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "startedAt",
+            "type": "i64"
+          },
+          {
+            "name": "expiresAt",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "subscriptionTerm",
+      "docs": [
+        "Subscription billing term."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "monthly"
+          },
+          {
+            "name": "annual"
+          }
+        ]
+      }
+    },
+    {
+      "name": "subscriptionTier",
+      "docs": [
+        "PREMIFLOW subscription plan. One plan per wallet applies whether the wallet",
+        "hires, works, or both. `Free` is the zero value (no or expired subscription)."
+      ],
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "free"
+          },
+          {
+            "name": "pro"
+          },
+          {
+            "name": "premium"
           }
         ]
       }

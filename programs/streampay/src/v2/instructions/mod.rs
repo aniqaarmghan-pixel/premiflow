@@ -34,6 +34,7 @@ pub mod start_hourly_session;
 pub mod stop_hourly_session;
 pub mod submit_trial_work;
 pub mod submit_work_unit;
+pub mod purchase_subscription;
 pub mod void_stale_revision;
 pub mod withdraw_freelancer;
 
@@ -68,5 +69,6 @@ pub use start_hourly_session::*;
 pub use stop_hourly_session::*;
 pub use submit_trial_work::*;
 pub use submit_work_unit::*;
+pub use purchase_subscription::*;
 pub use void_stale_revision::*;
 pub use withdraw_freelancer::*;

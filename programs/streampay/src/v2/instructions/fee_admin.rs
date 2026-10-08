@@ -1,13 +1,14 @@
 //! Platform fee configuration instructions and shared treasury validation.
 
 use anchor_lang::prelude::*;
-use anchor_spl::token::TokenAccount;
+use anchor_spl::token::{Mint, TokenAccount};
 
 use crate::v2::constants::FEE_CONFIG_SEED;
 use crate::v2::errors::StreamPayV2Error;
-use crate::v2::events::FeeConfigUpdated;
+use crate::v2::enums::SubscriptionTier;
+use crate::v2::events::{FeeConfigUpdated, SubscriptionMintConfigured};
 use crate::v2::fees::MAX_FEE_BPS;
-use crate::v2::state::FeeConfig;
+use crate::v2::state::{FeeConfig, Subscription};
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, PartialEq, Eq)]
 pub struct FeeConfigArgs {
@@ -65,7 +66,7 @@ pub fn handle_initialize_fee_config(
     cfg.treasury = args.treasury;
     cfg.fee_bps = args.fee_bps;
     cfg.bump = ctx.bumps.fee_config;
-    cfg.reserved = [0u8; 32];
+    cfg.subscription_mint = Pubkey::default();
     emit!(FeeConfigUpdated {
         fee_config: cfg.key(),
         admin: cfg.admin,
@@ -101,6 +102,51 @@ pub fn handle_update_fee_config(ctx: Context<UpdateFeeConfig>, args: FeeConfigAr
         fee_bps: cfg.fee_bps,
     });
     Ok(())
+}
+
+/// Fee admin sets the mint accepted for subscription payments (Devnet Demo
+/// USDT). Plan prices are scaled by this mint's decimals on-chain.
+#[derive(Accounts)]
+pub struct SetSubscriptionMint<'info> {
+    pub admin: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [FEE_CONFIG_SEED],
+        bump = fee_config.bump,
+        has_one = admin @ StreamPayV2Error::UnauthorizedFeeAdmin,
+    )]
+    pub fee_config: Account<'info, FeeConfig>,
+
+    pub subscription_mint: Account<'info, Mint>,
+}
+
+pub fn handle_set_subscription_mint(ctx: Context<SetSubscriptionMint>) -> Result<()> {
+    let cfg = &mut ctx.accounts.fee_config;
+    cfg.subscription_mint = ctx.accounts.subscription_mint.key();
+    emit!(SubscriptionMintConfigured {
+        fee_config: cfg.key(),
+        subscription_mint: cfg.subscription_mint,
+    });
+    Ok(())
+}
+
+/// Effective plan of `owner` at `now`, read from its canonical Subscription
+/// PDA (the caller's Accounts struct seeds-verifies the address). Missing or
+/// expired means Free. Only the program can write this account, and only
+/// after payment, so no client can assert Pro/Premium.
+pub fn read_subscription_tier(
+    info: &AccountInfo,
+    owner: Pubkey,
+    now: i64,
+) -> Result<SubscriptionTier> {
+    if info.owner != &crate::ID || info.data_is_empty() {
+        return Ok(SubscriptionTier::Free);
+    }
+    let data = info.try_borrow_data()?;
+    let sub = Subscription::try_deserialize(&mut &data[..])?;
+    require_keys_eq!(sub.owner, owner, StreamPayV2Error::InvalidSubscriptionAccount);
+    Ok(sub.effective_tier(now))
 }
 
 /// Reads the snapshot bps from the canonical FeeConfig PDA at create time.

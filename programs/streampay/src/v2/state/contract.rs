@@ -197,7 +197,10 @@ pub struct Contract {
     /// reserved 68 → 19. Platform fee consumed 18 more for `fee_bps` (2),
     /// `fee_reserve` (8) and `fee_paid` (8); reserved 19 → 1. Legacy
     /// accounts read these as zero (no fee). `INIT_SPACE` remains 621.
-    pub reserved: [u8; 1],
+    /// Freelancer platform fee frozen at creation, in units of 10 bps
+    /// (30 = 3%). Occupies the former last reserved byte, so every
+    /// pre-subscription contract reads 0: no freelancer fee, ever.
+    pub freelancer_fee_rate: u8,
 
     // -----------------------------------------------------------------
     // Variable length. Must remain the final field.
@@ -208,6 +211,11 @@ pub struct Contract {
 }
 
 impl Contract {
+    /// Freelancer platform fee (bps) frozen at creation; 0 for legacy contracts.
+    pub fn freelancer_fee_bps(&self) -> u16 {
+        crate::v2::fees::freelancer_fee_rate_bps(self.freelancer_fee_rate)
+    }
+
     /// Whether a paid trial is configured. `trial_amount` is the reservation,
     /// not a timestamp sentinel.
     pub fn has_trial(&self) -> bool {

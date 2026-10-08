@@ -16,5 +16,8 @@ pub struct FeeConfig {
     /// Platform fee in basis points, capped at `MAX_FEE_BPS`.
     pub fee_bps: u16,
     pub bump: u8,
-    pub reserved: [u8; 32],
+    /// Mint accepted for subscription payments (Devnet Demo USDT). Occupies
+    /// the former 32 reserved bytes, so pre-subscription configs read the
+    /// default key: purchases disabled until the admin sets it.
+    pub subscription_mint: Pubkey,
 }

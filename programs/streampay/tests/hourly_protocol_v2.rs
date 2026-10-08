@@ -91,10 +91,10 @@ struct Env {
 fn setup(employer_tokens: u64) -> Env {
     let program_id = streampay_program::id();
     let mut svm = LiteSVM::new();
-    let program_path = format!(
+    let program_path = std::env::var("STREAMPAY_SO").unwrap_or_else(|_| format!(
         "{}/../../target/deploy/streampay.so",
         env!("CARGO_MANIFEST_DIR")
-    );
+    ));
     svm.add_program_from_file(program_id, program_path)
         .expect("Could not load StreamPay program");
 
@@ -246,6 +246,8 @@ impl Env {
                 fee_config: ::streampay::v2::fees::fee_config_pda().0,
                 employer: self.employer_pk,
                 freelancer: self.freelancer_pk,
+                employer_subscription: ::streampay::v2::fees::subscription_pda(&self.employer_pk).0,
+                freelancer_subscription: ::streampay::v2::fees::subscription_pda(&self.freelancer_pk).0,
                 token_mint: self.token_mint,
                 employer_token_account: self.employer_token_account,
                 contract,
@@ -606,6 +608,8 @@ fn create_contract_still_rejects_hourly_mode() {
             fee_config: ::streampay::v2::fees::fee_config_pda().0,
             employer: env.employer_pk,
             freelancer: env.freelancer_pk,
+            employer_subscription: ::streampay::v2::fees::subscription_pda(&env.employer_pk).0,
+            freelancer_subscription: ::streampay::v2::fees::subscription_pda(&env.freelancer_pk).0,
             token_mint: env.token_mint,
             employer_token_account: env.employer_token_account,
             contract,
@@ -1097,7 +1101,7 @@ fn install_fee_config(env: &mut Env) -> Fee {
         treasury: treasury_owner,
         fee_bps: FEE_BPS,
         bump,
-        reserved: [0u8; 32],
+        subscription_mint: anchor_lang::prelude::Pubkey::default(),
     };
     let mut data = Vec::new();
     cfg.try_serialize(&mut data).unwrap();
@@ -1154,14 +1158,19 @@ impl Env {
         self.token_balance(a)
     }
 
+    /// Free/Free symmetric fees: on withdrawn gross principal `w`, the
+    /// employer paid `w + fee3(w)`, the freelancer netted `w - fee3(w)`, and
+    /// the treasury holds both fees; nothing remains in escrow.
     fn assert_fee_conserved(&self, id: u64, fee: &Fee) {
         let contract = self.contract_pda(id);
-        let f = self.bal(&self.freelancer_token_account);
-        assert_eq!(self.bal(&fee.treasury_ata), fee3(f));
-        assert_eq!(self.bal(&self.employer_token_account), FEE_START - f - fee3(f));
-        assert_eq!(self.bal(&self.escrow_pda(&contract)), 0);
         let c = self.read_contract(&contract);
-        assert_eq!(c.fee_paid, fee3(c.withdrawn_amount));
+        let w = c.withdrawn_amount;
+        assert_eq!(c.freelancer_fee_bps(), FEE_BPS);
+        assert_eq!(self.bal(&self.freelancer_token_account), w - fee3(w));
+        assert_eq!(self.bal(&fee.treasury_ata), 2 * fee3(w));
+        assert_eq!(self.bal(&self.employer_token_account), FEE_START - w - fee3(w));
+        assert_eq!(self.bal(&self.escrow_pda(&contract)), 0);
+        assert_eq!(c.fee_paid, fee3(w));
     }
 }
 
@@ -1188,8 +1197,8 @@ fn fee_hourly_full_settlement() {
     env.svm.expire_blockhash();
     env.stop(1).expect("stop");
     env.withdraw_fee(1, &fee).expect("withdraw");
-    assert_eq!(env.bal(&env.freelancer_token_account), main);
-    assert_eq!(env.bal(&fee.treasury_ata), fee3(main));
+    assert_eq!(env.bal(&env.freelancer_token_account), main - fee3(main));
+    assert_eq!(env.bal(&fee.treasury_ata), 2 * fee3(main));
     let c = env.read_contract(&contract);
     assert_eq!(c.fee_paid, c.fee_reserve);
     env.assert_fee_conserved(1, &fee);
@@ -1208,8 +1217,8 @@ fn fee_hourly_open_session_pays_no_fee_then_partial_end_refund() {
     env.svm.expire_blockhash();
     env.stop(1).expect("stop");
     env.withdraw_fee(1, &fee).expect("withdraw recorded");
-    assert_eq!(env.bal(&env.freelancer_token_account), earned(3_600));
-    assert_eq!(env.bal(&fee.treasury_ata), fee3(earned(3_600)));
+    assert_eq!(env.bal(&env.freelancer_token_account), earned(3_600) - fee3(earned(3_600)));
+    assert_eq!(env.bal(&fee.treasury_ata), 2 * fee3(earned(3_600)));
 
     env.svm.expire_blockhash();
     env.end(1).expect("end");
@@ -1245,8 +1254,8 @@ fn fee_hourly_dispute_split() {
     env.withdraw_fee(1, &fee).expect("withdraw award");
     env.svm.expire_blockhash();
     env.refund(1).expect("refund remainder");
-    let f = env.bal(&env.freelancer_token_account);
-    assert_eq!(f, earned(1_800) + c.contested_amount / 3);
+    let gross = earned(1_800) + c.contested_amount / 3;
+    assert_eq!(env.bal(&env.freelancer_token_account), gross - fee3(gross));
     env.assert_fee_conserved(1, &fee);
 }
 

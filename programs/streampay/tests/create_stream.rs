@@ -44,10 +44,10 @@ fn test_create_stream() {
     // 2. Load our compiled StreamPay program.
     // ---------------------------------------------------------
 
-    let program_path = format!(
+    let program_path = std::env::var("STREAMPAY_SO").unwrap_or_else(|_| format!(
         "{}/../../target/deploy/streampay.so",
         env!("CARGO_MANIFEST_DIR")
-    );
+    ));
 
     svm.add_program_from_file(program_id, program_path)
         .expect("Could not load StreamPay program");
@@ -421,10 +421,10 @@ fn test_withdraw_accounting() {
 
     let mut svm = LiteSVM::new();
 
-    let program_path = format!(
+    let program_path = std::env::var("STREAMPAY_SO").unwrap_or_else(|_| format!(
         "{}/../../target/deploy/streampay.so",
         env!("CARGO_MANIFEST_DIR")
-    );
+    ));
 
     svm.add_program_from_file(program_id, program_path)
         .expect("Could not load StreamPay program");
@@ -665,10 +665,10 @@ fn test_cancel_stream_accounting() {
 
     let mut svm = LiteSVM::new();
 
-    let program_path = format!(
+    let program_path = std::env::var("STREAMPAY_SO").unwrap_or_else(|_| format!(
         "{}/../../target/deploy/streampay.so",
         env!("CARGO_MANIFEST_DIR")
-    );
+    ));
 
     svm.add_program_from_file(program_id, program_path)
         .expect("Could not load StreamPay program");
@@ -896,10 +896,10 @@ fn test_reject_zero_amount_stream() {
     let mut svm = LiteSVM::new();
 
     // Load the compiled StreamPay program.
-    let program_path = format!(
+    let program_path = std::env::var("STREAMPAY_SO").unwrap_or_else(|_| format!(
         "{}/../../target/deploy/streampay.so",
         env!("CARGO_MANIFEST_DIR")
-    );
+    ));
 
     svm.add_program_from_file(program_id, program_path)
         .expect("Could not load StreamPay program");
@@ -1020,10 +1020,10 @@ fn test_reject_unauthorized_withdrawal() {
     let mut svm = LiteSVM::new();
 
     // Load StreamPay program.
-    let program_path = format!(
+    let program_path = std::env::var("STREAMPAY_SO").unwrap_or_else(|_| format!(
         "{}/../../target/deploy/streampay.so",
         env!("CARGO_MANIFEST_DIR")
-    );
+    ));
 
     svm.add_program_from_file(program_id, program_path)
         .expect("Could not load StreamPay program");
@@ -1283,10 +1283,10 @@ fn test_reject_unauthorized_cancellation() {
     let mut svm = LiteSVM::new();
 
     // Load StreamPay program.
-    let program_path = format!(
+    let program_path = std::env::var("STREAMPAY_SO").unwrap_or_else(|_| format!(
         "{}/../../target/deploy/streampay.so",
         env!("CARGO_MANIFEST_DIR")
-    );
+    ));
 
     svm.add_program_from_file(program_id, program_path)
         .expect("Could not load StreamPay program");

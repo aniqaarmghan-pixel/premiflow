@@ -10,13 +10,18 @@
 //! receives 100% of `available`; the proportional earned fee
 //! `fee_on(new_withdrawn) - fee_paid` moves from the escrow's fee reserve to
 //! the validated treasury token account in the same instruction.
+//!
+//! Freelancer platform fee (frozen `freelancer_fee_rate`, 0 on every
+//! pre-subscription contract): deducted from the principal actually withdrawn,
+//! cumulative `fee_on(W_new) - fee_on(W_old)`, so it never drifts, is never
+//! double-charged and never applies to principal the freelancer did not get.
 
 use anchor_lang::prelude::*;
 use anchor_spl::token::{transfer_checked, Mint, Token, TokenAccount, TransferChecked};
 
 use crate::v2::constants::{CONTRACT_ESCROW_SEED, CONTRACT_SEED, FEE_CONFIG_SEED};
 use crate::v2::errors::StreamPayV2Error;
-use crate::v2::events::{FreelancerWithdrawal, PlatformFeePaid};
+use crate::v2::events::{FreelancerPlatformFeePaid, FreelancerWithdrawal, PlatformFeePaid};
 use crate::v2::fees;
 use crate::v2::instructions::fee_admin::validate_treasury;
 use crate::v2::state::{Contract, FeeConfig};
@@ -126,6 +131,19 @@ pub fn handle_withdraw_freelancer(ctx: Context<WithdrawFreelancer>) -> Result<()
         .checked_add(fee_due)
         .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
 
+    let freelancer_fee_bps = contract.freelancer_fee_bps();
+    let freelancer_fee =
+        fees::freelancer_fee_due(contract.withdrawn_amount, new_withdrawn, freelancer_fee_bps)
+            .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+    let net_to_freelancer = available
+        .checked_sub(freelancer_fee)
+        .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+    let treasury_due = fee_due
+        .checked_add(freelancer_fee)
+        .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+    let freelancer_fee_total = fees::fee_on(new_withdrawn, freelancer_fee_bps)
+        .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
+
     // Accounting before the CPI. A failed transfer aborts the whole
     // transaction, so this update cannot persist without tokens leaving escrow.
     contract.withdrawn_amount = new_withdrawn;
@@ -138,7 +156,7 @@ pub fn handle_withdraw_freelancer(ctx: Context<WithdrawFreelancer>) -> Result<()
     let mint = contract.token_mint;
     let contract_key = contract.key();
 
-    if fee_due > 0 {
+    if treasury_due > 0 {
         validate_treasury(
             &ctx.accounts.fee_config,
             &ctx.accounts.treasury_token_account,
@@ -155,22 +173,24 @@ pub fn handle_withdraw_freelancer(ctx: Context<WithdrawFreelancer>) -> Result<()
         &bump,
     ];
 
-    transfer_checked(
-        CpiContext::new_with_signer(
-            ctx.accounts.token_program.key(),
-            TransferChecked {
-                from: ctx.accounts.contract_escrow.to_account_info(),
-                mint: ctx.accounts.token_mint.to_account_info(),
-                to: ctx.accounts.freelancer_token_account.to_account_info(),
-                authority: ctx.accounts.contract.to_account_info(),
-            },
-            &[signer_seeds],
-        ),
-        available,
-        decimals,
-    )?;
+    if net_to_freelancer > 0 {
+        transfer_checked(
+            CpiContext::new_with_signer(
+                ctx.accounts.token_program.key(),
+                TransferChecked {
+                    from: ctx.accounts.contract_escrow.to_account_info(),
+                    mint: ctx.accounts.token_mint.to_account_info(),
+                    to: ctx.accounts.freelancer_token_account.to_account_info(),
+                    authority: ctx.accounts.contract.to_account_info(),
+                },
+                &[signer_seeds],
+            ),
+            net_to_freelancer,
+            decimals,
+        )?;
+    }
 
-    if fee_due > 0 {
+    if treasury_due > 0 {
         let treasury = ctx
             .accounts
             .treasury_token_account
@@ -188,17 +208,30 @@ pub fn handle_withdraw_freelancer(ctx: Context<WithdrawFreelancer>) -> Result<()
                 },
                 &[signer_seeds],
             ),
-            fee_due,
+            treasury_due,
             decimals,
         )?;
-        emit!(PlatformFeePaid {
-            contract: contract_key,
-            treasury_token_account: treasury_key,
-            mint,
-            amount: fee_due,
-            fee_paid: new_fee_paid,
-            principal_released: new_withdrawn,
-        });
+        if fee_due > 0 {
+            emit!(PlatformFeePaid {
+                contract: contract_key,
+                treasury_token_account: treasury_key,
+                mint,
+                amount: fee_due,
+                fee_paid: new_fee_paid,
+                principal_released: new_withdrawn,
+            });
+        }
+        if freelancer_fee > 0 {
+            emit!(FreelancerPlatformFeePaid {
+                contract: contract_key,
+                treasury_token_account: treasury_key,
+                mint,
+                amount: freelancer_fee,
+                freelancer_fee_paid: freelancer_fee_total,
+                principal_withdrawn: new_withdrawn,
+                net_to_freelancer,
+            });
+        }
     }
 
     emit!(FreelancerWithdrawal {

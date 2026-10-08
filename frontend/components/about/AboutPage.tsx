@@ -32,6 +32,7 @@ import {
   ABOUT_VISION,
   ABOUT_WORKFLOW,
 } from "@/lib/app/about";
+import { APPROACH, WHY_PREMIFLOW, WHY_SOLANA, WHY_WEB3 } from "@/lib/app/positioning";
 import type { PaymentModeName } from "@/lib/streampay-v2";
 
 const MODEL_ORDER: PaymentModeName[] = ["Fixed", "Milestone", "Streaming", "Hourly"];
@@ -60,6 +61,91 @@ export function AboutPage() {
             {ABOUT_HERO.body}
           </p>
         </header>
+
+        <section aria-labelledby="about-why-premiflow-heading">
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan">{WHY_PREMIFLOW.eyebrow}</p>
+          <h2 id="about-why-premiflow-heading" className="mt-2 font-display text-3xl">
+            {WHY_PREMIFLOW.heading}
+          </h2>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-ink-soft">{WHY_PREMIFLOW.intro}</p>
+          <ul className="mt-5 grid min-w-0 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {WHY_PREMIFLOW.points.map((point) => (
+              <li key={point.title}>
+                <Card className="h-full p-5">
+                  <h3 className="font-display text-xl">{point.title}</h3>
+                  <p className="mt-2 text-sm leading-6 text-ink-soft">{point.body}</p>
+                </Card>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-sm">
+            <Link href="/pricing" className="font-semibold text-accent underline-offset-4 hover:underline">
+              {WHY_PREMIFLOW.pricingLink}
+            </Link>
+          </p>
+        </section>
+
+        <section aria-labelledby="about-approach-heading">
+          <h2 id="about-approach-heading" className="font-display text-3xl">
+            {APPROACH.heading}
+          </h2>
+          <p className="mt-3 max-w-3xl text-sm leading-7 text-ink-soft">{APPROACH.intro}</p>
+          <ul className="mt-4 flex flex-wrap gap-2" aria-label="PREMIFLOW features">
+            {APPROACH.items.map((item) => (
+              <li key={item} className="rounded-full border border-line px-3 py-1 text-xs text-ink-soft">
+                {item}
+              </li>
+            ))}
+          </ul>
+          <Card className="mt-4 overflow-x-auto p-0">
+            <table className="w-full min-w-[560px] text-left text-sm">
+              <thead>
+                <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-faint">
+                  <th scope="col" className="px-4 py-3">{APPROACH.columns.topic}</th>
+                  <th scope="col" className="px-4 py-3">{APPROACH.columns.traditional}</th>
+                  <th scope="col" className="px-4 py-3">{APPROACH.columns.premiflow}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-line">
+                {APPROACH.rows.map((row) => (
+                  <tr key={row.topic}>
+                    <th scope="row" className="px-4 py-3 font-medium text-ink">{row.topic}</th>
+                    <td className="px-4 py-3 text-ink-soft">{row.traditional}</td>
+                    <td className="px-4 py-3 text-ink">{row.premiflow}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+          <p className="mt-2 text-xs text-ink-faint">{APPROACH.disclaimer}</p>
+        </section>
+
+        <div className="grid min-w-0 gap-4 lg:grid-cols-2">
+          <section aria-labelledby="about-why-solana-heading">
+            <Card className="h-full p-5">
+              <h2 id="about-why-solana-heading" className="font-display text-2xl">
+                {WHY_SOLANA.heading}
+              </h2>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-ink-soft">
+                {WHY_SOLANA.points.map((point) => (
+                  <li key={point}>{point}</li>
+                ))}
+              </ul>
+            </Card>
+          </section>
+          <section aria-labelledby="about-why-web3-heading">
+            <Card className="h-full p-5">
+              <h2 id="about-why-web3-heading" className="font-display text-2xl">
+                {WHY_WEB3.heading}
+              </h2>
+              <ul className="mt-3 space-y-2 text-sm leading-6 text-ink-soft">
+                {WHY_WEB3.points.map((point) => (
+                  <li key={point}>{point}</li>
+                ))}
+              </ul>
+            </Card>
+          </section>
+        </div>
 
         <section aria-labelledby="about-problem-heading">
           <h2 id="about-problem-heading" className="font-display text-3xl">

@@ -318,6 +318,24 @@ pub enum StreamPayV2Error {
 
     #[msg("Only the fee admin may perform this action.")]
     UnauthorizedFeeAdmin,
+
+    #[msg("Subscription payments are not configured.")]
+    SubscriptionsNotConfigured,
+
+    #[msg("The subscription payment mint is invalid.")]
+    InvalidSubscriptionMint,
+
+    #[msg("The subscription plan or term is invalid.")]
+    InvalidSubscriptionPlan,
+
+    #[msg("The subscription account is invalid.")]
+    InvalidSubscriptionAccount,
+
+    #[msg("Change plans after the current subscription expires.")]
+    SubscriptionTierChangeWhileActive,
+
+    #[msg("A renewal cannot prepay that far ahead.")]
+    SubscriptionPrepaidLimit,
 }
 
 #[cfg(test)]
@@ -505,6 +523,16 @@ mod tests {
         assert_eq!(u32::from(StreamPayV2Error::FeeConfigRequired), 6181);
         assert_eq!(u32::from(StreamPayV2Error::InvalidTreasuryAccount), 6182);
         assert_eq!(u32::from(StreamPayV2Error::UnauthorizedFeeAdmin), 6183);
+    }
+
+    #[test]
+    fn v2_subscription_error_codes_are_pinned() {
+        assert_eq!(u32::from(StreamPayV2Error::SubscriptionsNotConfigured), 6184);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidSubscriptionMint), 6185);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidSubscriptionPlan), 6186);
+        assert_eq!(u32::from(StreamPayV2Error::InvalidSubscriptionAccount), 6187);
+        assert_eq!(u32::from(StreamPayV2Error::SubscriptionTierChangeWhileActive), 6188);
+        assert_eq!(u32::from(StreamPayV2Error::SubscriptionPrepaidLimit), 6189);
     }
 
     #[test]

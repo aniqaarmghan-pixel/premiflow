@@ -409,6 +409,19 @@ Ok(())
         v2::instructions::fee_admin::handle_update_fee_config(ctx, args)
     }
 
+    /// Fee admin sets the mint accepted for subscription payments (Demo USDT).
+    pub fn set_subscription_mint(ctx: Context<SetSubscriptionMint>) -> Result<()> {
+        v2::instructions::fee_admin::handle_set_subscription_mint(ctx)
+    }
+
+    /// Wallet-signed Pro / Premium purchase or renewal, paid to the treasury.
+    pub fn purchase_subscription(
+        ctx: Context<PurchaseSubscription>,
+        args: PurchaseSubscriptionArgs,
+    ) -> Result<()> {
+        v2::instructions::purchase_subscription::handle_purchase_subscription(ctx, args)
+    }
+
     /// Employer or freelancer freezes contested economics. No SPL transfer.
     pub fn open_dispute(ctx: Context<OpenDispute>) -> Result<()> {
         v2::instructions::open_dispute::handle_open_dispute(ctx)

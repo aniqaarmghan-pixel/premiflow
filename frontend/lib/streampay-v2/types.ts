@@ -77,6 +77,8 @@ export type ContractView = {
   feeBps?: number;
   feeReserve?: bigint;
   feePaid?: bigint;
+  /** Freelancer platform fee frozen at creation (0 / undefined on pre-upgrade contracts). */
+  freelancerFeeBps?: number;
   disputedAt: number;
   disputeInitiator: DisputeParty;
   acceptanceDeadline: number;

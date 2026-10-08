@@ -1,5 +1,6 @@
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { deriveFeeConfigPda } from "./pda";
+import { deriveFeeConfigPda, deriveSubscriptionPda } from "./pda";
+import { encodePlanTier, encodeSubscriptionTerm, type SubscriptionTerm } from "./subscription";
 import { SystemProgram } from "@solana/web3.js";
 import type { PublicKey } from "@solana/web3.js";
 
@@ -180,8 +181,8 @@ export function toCreateHourlyContractArgs(request: CreateHourlyContractRequest)
 }
 
 /**
- * Fee accounts for withdraw: only passed when the contract carries a fee
- * (fee_bps > 0). Treasury token account is the treasury owner's ATA for the mint.
+ * Fee accounts for withdraw: only passed when the contract carries an employer
+ * fee (fee_bps > 0) or a frozen freelancer fee (freelancer_fee_rate > 0). Treasury token account is the treasury owner's ATA for the mint.
  */
 async function resolveWithdrawFeeAccounts(
   program: StreamPayV2Program,
@@ -189,7 +190,7 @@ async function resolveWithdrawFeeAccounts(
   mint: PublicKey
 ): Promise<{ feeConfig: PublicKey | null; treasuryTokenAccount: PublicKey | null }> {
   const raw = await program.account.contract.fetch(contract);
-  if (!raw.feeBps) return { feeConfig: null, treasuryTokenAccount: null };
+  if (!raw.feeBps && !raw.freelancerFeeRate) return { feeConfig: null, treasuryTokenAccount: null };
   const feeConfig = deriveFeeConfigPda(program.programId).address;
   const cfg = await program.account.feeConfig.fetch(feeConfig);
   return {
@@ -200,6 +201,48 @@ async function resolveWithdrawFeeAccounts(
 
 export class StreamPayV2Client {
   constructor(readonly program: StreamPayV2Program) {}
+
+  /**
+   * Wallet-signed plan purchase or renewal. The program prices the plan, checks
+   * the configured Demo USDT mint and the treasury owner, and records tier and
+   * expiry on the wallet's subscription PDA. The client only picks tier + term.
+   */
+  async purchaseSubscription(params: {
+    tier: "Pro" | "Premium";
+    term: SubscriptionTerm;
+  }): Promise<TransactionResult> {
+    const subscriber = connectedWallet(this.program);
+    const feeConfig = deriveFeeConfigPda(this.program.programId).address;
+    const cfg = await this.program.account.feeConfig.fetchNullable(feeConfig);
+    // An unset subscription mint is the all-zero key (same bytes as the System Program id).
+    if (!cfg || cfg.subscriptionMint.equals(SystemProgram.programId)) {
+      throw new Error("Subscriptions are not enabled on this network yet.");
+    }
+    const paymentMint = cfg.subscriptionMint;
+    const subscription = deriveSubscriptionPda(subscriber, this.program.programId).address;
+    const subscriberTokenAccount = getAssociatedTokenAddressSync(paymentMint, subscriber);
+    const treasuryTokenAccount = getAssociatedTokenAddressSync(paymentMint, cfg.treasury, true);
+    const signature = await sendV2Method(this.program, this.program.methods
+      .purchaseSubscription({
+        tier: encodePlanTier(params.tier),
+        term: encodeSubscriptionTerm(params.term),
+      } as never)
+      .accountsPartial({
+        subscriber,
+        subscription,
+        feeConfig,
+        paymentMint,
+        subscriberTokenAccount,
+        treasuryTokenAccount,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+    );
+    return txResult({
+      signature,
+      extra: { subscriber, subscription, paymentMint, treasuryTokenAccount },
+    });
+  }
 
   async createContract(params: {
     request: CreateContractRequest;
@@ -235,6 +278,9 @@ export class StreamPayV2Client {
         trialWorkUnit,
         fixedWorkUnit,
         feeConfig: deriveFeeConfigPda(this.program.programId).address,
+        // Each participant's plan PDA: the program reads tiers itself (never client bps).
+        employerSubscription: deriveSubscriptionPda(employer, this.program.programId).address,
+        freelancerSubscription: deriveSubscriptionPda(params.freelancer, this.program.programId).address,
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       })
@@ -291,6 +337,9 @@ export class StreamPayV2Client {
         hourlyState,
         trialWorkUnit,
         feeConfig: deriveFeeConfigPda(this.program.programId).address,
+        // Each participant's plan PDA: the program reads tiers itself (never client bps).
+        employerSubscription: deriveSubscriptionPda(employer, this.program.programId).address,
+        freelancerSubscription: deriveSubscriptionPda(params.freelancer, this.program.programId).address,
         tokenProgram: TOKEN_PROGRAM_ID,
         systemProgram: SystemProgram.programId,
       })

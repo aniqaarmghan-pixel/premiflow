@@ -78,3 +78,6 @@ export const WORK_UNIT_ACCOUNT = {
 
 /** Rust `FEE_CONFIG_SEED` = b"fee_config" */
 export const FEE_CONFIG_SEED = new TextEncoder().encode("fee_config");
+
+/** Rust `SUBSCRIPTION_SEED` = b"subscription": one plan account per wallet. */
+export const SUBSCRIPTION_SEED = new TextEncoder().encode("subscription");

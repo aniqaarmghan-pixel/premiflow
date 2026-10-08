@@ -81,12 +81,24 @@ import {
 } from "@/lib/app/marketplace-link-store";
 import { formatTokenAmount } from "@/lib/app/money";
 import {
+  CREATE_RATES_LOADING_NOTE,
+  CREATE_RATES_NOTE,
+  CREATE_RATES_UNAVAILABLE_NOTE,
   EMPLOYER_FEE_NOTE,
-  INTENDED_PLATFORM_FEE_BPS,
+  FREELANCER_FEE_NOTE,
+  NETWORK_FEE_NOTE,
   agreedAmountLabel,
   createFeeSummary,
-  feeRowLabel,
 } from "@/lib/app/platform-fee";
+import { FeeSides } from "@/components/contracts/FeeSides";
+import { useCreateFeeRates, type CreateFeeRatesState } from "@/lib/hooks/useCreateFeeRates";
+import {
+  FEE_CHANGED_MESSAGE,
+  FEE_RECHECK_UNAVAILABLE_MESSAGE,
+  FEE_RECONFIRM_LABEL,
+  readAuthoritativeCreateFeeRates,
+  revalidateCreateFees,
+} from "@/lib/app/create-fee-revalidation";
 import { formatDuration, formatReviewPeriod } from "@/lib/app/datetime";
 import {
   lockedCreatePayment,
@@ -216,6 +228,9 @@ export function CreateWizard() {
   const tx = useTx();
   const [step, setStep] = useState(0);
   const [draft, setDraft] = useState<CreateWizardDraft>(defaultCreateDraft);
+  // One authoritative source for Review, the sidebar and pre-sign revalidation.
+  const createFeeRates = useCreateFeeRates(publicKey?.toBase58() ?? null, draft.freelancer);
+  const [feeChangeNotice, setFeeChangeNotice] = useState<string | null>(null);
   const [tokenBalanceUi, setTokenBalanceUi] = useState<string | null>(null);
   const [successOpen, setSuccessOpen] = useState(false);
   const [createdAddress, setCreatedAddress] = useState<string | null>(null);
@@ -654,6 +669,29 @@ export function CreateWizard() {
         setProgressNote(`A transaction is still in progress, so nothing was sent. ${retryHint}`);
         return;
       }
+      // Pre-sign fee revalidation: re-read FeeConfig + both plans and compare
+      // with the rates shown on Review. Any change blocks signing.
+      const readFreshFees = () =>
+        readAuthoritativeCreateFeeRates(
+          program,
+          publicKey,
+          new PublicKey(intent.freelancer),
+          nowSeconds()
+        );
+      const feeCheck = await revalidateCreateFees(
+        createFeeRates.status === "ready" ? createFeeRates : null,
+        readFreshFees
+      );
+      if (!feeCheck.ok) {
+        if (feeCheck.reason === "changed") {
+          createFeeRates.replace(feeCheck.rates);
+          setFeeChangeNotice(FEE_CHANGED_MESSAGE);
+        }
+        setProgressNote(
+          feeCheck.reason === "changed" ? FEE_CHANGED_MESSAGE : FEE_RECHECK_UNAVAILABLE_MESSAGE
+        );
+        return;
+      }
       const result: { outcome: CreateSetupOutcome | null; started: boolean } = {
         outcome: null,
         started: false,
@@ -681,6 +719,16 @@ export function CreateWizard() {
               }
               // Persist before the wallet prompt: from here on the ID and terms
               // are locked. If this cannot be saved, nothing is sent.
+              const lastFeeCheck = await revalidateCreateFees(feeCheck.rates, readFreshFees);
+              if (!lastFeeCheck.ok) {
+                if (lastFeeCheck.reason === "changed") {
+                  createFeeRates.replace(lastFeeCheck.rates);
+                  setFeeChangeNotice(FEE_CHANGED_MESSAGE);
+                }
+                throw new Error(
+                  lastFeeCheck.reason === "changed" ? FEE_CHANGED_MESSAGE : FEE_RECHECK_UNAVAILABLE_MESSAGE
+                );
+              }
               const beforeAttempt = intent;
               intent = markCreateAttempted(intent, Date.now());
               saveCreateIntent(intentStorage(), intent);
@@ -1398,13 +1446,32 @@ export function CreateWizard() {
               </div>
             ) : null}
             {step === 6 ? (
-              <ReviewPanel
-                draft={draft}
-                errors={errors}
-                mainAmount={mainAmount}
-                trialAmount={trialParsed ?? 0n}
-                fundedPrincipal={totalParsed}
-              />
+              <>
+                <ReviewPanel
+                  draft={draft}
+                  errors={errors}
+                  mainAmount={mainAmount}
+                  trialAmount={trialParsed ?? 0n}
+                  fundedPrincipal={totalParsed}
+                  feeRates={createFeeRates}
+                />
+                {feeChangeNotice ? (
+                  <div role="alert" className="mt-3 rounded-xl border border-accent/50 px-3 py-2 text-sm">
+                    <p className="font-medium text-ink">{feeChangeNotice}</p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => {
+                        setFeeChangeNotice(null);
+                        setProgressNote(null);
+                      }}
+                      className="mt-2 px-3 py-1.5"
+                    >
+                      {FEE_RECONFIRM_LABEL}
+                    </Button>
+                  </div>
+                ) : null}
+              </>
             ) : null}
           </motion.div>
         </AnimatePresence>
@@ -1441,6 +1508,7 @@ export function CreateWizard() {
               disabled={
                 setupInFlight ||
                 connecting ||
+                feeChangeNotice !== null ||
                 Object.keys(errors).length > 0 ||
                 Boolean(publicKey && !client)
               }
@@ -1548,10 +1616,13 @@ export function CreateWizard() {
               </dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-white/45">Employer funds (incl. 3% fee)</dt>
+              <dt className="text-white/45">Employer funds (incl. platform fee)</dt>
               <dd>
-                {totalParsed != null
-                  ? formatTokenAmount(createFeeSummary(totalParsed).employerTotal, draft.decimals)
+                {totalParsed != null && createFeeRates.status === "ready"
+                  ? formatTokenAmount(
+                      createFeeSummary(totalParsed, createFeeRates.employerFeeBps).employerTotal,
+                      draft.decimals
+                    )
                   : "\u2014"}
               </dd>
             </div>
@@ -1734,6 +1805,7 @@ function ReviewPanel({
   mainAmount,
   trialAmount,
   fundedPrincipal,
+  feeRates,
 }: {
   draft: CreateWizardDraft;
   errors: Record<string, string>;
@@ -1741,17 +1813,20 @@ function ReviewPanel({
   trialAmount: bigint;
   /** Full escrowed principal: total (incl. trial); Hourly = max budget + trial. */
   fundedPrincipal: bigint | null;
+  /** Authoritative on-chain rates (same object the pre-sign check compares). */
+  feeRates: CreateFeeRatesState;
 }) {
   const issueCount = Object.keys(errors).length;
-  const fee = fundedPrincipal != null ? createFeeSummary(fundedPrincipal) : null;
-  const feeRows: [string, string][] = [
-    [
-      agreedAmountLabel(draft.paymentMode, draft.trialEnabled),
-      fee ? formatTokenAmount(fee.agreedAmount, draft.decimals) : "\u2014",
-    ],
-    [feeRowLabel(fee?.feeBps ?? INTENDED_PLATFORM_FEE_BPS), fee ? formatTokenAmount(fee.fee, draft.decimals) : "\u2014"],
-    ["Total employer funds", fee ? formatTokenAmount(fee.employerTotal, draft.decimals) : "\u2014"],
-  ];
+  const fee =
+    fundedPrincipal != null && feeRates.status === "ready"
+      ? createFeeSummary(fundedPrincipal, feeRates.employerFeeBps, feeRates.freelancerFeeBps)
+      : null;
+  const feeRatesNote =
+    feeRates.status === "ready"
+      ? CREATE_RATES_NOTE
+      : feeRates.status === "loading"
+        ? CREATE_RATES_LOADING_NOTE
+        : CREATE_RATES_UNAVAILABLE_NOTE;
   const rows: [string, string][] = [
     ["Contract", presentType(draft.paymentMode)],
     [
@@ -1810,15 +1885,20 @@ function ReviewPanel({
           Payment summary ({paymentTokenDisplayLabel(draft.mint)})
           <DevnetAssetNote mint={draft.mint} className="ml-2 normal-case tracking-normal" />
         </p>
-        <dl className="divide-y divide-line">
-          {feeRows.map(([label, value]) => (
-            <div key={label} className="flex items-start justify-between gap-3 px-3 py-2 text-sm">
-              <dt className="text-ink-faint">{label}</dt>
-              <dd className="max-w-[60%] text-right font-medium text-ink">{value}</dd>
-            </div>
-          ))}
-        </dl>
-        <p className="px-3 pb-2 text-xs text-ink-soft">{EMPLOYER_FEE_NOTE}</p>
+        <div className="px-3 py-2">
+          <FeeSides
+            summary={fee}
+            decimals={draft.decimals}
+            employerPlan={feeRates.status === "ready" ? feeRates.employerTier : undefined}
+            freelancerPlan={feeRates.status === "ready" ? feeRates.freelancerTier : undefined}
+            agreedLabel={agreedAmountLabel(draft.paymentMode, draft.trialEnabled)}
+          />
+        </div>
+        <p className="px-3 text-xs text-ink-soft">{EMPLOYER_FEE_NOTE}</p>
+        <p className="px-3 text-xs text-ink-soft">{FREELANCER_FEE_NOTE}</p>
+        <p className="px-3 pb-2 text-xs text-ink-faint">
+          {feeRatesNote} {NETWORK_FEE_NOTE}
+        </p>
       </div>
       {draft.paymentMode === "Hourly" ? (
         <ul className="mt-2 space-y-1 text-xs text-ink-soft">

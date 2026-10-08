@@ -20,10 +20,11 @@ use crate::v2::constants::{
 use crate::v2::enums::{ContractStatus, DisputeParty, PaymentMode, StartMode};
 use crate::v2::errors::StreamPayV2Error;
 use crate::v2::events::{
-    ContractCreated, HourlyContractCreated, PlatformFeeReserved, TrialConfigured,
+    ContractCreated, HourlyContractCreated, PlatformFeeReserved, PlatformFeeTermsFrozen, TrialConfigured,
 };
 use crate::v2::fees;
-use crate::v2::instructions::fee_admin::read_fee_bps;
+use crate::v2::constants::SUBSCRIPTION_SEED;
+use crate::v2::instructions::fee_admin::{read_fee_bps, read_subscription_tier};
 use crate::v2::hourly::canonical_hourly_earned;
 use crate::v2::instructions::create_shared::{
     fund_contract_escrow, prove_on_activation_end_fits, validate_common_offer_terms,
@@ -156,6 +157,16 @@ pub struct CreateHourlyContract<'info> {
     #[account(seeds = [FEE_CONFIG_SEED], bump)]
     pub fee_config: UncheckedAccount<'info>,
 
+    /// CHECK: Employer's canonical Subscription PDA (seeds-verified; may be
+    /// uninitialized = Free). Read in the handler; plans are never client input.
+    #[account(seeds = [SUBSCRIPTION_SEED, employer.key().as_ref()], bump)]
+    pub employer_subscription: UncheckedAccount<'info>,
+
+    /// CHECK: Freelancer's canonical Subscription PDA (same rules). Required so
+    /// the employer cannot omit it and change the freelancer's rate.
+    #[account(seeds = [SUBSCRIPTION_SEED, freelancer.key().as_ref()], bump)]
+    pub freelancer_subscription: UncheckedAccount<'info>,
+
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
@@ -230,7 +241,7 @@ pub fn handle_create_hourly_contract(
         contract.metadata_hash = args.metadata_hash;
         contract.bump = ctx.bumps.contract;
         contract.escrow_bump = ctx.bumps.contract_escrow;
-        contract.reserved = [0u8; 1];
+        contract.freelancer_fee_rate = 0;
         contract.metadata_uri = args.metadata_uri;
     }
 
@@ -268,7 +279,21 @@ pub fn handle_create_hourly_contract(
     }
 
     // Platform fee reserve on top of the derived principal.
-    let fee_bps = read_fee_bps(&ctx.accounts.fee_config.to_account_info())?;
+    let base_fee_bps = read_fee_bps(&ctx.accounts.fee_config.to_account_info())?;
+    let employer_tier = read_subscription_tier(
+        &ctx.accounts.employer_subscription.to_account_info(),
+        employer_key,
+        now,
+    )?;
+    let freelancer_tier = read_subscription_tier(
+        &ctx.accounts.freelancer_subscription.to_account_info(),
+        freelancer_key,
+        now,
+    )?;
+    // Each participant's OWN plan sets only their OWN rate; frozen here.
+    let fee_bps = fees::plan_fee_bps(employer_tier, base_fee_bps);
+    let freelancer_fee_rate =
+        fees::freelancer_fee_rate_for(fees::plan_fee_bps(freelancer_tier, base_fee_bps));
     let fee_reserve = fees::fee_reserve_for(terms.total_amount, fee_bps)
         .ok_or(StreamPayV2Error::ArithmeticOverflow)?;
     let funding_total = terms
@@ -280,6 +305,7 @@ pub fn handle_create_hourly_contract(
         contract.fee_bps = fee_bps;
         contract.fee_reserve = fee_reserve;
         contract.fee_paid = 0;
+        contract.freelancer_fee_rate = freelancer_fee_rate;
     }
 
     fund_contract_escrow(
@@ -290,6 +316,16 @@ pub fn handle_create_hourly_contract(
         ctx.accounts.employer.to_account_info(),
         funding_total,
     )?;
+
+    if base_fee_bps > 0 {
+        emit!(PlatformFeeTermsFrozen {
+            contract: contract_key,
+            employer_tier,
+            freelancer_tier,
+            employer_fee_bps: fee_bps,
+            freelancer_fee_bps: fees::freelancer_fee_rate_bps(freelancer_fee_rate),
+        });
+    }
 
     if fee_bps > 0 {
         emit!(PlatformFeeReserved {

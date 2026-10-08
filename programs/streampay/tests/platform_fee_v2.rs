@@ -70,10 +70,10 @@ struct Env {
 fn setup(employer_tokens: u64) -> Env {
     let program_id = streampay_program::id();
     let mut svm = LiteSVM::new();
-    let program_path = format!(
+    let program_path = std::env::var("STREAMPAY_SO").unwrap_or_else(|_| format!(
         "{}/../../target/deploy/streampay.so",
         env!("CARGO_MANIFEST_DIR")
-    );
+    ));
     svm.add_program_from_file(program_id, program_path)
         .expect("Could not load StreamPay program");
 
@@ -224,6 +224,8 @@ impl Env {
                 fee_config: ::streampay::v2::fees::fee_config_pda().0,
                 employer: self.employer_pk,
                 freelancer: self.freelancer_pk,
+                employer_subscription: ::streampay::v2::fees::subscription_pda(&self.employer_pk).0,
+                freelancer_subscription: ::streampay::v2::fees::subscription_pda(&self.freelancer_pk).0,
                 token_mint: self.token_mint,
                 employer_token_account: self.employer_token_account,
                 contract,
@@ -672,7 +674,7 @@ fn fee_pda() -> Address {
 /// Injects the singleton FeeConfig directly. `initialize_fee_config` is gated
 /// by the upgrade authority's ProgramData, which LiteSVM's plain program
 /// loader does not provide.
-fn install_fee_config(env: &mut Env, bps: u16) -> Fee {
+fn install_fee_config_free(env: &mut Env, bps: u16) -> Fee {
     let admin = Keypair::new();
     env.svm.airdrop(&admin.pubkey(), 1_000_000_000).unwrap();
     let treasury_owner = Keypair::new().pubkey();
@@ -686,7 +688,7 @@ fn install_fee_config(env: &mut Env, bps: u16) -> Fee {
         treasury: treasury_owner,
         fee_bps: bps,
         bump,
-        reserved: [0u8; 32],
+        subscription_mint: env.token_mint,
     };
     let mut data = Vec::new();
     cfg.try_serialize(&mut data).unwrap();
@@ -1107,4 +1109,487 @@ fn fee_initialize_requires_upgrade_authority() {
     };
     assert!(env.send_employer(ix).is_err());
     assert!(env.svm.get_account(&fee_pda()).map_or(true, |a| a.data.is_empty()));
+}
+
+// ---------------------------------------------------------------------------
+// Symmetric plan-based fees and on-chain subscriptions.
+//
+// The employer-fee mechanics tests above isolate the employer side: their
+// `install_fee_config` gives the freelancer an active Premium plan (0%).
+// Everything below uses `install_fee_config_free` (no plans = Free/Free).
+// ---------------------------------------------------------------------------
+
+use ::streampay::{PurchaseSubscriptionArgs, Subscription, SubscriptionTerm, SubscriptionTier};
+
+const E_CONSTRAINT_SEEDS: u32 = 2006;
+const E_INVALID_SUBSCRIPTION_MINT: u32 = 6185;
+const E_INVALID_SUBSCRIPTION_PLAN: u32 = 6186;
+const E_TIER_CHANGE_WHILE_ACTIVE: u32 = 6188;
+const E_PREPAID_LIMIT: u32 = 6189;
+const DAY: i64 = 86_400;
+const ONE_TOKEN: u64 = 1_000_000;
+
+fn install_fee_config(env: &mut Env, bps: u16) -> Fee {
+    let fee = install_fee_config_free(env, bps);
+    let freelancer = env.freelancer_pk;
+    install_subscription(env, freelancer, SubscriptionTier::Premium, i64::MAX);
+    fee
+}
+
+fn sub_pda(owner: &Address) -> Address {
+    ::streampay::v2::fees::subscription_pda(owner).0
+}
+
+/// Test-only injection of a program-owned Subscription (like FeeConfig above;
+/// real wallets can only get one through `purchase_subscription`).
+fn install_subscription(env: &mut Env, owner: Address, tier: SubscriptionTier, expires_at: i64) {
+    let (pda, bump) = ::streampay::v2::fees::subscription_pda(&owner);
+    let sub = Subscription {
+        version: 1,
+        owner,
+        tier,
+        last_term: SubscriptionTerm::Monthly,
+        started_at: env.now(),
+        expires_at,
+        total_paid: 0,
+        bump,
+        reserved: [0u8; 32],
+    };
+    let mut data = Vec::new();
+    sub.try_serialize(&mut data).unwrap();
+    env.svm.airdrop(&pda, 10_000_000).unwrap();
+    let mut acc = env.svm.get_account(&pda).unwrap();
+    acc.data = data;
+    acc.owner = env.program_id;
+    env.svm.set_account(pda, acc).unwrap();
+}
+
+fn read_sub(env: &Env, owner: &Address) -> Subscription {
+    let acc = env.svm.get_account(&sub_pda(owner)).unwrap();
+    Subscription::try_deserialize(&mut acc.data.as_slice()).unwrap()
+}
+
+impl Env {
+    #[allow(clippy::too_many_arguments)]
+    fn purchase_with(
+        &mut self,
+        payer: &Keypair,
+        payer_ata: Address,
+        mint: Address,
+        treasury: Address,
+        tier: SubscriptionTier,
+        term: SubscriptionTerm,
+    ) -> TransactionResult {
+        let ix = Instruction {
+            program_id: self.program_id,
+            accounts: streampay_program::accounts::PurchaseSubscription {
+                subscriber: payer.pubkey(),
+                subscription: sub_pda(&payer.pubkey()),
+                fee_config: fee_pda(),
+                payment_mint: mint,
+                subscriber_token_account: payer_ata,
+                treasury_token_account: treasury,
+                token_program: TOKEN_ID,
+                system_program: anchor_lang::system_program::ID,
+            }
+            .to_account_metas(None),
+            data: streampay_program::instruction::PurchaseSubscription {
+                args: PurchaseSubscriptionArgs { tier, term },
+            }
+            .data(),
+        };
+        self.send(ix, payer)
+    }
+
+    fn purchase(&mut self, fee: &Fee, tier: SubscriptionTier, term: SubscriptionTerm) -> TransactionResult {
+        let employer = clone_kp(&self.employer);
+        let (ata, mint) = (self.employer_token_account, self.token_mint);
+        self.purchase_with(&employer, ata, mint, fee.treasury_ata, tier, term)
+    }
+
+    fn mint_to_employer(&mut self, amount: u64) {
+        MintTo::new(&mut self.svm, &self.employer, &self.token_mint, &self.employer_token_account, amount)
+            .owner(&self.employer)
+            .send()
+            .unwrap();
+    }
+
+    fn create_with_subs(&mut self, args: &CreateContractArgs, esub: Address, fsub: Address) -> TransactionResult {
+        let contract = self.contract_pda(args.contract_id);
+        let ix = Instruction {
+            program_id: self.program_id,
+            accounts: streampay_program::accounts::CreateContract {
+                fee_config: fee_pda(),
+                employer: self.employer_pk,
+                freelancer: self.freelancer_pk,
+                employer_subscription: esub,
+                freelancer_subscription: fsub,
+                token_mint: self.token_mint,
+                employer_token_account: self.employer_token_account,
+                contract,
+                contract_escrow: self.escrow_pda(&contract),
+                trial_work_unit: None,
+                fixed_work_unit: Some(self.work_unit_pda(&contract, 0)),
+                token_program: TOKEN_ID,
+                system_program: anchor_lang::system_program::ID,
+            }
+            .to_account_metas(None),
+            data: streampay_program::instruction::CreateContract { args: args.clone() }.data(),
+        };
+        self.send_employer(ix)
+    }
+
+    fn release_fixed(&mut self, id: u64) {
+        self.submit_work(id, 0).unwrap();
+        self.approve_work(id, 0).unwrap();
+    }
+}
+
+#[test]
+fn sym_free_free_fixed_100_employer_103_freelancer_97() {
+    let mut env = setup(START);
+    let fee = install_fee_config_free(&mut env, BPS);
+    activate_fixed(&mut env, 1, 100, 0);
+    let c = env.c(1);
+    assert_eq!((c.fee_bps, c.freelancer_fee_rate, c.freelancer_fee_bps()), (300, 30, 300));
+    assert_eq!(env.employer_bal(), START - 103);
+    env.release_fixed(1);
+    env.withdraw_fee(1, &fee).unwrap();
+    assert_eq!(env.freelancer_bal(), 97);
+    assert_eq!(env.token_balance(&fee.treasury_ata), 6, "total possible fee 6");
+    assert_eq!(env.escrow_amount(1), 0);
+    assert_eq!(env.c(1).withdrawn_amount, 100, "gross principal accounting");
+}
+
+#[test]
+fn sym_pro_pro_101_99_and_premium_premium_100_100() {
+    let mut env = setup(START);
+    let fee = install_fee_config_free(&mut env, BPS);
+    let (e, f) = (env.employer_pk, env.freelancer_pk);
+    install_subscription(&mut env, e, SubscriptionTier::Pro, BASE_TS + 400 * DAY);
+    install_subscription(&mut env, f, SubscriptionTier::Pro, BASE_TS + 400 * DAY);
+    activate_fixed(&mut env, 1, 100, 0);
+    assert_eq!((env.c(1).fee_bps, env.c(1).freelancer_fee_bps()), (100, 100));
+    assert_eq!(env.employer_bal(), START - 101);
+    env.release_fixed(1);
+    env.withdraw_fee(1, &fee).unwrap();
+    assert_eq!(env.freelancer_bal(), 99);
+    assert_eq!(env.token_balance(&fee.treasury_ata), 2);
+
+    install_subscription(&mut env, e, SubscriptionTier::Premium, BASE_TS + 400 * DAY);
+    install_subscription(&mut env, f, SubscriptionTier::Premium, BASE_TS + 400 * DAY);
+    activate_fixed(&mut env, 2, 100, 0);
+    assert_eq!((env.c(2).fee_bps, env.c(2).freelancer_fee_bps()), (0, 0));
+    assert_eq!(env.employer_bal(), START - 101 - 100);
+    env.release_fixed(2);
+    env.withdraw(2).unwrap();
+    assert_eq!(env.freelancer_bal(), 99 + 100);
+    assert_eq!(env.token_balance(&fee.treasury_ata), 2);
+}
+
+#[test]
+fn sym_each_participants_own_plan_controls_only_their_fee() {
+    use SubscriptionTier::*;
+    let mut env = setup(START);
+    let fee = install_fee_config_free(&mut env, BPS);
+    let (e, f) = (env.employer_pk, env.freelancer_pk);
+    let cases = [
+        (Pro, Free, 100u16, 300u16, 101u64, 97u64),
+        (Premium, Pro, 0, 100, 100, 99),
+        (Free, Premium, 300, 0, 103, 100),
+    ];
+    for (i, (et, ft, ebps, fbps, funding, net)) in cases.into_iter().enumerate() {
+        let id = i as u64 + 1;
+        install_subscription(&mut env, e, et, BASE_TS + 400 * DAY);
+        install_subscription(&mut env, f, ft, BASE_TS + 400 * DAY);
+        let employer_before = env.employer_bal();
+        activate_fixed(&mut env, id, 100, 0);
+        assert_eq!((env.c(id).fee_bps, env.c(id).freelancer_fee_bps()), (ebps, fbps), "case {id}");
+        assert_eq!(employer_before - env.employer_bal(), funding, "case {id}");
+        let (fb, tb) = (env.freelancer_bal(), env.token_balance(&fee.treasury_ata));
+        env.release_fixed(id);
+        env.withdraw_fee(id, &fee).unwrap();
+        assert_eq!(env.freelancer_bal() - fb, net, "case {id}");
+        assert_eq!(env.token_balance(&fee.treasury_ata) - tb, (funding - 100) + (100 - net));
+    }
+}
+
+#[test]
+fn sym_rates_frozen_at_creation_expiry_never_changes_existing_contract() {
+    let mut env = setup(START);
+    let fee = install_fee_config_free(&mut env, BPS);
+    let (e, f) = (env.employer_pk, env.freelancer_pk);
+    install_subscription(&mut env, e, SubscriptionTier::Premium, BASE_TS + 30 * DAY);
+    install_subscription(&mut env, f, SubscriptionTier::Premium, BASE_TS + 30 * DAY);
+    activate_fixed(&mut env, 1, 1_000, 0);
+    assert_eq!((env.c(1).fee_bps, env.c(1).freelancer_fee_bps()), (0, 0));
+    env.warp(BASE_TS + 31 * DAY);
+    activate_fixed(&mut env, 2, 1_000, 0);
+    assert_eq!((env.c(2).fee_bps, env.c(2).freelancer_fee_bps()), (300, 300));
+    assert_eq!((env.c(1).fee_bps, env.c(1).freelancer_fee_rate), (0, 0), "no retroactive change");
+    env.release_fixed(1);
+    env.withdraw(1).unwrap();
+    assert_eq!(env.freelancer_bal(), 1_000);
+    assert_eq!(env.token_balance(&fee.treasury_ata), 0);
+}
+
+#[test]
+fn sym_milestone_partial_release_then_cancel_charges_only_released() {
+    let mut env = setup(START);
+    let fee = install_fee_config_free(&mut env, BPS);
+    activate_milestone(&mut env, 1, &[500, 500]);
+    assert_eq!(env.employer_bal(), START - 1_030);
+    env.submit_work(1, 0).unwrap();
+    env.approve_work(1, 0).unwrap();
+    env.withdraw_fee(1, &fee).unwrap();
+    assert_eq!(env.freelancer_bal(), 485);
+    assert_eq!(env.token_balance(&fee.treasury_ata), 30);
+    env.cancel(1).unwrap();
+    env.refund(1).unwrap();
+    assert_eq!(env.freelancer_bal(), 485);
+    // Unreleased 500 + its 15 unearned employer fee reserve go back.
+    assert_eq!(env.employer_bal(), START - 500 - 15);
+    assert_eq!(env.token_balance(&fee.treasury_ata), 30);
+    assert_eq!(env.escrow_amount(1), 0);
+}
+
+#[test]
+fn sym_cancel_before_release_retains_no_fee() {
+    let mut env = setup(START);
+    let fee = install_fee_config_free(&mut env, BPS);
+    activate_fixed(&mut env, 1, 1_000, 0);
+    env.cancel(1).unwrap();
+    env.refund(1).unwrap();
+    assert_eq!(env.employer_bal(), START);
+    assert_eq!(env.freelancer_bal(), 0);
+    assert_eq!(env.token_balance(&fee.treasury_ata), 0);
+    assert_eq!(env.escrow_amount(1), 0);
+}
+
+#[test]
+fn sym_dispute_60_40_principal_allocation() {
+    let mut env = setup(START);
+    let fee = install_fee_config_free(&mut env, BPS);
+    activate_fixed(&mut env, 1, 1_000, 0);
+    env.open_as_employer(1).unwrap();
+    env.resolve(1, 600).unwrap();
+    env.withdraw_fee(1, &fee).unwrap();
+    env.refund(1).unwrap();
+    // Freelancer fee only on the 600 awarded; employer fee on 600 earned.
+    assert_eq!(env.freelancer_bal(), 600 - 18);
+    assert_eq!(env.token_balance(&fee.treasury_ata), 18 + 18);
+    // 400 principal + (30 - 18) unearned employer fee reserve.
+    assert_eq!(env.employer_bal(), START - 1_030 + 412);
+    assert_eq!(env.escrow_amount(1), 0);
+}
+
+#[test]
+fn sym_streaming_fee_follows_withdrawn_principal() {
+    let mut env = setup(START);
+    let fee = install_fee_config_free(&mut env, BPS);
+    let start = activate_streaming(&mut env, 1, 1_000);
+    env.warp(start + DURATION / 2);
+    assert_rejected(env.withdraw_fee(1, &fee), E_NOTHING_TO_WITHDRAW, "time alone pays no fee");
+    env.release_stream(1).unwrap();
+    let released = env.c(1).released_amount;
+    env.withdraw_fee(1, &fee).unwrap();
+    assert_eq!(env.freelancer_bal(), released - fee3(released));
+    assert_eq!(env.token_balance(&fee.treasury_ata), 2 * fee3(released));
+    env.cancel(1).unwrap();
+    let c = env.c(1);
+    if c.freelancer_settlement_amount > c.withdrawn_amount {
+        env.withdraw_fee(1, &fee).unwrap();
+    }
+    env.refund(1).unwrap();
+    let w = env.c(1).withdrawn_amount;
+    assert_eq!(env.freelancer_bal(), w - fee3(w));
+    assert_eq!(env.token_balance(&fee.treasury_ata), 2 * fee3(w));
+    assert_eq!(env.employer_bal(), START - w - fee3(w));
+    assert_eq!(env.escrow_amount(1), 0);
+}
+
+#[test]
+fn sym_many_small_withdrawals_match_single_cumulative_fee() {
+    // Freelancer fee is cumulative: after every withdrawal the total charged is
+    // floor(total_withdrawn * bps / 10_000); fee_due_now = that minus what the
+    // earlier withdrawals already paid. Never floored per withdrawal.
+    let mut env = setup(START);
+    let fee = install_fee_config_free(&mut env, BPS);
+    let start = activate_streaming(&mut env, 1, 1_000);
+    let mut prev_w = 0u64;
+    let mut naive_per_withdrawal_floor = 0u64;
+    let mut steps = 0u32;
+    for t in (4..=DURATION).step_by(4) {
+        env.warp(start + t);
+        env.release_stream(1).unwrap();
+        env.withdraw_fee(1, &fee).unwrap();
+        let w = env.c(1).withdrawn_amount;
+        assert!(w > prev_w, "step {steps} withdrew something");
+        naive_per_withdrawal_floor += fee3(w - prev_w);
+        prev_w = w;
+        steps += 1;
+        assert_eq!(env.freelancer_bal(), w - fee3(w), "cumulative after step {steps}");
+        assert_eq!(env.token_balance(&fee.treasury_ata), 2 * fee3(w));
+    }
+    assert_eq!(prev_w, 1_000);
+    assert!(steps >= 10, "many small partial withdrawals ({steps})");
+    assert_eq!(env.freelancer_bal(), 970);
+    assert!(
+        naive_per_withdrawal_floor < fee3(1_000),
+        "per-withdrawal flooring would drift ({naive_per_withdrawal_floor} < 30)"
+    );
+
+    // The same principal withdrawn once pays exactly the same fee.
+    let mut once = setup(START);
+    let fee_once = install_fee_config_free(&mut once, BPS);
+    let start_once = activate_streaming(&mut once, 1, 1_000);
+    once.warp(start_once + DURATION);
+    once.release_stream(1).unwrap();
+    once.withdraw_fee(1, &fee_once).unwrap();
+    assert_eq!(once.c(1).withdrawn_amount, 1_000);
+    assert_eq!(once.freelancer_bal(), env.freelancer_bal());
+    assert_eq!(
+        once.token_balance(&fee_once.treasury_ata),
+        env.token_balance(&fee.treasury_ata)
+    );
+}
+
+#[test]
+fn legacy_contract_layout_never_charges_freelancer() {
+    let mut env = setup(START);
+    let fee = install_fee_config_free(&mut env, BPS);
+    activate_fixed(&mut env, 1, 100, 0);
+    // Simulate a pre-subscription contract: its former reserved byte is 0.
+    let pda = env.contract_pda(1);
+    let mut c = env.c(1);
+    assert_eq!(c.freelancer_fee_rate, 30);
+    c.freelancer_fee_rate = 0;
+    let mut data = Vec::new();
+    c.try_serialize(&mut data).unwrap();
+    let mut acc = env.svm.get_account(&pda).unwrap();
+    acc.data[..data.len()].copy_from_slice(&data);
+    env.svm.set_account(pda, acc).unwrap();
+    env.release_fixed(1);
+    env.withdraw_fee(1, &fee).unwrap();
+    assert_eq!(env.freelancer_bal(), 100, "historical employer-only behaviour");
+    assert_eq!(env.token_balance(&fee.treasury_ata), 3);
+    assert_eq!(env.escrow_amount(1), 0);
+}
+
+#[test]
+fn subscription_purchase_renewal_expiry_and_annual() {
+    use SubscriptionTerm::*;
+    use SubscriptionTier::*;
+    let mut env = setup(START);
+    let fee = install_fee_config_free(&mut env, BPS);
+    env.mint_to_employer(2_000 * ONE_TOKEN);
+    let e = env.employer_pk;
+    let before = env.employer_bal();
+    env.purchase(&fee, Pro, Monthly).unwrap();
+    let s = read_sub(&env, &e);
+    assert_eq!((s.owner, s.tier, s.started_at, s.expires_at), (e, Pro, BASE_TS, BASE_TS + 30 * DAY));
+    assert_eq!(env.token_balance(&fee.treasury_ata), 25 * ONE_TOKEN);
+    assert_eq!(before - env.employer_bal(), 25 * ONE_TOKEN);
+
+    env.warp(BASE_TS + 10 * DAY);
+    env.purchase(&fee, Pro, Monthly).unwrap();
+    let s = read_sub(&env, &e);
+    assert_eq!((s.started_at, s.expires_at, s.total_paid), (BASE_TS, BASE_TS + 60 * DAY, 50 * ONE_TOKEN));
+    assert_rejected(env.purchase(&fee, Premium, Monthly), E_TIER_CHANGE_WHILE_ACTIVE, "plan change while active");
+
+    activate_fixed(&mut env, 1, 1_000, 0);
+    assert_eq!(env.c(1).fee_bps, 100);
+
+    env.warp(BASE_TS + 60 * DAY);
+    activate_fixed(&mut env, 2, 1_000, 0);
+    assert_eq!(env.c(2).fee_bps, 300, "expired plan reads as Free");
+
+    env.purchase(&fee, Premium, Annual).unwrap();
+    let s = read_sub(&env, &e);
+    assert_eq!(
+        (s.tier, s.last_term, s.started_at, s.expires_at),
+        (Premium, Annual, BASE_TS + 60 * DAY, BASE_TS + 60 * DAY + 365 * DAY)
+    );
+    assert_eq!(env.token_balance(&fee.treasury_ata), 650 * ONE_TOKEN);
+    activate_fixed(&mut env, 3, 1_000, 0);
+    assert_eq!(env.c(3).fee_bps, 0);
+    assert_eq!((env.c(1).fee_bps, env.c(2).fee_bps), (100, 300), "frozen");
+}
+
+#[test]
+fn subscription_prepay_is_bounded() {
+    use SubscriptionTerm::*;
+    let mut env = setup(START);
+    let fee = install_fee_config_free(&mut env, BPS);
+    env.mint_to_employer(1_000 * ONE_TOKEN);
+    for _ in 0..3 {
+        env.purchase(&fee, SubscriptionTier::Pro, Annual).unwrap();
+    }
+    assert_eq!(read_sub(&env, &env.employer_pk).expires_at, BASE_TS + 3 * 365 * DAY);
+    assert_rejected(env.purchase(&fee, SubscriptionTier::Pro, Monthly), E_PREPAID_LIMIT, "beyond 3 years");
+}
+
+#[test]
+fn subscription_spoofing_is_rejected() {
+    use SubscriptionTerm::*;
+    use SubscriptionTier::*;
+    let mut env = setup(START);
+    let fee = install_fee_config_free(&mut env, BPS);
+    env.mint_to_employer(1_000 * ONE_TOKEN);
+    let employer = clone_kp(&env.employer);
+    let e = env.employer_pk;
+
+    assert_rejected(env.purchase(&fee, Free, Monthly), E_INVALID_SUBSCRIPTION_PLAN, "free is not purchasable");
+
+    let treasury_owner = {
+        let t: SplTokenAccount = get_spl_account(&env.svm, &fee.treasury_ata).unwrap();
+        t.owner
+    };
+    let other_mint = CreateMint::new(&mut env.svm, &employer).authority(&e).decimals(6).send().unwrap();
+    let other_ata = CreateAccount::new(&mut env.svm, &employer, &other_mint).owner(&e).send().unwrap();
+    MintTo::new(&mut env.svm, &employer, &other_mint, &other_ata, 1_000 * ONE_TOKEN)
+        .owner(&employer)
+        .send()
+        .unwrap();
+    let other_treasury = CreateAccount::new(&mut env.svm, &employer, &other_mint)
+        .owner(&treasury_owner)
+        .send()
+        .unwrap();
+    assert_rejected(
+        env.purchase_with(&employer, other_ata, other_mint, other_treasury, Premium, Monthly),
+        E_INVALID_SUBSCRIPTION_MINT,
+        "worthless mint",
+    );
+    let rogue = CreateAccount::new(&mut env.svm, &employer, &env.token_mint)
+        .owner(&env.outsider_pk)
+        .send()
+        .unwrap();
+    let (ata, mint) = (env.employer_token_account, env.token_mint);
+    assert_rejected(
+        env.purchase_with(&employer, ata, mint, rogue, Premium, Monthly),
+        E_INVALID_TREASURY,
+        "rogue treasury",
+    );
+    assert!(env.purchase_with(&employer, ata, mint, ata, Premium, Monthly).is_err(), "self as treasury");
+    assert!(
+        env.svm.get_account(&sub_pda(&e)).map_or(true, |a| a.data.is_empty()),
+        "no entitlement without payment"
+    );
+
+    // Borrowing another wallet's Premium account is rejected by PDA seeds.
+    let outsider = env.outsider_pk;
+    install_subscription(&mut env, outsider, Premium, i64::MAX);
+    let args = fixed_args(&env, 7, 1_000, env.now());
+    let fsub = sub_pda(&env.freelancer_pk);
+    assert_rejected(env.create_with_subs(&args, sub_pda(&outsider), fsub), E_CONSTRAINT_SEEDS, "borrowed employer plan");
+    assert_rejected(env.create_with_subs(&args, sub_pda(&e), sub_pda(&e)), E_CONSTRAINT_SEEDS, "wrong freelancer plan");
+
+    // A Premium-looking account at the PDA that the program does not own is Free.
+    install_subscription(&mut env, e, Premium, i64::MAX);
+    let pda = sub_pda(&e);
+    let mut acc = env.svm.get_account(&pda).unwrap();
+    acc.owner = anchor_lang::system_program::ID;
+    env.svm.set_account(pda, acc).unwrap();
+    activate_fixed(&mut env, 1, 1_000, 0);
+    assert_eq!(env.c(1).fee_bps, 300);
 }

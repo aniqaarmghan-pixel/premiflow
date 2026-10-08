@@ -24,7 +24,7 @@ test("create summary: agreed + 3% fee = employer total (base units, floor)", () 
   );
   assert.equal(createFeeSummary(33n).fee, 0n);
   assert.equal(createFeeSummary(101n).employerTotal, 104n);
-  assert.equal(feeRowLabel(300), "PREMIFLOW fee (3%)");
+  assert.equal(feeRowLabel(300), "Platform fee (3%)");
   assert.equal(feePercentLabel(250), "2.5%");
   assert.equal(feePercentLabel(125), "1.25%");
 });
@@ -37,7 +37,7 @@ test("hourly fee uses max funded budget + trial, never the hourly rate", () => {
   assert.equal(s.agreedAmount, 25_000_000n);
   assert.equal(s.fee, 750_000n);
   assert.notEqual(s.fee, createFeeSummary(rate).fee);
-  assert.equal(agreedAmountLabel("Hourly", true), "Agreed amount (max budget + trial)");
+  assert.equal(agreedAmountLabel("Hourly", true), "Contract amount (max budget + trial)");
 });
 
 test("streaming fee is on the full stream principal, not accrued earnings", () => {
@@ -50,7 +50,7 @@ test("streaming fee is on the full stream principal, not accrued earnings", () =
   });
   const s = contractFeeSummary(c);
   assert.deepEqual([s.agreedAmount, s.fee, s.employerTotal], [1_000n, 30n, 1_030n]);
-  assert.equal(agreedAmountLabel("Streaming", false), "Agreed amount (full stream)");
+  assert.equal(agreedAmountLabel("Streaming", false), "Contract amount (full stream)");
 });
 
 test("old feeBps = 0 contracts never show a charged fee", () => {
@@ -67,30 +67,39 @@ test("old feeBps = 0 contracts never show a charged fee", () => {
 test("on-chain fee reserve is authoritative for existing contracts", () => {
   const s = contractFeeSummary(makeContract({ totalAmount: 1_000n, feeBps: 500, feeReserve: 50n }));
   assert.equal(s.fee, 50n);
-  assert.equal(feeRowLabel(s.feeBps), "PREMIFLOW fee (5%)");
+  assert.equal(feeRowLabel(s.feeBps), "Platform fee (5%)");
 });
 
-test("copy: freelancer gets the full agreed amount; fee is never deducted from earnings", () => {
-  assert.match(FREELANCER_FEE_NOTE, /full agreed amount/);
-  assert.match(FREELANCER_FEE_NOTE, /employer pays the PREMIFLOW fee separately/);
-  assert.match(EMPLOYER_FEE_NOTE, /freelancer receives the full agreed amount/);
+test("copy: symmetric plan-based fee is disclosed on both sides, never hidden", () => {
+  assert.match(EMPLOYER_FEE_NOTE, /PREMIFLOW platform fee/);
+  assert.match(FREELANCER_FEE_NOTE, /deducted from principal you actually withdraw/);
+  assert.match(FREELANCER_FEE_NOTE, /never charged/);
+  const sides = read("components/contracts/FeeSides.tsx");
+  for (const label of ['"Total funding"', '"Gross earnings"', '"Estimated net"', '"Employer"', '"Freelancer"']) {
+    assert.ok(sides.includes(label), label);
+  }
   const sources = [
     "lib/app/platform-fee.ts",
     "components/contracts/ProtectionFeeSummary.tsx",
     "components/create/CreateWizard.tsx",
   ].map(read);
-  for (const src of sources) assert.doesNotMatch(src, /deducted from (your|freelancer)/i);
+  for (const src of sources) assert.doesNotMatch(src, /receives the full agreed amount/i);
   const helper = read("lib/app/platform-fee.ts");
   assert.doesNotMatch(helper, /parseFloat|Math\.round|\* 0\.03/);
 });
 
-test("create wizard review shows the fee rows for every mode", () => {
+test("create wizard review shows both fee sides for every mode", () => {
   const wizard = read("components/create/CreateWizard.tsx");
-  assert.match(wizard, /createFeeSummary\(fundedPrincipal\)/);
-  assert.match(wizard, /"Total employer funds"/);
+  assert.match(wizard, /createFeeSummary\(fundedPrincipal, feeRates\.employerFeeBps, feeRates\.freelancerFeeBps\)/);
+  assert.match(wizard, /fundedPrincipal != null && feeRates\.status === "ready"/);
+  assert.doesNotMatch(wizard, /useSubscriptionPlan|INTENDED_PLATFORM_FEE_BPS/);
+  assert.match(wizard, /<FeeSides/);
+  assert.match(wizard, /useCreateFeeRates\(publicKey\?\.toBase58\(\) \?\? null, draft\.freelancer\)/);
+  assert.match(wizard, /feeRates=\{createFeeRates\}/);
   assert.match(wizard, /fundedPrincipal=\{totalParsed\}/);
+  assert.doesNotMatch(wizard, /incl\. 3% fee/);
   for (const mode of ["Fixed", "Milestone", "Streaming", "Hourly"] as const) {
-    assert.match(agreedAmountLabel(mode, false), /^Agreed amount/);
+    assert.match(agreedAmountLabel(mode, false), /^Contract amount/);
   }
   const progress = read("components/contracts/PaymentProgress.tsx");
   assert.match(progress, /<ProtectionFeeSummary contract=\{contract\} decimals=\{decimals\} role=\{role\} \/>/);

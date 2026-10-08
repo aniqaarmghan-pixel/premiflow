@@ -15,6 +15,7 @@ export const AUTH_PATHS: readonly string[] = ["/sign-in", "/sign-up", "/forgot-p
 const PUBLIC_EXACT: readonly string[] = [
   "/",
   "/about",
+  "/pricing",
   "/marketplace",
   "/marketplace/jobs",
   "/marketplace/gigs",

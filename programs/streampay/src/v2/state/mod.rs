@@ -13,12 +13,14 @@ pub mod contract;
 pub mod fee_config;
 pub mod hourly_session;
 pub mod hourly_state;
+pub mod subscription;
 pub mod work_unit;
 
 pub use contract::*;
 pub use fee_config::*;
 pub use hourly_session::*;
 pub use hourly_state::*;
+pub use subscription::*;
 pub use work_unit::*;
 
 #[cfg(test)]

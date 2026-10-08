@@ -8,6 +8,7 @@ import {
   HOURLY_SESSION_SEED,
   HOURLY_STATE_SEED,
   STREAMPAY_PROGRAM_ID,
+  SUBSCRIPTION_SEED,
   TRIAL_UNIT_SEED,
   WORK_UNIT_SEED,
 } from "./constants";
@@ -130,4 +131,12 @@ export function deriveFeeConfigPda(
   programId: PublicKey = STREAMPAY_PROGRAM_ID
 ): Pda {
   return findPda([FEE_CONFIG_SEED], programId);
+}
+
+/** Rust `[SUBSCRIPTION_SEED, owner]`: the wallet's on-chain plan (Free when absent). */
+export function deriveSubscriptionPda(
+  owner: PublicKey,
+  programId: PublicKey = STREAMPAY_PROGRAM_ID
+): Pda {
+  return findPda([SUBSCRIPTION_SEED, owner.toBuffer()], programId);
 }

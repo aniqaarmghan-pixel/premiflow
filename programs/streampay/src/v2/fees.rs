@@ -23,7 +23,11 @@
 
 use anchor_lang::prelude::Pubkey;
 
-use crate::v2::constants::FEE_CONFIG_SEED;
+use crate::v2::constants::{
+    FEE_CONFIG_SEED, PREMIUM_ANNUAL_PRICE, PREMIUM_MONTHLY_PRICE, PRO_ANNUAL_PRICE,
+    PRO_MONTHLY_PRICE, SUBSCRIPTION_MONTH_SECONDS, SUBSCRIPTION_SEED, SUBSCRIPTION_YEAR_SECONDS,
+};
+use crate::v2::enums::{SubscriptionTerm, SubscriptionTier};
 
 /// Basis-point denominator.
 pub const FEE_BPS_DENOMINATOR: u64 = 10_000;
@@ -31,6 +35,79 @@ pub const FEE_BPS_DENOMINATOR: u64 = 10_000;
 pub const MAX_FEE_BPS: u16 = 1_000;
 /// The launch platform fee: 3%.
 pub const DEFAULT_PLATFORM_FEE_BPS: u16 = 300;
+
+/// Pro plan platform fee: 1% (never above the Free/base rate).
+pub const PRO_FEE_BPS: u16 = 100;
+/// Premium plan platform fee: 0%.
+pub const PREMIUM_FEE_BPS: u16 = 0;
+/// The freelancer rate is frozen in one byte, in units of 10 bps.
+pub const FREELANCER_FEE_RATE_UNIT_BPS: u16 = 10;
+
+/// Fee bps for a participant's OWN plan. Free pays the configured base rate
+/// (3% at launch), Pro `min(1%, base)`, Premium 0. The other participant's
+/// plan never affects it.
+pub fn plan_fee_bps(tier: SubscriptionTier, base_bps: u16) -> u16 {
+    match tier {
+        SubscriptionTier::Free => base_bps,
+        SubscriptionTier::Pro => base_bps.min(PRO_FEE_BPS),
+        SubscriptionTier::Premium => PREMIUM_FEE_BPS,
+    }
+}
+
+/// Encodes a freelancer bps (<= MAX_FEE_BPS) into the frozen byte. Rounds
+/// down to a 10-bps step (in the freelancer's favour).
+pub fn freelancer_fee_rate_for(fee_bps: u16) -> u8 {
+    let rate = fee_bps.min(MAX_FEE_BPS) / FREELANCER_FEE_RATE_UNIT_BPS;
+    u8::try_from(rate).unwrap_or(u8::MAX)
+}
+
+pub fn freelancer_fee_rate_bps(rate: u8) -> u16 {
+    u16::from(rate) * FREELANCER_FEE_RATE_UNIT_BPS
+}
+
+/// Freelancer fee for a withdrawal moving cumulative gross principal from
+/// `old_withdrawn` to `new_withdrawn`: `fee_on(new) - fee_on(old)`.
+/// Telescoping: the total ever charged is exactly `fee_on(total withdrawn)`,
+/// independent of chunking, and never charged on principal not received.
+pub fn freelancer_fee_due(old_withdrawn: u64, new_withdrawn: u64, fee_bps: u16) -> Option<u64> {
+    if new_withdrawn < old_withdrawn {
+        return None;
+    }
+    fee_on(new_withdrawn, fee_bps)?.checked_sub(fee_on(old_withdrawn, fee_bps)?)
+}
+
+/// Whole-token plan price; `None` for Free (nothing to buy).
+pub fn subscription_price_tokens(tier: SubscriptionTier, term: SubscriptionTerm) -> Option<u64> {
+    match (tier, term) {
+        (SubscriptionTier::Free, _) => None,
+        (SubscriptionTier::Pro, SubscriptionTerm::Monthly) => Some(PRO_MONTHLY_PRICE),
+        (SubscriptionTier::Pro, SubscriptionTerm::Annual) => Some(PRO_ANNUAL_PRICE),
+        (SubscriptionTier::Premium, SubscriptionTerm::Monthly) => Some(PREMIUM_MONTHLY_PRICE),
+        (SubscriptionTier::Premium, SubscriptionTerm::Annual) => Some(PREMIUM_ANNUAL_PRICE),
+    }
+}
+
+/// Plan price in base units of a mint with `decimals`.
+pub fn subscription_price_base_units(
+    tier: SubscriptionTier,
+    term: SubscriptionTerm,
+    decimals: u8,
+) -> Option<u64> {
+    let scale = 10u64.checked_pow(u32::from(decimals))?;
+    subscription_price_tokens(tier, term)?.checked_mul(scale)
+}
+
+pub fn subscription_term_seconds(term: SubscriptionTerm) -> i64 {
+    match term {
+        SubscriptionTerm::Monthly => SUBSCRIPTION_MONTH_SECONDS,
+        SubscriptionTerm::Annual => SUBSCRIPTION_YEAR_SECONDS,
+    }
+}
+
+/// Canonical Subscription PDA for `owner`.
+pub fn subscription_pda(owner: &Pubkey) -> (Pubkey, u8) {
+    Pubkey::find_program_address(&[SUBSCRIPTION_SEED, owner.as_ref()], &crate::ID)
+}
 
 /// Canonical singleton FeeConfig PDA.
 pub fn fee_config_pda() -> (Pubkey, u8) {
@@ -181,6 +258,92 @@ mod tests {
         let reserve = fee_reserve_for(100, BPS).unwrap();
         assert_eq!(fee_due_on_release(200, 0, reserve, BPS), None);
         assert_eq!(fee_refund_due(100, 0, 101, reserve, BPS), None);
+    }
+
+    /// Net to the freelancer and total funding for one participant pair.
+    fn pair(employer: SubscriptionTier, freelancer: SubscriptionTier, principal: u64) -> (u64, u64, u64) {
+        let e = plan_fee_bps(employer, BPS);
+        let f = freelancer_fee_rate_bps(freelancer_fee_rate_for(plan_fee_bps(freelancer, BPS)));
+        let funding = employer_total(principal, e).unwrap();
+        let ffee = freelancer_fee_due(0, principal, f).unwrap();
+        (funding, principal - ffee, fee_on(principal, e).unwrap() + ffee)
+    }
+
+    #[test]
+    fn hundred_demo_usdt_examples_per_plan() {
+        use SubscriptionTier::*;
+        assert_eq!(pair(Free, Free, 100), (103, 97, 6));
+        assert_eq!(pair(Pro, Pro, 100), (101, 99, 2));
+        assert_eq!(pair(Premium, Premium, 100), (100, 100, 0));
+        // Each participant's own plan controls only their own fee.
+        assert_eq!(pair(Pro, Free, 100), (101, 97, 4));
+        assert_eq!(pair(Premium, Pro, 100), (100, 99, 1));
+        assert_eq!(pair(Free, Premium, 100), (103, 100, 3));
+    }
+
+    #[test]
+    fn plan_rates_and_frozen_byte_encoding() {
+        assert_eq!(plan_fee_bps(SubscriptionTier::Free, 300), 300);
+        assert_eq!(plan_fee_bps(SubscriptionTier::Pro, 300), 100);
+        assert_eq!(plan_fee_bps(SubscriptionTier::Pro, 50), 50, "Pro never above base");
+        assert_eq!(plan_fee_bps(SubscriptionTier::Premium, 300), 0);
+        assert_eq!(plan_fee_bps(SubscriptionTier::Free, 0), 0, "no FeeConfig = no fee");
+        assert_eq!(freelancer_fee_rate_for(300), 30);
+        assert_eq!(freelancer_fee_rate_bps(30), 300);
+        assert_eq!(freelancer_fee_rate_for(305), 30, "rounds down in the freelancer's favour");
+        assert_eq!(freelancer_fee_rate_for(MAX_FEE_BPS), 100);
+        assert_eq!(freelancer_fee_rate_bps(0), 0, "legacy byte = no freelancer fee");
+    }
+
+    #[test]
+    fn freelancer_fee_is_proportional_and_chunk_independent() {
+        for total in [1u64, 33, 100, 101, 333, 1_000_003, u64::MAX / 3] {
+            for bps in [0u16, 100, 300] {
+                let mut w = 0u64;
+                let mut paid = 0u64;
+                let step = (total / 7).max(1);
+                while w < total {
+                    let next = (w + step).min(total);
+                    paid += freelancer_fee_due(w, next, bps).unwrap();
+                    w = next;
+                    assert_eq!(paid, fee_on(w, bps).unwrap(), "only on principal received");
+                }
+                assert_eq!(paid, fee_on(total, bps).unwrap());
+            }
+        }
+        assert_eq!(freelancer_fee_due(10, 5, 300), None);
+        // owed-minus-paid: 30 withdrawals of 33 units. Per-withdrawal flooring
+        // would charge 0 each; cumulative charges floor(990 * 3%) = 29.
+        let (mut w, mut paid, mut naive) = (0u64, 0u64, 0u64);
+        for _ in 0..30 {
+            let owed = fee_on(w + 33, 300).unwrap();
+            let due = freelancer_fee_due(w, w + 33, 300).unwrap();
+            assert_eq!(due, owed - paid);
+            naive += fee_on(33, 300).unwrap();
+            paid += due;
+            w += 33;
+        }
+        assert_eq!((paid, naive), (29, 0));
+        assert_eq!(paid, fee_on(990, 300).unwrap());
+        // 60/40 dispute split: fee only on the 60 the freelancer receives.
+        assert_eq!(freelancer_fee_due(0, 60, 300), Some(1));
+        assert_eq!(freelancer_fee_due(0, 60_000_000, 300), Some(1_800_000));
+    }
+
+    #[test]
+    fn subscription_prices_and_terms() {
+        use SubscriptionTerm::*;
+        use SubscriptionTier::*;
+        assert_eq!(subscription_price_base_units(Pro, Monthly, 6), Some(25_000_000));
+        assert_eq!(subscription_price_base_units(Pro, Annual, 6), Some(250_000_000));
+        assert_eq!(subscription_price_base_units(Premium, Monthly, 6), Some(60_000_000));
+        assert_eq!(subscription_price_base_units(Premium, Annual, 6), Some(600_000_000));
+        assert_eq!(subscription_price_base_units(Free, Monthly, 6), None);
+        assert_eq!(subscription_price_base_units(Pro, Monthly, 30), None, "overflow checked");
+        assert_eq!(subscription_term_seconds(Monthly), 30 * 86_400);
+        assert_eq!(subscription_term_seconds(Annual), 365 * 86_400);
+        assert_eq!(PRO_ANNUAL_PRICE, PRO_MONTHLY_PRICE * 10, "annual = 2 months free");
+        assert_eq!(PREMIUM_ANNUAL_PRICE, PREMIUM_MONTHLY_PRICE * 10);
     }
 
     #[test]

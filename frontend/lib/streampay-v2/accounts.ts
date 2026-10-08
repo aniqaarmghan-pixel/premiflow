@@ -1,6 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 
 import { CONTRACT_ACCOUNT, WORK_UNIT_ACCOUNT } from "./constants";
+import { freelancerFeeRateBps } from "./fees";
 import { deriveWorkUnitPda } from "./pda";
 import type { StreamPayV2Program } from "./program";
 import {
@@ -81,6 +82,8 @@ export function decodeContract(
     feeBps: Number(optionalField(raw, "feeBps", "fee_bps") ?? 0),
     feeReserve: bnToBigInt((optionalField(raw, "feeReserve", "fee_reserve") ?? 0) as never),
     feePaid: bnToBigInt((optionalField(raw, "feePaid", "fee_paid") ?? 0) as never),
+    // Frozen at creation in 10-bps units; absent / 0 on pre-upgrade contracts (no freelancer fee).
+    freelancerFeeBps: freelancerFeeRateBps(Number(optionalField(raw, "freelancerFeeRate", "freelancer_fee_rate") ?? 0)),
     disputedAt: i64ToNumber(field(raw, "disputedAt", "disputed_at") as never),
     disputeInitiator: decodeDisputeParty(
       field(raw, "disputeInitiator", "dispute_initiator")

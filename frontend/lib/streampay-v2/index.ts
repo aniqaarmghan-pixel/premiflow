@@ -217,3 +217,12 @@ export type {
 
 export { REQUIRED_V2_INSTRUCTIONS } from "./idl-required";
 export { clampStreamNow, isStreamEnded, projectedFinalStreamClaim } from "./derived";
+
+export { deriveSubscriptionPda } from "./pda";
+export {
+  decodePlanTier,
+  effectivePlanTier,
+  fetchSubscriptionIfExists,
+  type SubscriptionTerm,
+  type SubscriptionView,
+} from "./subscription";

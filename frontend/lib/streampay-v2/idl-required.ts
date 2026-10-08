@@ -29,6 +29,7 @@ export const REQUIRED_V2_INSTRUCTIONS = [
   "start_hourly_session",
   "stop_hourly_session",
   "end_hourly_contract",
+  "purchase_subscription",
 ] as const;
 
 export type RequiredV2Instruction = (typeof REQUIRED_V2_INSTRUCTIONS)[number];

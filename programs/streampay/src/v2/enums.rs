@@ -366,3 +366,19 @@ mod tests {
         assert!(!PaymentMode::Streaming.requires_allocation());
     }
 }
+
+/// PREMIFLOW subscription plan. One plan per wallet applies whether the wallet
+/// hires, works, or both. `Free` is the zero value (no or expired subscription).
+#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SubscriptionTier {
+    Free,
+    Pro,
+    Premium,
+}
+
+/// Subscription billing term.
+#[derive(AnchorSerialize, AnchorDeserialize, InitSpace, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum SubscriptionTerm {
+    Monthly,
+    Annual,
+}

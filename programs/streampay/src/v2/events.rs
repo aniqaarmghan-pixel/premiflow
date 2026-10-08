@@ -458,3 +458,47 @@ pub struct FeeConfigUpdated {
     pub treasury: Pubkey,
     pub fee_bps: u16,
 }
+
+/// Subscription payment mint configured by the fee admin.
+#[event]
+pub struct SubscriptionMintConfigured {
+    pub fee_config: Pubkey,
+    pub subscription_mint: Pubkey,
+}
+
+/// Wallet-signed plan purchase or renewal paid to the treasury.
+#[event]
+pub struct SubscriptionPurchased {
+    pub subscriber: Pubkey,
+    pub subscription: Pubkey,
+    pub tier: crate::v2::enums::SubscriptionTier,
+    pub term: crate::v2::enums::SubscriptionTerm,
+    pub mint: Pubkey,
+    pub treasury_token_account: Pubkey,
+    pub amount: u64,
+    pub started_at: i64,
+    pub expires_at: i64,
+}
+
+/// Both participants' plan rates, frozen onto a new contract.
+#[event]
+pub struct PlatformFeeTermsFrozen {
+    pub contract: Pubkey,
+    pub employer_tier: crate::v2::enums::SubscriptionTier,
+    pub freelancer_tier: crate::v2::enums::SubscriptionTier,
+    pub employer_fee_bps: u16,
+    pub freelancer_fee_bps: u16,
+}
+
+/// Freelancer platform fee deducted from withdrawn principal.
+#[event]
+pub struct FreelancerPlatformFeePaid {
+    pub contract: Pubkey,
+    pub treasury_token_account: Pubkey,
+    pub mint: Pubkey,
+    pub amount: u64,
+    /// Cumulative freelancer fee: `fee_on(principal_withdrawn)`.
+    pub freelancer_fee_paid: u64,
+    pub principal_withdrawn: u64,
+    pub net_to_freelancer: u64,
+}

@@ -41,6 +41,24 @@ pub const HOURLY_SESSION_SEED: &[u8] = b"hourly_session";
 /// Full seeds: `[FEE_CONFIG_SEED]`
 pub const FEE_CONFIG_SEED: &[u8] = b"fee_config";
 
+/// Seed for a wallet's PREMIFLOW subscription PDA. One plan per wallet covers
+/// hiring and working. Full seeds: `[SUBSCRIPTION_SEED, owner]`
+pub const SUBSCRIPTION_SEED: &[u8] = b"subscription";
+
+/// Deterministic subscription terms in unix seconds (Solana `Clock`):
+/// monthly = 30 days, annual = 365 days.
+pub const SUBSCRIPTION_MONTH_SECONDS: i64 = 30 * 86_400;
+pub const SUBSCRIPTION_YEAR_SECONDS: i64 = 365 * 86_400;
+/// A renewal may extend the expiry at most this far beyond `now`.
+pub const SUBSCRIPTION_MAX_PREPAID_SECONDS: i64 = 3 * 365 * 86_400;
+
+/// Plan prices in whole tokens of the configured subscription mint (Devnet
+/// Demo USDT); scaled by the mint's decimals on-chain. Annual = 10 months.
+pub const PRO_MONTHLY_PRICE: u64 = 25;
+pub const PRO_ANNUAL_PRICE: u64 = 250;
+pub const PREMIUM_MONTHLY_PRICE: u64 = 60;
+pub const PREMIUM_ANNUAL_PRICE: u64 = 600;
+
 /// Current on-chain layout version written to `Contract::version` and
 /// `WorkUnit::version`. Bump only on a layout change.
 pub const V2_LAYOUT_VERSION: u8 = 1;

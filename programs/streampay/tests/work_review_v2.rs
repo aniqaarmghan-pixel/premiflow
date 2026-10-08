@@ -73,10 +73,10 @@ struct Env {
 fn setup(employer_tokens: u64) -> Env {
     let program_id = streampay_program::id();
     let mut svm = LiteSVM::new();
-    let program_path = format!(
+    let program_path = std::env::var("STREAMPAY_SO").unwrap_or_else(|_| format!(
         "{}/../../target/deploy/streampay.so",
         env!("CARGO_MANIFEST_DIR")
-    );
+    ));
     svm.add_program_from_file(program_id, program_path)
         .expect("Could not load StreamPay program");
 
@@ -213,6 +213,8 @@ impl Env {
                 fee_config: ::streampay::v2::fees::fee_config_pda().0,
                 employer: self.employer_pk,
                 freelancer: self.freelancer_pk,
+                employer_subscription: ::streampay::v2::fees::subscription_pda(&self.employer_pk).0,
+                freelancer_subscription: ::streampay::v2::fees::subscription_pda(&self.freelancer_pk).0,
                 token_mint: self.token_mint,
                 employer_token_account: self.employer_token_account,
                 contract,
