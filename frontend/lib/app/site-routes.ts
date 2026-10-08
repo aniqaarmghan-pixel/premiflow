@@ -56,6 +56,7 @@ export const PUBLIC_NAV = [
   { href: "/marketplace/gigs", label: "Gigs" },
   { href: "/marketplace/freelancers", label: "Freelancers" },
   { href: "/#how-it-works", label: "How it works" },
+  { href: "/pricing", label: "Pricing" },
 ] as const;
 
 export const PUBLIC_SEARCH_HREF = "/marketplace/search";

@@ -21,7 +21,7 @@ export function ProtectionFeeSummary({
 }: {
   contract: Pick<
     ContractView,
-    "totalAmount" | "feeBps" | "feeReserve" | "freelancerFeeBps" | "paymentMode" | "trialAmount"
+    "totalAmount" | "feeBps" | "feeReserve" | "freelancerFeeBps" | "paymentMode" | "trialAmount" | "tokenMint"
   >;
   decimals?: number;
   role?: string;
@@ -35,6 +35,7 @@ export function ProtectionFeeSummary({
       <FeeSides
         summary={summary}
         decimals={decimals}
+        mint={contract.tokenMint}
         agreedLabel={agreedAmountLabel(contract.paymentMode, contract.trialAmount > 0n)}
         highlight={freelancer ? "freelancer" : "employer"}
       />

@@ -1,17 +1,21 @@
-import { formatTokenAmount } from "@/lib/app/money";
+import { DevnetAssetNote } from "@/components/ui/DevnetAssetNote";
+import { formatFriendlyTokenAmount } from "@/lib/app/money";
 import { feeRowLabel, type PlatformFeeSummary } from "@/lib/app/platform-fee";
 import type { PlanTier } from "@/lib/streampay-v2/fees";
+import type { PublicKey } from "@solana/web3.js";
 
-const DASH = "\u2014";
+const DASH = "—";
 
 /**
  * Both sides of the PREMIFLOW platform fee, never hidden:
  * EMPLOYER Contract amount / Platform fee / Total funding and
  * FREELANCER Gross earnings / Platform fee / Estimated net. Display only.
+ * Demo USDT amounts use $-style display with a Devnet test-asset badge.
  */
 export function FeeSides({
   summary,
   decimals,
+  mint,
   employerPlan,
   freelancerPlan,
   agreedLabel = "Contract amount",
@@ -19,13 +23,14 @@ export function FeeSides({
 }: {
   summary: PlatformFeeSummary | null;
   decimals?: number;
+  mint?: string | PublicKey | null;
   employerPlan?: PlanTier;
   freelancerPlan?: PlanTier;
   agreedLabel?: string;
   highlight?: "employer" | "freelancer";
 }) {
   const amount = (value: bigint | undefined) =>
-    summary && value !== undefined ? formatTokenAmount(value, decimals) : DASH;
+    summary && value !== undefined ? formatFriendlyTokenAmount(value, decimals) : DASH;
   const sides: { id: "employer" | "freelancer"; title: string; plan?: PlanTier; rows: [string, string][] }[] = [
     {
       id: "employer",
@@ -70,6 +75,11 @@ export function FeeSides({
           </dl>
         </section>
       ))}
+      {mint ? (
+        <div className="sm:col-span-2">
+          <DevnetAssetNote mint={mint} />
+        </div>
+      ) : null}
     </div>
   );
 }

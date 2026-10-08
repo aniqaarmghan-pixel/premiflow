@@ -27,7 +27,7 @@ test("Devnet token displays as Demo USDT; mint/decimals/labels unchanged", () =>
   assert.equal(PREMIFLOW_TEST_TOKEN.decimals, 6);
   assert.equal(PREMIFLOW_TEST_TOKEN.mint.toBase58(), "9JTBN7QLcoam7LkN44YDhtMQsYt4zKLW7KUE4FscgZtx");
   assert.equal(paymentTokenLabel(PREMIFLOW_TEST_TOKEN.mint), "PREMIFLOW Test Token");
-  assert.equal(formatFriendlyTokenAmount(103_000_000n, 6), "103.00 Demo USDT");
+  assert.equal(formatFriendlyTokenAmount(103_000_000n, 6), "$103.00");
   assert.equal(formatFriendlyTokenAmount(3_000_000n, 6, "ACME"), "3.00 ACME", "custom labels untouched");
   assert.equal(defaultPaymentToken().symbol, "Demo USDT");
   assert.equal(DEVNET_TEST_ASSET_COPY.label, "Devnet test asset");

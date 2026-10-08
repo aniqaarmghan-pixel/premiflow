@@ -114,7 +114,7 @@ import {
 import { supportTopicHref } from "@/lib/app/support";
 import { formatUnix } from "@/lib/app/datetime";
 import { localMetadataStore } from "@/lib/app/local-metadata";
-import { formatTokenAmount } from "@/lib/app/money";
+import { formatFriendlyTokenAmount, formatTokenAmount } from "@/lib/app/money";
 import {
   STREAMING_PAY_EXPLAINER,
   STREAMING_COLLECT_FINAL_LABEL,
@@ -1058,7 +1058,7 @@ export function ContractDetail({ address }: { address: string }) {
               <span>
                 Funded{" "}
                 <span className="font-medium text-ink">
-                  {formatTokenAmount(contract.totalAmount, decimals)}
+                  {formatFriendlyTokenAmount(contract.totalAmount, decimals)}
                 </span>
               </span>
               {headerDeadline ? (
@@ -1242,19 +1242,19 @@ export function ContractDetail({ address }: { address: string }) {
             <dl className="mt-4 grid gap-3 sm:grid-cols-2">
               <Row
                 label="Freelancer settlement"
-                value={formatTokenAmount(settlement.freelancerSettlementAmount, decimals)}
+                value={formatFriendlyTokenAmount(settlement.freelancerSettlementAmount, decimals)}
               />
               <Row
                 label="Employer refundable"
-                value={formatTokenAmount(settlement.employerRefundableAmount, decimals)}
+                value={formatFriendlyTokenAmount(settlement.employerRefundableAmount, decimals)}
               />
               <Row
                 label="Still to collect"
-                value={formatTokenAmount(remainingFreelancerClaim(contract), decimals)}
+                value={formatFriendlyTokenAmount(remainingFreelancerClaim(contract), decimals)}
               />
               <Row
                 label="Still to refund"
-                value={formatTokenAmount(remainingEmployerRefund(contract), decimals)}
+                value={formatFriendlyTokenAmount(remainingEmployerRefund(contract), decimals)}
               />
             </dl>
           </Card>
@@ -1508,10 +1508,10 @@ export function ContractDetail({ address }: { address: string }) {
               }
             />
             <Row label="Token mint" value={<Address value={contract.tokenMint.toBase58()} />} />
-            <Row label="Total" value={formatTokenAmount(contract.totalAmount, decimals)} />
-            <Row label="Main" value={formatTokenAmount(contract.mainAmount, decimals)} />
+            <Row label="Total" value={formatFriendlyTokenAmount(contract.totalAmount, decimals)} />
+            <Row label="Main" value={formatFriendlyTokenAmount(contract.mainAmount, decimals)} />
             {contract.trialAmount > 0n ? (
-              <Row label="Trial" value={formatTokenAmount(contract.trialAmount, decimals)} />
+              <Row label="Trial" value={formatFriendlyTokenAmount(contract.trialAmount, decimals)} />
             ) : null}
             <Row label="Created" value={formatUnix(contract.createdAt)} />
             <Row label="Accepted" value={formatUnix(contract.acceptedAt)} />

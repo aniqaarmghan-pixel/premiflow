@@ -79,7 +79,7 @@ import {
   dropAwaitingLinks,
   saveMarketplaceSource,
 } from "@/lib/app/marketplace-link-store";
-import { formatTokenAmount } from "@/lib/app/money";
+import { formatFriendlyTokenAmount, formatTokenAmount } from "@/lib/app/money";
 import {
   CREATE_RATES_LOADING_NOTE,
   CREATE_RATES_NOTE,
@@ -1619,7 +1619,7 @@ export function CreateWizard() {
               <dt className="text-white/45">Employer funds (incl. platform fee)</dt>
               <dd>
                 {totalParsed != null && createFeeRates.status === "ready"
-                  ? formatTokenAmount(
+                  ? formatFriendlyTokenAmount(
                       createFeeSummary(totalParsed, createFeeRates.employerFeeBps).employerTotal,
                       draft.decimals
                     )
@@ -1889,6 +1889,7 @@ function ReviewPanel({
           <FeeSides
             summary={fee}
             decimals={draft.decimals}
+            mint={draft.mint}
             employerPlan={feeRates.status === "ready" ? feeRates.employerTier : undefined}
             freelancerPlan={feeRates.status === "ready" ? feeRates.freelancerTier : undefined}
             agreedLabel={agreedAmountLabel(draft.paymentMode, draft.trialEnabled)}

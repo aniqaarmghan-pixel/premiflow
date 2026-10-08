@@ -65,7 +65,7 @@ test("shellKind: marketplace discovery is public, owner pages stay in the dashbo
 test("public navbar: marketplace-first items, active states, search and dashboard entry", () => {
   assert.deepEqual(
     PUBLIC_NAV.map((n) => n.label),
-    ["Find Work", "Hire Talent", "Gigs", "Freelancers", "How it works"]
+    ["Find Work", "Hire Talent", "Gigs", "Freelancers", "How it works", "Pricing"]
   );
   assert.equal(isPublicNavActive("/marketplace/jobs", "/marketplace/jobs/abc"), true);
   assert.equal(isPublicNavActive("/marketplace/freelancers", "/marketplace/profiles/x"), true);

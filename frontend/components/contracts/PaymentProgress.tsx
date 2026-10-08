@@ -1,7 +1,9 @@
 import { Card } from "@/components/ui/Card";
 import { Progress } from "@/components/ui/Progress";
 import { ProtectionFeeSummary } from "@/components/contracts/ProtectionFeeSummary";
-import { formatTokenAmount } from "@/lib/app/money";
+import { DevnetAssetNote } from "@/components/ui/DevnetAssetNote";
+import { formatFriendlyTokenAmount } from "@/lib/app/money";
+import { findPaymentToken } from "@/lib/app/premiflow";
 import { financialProgress } from "@/lib/app/view-model";
 import type { ContractView } from "@/lib/streampay-v2";
 
@@ -16,6 +18,8 @@ export function PaymentProgress({
 }) {
   const progress = financialProgress(contract);
   const streaming = contract.paymentMode === "Streaming";
+  const symbol = findPaymentToken(contract.tokenMint)?.symbol;
+  const money = (value: bigint) => formatFriendlyTokenAmount(value, decimals, symbol);
   const rows: Array<{ label: string; value: bigint }> = [
     { label: "Total contract value", value: progress.total },
     {
@@ -45,6 +49,7 @@ export function PaymentProgress({
       <p className="mt-1 text-xs text-ink-faint">
         Displayed from the contract account. The program remains authoritative.
       </p>
+      <DevnetAssetNote mint={contract.tokenMint} className="mt-1.5" />
       <div className="mt-4">
         <Progress
           value={progress.releasedPct}
@@ -58,7 +63,7 @@ export function PaymentProgress({
               {row.label}
             </dt>
             <dd className="mt-1 font-medium text-ink">
-              {formatTokenAmount(row.value, decimals)}
+              {money(row.value)}
             </dd>
           </div>
         ))}

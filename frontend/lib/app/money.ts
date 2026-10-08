@@ -7,13 +7,14 @@ export function formatTokenAmount(base: bigint, decimals: number | undefined): s
 }
 
 export function formatUsdLike(base: bigint, decimals: number | undefined): string {
-  const ui = formatTokenAmount(base, decimals);
-  return ui;
+  return formatFriendlyTokenAmount(base, decimals);
 }
 
 /**
- * Summary-card display only: ~2 decimal places + configured payment-token symbol.
- * Does not change base-unit math or stored values.
+ * Summary-card / monetary-summary display only (~2 decimal places).
+ * Demo USDT (the Devnet test asset) → "$7.93". Not real USD: always pair with
+ * `DevnetAssetNote` / `DEMO_USDT_BADGE` nearby. Other tokens → "7.93 SYMBOL".
+ * Does not change base-unit math, mint, decimals, or on-chain logic.
  */
 export function formatFriendlyTokenAmount(
   base: bigint,
@@ -25,7 +26,7 @@ export function formatFriendlyTokenAmount(
   const ui = baseUnitsToUiAmount(base, decimals);
   const n = Number(ui);
   if (!Number.isFinite(n)) return `${ui} ${unit}`;
-  // Summary cards: always ~2 decimal places (base-unit math stays elsewhere).
   const friendly = n.toFixed(2);
+  if (unit === defaultPaymentToken().symbol) return `$${friendly}`;
   return `${friendly} ${unit}`;
 }

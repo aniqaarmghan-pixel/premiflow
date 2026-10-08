@@ -83,6 +83,9 @@ export const DEVNET_TEST_ASSET_COPY = {
   tooltip: "Not official USDT: a Devnet test token with no real value.",
 } as const;
 
+/** Compact badge next to $-style Demo USDT amounts. Not real USD. */
+export const DEMO_USDT_BADGE = "Demo USDT · Devnet test asset" as const;
+
 export const SUPPORTED_PAYMENT_TOKENS: readonly SupportedPaymentToken[] = [
   PREMIFLOW_TEST_TOKEN,
 ];

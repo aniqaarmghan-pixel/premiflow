@@ -14,6 +14,8 @@ test("summary money: friendly ~2 decimals + token symbol; full precision helper 
   assert.equal(formatTokenAmount(base, 6), "230.696642");
   assert.equal(formatFriendlyTokenAmount(base, 6, "PFT"), "230.70 PFT");
   assert.equal(formatFriendlyTokenAmount(100_000_000n, 6, "PFT"), "100.00 PFT");
+  assert.equal(formatFriendlyTokenAmount(base, 6), "$230.70");
+  assert.equal(formatFriendlyTokenAmount(7_930_000n, 6), "$7.93");
 });
 
 test("humanize durations: 86400s -> 1 day, not raw seconds", () => {
