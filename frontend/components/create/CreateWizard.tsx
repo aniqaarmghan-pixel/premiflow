@@ -17,6 +17,13 @@ import { TransactionStatus } from "@/components/ui/TransactionStatus";
 import { localMetadataStore } from "@/lib/app/local-metadata";
 import { requestOfferLifecycleNotification } from "@/lib/app/lifecycle-notifications-client";
 import {
+  OFFER_REVISION_COPY,
+  loadReviseHandoff,
+  clearReviseHandoff,
+  markOfferRevised,
+} from "@/lib/app/offer-revision";
+import { browserStorage, CREATE_SCOPE } from "@/lib/app/marketplace-create-handoff";
+import {
   CREATE_SEND_OFFER_LABEL,
   OPEN_CONTRACT_LABEL,
   RESUME_SETUP_LABEL,
@@ -337,6 +344,12 @@ export function CreateWizard() {
     if (!hydrated || !employerKey || handoffDecidedFor === employerKey) return null;
     return loadPendingHandoff(intentStorage(), INTENT_SCOPE, employerKey);
   }, [hydrated, employerKey, handoffDecidedFor]);
+
+  const [reviseDecidedFor, setReviseDecidedFor] = useState<string | null>(null);
+  const pendingReviseHandoff = useMemo(() => {
+    if (!hydrated || !employerKey || reviseDecidedFor === employerKey) return null;
+    return loadReviseHandoff(browserStorage(), CREATE_SCOPE, employerKey);
+  }, [hydrated, employerKey, reviseDecidedFor]);
   const handoffPrompt = handoffPromptKind({
     pending: pendingHandoff != null,
     draftExists: draftOffer != null,
@@ -841,6 +854,19 @@ export function CreateWizard() {
     if (progress.status === "PendingAcceptance") {
       // Offer is live: notify the freelancer (server re-reads chain state; idempotent key).
       void requestOfferLifecycleNotification(progress.contractAddress, "contract_offer_received");
+
+      try {
+        const revisedFrom = sessionStorage.getItem("premiflow:revise-from-active");
+        if (revisedFrom) {
+          markOfferRevised(
+            browserStorage(),
+            CREATE_SCOPE,
+            revisedFrom,
+            progress.contractAddress
+          );
+          sessionStorage.removeItem("premiflow:revise-from-active");
+        }
+      } catch { /* ignore */ }
     }
     setSetupProgress(null);
     setSetupConflict(null);
@@ -1039,6 +1065,47 @@ export function CreateWizard() {
   return (
     <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_240px]">
       <div className="min-w-0">
+        {pendingReviseHandoff ? (
+          <div
+            data-testid="offer-revise-handoff"
+            className="rounded-2xl border border-line bg-surface p-4"
+          >
+            <p className="text-sm font-semibold text-ink">{OFFER_REVISION_COPY.handoffTitle}</p>
+            <p className="mt-1 text-sm text-ink-soft">{OFFER_REVISION_COPY.handoffNote}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                className="inline-flex min-h-10 items-center justify-center rounded-xl border border-line px-4 py-2 text-sm font-semibold text-ink hover:bg-surface-muted"
+                onClick={() => {
+                  if (!employerKey || !pendingReviseHandoff) return;
+                  try {
+                    sessionStorage.setItem(
+                      "premiflow:revise-from-active",
+                      pendingReviseHandoff.revisedFrom
+                    );
+                  } catch { /* ignore */ }
+                  setDraft(pendingReviseHandoff.draft);
+                  clearReviseHandoff(browserStorage(), CREATE_SCOPE, employerKey);
+                  setReviseDecidedFor(employerKey);
+                }}
+              >
+                Use cancelled terms
+              </button>
+              <button
+                type="button"
+                className="inline-flex min-h-10 items-center justify-center rounded-xl border border-line px-4 py-2 text-sm font-semibold text-ink-soft hover:bg-surface-muted"
+                onClick={() => {
+                  if (!employerKey) return;
+                  clearReviseHandoff(browserStorage(), CREATE_SCOPE, employerKey);
+                  setReviseDecidedFor(employerKey);
+                }}
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        ) : null}
+
         {pendingHandoff && handoffPrompt !== "none" ? (
           <div
             role="status"

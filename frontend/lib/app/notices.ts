@@ -218,6 +218,8 @@ export function noticeKindForAction(
       return "contract_accepted";
     case "declineContract":
       return "contract_declined";
+    case "cancelPendingOffer":
+      return "contract_cancelled";
     case "expireAcceptance":
       return "offer_expired";
     case "expireActivation":

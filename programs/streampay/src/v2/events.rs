@@ -6,7 +6,7 @@
 //!
 //! - Phase 1: `ContractCreated`
 //! - Phase 2: `MilestoneAdded`, `TermsFinalized`
-//! - Phase 3: `ContractAccepted`, `ContractDeclined`, `ContractActivated`,
+//! - Phase 3: `ContractAccepted`, `ContractDeclined`, `PendingOfferCancelled`, `ContractActivated`,
 //!   `ActivationRejected`, `ContractExpired`, `ActivationWindowExpired`
 //! - Phase 4: `TrialConfigured`, `TrialSubmitted`, `TrialRevisionRequested`,
 //!   `TrialApproved`, `TrialRejected`, `TrialSettledAndEnded`,
@@ -93,6 +93,18 @@ pub struct ContractDeclined {
     pub employer: Pubkey,
     pub freelancer: Pubkey,
     pub declined_at: i64,
+}
+
+/// Employer cancelled a funded PendingAcceptance offer before acceptance.
+/// No SPL transfer. Full principal is employer-refundable; unearned fee reserve
+/// returns on later `claim_employer_refund`. Not a dispute. Terms unchanged.
+#[event]
+pub struct PendingOfferCancelled {
+    pub contract: Pubkey,
+    pub employer: Pubkey,
+    pub freelancer: Pubkey,
+    pub cancelled_at: i64,
+    pub employer_refundable: u64,
 }
 
 /// A funded offer lapsed without acceptance. No SPL transfer. Not a dispute.

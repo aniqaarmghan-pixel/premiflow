@@ -452,6 +452,19 @@ impl Env {
         self.send_employer(ix)
     }
 
+    fn cancel_pending(&mut self, contract_id: u64) -> TransactionResult {
+        let ix = Instruction {
+            program_id: self.program_id,
+            accounts: streampay_program::accounts::CancelPendingOffer {
+                employer: self.employer_pk,
+                contract: self.contract_pda(contract_id),
+            }
+            .to_account_metas(None),
+            data: streampay_program::instruction::CancelPendingOffer {}.data(),
+        };
+        self.send_employer(ix)
+    }
+
     fn withdraw(&mut self, contract_id: u64) -> TransactionResult {
         let contract = self.contract_pda(contract_id);
         let ix = Instruction {
@@ -1592,4 +1605,35 @@ fn subscription_spoofing_is_rejected() {
     env.svm.set_account(pda, acc).unwrap();
     activate_fixed(&mut env, 1, 1_000, 0);
     assert_eq!(env.c(1).fee_bps, 300);
+}
+
+#[test]
+fn cancel_pending_offer_free_100_recovers_103() {
+    // Free plan 3% on 100 principal ? fund 103. Cancel before accept: platform
+    // earns 0; claim returns full principal + unearned fee reserve at frozen rate.
+    let mut env = setup(START);
+    let fee = install_fee_config_free(&mut env, BPS);
+    let now = env.now();
+    env.create(&fixed_args(&env, 1, 100, now)).unwrap();
+    let c = env.c(1);
+    assert_eq!(c.status, ContractStatus::PendingAcceptance);
+    assert_eq!((c.fee_bps, c.fee_reserve, c.fee_paid), (300, 3, 0));
+    assert_eq!(c.total_amount, 100);
+    assert_eq!(env.employer_bal(), START - 103);
+    assert_eq!(env.escrow_amount(1), 103);
+
+    env.cancel_pending(1).unwrap();
+    let c = env.c(1);
+    assert_eq!(c.status, ContractStatus::Cancelled);
+    assert_eq!(c.employer_refundable_amount, 100);
+    assert_eq!(c.freelancer_settlement_amount, 0);
+    assert_eq!((c.fee_bps, c.fee_reserve), (300, 3), "frozen employer rate");
+
+    let before = env.employer_bal();
+    env.refund(1).expect("claim principal + unearned fee");
+    assert_eq!(env.employer_bal(), before + 103);
+    assert_eq!(env.escrow_amount(1), 0);
+    assert_eq!(env.token_balance(&fee.treasury_ata), 0, "platform earns 0");
+    assert_eq!(env.c(1).fee_paid, 0);
+    assert_eq!(env.c(1).refunded_amount, 100);
 }

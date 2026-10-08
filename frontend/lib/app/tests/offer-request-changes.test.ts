@@ -36,16 +36,10 @@ test("PendingAcceptance freelancer can enter Request changes negotiation without
     /\?chat=1#messages/
   );
 
-  // UX must explicitly say this does not mutate the funded offer.
-  assert.match(
-    detail,
-    /On-chain terms stay unchanged/
-  );
-
-  assert.match(
-    detail,
-    /does not accept, decline, cancel, or move escrow funds/
-  );
+  assert.match(detail, /OFFER_REVISION_COPY\.requestChangesNote/);
+  const revision = read("lib/app/offer-revision.ts");
+  assert.match(revision, /On-chain terms stay unchanged/);
+  assert.match(revision, /does not accept, decline, cancel, or move escrow funds/);
 });
 
 test("Request changes remains off-chain and uses the existing message notification path", () => {

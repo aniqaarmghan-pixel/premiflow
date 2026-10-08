@@ -447,6 +447,12 @@ const ACTION_COPY: Record<
     consequence:
       "After accept, the contract typically waits for employer activation (and any trial path). Main work/session rules still apply afterward.",
   },
+  cancelPendingOffer: {
+    explanation:
+      "Cancels a funded offer before the freelancer accepts. Does not change terms in place.",
+    consequence:
+      "The offer becomes Cancelled and refundable. Create a replacement offer with a new contract id after claiming the refund.",
+  },
   declineContract: {
     explanation: "Decline this offer if you will not take the job.",
     consequence: "The offer closes. The employer can later claim the unused refund.",

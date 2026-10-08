@@ -198,7 +198,7 @@ export function actionsSectionGuidance(input: {
     return "Review the offer, then accept or decline before the acceptance deadline.";
   }
   if (status === "PendingAcceptance" && role === "employer") {
-    return "Waiting for the freelancer to accept or decline this offer.";
+    return "Waiting for the freelancer to accept, decline, or request changes. You can Cancel & Revise to return funds and send a replacement offer ? the funded terms are not changed in place.";
   }
 
   if (status === "Active" && (paymentMode === "Fixed" || paymentMode === "Milestone")) {
@@ -494,6 +494,7 @@ export function contractActionVariant(
     action === "completeContract" ||
     action === "endHourlyContract" ||
     action === "expireAcceptance" ||
+    action === "cancelPendingOffer" ||
     action === "expireActivation"
   ) {
     return "secondary";
@@ -744,6 +745,8 @@ export function actionLabel(
       return "Decline offer";
     case "expireAcceptance":
       return "Expire offer";
+    case "cancelPendingOffer":
+      return "Cancel & Revise";
     case "expireActivation":
       return "End expired activation";
     case "approveActivation":
@@ -811,6 +814,7 @@ export function confirmTitle(
   if (action === "settleTrialAndEnd") return "Pay trial & don't continue?";
   if (action === "finalizeTrialReviewTimeout") return "Finalize expired trial review?";
   if (action === "expireAcceptance") return "Expire offer?";
+  if (action === "cancelPendingOffer") return "Cancel & Revise?";
   if (action === "expireActivation") return "End expired activation?";
   if (action === "declineContract") return "Decline offer?";
   if (action === "rejectActivation") return `${actionLabel(action, context)}?`;
@@ -830,6 +834,8 @@ export function clientMethodForAction(action: UiAction): string {
       return "declineContract";
     case "expireAcceptance":
       return "expireAcceptance";
+    case "cancelPendingOffer":
+      return "cancelPendingOffer";
     case "expireActivation":
       return "expireActivation";
     case "approveActivation":
@@ -895,6 +901,7 @@ export function isEconomicAction(action: UiAction): boolean {
     action === "finalizeReviewTimeout" ||
     action === "declineContract" ||
     action === "expireAcceptance" ||
+    action === "cancelPendingOffer" ||
     action === "expireActivation" ||
     action === "rejectActivation" ||
     action === "stopHourlySession" ||

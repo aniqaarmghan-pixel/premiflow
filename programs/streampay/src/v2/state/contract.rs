@@ -581,17 +581,20 @@ impl Contract {
 
     /// Peaceful pre-acceptance exit. Nothing is earned.
     ///
-    /// Used by freelancer `decline_contract` (`Declined`) and permissionless
-    /// `expire_acceptance` (`Expired`, including funded Milestone `Draft`).
+    /// Used by freelancer `decline_contract` (`Declined`), permissionless
+    /// `expire_acceptance` (`Expired`, including funded Milestone `Draft`), and
+    /// employer `cancel_pending_offer` (`Cancelled`, PendingAcceptance only).
     /// No stream materialization. No activation timing. Trial, if present,
-    /// stays Defined.
+    /// stays Defined. Offer terms are never mutated in place.
     pub fn settle_unaccepted_offer(
         &mut self,
         now: i64,
         terminal: ContractStatus,
     ) -> Result<(u64, u64)> {
         require!(
-            terminal == ContractStatus::Declined || terminal == ContractStatus::Expired,
+            terminal == ContractStatus::Declined
+                || terminal == ContractStatus::Expired
+                || terminal == ContractStatus::Cancelled,
             StreamPayV2Error::InvalidState
         );
         match self.status {

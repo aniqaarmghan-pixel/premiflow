@@ -35,6 +35,7 @@ import {
   validateResolverSettlement,
 } from "@/lib/app/resolver-cases";
 import { StatusBadge } from "@/components/contracts/StatusBadge";
+import { useRouter } from "next/navigation";
 import { ContractMessages } from "@/components/contracts/ContractMessages";
 import { ContractReviewForm } from "@/components/marketplace/MarketplaceContractLinks";
 import { HourlyShowcase } from "@/components/contracts/HourlyShowcase";
@@ -107,6 +108,20 @@ import {
   trialEmployerDecisions,
 } from "@/lib/app/trial-exit";
 import { OFFER_EXIT_COPY, expireOfferConfirmation } from "@/lib/app/offer-exit";
+import {
+  OFFER_REVISION_COPY,
+  isOfferChangesRequested,
+  markOfferChangesRequested,
+  clearOfferChangesRequested,
+  saveReviseHandoff,
+  draftFromCancelledOffer,
+  isOfferRevisedLabel,
+  presentOfferTerminalLabel,
+  markOfferRevised,
+} from "@/lib/app/offer-revision";
+import { CREATE_SCOPE, browserStorage, createIntentExists } from "@/lib/app/marketplace-create-handoff";
+import { defaultCreateDraft } from "@/lib/app/validation";
+
 import {
   ACTIVATION_EXIT_COPY,
   expireActivationConfirmation,
@@ -210,6 +225,8 @@ const TRIAL_ACTIONS: UiAction[] = [
 ];
 
 export function ContractDetail({ address }: { address: string }) {
+  const router = useRouter();
+
   const { publicKey, signMessage } = useWallet();
   const wallet = useAnchorWallet();
   const { connection } = useConnection();
@@ -756,6 +773,8 @@ export function ContractDetail({ address }: { address: string }) {
           return client.declineContract(contract.address);
         case "expireAcceptance":
           return client.expireAcceptance(contract.address);
+        case "cancelPendingOffer":
+          return client.cancelPendingOffer(contract.address);
         case "expireActivation":
           return client.expireActivation(contract.address);
         case "approveActivation":
@@ -917,6 +936,50 @@ export function ContractDetail({ address }: { address: string }) {
       const lifecycleKind = lifecycleNotificationForAction(action);
       if (lifecycleKind) {
         void requestOfferLifecycleNotification(contract.address.toBase58(), lifecycleKind);
+      }
+      if (action === "cancelPendingOffer") {
+        // Cancel succeeded. Claim full principal + unearned fee reserve, then
+        // open Create prefilled. Never proceed to create if claim fails; never
+        // revive the cancelled offer.
+        try {
+          await client.claimEmployerRefund({ contract: contract.address });
+        } catch (claimErr) {
+          console.warn("cancelPendingOffer claim refund failed", claimErr);
+          await load();
+          await refreshList();
+          return;
+        }
+        const addr = contract.address.toBase58();
+        clearOfferChangesRequested(browserStorage(), CREATE_SCOPE, addr);
+        if (createIntentExists(contract.employer.toBase58())) {
+          // Leave cancelled/refundable; do not stash a competing create.
+          await load();
+          await refreshList();
+          router.push("/create");
+          return;
+        }
+        const draft = draftFromCancelledOffer({
+          contract,
+          base: defaultCreateDraft(),
+          title: metadata?.title || "Protected contract",
+          description: metadata?.description || "",
+          totalAmountUi: formatTokenAmount(contract.totalAmount, decimals),
+          trialAmountUi:
+            contract.trialAmount > 0n
+              ? formatTokenAmount(contract.trialAmount, decimals)
+              : "0",
+        });
+        saveReviseHandoff(
+          browserStorage(),
+          CREATE_SCOPE,
+          contract.employer.toBase58(),
+          addr,
+          draft
+        );
+        await load();
+        await refreshList();
+        router.push("/create");
+        return;
       }
       if (action === "openDispute") {
         // Best-effort resolver inbox notification; the server re-reads chain facts and dedupes.
@@ -1081,7 +1144,14 @@ export function ContractDetail({ address }: { address: string }) {
             label={
               isStreamEnded(contract, now)
                 ? STREAMING_ENDED_LABEL
-                : presentStatus(contract.status)
+                : presentOfferTerminalLabel({
+                    status: presentStatus(contract.status),
+                    revised: isOfferRevisedLabel(
+                      browserStorage(),
+                      CREATE_SCOPE,
+                      contract.address.toBase58()
+                    ),
+                  })
             }
           />
         </header>
@@ -1430,7 +1500,7 @@ export function ContractDetail({ address }: { address: string }) {
           <PaymentProgress contract={contract} decimals={decimals} role={role} />
         </div>
 
-        {actions.includes("acceptContract") ? (
+                {actions.includes("acceptContract") ? (
           <section
             data-testid="offer-request-changes"
             className="rounded-2xl border border-line bg-surface p-4 sm:p-5 lg:p-4"
@@ -1438,29 +1508,63 @@ export function ContractDetail({ address }: { address: string }) {
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div className="max-w-2xl">
                 <p className="text-sm font-semibold text-ink">
-                  Need different terms before accepting?
+                  {OFFER_REVISION_COPY.requestChangesTitle}
                 </p>
-
                 <p className="mt-1 text-sm leading-6 text-ink-soft">
-                  Request changes in the contract chat before accepting the offer.
-                  Tell the employer exactly what should change, such as the amount,
-                  schedule, milestones, review window, or other terms.
+                  {OFFER_REVISION_COPY.requestChangesBody}
                 </p>
-
                 <p className="mt-2 text-xs leading-5 text-ink-faint">
-                  This is a negotiation message only. On-chain terms stay unchanged
-                  until the employer creates or reissues an updated offer. Requesting
-                  changes does not accept, decline, cancel, or move escrow funds.
+                  {OFFER_REVISION_COPY.requestChangesNote}
                 </p>
+                {isOfferChangesRequested(
+                  browserStorage(),
+                  CREATE_SCOPE,
+                  contract.address.toBase58()
+                ) ? (
+                  <p
+                    className="mt-2 text-sm font-medium text-ink"
+                    data-testid="offer-awaiting-revision"
+                  >
+                    {OFFER_REVISION_COPY.awaitingEmployerRevision}
+                  </p>
+                ) : null}
               </div>
-
               <a
                 href={`/contracts/${contract.address.toBase58()}?chat=1#messages`}
+                onClick={() =>
+                  markOfferChangesRequested(
+                    browserStorage(),
+                    CREATE_SCOPE,
+                    contract.address.toBase58()
+                  )
+                }
                 className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-line px-4 py-2 text-sm font-semibold text-ink transition hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 Request changes
               </a>
             </div>
+          </section>
+        ) : null}
+
+        {contract.status === "PendingAcceptance" &&
+        role === "employer" &&
+        isOfferChangesRequested(
+          browserStorage(),
+          CREATE_SCOPE,
+          contract.address.toBase58()
+        ) ? (
+          <section
+            data-testid="offer-changes-requested"
+            className="rounded-2xl border border-line bg-surface p-4 sm:p-5 lg:p-4"
+          >
+            <p className="text-sm font-semibold text-ink">Changes requested</p>
+            <p className="mt-1 text-sm leading-6 text-ink-soft">
+              {OFFER_REVISION_COPY.changesRequestedEmployer}
+            </p>
+            <p className="mt-2 text-xs leading-5 text-ink-faint">
+              The funded offer on-chain is unchanged. Review chat, then use Cancel &amp; Revise
+              when you are ready to return funds and send a replacement offer.
+            </p>
           </section>
         ) : null}
 
@@ -1959,6 +2063,18 @@ function ConfirmBody({
       </div>
     );
   }
+  if (action === "cancelPendingOffer") {
+    return (
+      <div className="space-y-2 text-sm leading-6 text-ink-soft">
+        <p>{OFFER_REVISION_COPY.cancelReviseTitle}</p>
+        <p>{OFFER_REVISION_COPY.cancelReviseLead}</p>
+        <p>{OFFER_REVISION_COPY.cancelReviseFunds}</p>
+        <p>{OFFER_REVISION_COPY.cancelReviseNoDispute}</p>
+        <p>{OFFER_REVISION_COPY.cancelReviseNewOffer}</p>
+      </div>
+    );
+  }
+
   if (action === "declineContract") {
     return (
       <div className="space-y-3 text-sm leading-6 text-ink-soft">

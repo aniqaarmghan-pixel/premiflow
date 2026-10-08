@@ -23,6 +23,7 @@ export type UiAction =
   | "acceptContract"
   | "declineContract"
   | "expireAcceptance"
+  | "cancelPendingOffer"
   | "expireActivation"
   | "approveActivation"
   | "rejectActivation"
@@ -62,6 +63,7 @@ const LIFECYCLE_ACTIONS: readonly UiAction[] = [
   "acceptContract",
   "declineContract",
   "expireAcceptance",
+  "cancelPendingOffer",
   "expireActivation",
   "approveActivation",
   "rejectActivation",
@@ -106,6 +108,14 @@ export function availableActions(input: ActionAvailabilityInput): UiAction[] {
       actions.add("acceptContract");
     }
     actions.add("declineContract");
+  }
+
+  if (
+    contract.status === "PendingAcceptance" &&
+    role === "employer" &&
+    contract.acceptedAt === 0
+  ) {
+    actions.add("cancelPendingOffer");
   }
 
   if (

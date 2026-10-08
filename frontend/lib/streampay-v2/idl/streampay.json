@@ -510,6 +510,68 @@
       "args": []
     },
     {
+      "name": "cancel_pending_offer",
+      "docs": [
+        "Employer cancels a funded PendingAcceptance offer before acceptance.",
+        "Freezes a full employer refund. No SPL transfer. Not a dispute."
+      ],
+      "discriminator": [
+        4,
+        197,
+        38,
+        28,
+        114,
+        185,
+        246,
+        140
+      ],
+      "accounts": [
+        {
+          "name": "employer",
+          "signer": true,
+          "relations": [
+            "contract"
+          ]
+        },
+        {
+          "name": "contract",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  116,
+                  114,
+                  97,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "employer"
+              },
+              {
+                "kind": "account",
+                "path": "contract.freelancer",
+                "account": "Contract"
+              },
+              {
+                "kind": "account",
+                "path": "contract.contract_id",
+                "account": "Contract"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "cancel_stream",
       "discriminator": [
         218,
@@ -4017,6 +4079,19 @@
       ]
     },
     {
+      "name": "PendingOfferCancelled",
+      "discriminator": [
+        85,
+        86,
+        169,
+        142,
+        55,
+        52,
+        237,
+        187
+      ]
+    },
+    {
       "name": "PlatformFeePaid",
       "discriminator": [
         54,
@@ -5151,10 +5226,10 @@
               "were taken from it.",
               "",
               "Phase 7 layout: two u64 settlement fields after `stream_released_amount`;",
-              "reserved 84 → 68. Phase 9 consumed 49 more bytes for `resolver` (32),",
+              "reserved 84 \u2192 68. Phase 9 consumed 49 more bytes for `resolver` (32),",
               "`contested_amount` (8), `disputed_at` (8) and `dispute_initiator` (1);",
-              "reserved 68 → 19. Platform fee consumed 18 more for `fee_bps` (2),",
-              "`fee_reserve` (8) and `fee_paid` (8); reserved 19 → 1. Legacy",
+              "reserved 68 \u2192 19. Platform fee consumed 18 more for `fee_bps` (2),",
+              "`fee_reserve` (8) and `fee_paid` (8); reserved 19 \u2192 1. Legacy",
               "accounts read these as zero (no fee). `INIT_SPACE` remains 621.",
               "Freelancer platform fee frozen at creation, in units of 10 bps",
               "(30 = 3%). Occupies the former last reserved byte, so every",
@@ -5456,25 +5531,57 @@
       }
     },
     {
+      "name": "PendingOfferCancelled",
+      "docs": [
+        "Employer cancelled a funded PendingAcceptance offer before acceptance.",
+        "No SPL transfer. Full principal is employer-refundable."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "cancelled_at",
+            "type": "i64"
+          },
+          {
+            "name": "employer_refundable",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
       "name": "ContractStatus",
       "docs": [
         "Authoritative contract lifecycle state.",
         "",
-        "Borsh unit-enum discriminants, old → new (V2 was never deployed):",
+        "Borsh unit-enum discriminants, old \u2192 new (V2 was never deployed):",
         "",
         "| variant                  | old | new |",
         "|--------------------------|-----|-----|",
         "| Draft                    | 0   | 0   |",
         "| PendingAcceptance        | 1   | 1   |",
-        "| PendingEmployerApproval  | —   | 2   |",
+        "| PendingEmployerApproval  | \u2014   | 2   |",
         "| Active                   | 2   | 3   |",
         "| Completed                | 3   | 4   |",
         "| Declined                 | 4   | 5   |",
         "| Expired                  | 5   | 6   |",
         "| Cancelled                | 6   | 7   |",
-        "| ActivationRejected       | —   | 8   |",
-        "| Disputed                 | —   | 9   |",
-        "| Resolved                 | —   | 10  |",
+        "| ActivationRejected       | \u2014   | 8   |",
+        "| Disputed                 | \u2014   | 9   |",
+        "| Resolved                 | \u2014   | 10  |",
         "",
         "`PendingEmployerApproval` is the employer-approval gate: the freelancer has",
         "accepted, the main stream has not started. `ActivationRejected` is the",

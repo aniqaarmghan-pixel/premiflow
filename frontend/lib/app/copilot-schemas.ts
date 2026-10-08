@@ -12,6 +12,7 @@ export const COPILOT_ACTION_IDS = [
   "finalizeTerms",
   "acceptContract",
   "declineContract",
+  "cancelPendingOffer",
   "expireAcceptance",
   "expireActivation",
   "approveActivation",

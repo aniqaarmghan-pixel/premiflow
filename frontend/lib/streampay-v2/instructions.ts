@@ -510,6 +510,15 @@ export class StreamPayV2Client {
     return txResult({ signature, contract });
   }
 
+  async cancelPendingOffer(contract: PublicKey): Promise<TransactionResult> {
+    const employer = connectedWallet(this.program);
+    const signature = await sendV2Method(this.program, this.program.methods
+      .cancelPendingOffer()
+      .accountsPartial({ employer, contract })
+    );
+    return txResult({ signature, contract });
+  }
+
   async expireActivation(contract: PublicKey): Promise<TransactionResult> {
     const caller = connectedWallet(this.program);
     const fetched = await fetchContract(this.program, contract);

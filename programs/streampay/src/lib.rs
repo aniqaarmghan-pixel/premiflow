@@ -283,6 +283,12 @@ Ok(())
         v2::instructions::decline_contract::handle_decline_contract(ctx)
     }
 
+    /// Employer cancels a funded PendingAcceptance offer before acceptance.
+    /// Freezes a full employer refund. No SPL transfer. Not a dispute.
+    pub fn cancel_pending_offer(ctx: Context<CancelPendingOffer>) -> Result<()> {
+        v2::instructions::cancel_pending_offer::handle_cancel_pending_offer(ctx)
+    }
+
     /// Permissionless close of a lapsed funded offer. No SPL transfer.
     pub fn expire_acceptance(ctx: Context<ExpireAcceptance>) -> Result<()> {
         v2::instructions::expire_acceptance::handle_expire_acceptance(ctx)

@@ -516,6 +516,59 @@ export type Streampay = {
       "args": []
     },
     {
+      "name": "cancelPendingOffer",
+      "docs": [
+        "Employer cancels a funded PendingAcceptance offer before acceptance.",
+        "Freezes a full employer refund. No SPL transfer. Not a dispute."
+      ],
+      "discriminator": [4, 197, 38, 28, 114, 185, 246, 140],
+      "accounts": [
+        {
+          "name": "employer",
+          "signer": true,
+          "relations": [
+            "contract"
+          ]
+        },
+        {
+          "name": "contract",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  111,
+                  110,
+                  116,
+                  114,
+                  97,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "employer"
+              },
+              {
+                "kind": "account",
+                "path": "contract.freelancer",
+                "account": "contract"
+              },
+              {
+                "kind": "account",
+                "path": "contract.contractId",
+                "account": "contract"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "cancelStream",
       "discriminator": [
         218,
@@ -3880,6 +3933,11 @@ export type Streampay = {
       ]
     },
     {
+      "name": "pendingOfferCancelled",
+      "discriminator": [85, 86, 169, 142, 55, 52, 237, 187]
+    },
+
+    {
       "name": "disputeOpened",
       "discriminator": [
         239,
@@ -5452,6 +5510,38 @@ export type Streampay = {
           },
           {
             "name": "expiredAt",
+            "type": "i64"
+          },
+          {
+            "name": "employerRefundable",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "pendingOfferCancelled",
+      "docs": [
+        "Employer cancelled a funded PendingAcceptance offer before acceptance.",
+        "No SPL transfer. Full principal is employer-refundable."
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "contract",
+            "type": "pubkey"
+          },
+          {
+            "name": "employer",
+            "type": "pubkey"
+          },
+          {
+            "name": "freelancer",
+            "type": "pubkey"
+          },
+          {
+            "name": "cancelledAt",
             "type": "i64"
           },
           {

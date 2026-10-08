@@ -363,6 +363,23 @@ impl Env {
         self.send(ix, signer)
     }
 
+    fn cancel_pending(&mut self, contract_id: u64) -> TransactionResult {
+        self.cancel_pending_as(&clone_kp(&self.employer), self.contract_pda(contract_id))
+    }
+
+    fn cancel_pending_as(&mut self, signer: &Keypair, contract: Address) -> TransactionResult {
+        let ix = Instruction {
+            program_id: self.program_id,
+            accounts: streampay_program::accounts::CancelPendingOffer {
+                employer: signer.pubkey(),
+                contract,
+            }
+            .to_account_metas(None),
+            data: streampay_program::instruction::CancelPendingOffer {}.data(),
+        };
+        self.send(ix, signer)
+    }
+
     fn expire(&mut self, contract_id: u64) -> TransactionResult {
         self.expire_as(&clone_kp(&self.stranger), self.contract_pda(contract_id))
     }
@@ -916,4 +933,58 @@ fn expire_rejected_from_started_and_terminal_states() {
     env.decline(6).unwrap();
     env.warp(env.now() + 3_600);
     assert_rejected(env.expire(6), E_INVALID_STATE, "already declined");
+}
+
+#[test]
+fn cancel_pending_offer_freezes_full_employer_refund() {
+    let mut env = setup(TOTAL_AMOUNT);
+    env.create(&fixed_args(&env, 1)).unwrap();
+    env.cancel_pending(1).unwrap();
+    assert_t3_freeze(&env, 1, ContractStatus::Cancelled, TOTAL_AMOUNT);
+    // Terms frozen; acceptance must stay impossible.
+    assert_rejected(env.accept(1), E_INVALID_STATE, "accept after cancel");
+    claim_full_refund(&mut env, 1, TOTAL_AMOUNT);
+}
+
+#[test]
+fn cancel_pending_offer_guards_signer_state_and_duplicate() {
+    let mut env = setup(TOTAL_AMOUNT * 3);
+    env.create(&fixed_args(&env, 1)).unwrap();
+    assert_rejected(
+        env.cancel_pending_as(&clone_kp(&env.freelancer), env.contract_pda(1)),
+        E_CONSTRAINT_SEEDS,
+        "freelancer cannot cancel pending",
+    );
+    assert_rejected(
+        env.cancel_pending_as(&clone_kp(&env.stranger), env.contract_pda(1)),
+        E_CONSTRAINT_SEEDS,
+        "third party cannot cancel pending",
+    );
+    env.cancel_pending(1).unwrap();
+    env.svm.expire_blockhash();
+    assert_rejected(env.cancel_pending(1), E_INVALID_STATE, "duplicate cancel");
+    assert_rejected(env.decline(1), E_INVALID_STATE, "decline after cancel");
+
+    env.create(&fixed_args(&env, 2)).unwrap();
+    env.accept(2).unwrap();
+    assert_rejected(env.cancel_pending(2), E_INVALID_STATE, "cancel after accept");
+
+    env.create(&fixed_args(&env, 3)).unwrap();
+    env.decline(3).unwrap();
+    assert_rejected(env.cancel_pending(3), E_INVALID_STATE, "cancel after decline");
+}
+
+#[test]
+fn cancel_pending_streaming_and_hourly_never_start() {
+    let mut env = setup(TOTAL_AMOUNT + hourly_main() + TRIAL_AMOUNT);
+    env.create(&streaming_args(&env, 1)).unwrap();
+    env.cancel_pending(1).unwrap();
+    assert_t3_freeze(&env, 1, ContractStatus::Cancelled, TOTAL_AMOUNT);
+    env.warp(env.now() + 10_000);
+    assert_rejected(env.release_stream(1), E_INVALID_STATE, "stream after cancel");
+
+    env.create_hourly(&hourly_args(&env, 2)).unwrap();
+    env.cancel_pending(2).unwrap();
+    assert_t3_freeze(&env, 2, ContractStatus::Cancelled, hourly_main() + TRIAL_AMOUNT);
+    assert_rejected(env.start_hourly(2), E_INVALID_STATE, "hourly after cancel");
 }
