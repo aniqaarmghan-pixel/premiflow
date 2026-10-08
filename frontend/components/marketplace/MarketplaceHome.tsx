@@ -19,6 +19,7 @@ import { Aurora } from "@/components/site/Aurora";
 import { CategoryArt } from "@/components/site/CategoryArt";
 import { Reveal } from "@/components/site/Reveal";
 
+import { MarketplaceExplainerSection } from "./MarketplaceExplainerSection";
 import { MarketplaceHeroVideo } from "./MarketplaceHeroVideo";
 import {
   EmptyState,
@@ -307,7 +308,7 @@ export function MarketplaceHome() {
                 <Reveal key={c.slug} delay={Math.min(i, 7) * 60}>
                   <Link
                     href={searchPageHref({ category: c.slug })}
-                    className="pf-card group relative flex aspect-[4/3] min-w-0 flex-col justify-end overflow-hidden rounded-[22px] border border-line p-4 shadow-[var(--shadow)] sm:p-5"
+                    className="pf-card pf-glow-card group relative flex aspect-[4/3] min-w-0 flex-col justify-end overflow-hidden rounded-[22px] border border-line p-4 shadow-[var(--shadow)] sm:p-5"
                   >
                     <CategoryArt slug={c.slug} className="pf-zoom absolute inset-0 h-full w-full" />
                     <span aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(180deg,transparent_35%,rgba(4,10,20,.7))]" />
@@ -553,6 +554,8 @@ export function MarketplaceHome() {
           </Reveal>
         </Container>
       </section>
+
+      <MarketplaceExplainerSection />
 
       {/* Dark: how it works with the animated flow */}
       <section id="how-it-works" className="pf-midnight relative scroll-mt-20 overflow-hidden py-16 sm:py-24" aria-labelledby="pf-how">

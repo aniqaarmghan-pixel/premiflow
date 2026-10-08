@@ -537,18 +537,21 @@ export function GigSummaryCard({
             referrerPolicy="no-referrer"
             className="pf-zoom absolute inset-0 h-full w-full object-cover"
           />
-        ) : seller?.avatarUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={seller.avatarUrl}
-            alt=""
-            loading="lazy"
-            decoding="async"
-            referrerPolicy="no-referrer"
-            className="pf-zoom h-16 w-16 rounded-full border-2 border-white/70 object-cover shadow-lg sm:h-20 sm:w-20"
-          />
         ) : (
-          <CategoryArt slug={primary} className="pf-zoom absolute inset-0 h-full w-full" />
+          <>
+            <CategoryArt slug={primary} className="pf-zoom absolute inset-0 h-full w-full" />
+            {seller?.avatarUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={seller.avatarUrl}
+                alt=""
+                loading="lazy"
+                decoding="async"
+                referrerPolicy="no-referrer"
+                className="absolute bottom-3 right-3 h-11 w-11 rounded-full border-2 border-white/80 object-cover shadow-lg sm:h-12 sm:w-12"
+              />
+            ) : null}
+          </>
         )}
         <span
           aria-hidden="true"

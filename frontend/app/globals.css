@@ -512,6 +512,34 @@ body {
   transform: scale(1.06);
 }
 
+/* Soft category/media glow on hover (tasteful, reduced-motion safe). */
+.pf-glow-card {
+  isolation: isolate;
+}
+.pf-glow-card::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 320ms var(--ease-out-soft, ease);
+  box-shadow:
+    0 0 0 1px rgba(46, 230, 214, 0.35),
+    0 18px 48px -20px rgba(46, 230, 214, 0.55);
+  z-index: 2;
+}
+.pf-glow-card:hover::after,
+.pf-glow-card:focus-within::after {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-glow-card::after {
+    transition: none;
+  }
+}
+
+
 /* Chips: hover, focus and selected states. */
 .pf-chip {
   transition:

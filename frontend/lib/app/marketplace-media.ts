@@ -50,3 +50,22 @@ export { parseGigVideo, type GigVideo } from "./video-embed";
 export function playableVideoUrl(value: unknown): string | null {
   return normalizeGigVideoUrl(value);
 }
+
+/**
+ * Optional landing explainer video (modal). Null = thumbnail + placeholder
+ * modal with PREMIFLOW product points (no fabricated stock footage).
+ * Point at a self-hosted "/media/explainer.mp4" or https URL when ready.
+ */
+export type ExplainerVideoConfig = {
+  src: string;
+  poster?: string;
+  type?: string;
+};
+
+export const MARKETPLACE_EXPLAINER_VIDEO: ExplainerVideoConfig | null = null;
+
+export function resolveExplainerVideo(
+  config: ExplainerVideoConfig | null
+): ExplainerVideoConfig | null {
+  return resolveHeroVideo(config);
+}
