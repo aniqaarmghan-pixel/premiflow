@@ -10,6 +10,7 @@ const COLUMNS = [
       { href: "/marketplace/gigs", label: "Gigs" },
       { href: "/marketplace/freelancers", label: "Freelancers" },
       { href: "/marketplace/search", label: "Search" },
+      { href: "/#categories", label: "Categories" },
     ],
   },
   {

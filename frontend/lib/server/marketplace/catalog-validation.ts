@@ -6,6 +6,7 @@ import { PublicKey } from "@solana/web3.js";
 
 import {
   isCategorySlug,
+  normalizeCategorySlug,
   matchesCategory,
   type MarketplaceCategorySlug,
 } from "@/lib/app/marketplace-categories";
@@ -132,8 +133,9 @@ export function parsePackages(value: unknown): GigPackage[] {
 /** Optional listing category: empty/null means "derive from keywords". */
 export function parseCategory(value: unknown): MarketplaceCategorySlug | null {
   if (value === undefined || value === null || value === "") return null;
-  if (!isCategorySlug(value)) throw invalid("Choose a category from the list.");
-  return value;
+  const normalized = normalizeCategorySlug(value);
+  if (!normalized) throw invalid("Choose a category from the list.");
+  return normalized;
 }
 
 const SKILL_MAX = 32;

@@ -38,6 +38,7 @@ import type { MarketplaceApiError } from "@/lib/app/marketplace-client";
 import { Field, Input, Select } from "@/components/ui/Field";
 import {
   MARKETPLACE_CATEGORIES,
+  coverSeedFromTitle,
   type MarketplaceCategorySlug,
 } from "@/lib/app/marketplace-categories";
 import type {
@@ -239,7 +240,7 @@ export function JobSummaryCard({
       />
       <div className="flex min-w-0 items-start gap-3">
         <span className="hidden size-12 shrink-0 overflow-hidden rounded-2xl sm:block">
-          <CategoryArt slug={jobCategory(job) ?? "none"} className="pf-zoom block h-full w-full" />
+          <CategoryArt slug={jobCategory(job) ?? "none"} seed={coverSeedFromTitle(job.title)} className="pf-zoom block h-full w-full" />
         </span>
       <div className="flex min-w-0 flex-1 flex-wrap items-start justify-between gap-2">
         <Link
@@ -494,6 +495,12 @@ const COVER_GRADIENTS: Record<MarketplaceCategorySlug | "none", string> = {
   marketing: "bg-[linear-gradient(135deg,#0f3d2e,#1f8a70_55%,#bfdb38)]",
   writing: "bg-[linear-gradient(135deg,#2d2a32,#5c5470_55%,#dbd8e3)]",
   business: "bg-[linear-gradient(135deg,#1d2b3a,#3c6e71_55%,#d9d9d9)]",
+  data: "bg-[linear-gradient(135deg,#071820,#0e4d6e_55%,#5ec8ff)]",
+  finance: "bg-[linear-gradient(135deg,#0c1a12,#1a5c3a_55%,#7dcea0)]",
+  support: "bg-[linear-gradient(135deg,#1a1020,#5a2d7a_55%,#e0aaff)]",
+  admin: "bg-[linear-gradient(135deg,#141820,#3d4f66_55%,#a8b8cc)]",
+  engineering: "bg-[linear-gradient(135deg,#1a1208,#6b4a1e_55%,#e0b068)]",
+  legal: "bg-[linear-gradient(135deg,#101418,#2c3e50_55%,#85929e)]",
   none: "bg-[linear-gradient(135deg,#07111f,#13315c_55%,#4f8cff)]",
 };
 
@@ -539,7 +546,7 @@ export function GigSummaryCard({
           />
         ) : (
           <>
-            <CategoryArt slug={primary} className="pf-zoom absolute inset-0 h-full w-full" />
+            <CategoryArt slug={primary} seed={coverSeedFromTitle(gig.title)} className="pf-zoom absolute inset-0 h-full w-full" />
             {seller?.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img

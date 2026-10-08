@@ -12,6 +12,7 @@ import {
 } from "@/lib/app/validation";
 import {
   MARKETPLACE_CATEGORIES,
+  normalizeCategorySlug,
   categorizeText,
   type MarketplaceCategorySlug,
 } from "@/lib/app/marketplace-categories";
@@ -239,7 +240,7 @@ export function searchFormFromParams(
     mode: MODES.includes(mode) ? (mode as SearchFormState["mode"]) : "",
     minUi: toUi(params.get("min")),
     maxUi: toUi(params.get("max")),
-    category: isCategory(category) ? category : "",
+    category: normalizeCategorySlug(category) ?? "",
     sort: SORTS.includes(sort) ? (sort as MarketplaceSort) : "newest",
   };
 }
@@ -294,10 +295,11 @@ export const DELIVERY_TERMS: Record<PublicJob["paymentMode"], string> = {
 
 export const HOW_IT_WORKS = [
   { title: "Discover", body: "Search jobs, gigs and freelancer profiles by skill, category and budget." },
-  { title: "Agree", body: "Pick a proposal or a gig. The terms prefill Create contract for you to review." },
-  { title: "Escrow", body: "The employer creates and funds the contract on-chain from their own wallet." },
-  { title: "Deliver", body: "The freelancer submits work against the contract's milestones, hours or stream." },
-  { title: "Get paid", body: "Approved work is released from escrow to the freelancer's wallet." },
+  { title: "Agree", body: "Pick a proposal or a gig. Terms prefill Create contract for both sides to review." },
+  { title: "Fund escrow", body: "The employer creates and funds the contract on-chain from their own wallet." },
+  { title: "Deliver", body: "The freelancer submits work against milestones, hours or the stream schedule." },
+  { title: "Review & release", body: "Approved work is released from escrow to the freelancer's wallet." },
+  { title: "Resolve if needed", body: "Disputes use structured evidence and a human resolver. AI may summarize; it never decides." },
 ] as const;
 
 export const TRUST_POINTS = [
