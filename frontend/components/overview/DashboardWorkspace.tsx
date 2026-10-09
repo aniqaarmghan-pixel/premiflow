@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { useState, type ReactNode } from "react";
-import { Award, Bell, ChevronRight, Compass, FilePlus2, Megaphone, RefreshCw, Sparkles, Store } from "lucide-react";
+import { Award, Bell, ChevronRight, FilePlus2, Megaphone, RefreshCw, Sparkles, Store } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import {
   DASHBOARD_WORKSPACE_HREFS,
@@ -320,9 +320,11 @@ export function ActivityPanel() {
   );
 }
 
-/** Command-center quick actions; Explore Marketplace always comes first. */
+/**
+ * Command-center quick actions. Explore Marketplace lives once in the sidebar /
+ * drawer (and mobile bottom nav), so it is not repeated here.
+ */
 export const QUICK_ACTIONS = [
-  { href: "/", label: "Explore Marketplace", icon: Compass },
   { href: "/marketplace/post", label: "Post Job", icon: Megaphone },
   { href: "/marketplace/gigs/new", label: "Offer Gig", icon: Sparkles },
   { href: "/create", label: "Create Protected Contract", icon: FilePlus2 },

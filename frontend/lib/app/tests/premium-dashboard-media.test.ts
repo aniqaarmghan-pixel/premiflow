@@ -212,8 +212,9 @@ test("dashboard renders the command center from real hooks only", () => {
   }
   const ws = read("components/overview/DashboardWorkspace.tsx");
   const quick = ws.slice(ws.indexOf("export const QUICK_ACTIONS"));
-  assert.match(quick, /\{ href: "\/", label: "Explore Marketplace"/);
-  assert.ok(quick.indexOf("Explore Marketplace") < quick.indexOf("Post Job"));
+  // Explore Marketplace appears once (sidebar / drawer), not again in quick actions.
+  assert.doesNotMatch(quick.slice(0, quick.indexOf("] as const")), /Explore Marketplace/);
+  assert.ok(quick.indexOf("Post Job") < quick.indexOf("Offer Gig"));
   assert.ok(quick.indexOf("Offer Gig") < quick.indexOf("Create Protected Contract"));
   const visuals = read("components/overview/DashboardVisuals.tsx");
   assert.match(visuals, /useReducedMotion/);

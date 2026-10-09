@@ -2,7 +2,7 @@
  * Off-chain marketplace helpers. Escrow is still created only by the existing
  * on-chain Create flow, signed by the employer; nothing here sends a transaction.
  */
-import { lockedCreatePayment } from "@/lib/app/premiflow";
+import { isDevnetTestAsset, lockedCreatePayment } from "@/lib/app/premiflow";
 import { DEMO_TOKEN_LABEL } from "@/lib/app/marketplace-demo";
 import { uiAmountToBaseUnits } from "@/lib/streampay-v2";
 import {
@@ -102,10 +102,53 @@ export function amountLabel(mode: PublicJob["paymentMode"]): string {
   return mode === "Hourly" ? "Hourly rate" : "Budget";
 }
 
-/** `demo`: display-only short Devnet label for seeded demo cards; mint and decimals are unchanged. */
+/**
+ * True when marketplace prices use the $-style display: the locked payment
+ * token is the Devnet test asset (Demo USDT). Display only; pair with a small
+ * "Devnet test asset" note. Mint, decimals and base-unit math are unchanged.
+ */
+export function marketplaceUsesDollarDisplay(): boolean {
+  return isDevnetTestAsset(lockedCreatePayment().mint);
+}
+
+function dollarStyle(ui: string): string {
+  if (!ui) return "$0";
+  const [whole, fraction = ""] = ui.split(".");
+  const grouped = whole.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  if (!fraction) return `$${grouped}`;
+  return `$${grouped}.${fraction.length < 2 ? fraction.padEnd(2, "0") : fraction}`;
+}
+
+/**
+ * Marketplace price display. Devnet test asset: "$600" / "$1,250.50" (never
+ * real USD; show the Devnet test asset note nearby). Other tokens keep
+ * "600 TokenName". `demo` is kept for seeded cards on non-test tokens.
+ */
 export function formatMarketplaceAmount(base: string, opts: { demo?: boolean } = {}): string {
   const locked = lockedCreatePayment();
-  return `${baseUnitsToUi(base, locked.decimals)} ${opts.demo ? DEMO_TOKEN_LABEL : locked.tokenName}`;
+  const ui = baseUnitsToUi(base, locked.decimals);
+  if (isDevnetTestAsset(locked.mint)) return dollarStyle(ui);
+  return `${ui} ${opts.demo ? DEMO_TOKEN_LABEL : locked.tokenName}`;
+}
+
+/** Hourly rate display: "$40/hr". */
+export function formatMarketplaceRate(base: string, opts: { demo?: boolean } = {}): string {
+  return `${formatMarketplaceAmount(base, opts)}/hr`;
+}
+
+/** Budget range display: "$500\u2013$1,000". */
+export function formatMarketplaceRange(min: string, max: string, opts: { demo?: boolean } = {}): string {
+  return `${formatMarketplaceAmount(min, opts)}\u2013${formatMarketplaceAmount(max, opts)}`;
+}
+
+/** Job price chip: "$40/hr" for hourly work, else "Budget $600". */
+export function jobPriceLabel(
+  job: Pick<PublicJob, "paymentMode" | "budgetAmount">,
+  opts: { demo?: boolean } = {}
+): string {
+  return job.paymentMode === "Hourly"
+    ? formatMarketplaceRate(job.budgetAmount, opts)
+    : `Budget ${formatMarketplaceAmount(job.budgetAmount, opts)}`;
 }
 
 export const JOB_STATUS_LABELS: Record<PublicJob["status"], string> = {
@@ -354,14 +397,15 @@ export function gigDeliveryLabel(days: number | null | undefined): string | null
   return typeof days === "number" && days > 0 ? `${days}-day delivery` : null;
 }
 
-/** Card price: "From X" when several packages exist, else the single price. */
+/** Card price: "From $X" when several packages exist, "$40/hr" when hourly, else "$600". */
 export function gigPriceLabel(
   gig: Pick<PublicGig, "paymentMode" | "priceAmount" | "packages">,
   opts: { demo?: boolean } = {}
 ): string {
   const packages = gig.packages ?? [];
   const amount = formatMarketplaceAmount(gig.priceAmount, opts);
-  return packages.length > 1 ? `From ${amount}` : `${amountLabel(gig.paymentMode)} ${amount}`;
+  if (packages.length > 1) return `From ${amount}`;
+  return gig.paymentMode === "Hourly" ? `${amount}/hr` : amount;
 }
 
 /** Explicit gig category, else keyword derivation (legacy gigs). */

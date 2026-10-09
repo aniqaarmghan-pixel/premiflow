@@ -1,5 +1,7 @@
 "use client";
 
+import { lockedCreatePayment } from "@/lib/app/premiflow";
+import { DevnetAssetNote } from "@/components/ui/DevnetAssetNote";
 import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 
@@ -7,7 +9,7 @@ import { Card } from "@/components/ui/Card";
 import {
   AVAILABILITY_LABELS,
   PROFILE_COPY,
-  formatMarketplaceAmount,
+  formatMarketplaceRate,
 } from "@/lib/app/marketplace";
 import { fetchProfilePage } from "@/lib/app/marketplace-client";
 import { useMarketplaceQuery, useMarketplaceSession } from "@/lib/hooks/useMarketplace";
@@ -62,7 +64,10 @@ export function MarketplaceProfileView({ wallet }: { wallet: string }) {
         {profile ? (
           <>
             {profile.rateAmount ? (
-              <p className="text-sm text-ink-soft">Rate: {formatMarketplaceAmount(profile.rateAmount)} / hour</p>
+              <p className="flex flex-wrap items-center gap-2 text-sm text-ink-soft">
+                Rate: <span className="font-semibold text-ink">{formatMarketplaceRate(profile.rateAmount)}</span>
+                <DevnetAssetNote mint={lockedCreatePayment().mint} />
+              </p>
             ) : null}
             <SkillList skills={profile.skills} />
             {profile.bio ? (

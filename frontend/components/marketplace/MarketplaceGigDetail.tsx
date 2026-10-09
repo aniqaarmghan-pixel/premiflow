@@ -1,5 +1,7 @@
 "use client";
 
+import { lockedCreatePayment } from "@/lib/app/premiflow";
+import { DevnetAssetNote } from "@/components/ui/DevnetAssetNote";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -11,9 +13,9 @@ import {
   GIG_STATUS_LABELS,
   MARKETPLACE_COPY,
   PACKAGE_TIER_LABELS,
-  amountLabel,
   categoryLabelOf,
   formatMarketplaceAmount,
+  gigPriceLabel,
   gigCategory,
   gigDeliveryLabel,
   marketplaceErrorMessage,
@@ -118,6 +120,8 @@ export function MarketplaceGigDetail({ gigId }: { gigId: string }) {
         coverUrl={gig.coverUrl ?? null}
         media={gig.media ?? []}
         videoUrl={gig.videoUrl ?? null}
+        category={category ?? "none"}
+        seedKey={gig.id}
       />
       <Card className="min-w-0 space-y-3 p-4">
         <div className="flex min-w-0 flex-wrap items-center gap-3">
@@ -138,9 +142,8 @@ export function MarketplaceGigDetail({ gigId }: { gigId: string }) {
         <p className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-faint">
           {category ? <span>{categoryLabelOf(category)}</span> : null}
           <span>{gig.paymentMode}</span>
-          <span>
-            {packages.length > 1 ? "From" : `${amountLabel(gig.paymentMode)}:`} {formatMarketplaceAmount(gig.priceAmount)}
-          </span>
+          <span className="font-semibold text-ink">{gigPriceLabel(gig)}</span>
+          <DevnetAssetNote mint={lockedCreatePayment().mint} />
           {delivery ? <span>{delivery}</span> : null}
           <span>Updated {new Date(gig.updatedAt).toLocaleDateString()}</span>
         </p>

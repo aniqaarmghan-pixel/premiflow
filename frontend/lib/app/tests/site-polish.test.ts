@@ -50,7 +50,7 @@ test("category art is original inline SVG with no external assets", () => {
   }
   assert.match(read("components/marketplace/MarketplaceHome.tsx"), /<CategoryArt slug=\{c\.slug\}/);
   const parts = read("components/marketplace/MarketplaceParts.tsx");
-  assert.match(parts, /<CategoryArt slug=\{primary\}/);
+  assert.match(parts, /<GigCoverArt title=\{gig\.title\} category=\{primary\}/);
   assert.match(parts, /pf-play/);
 });
 

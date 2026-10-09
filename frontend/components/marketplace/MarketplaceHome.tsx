@@ -496,7 +496,7 @@ export function MarketplaceHome() {
               id="pf-gigs"
               eyebrow="Services"
               title="Featured gigs"
-              subtitle="Covers reflect each gig's category and title — not a single placeholder for every listing."
+              subtitle="Each cover is a product preview drawn from the gig's own title, unless the seller uploads one."
               href="/marketplace/gigs"
               cta="All gigs"
             />

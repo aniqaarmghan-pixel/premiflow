@@ -8,6 +8,11 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: dir,
   },
+  // Landing explainer video (display only). Unset = interactive preview.
+  env: {
+    MARKETPLACE_EXPLAINER_VIDEO: process.env.MARKETPLACE_EXPLAINER_VIDEO ?? "",
+    MARKETPLACE_EXPLAINER_POSTER: process.env.MARKETPLACE_EXPLAINER_POSTER ?? "",
+  },
 };
 
 export default nextConfig;

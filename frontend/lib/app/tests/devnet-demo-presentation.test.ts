@@ -74,27 +74,23 @@ test("demo token label: short Devnet label on demo cards; mint and default label
   const base = (1200n * 10n ** BigInt(locked.decimals)).toString();
   assert.equal(DEMO_TOKEN_LABEL, "Demo USDT");
   assert.equal(DEMO_ASSET_NOTE, "Devnet test asset");
-  assert.equal(formatMarketplaceAmount(base, { demo: true }), `1200 ${DEMO_TOKEN_LABEL}`);
-  assert.equal(formatMarketplaceAmount(base), `1200 ${locked.tokenName}`);
-  assert.doesNotMatch(formatMarketplaceAmount(base, { demo: true }), /PREMIFLOW Test Token|USDC/);
-  assert.match(gigPriceLabel({ paymentMode: "Fixed", priceAmount: base, packages: [] }, { demo: true }), /Demo USDT$/);
+  // Devnet test asset: $-style display only (mint, decimals and math unchanged).
+  assert.equal(formatMarketplaceAmount(base, { demo: true }), "$1,200");
+  assert.equal(formatMarketplaceAmount(base), "$1,200");
+  assert.equal(gigPriceLabel({ paymentMode: "Fixed", priceAmount: base, packages: [] }), "$1,200");
+  assert.equal(gigPriceLabel({ paymentMode: "Hourly", priceAmount: base, packages: [] }), "$1,200/hr");
   assert.equal(paymentTokenLabel(locked.mint), "PREMIFLOW Test Token");
-  // Non-demo displays are unchanged: real token name, never the demo label or caption.
-  for (const label of [formatMarketplaceAmount(base), gigPriceLabel({ paymentMode: "Fixed", priceAmount: base, packages: [] })]) {
-    assert.ok(label.endsWith(locked.tokenName), label);
-    assert.doesNotMatch(label, /USDT|Devnet test/);
-  }
   // Devnet display symbol is "Demo USDT"; name, mint and decimals are unchanged.
   assert.match(read("lib/app/premiflow.ts"), /symbol: "Demo USDT"/);
 
   const src = parts();
-  assert.match(src, /formatMarketplaceAmount\(job\.budgetAmount, \{ demo \}\)/);
+  assert.match(src, /jobPriceLabel\(job, \{ demo \}\)/);
   assert.match(src, /gigPriceLabel\(gig, \{ demo \}\)/);
   assert.match(between(src, "export function DemoAssetNote", "export function StatusPill"), /title=\{DEMO_ASSET_NOTE_TITLE\}[\s\S]*\{DEMO_ASSET_NOTE\}/);
   for (const [start, end] of [["export function JobSummaryCard", "export function JobTags"], ["export function GigSummaryCard", "export function FreelancerSummaryCard"], ["export function FreelancerSummaryCard", "export function SkeletonGrid"]]) {
-    assert.match(between(src, start, end), /\{demo \? <DemoAssetNote \/> : null\}/, start);
+    assert.match(between(src, start, end), /\{demo \|\| marketplaceUsesDollarDisplay\(\) \? <DemoAssetNote \/> : null\}/, start);
   }
-  assert.match(src, /formatMarketplaceAmount\(freelancer\.rateAmount, \{ demo \}\)/);
+  assert.match(src, /formatMarketplaceRate\(freelancer\.rateAmount, \{ demo \}\)/);
 });
 
 test("demo seed presentation: no (demo) names; previews start with real content", () => {

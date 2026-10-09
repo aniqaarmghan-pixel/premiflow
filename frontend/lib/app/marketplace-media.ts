@@ -62,7 +62,24 @@ export type ExplainerVideoConfig = {
   type?: string;
 };
 
-export const MARKETPLACE_EXPLAINER_VIDEO: ExplainerVideoConfig | null = null;
+function explainerVideoFromEnv(rawSrc: string | undefined, rawPoster: string | undefined): ExplainerVideoConfig | null {
+  const src = (rawSrc ?? "").trim();
+  if (!src) return null;
+  const type = /\.webm(?:[?#]|$)/i.test(src) ? "video/webm" : "video/mp4";
+  const poster = (rawPoster ?? "").trim();
+  return poster ? { src, poster, type } : { src, type };
+}
+
+/**
+ * Set NEXT_PUBLIC_MARKETPLACE_EXPLAINER_VIDEO (or MARKETPLACE_EXPLAINER_VIDEO,
+ * exposed via next.config) to e.g. "/media/premiflow-demo.mp4" after adding
+ * public/media/premiflow-demo.mp4. Unset = interactive product preview.
+ * Optional poster: NEXT_PUBLIC_MARKETPLACE_EXPLAINER_POSTER / MARKETPLACE_EXPLAINER_POSTER.
+ */
+export const MARKETPLACE_EXPLAINER_VIDEO: ExplainerVideoConfig | null = explainerVideoFromEnv(
+  process.env.NEXT_PUBLIC_MARKETPLACE_EXPLAINER_VIDEO || process.env.MARKETPLACE_EXPLAINER_VIDEO,
+  process.env.NEXT_PUBLIC_MARKETPLACE_EXPLAINER_POSTER || process.env.MARKETPLACE_EXPLAINER_POSTER
+);
 
 export function resolveExplainerVideo(
   config: ExplainerVideoConfig | null

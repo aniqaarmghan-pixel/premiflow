@@ -254,7 +254,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="pf-dashboard min-h-screen min-w-0 lg:grid lg:grid-cols-[224px_minmax(0,1fr)] 2xl:grid-cols-[240px_minmax(0,1fr)]">
-      <aside className="pf-sidebar hidden bg-navy px-3.5 pt-5 text-white lg:px-3 lg:pt-4 lg:sticky lg:top-0 lg:flex lg:h-[100dvh] lg:flex-col lg:self-start lg:overflow-hidden lg:min-h-[100dvh]">
+      {/* The navy aside stretches with the grid row (never a white gap below it);
+          the inner column stays pinned to the viewport and only .pf-rail scrolls. */}
+      <aside className="pf-sidebar hidden bg-navy text-white lg:block lg:min-h-[100dvh] lg:self-stretch">
+        <div className="pf-sidebar-inner flex flex-col px-3.5 pt-5 lg:sticky lg:top-0 lg:h-[100dvh] lg:overflow-hidden lg:px-3 lg:pt-4">
         <Link href={homeHref} className="block min-w-0 shrink-0 px-1">
           <BrandMark light size={44} wordmarkFontSize="1.32rem" />
           <p
@@ -321,6 +324,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <ClientOnly>
             <SoundPreference compact />
           </ClientOnly>
+        </div>
         </div>
         </div>
       </aside>

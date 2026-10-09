@@ -108,7 +108,8 @@ test("one active wallet: switching disconnects first, provider has no autoConnec
 // ---------------------------------------------------------------- 2/3. sidebar + brand
 test("desktop sidebar fills 100dvh with an internal hidden-scrollbar nav; logos never clipped", () => {
   const shell = read("components/shell/AppShell.tsx");
-  assert.match(shell, /lg:h-\[100dvh\] lg:flex-col lg:self-start lg:overflow-hidden lg:min-h-\[100dvh\]/);
+  assert.match(shell, /pf-sidebar hidden bg-navy text-white lg:block lg:min-h-\[100dvh\] lg:self-stretch/);
+  assert.match(shell, /pf-sidebar-inner flex flex-col[^"]*lg:sticky lg:top-0 lg:h-\[100dvh\] lg:overflow-hidden/);
   assert.match(shell, /pf-rail [^"]*min-h-0 flex-1 [^"]*overflow-y-auto/);
   // Bottom padding keeps the last Profile / Support / footer items reachable above overlays.
   assert.match(shell, /pf-rail [^"]*pb-\[calc\(6rem/);

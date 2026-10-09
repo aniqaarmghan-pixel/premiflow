@@ -1,5 +1,6 @@
 "use client";
 
+import { DevnetAssetNote } from "@/components/ui/DevnetAssetNote";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
@@ -17,6 +18,7 @@ import {
   PROPOSAL_STATUS_LABELS,
   amountLabel,
   formatMarketplaceAmount,
+  jobPriceLabel,
   marketplaceErrorMessage,
 } from "@/lib/app/marketplace";
 import {
@@ -183,9 +185,8 @@ export function MarketplaceJobDetail({ jobId }: { jobId: string }) {
         <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-ink-faint">
           <StatusPill>{JOB_STATUS_LABELS[job.status]}</StatusPill>
           <span>{job.paymentMode}</span>
-          <span>
-            {amountLabel(job.paymentMode)}: {formatMarketplaceAmount(job.budgetAmount)}
-          </span>
+          <span className="font-semibold text-ink">{jobPriceLabel(job)}</span>
+          <DevnetAssetNote mint={locked.mint} />
           <span className="inline-flex min-w-0 items-center gap-2">
             <Avatar url={null} wallet={job.employerWallet} size={24} />
             <ProfileLink wallet={job.employerWallet} prefix="Employer" />

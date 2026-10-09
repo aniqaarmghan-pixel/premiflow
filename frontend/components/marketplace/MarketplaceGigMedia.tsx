@@ -1,6 +1,8 @@
 "use client";
 import { parseGigVideo } from "@/lib/app/video-embed";
 import { GigVideoPreview } from "./MarketplaceVideoModal";
+import { GigCoverArt } from "./GigCoverArt";
+import type { MarketplaceCategorySlug } from "@/lib/app/marketplace-categories";
 
 /**
  * Seller-owned gig media, linked by https URL only (nothing is bundled or proxied).
@@ -13,15 +15,18 @@ export function MarketplaceGigMedia({
   coverUrl,
   media,
   videoUrl,
+  category,
+  seedKey,
 }: {
   title: string;
+  category?: MarketplaceCategorySlug | "none" | null;
+  seedKey?: string;
   coverUrl: string | null;
   media: string[];
   videoUrl: string | null;
 }) {
   const video = parseGigVideo(videoUrl);
   const playable = video?.kind === "file" ? video.src : null;
-  if (!coverUrl && media.length === 0 && !video) return null;
   return (
     <section aria-label="Gig media" className="min-w-0 space-y-3">
       {coverUrl ? (
@@ -34,7 +39,11 @@ export function MarketplaceGigMedia({
           referrerPolicy="no-referrer"
           className="aspect-[16/9] w-full rounded-[var(--radius)] border border-line object-cover"
         />
-      ) : null}
+      ) : (
+        <div className="relative aspect-[16/9] w-full overflow-hidden rounded-[var(--radius)] border border-line bg-navy">
+          <GigCoverArt title={title} category={category ?? "none"} seedKey={seedKey} className="absolute inset-0 h-full w-full" />
+        </div>
+      )}
       {video ? (
         <p className="inline-flex items-center gap-1.5 rounded-full bg-accent-soft px-2.5 py-1 text-xs font-semibold text-accent">
           <span aria-hidden="true">&#9654;</span> Includes a video from the seller

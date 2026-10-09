@@ -24,8 +24,9 @@ import {
   isMarketplaceNavActive,
   jobCategory,
   categoryLabelOf,
-  amountLabel,
-  formatMarketplaceAmount,
+  formatMarketplaceRate,
+  jobPriceLabel,
+  marketplaceUsesDollarDisplay,
   gigHref,
   gigCategory,
   gigDeliveryLabel,
@@ -49,6 +50,7 @@ import type {
 import type { PublicJob } from "@/lib/server/marketplace/service";
 import { playableVideoUrl } from "@/lib/app/marketplace-media";
 import { GigVideoButton } from "./MarketplaceVideoModal";
+import { GigCoverArt } from "./GigCoverArt";
 import { VerifiedReputationBadge } from "./MarketplaceTrustSummary";
 import {
   DEMO_ASSET_NOTE,
@@ -284,9 +286,9 @@ export function JobSummaryCard({
         </p>
         <span className="flex flex-col items-end gap-1">
           <span className="rounded-full bg-[color-mix(in_srgb,var(--accent)_14%,white)] px-3 py-1 text-sm font-semibold text-ink">
-            {amountLabel(job.paymentMode)}: {formatMarketplaceAmount(job.budgetAmount, { demo })}
+            {jobPriceLabel(job, { demo })}
           </span>
-          {demo ? <DemoAssetNote /> : null}
+          {demo || marketplaceUsesDollarDisplay() ? <DemoAssetNote /> : null}
         </span>
       </div>
       {footer ? (
@@ -510,7 +512,7 @@ function categoryLabel(slug: MarketplaceCategorySlug): string {
 
 /**
  * Visual service card. Media is only the seller's own cover / avatar (https,
- * set by the seller); otherwise a category gradient. A small badge shows when
+ * set by the seller); otherwise a title-specific product-mockup cover. A small badge shows when
  * the gig includes a playable video; its play button opens an accessible player.
  */
 export function GigSummaryCard({
@@ -546,7 +548,7 @@ export function GigSummaryCard({
           />
         ) : (
           <>
-            <CategoryArt slug={primary} seed={coverSeedFromTitle(gig.title)} className="pf-zoom absolute inset-0 h-full w-full" />
+            <GigCoverArt title={gig.title} category={primary} seedKey={gig.id} className="pf-zoom absolute inset-0 h-full w-full" />
             {seller?.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -608,7 +610,7 @@ export function GigSummaryCard({
           <span className="text-xs uppercase tracking-wide text-ink-faint">{gig.paymentMode}</span>
           <span className="flex flex-col items-end gap-1">
             <span className="text-base font-semibold text-ink">{gigPriceLabel(gig, { demo })}</span>
-            {demo ? <DemoAssetNote /> : null}
+            {demo || marketplaceUsesDollarDisplay() ? <DemoAssetNote /> : null}
           </span>
         </div>
         {footer}
@@ -662,8 +664,8 @@ export function FreelancerSummaryCard({ freelancer }: { freelancer: FreelancerCa
           </Link>
           {freelancer.rateAmount ? (
             <span className="flex flex-col items-end gap-1">
-              <span className="font-semibold text-ink">{formatMarketplaceAmount(freelancer.rateAmount, { demo })} / hour</span>
-              {demo ? <DemoAssetNote /> : null}
+              <span className="font-semibold text-ink">{formatMarketplaceRate(freelancer.rateAmount, { demo })}</span>
+              {demo || marketplaceUsesDollarDisplay() ? <DemoAssetNote /> : null}
             </span>
           ) : (
             <span className="text-ink-faint">Rate on request</span>

@@ -604,7 +604,7 @@ function CommandHeader({ context }: { context: RoleContext | null }) {
         <nav aria-label="Quick actions" className="min-w-0">
           <ul className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
             {QUICK_ACTIONS.map(({ href, label, icon: Icon }, i) => (
-              <li key={href} className="min-w-0">
+              <li key={href} className={`min-w-0 ${i === 0 ? "col-span-2 sm:col-auto" : ""}`}>
                 <Link
                   href={href}
                   className={`flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-full px-4 text-[13px] lg:min-h-10 lg:px-3.5 font-semibold transition ${NAV_CARD_FOCUS} ${

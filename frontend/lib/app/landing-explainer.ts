@@ -8,7 +8,16 @@ export const LANDING_EXPLAINER = {
     "A short look at how PREMIFLOW keeps contracts clear and payments protected on Solana — without turning the whole marketplace into a wallet-only experience.",
   playLabel: "Watch how PREMIFLOW works",
   modalTitle: "How PREMIFLOW protects freelance work",
-  placeholderNote: "Full explainer video coming soon. Here is what PREMIFLOW covers today:",
+  previewLabel: "Interactive product preview",
+  previewNote: "Full product video coming soon",
+  steps: [
+    { short: "Marketplace", title: "Find the work", caption: "Browse jobs, gigs and freelancer profiles." },
+    { short: "Contract", title: "Protected contract", caption: "Agree on scope, payment model and a human resolver." },
+    { short: "Escrow", title: "Escrow funded", caption: "The employer funds program escrow on Solana." },
+    { short: "Work", title: "Work delivered", caption: "The freelancer submits deliverables against the plan." },
+    { short: "Approval", title: "Approval", caption: "The employer approves or requests changes." },
+    { short: "Payment", title: "Payment released", caption: "Approved funds release from escrow to the freelancer." },
+  ],
   points: [
     {
       title: "Protected contracts & escrow",
