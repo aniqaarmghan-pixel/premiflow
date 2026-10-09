@@ -9,10 +9,10 @@ export const PITCH_ROUTE = "/demo/pitch";
 
 /** Words per minute used to estimate slide timing from the script. */
 export const PITCH_WORDS_PER_MINUTE = 150;
-const PITCH_SLIDE_PAUSE_MS = 1800;
-const PITCH_MIN_SLIDE_MS = 9000;
+const PITCH_SLIDE_PAUSE_MS = 600;
+const PITCH_MIN_SLIDE_MS = 7000;
 
-export const PITCH_SPEECH_OVERRUN_CAP_MS = 4000;
+export const PITCH_SPEECH_OVERRUN_CAP_MS = 2500;
 
 export type PitchClipSlot = "contract" | "product" | "closing";
 

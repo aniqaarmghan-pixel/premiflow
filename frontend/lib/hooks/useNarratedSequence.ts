@@ -5,11 +5,17 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import { pickNarrationVoice } from "@/lib/app/landing-explainer";
 
 /**
- * Shared narrated-sequence engine for the /demo product tour and the
- * /demo/pitch deck. A deterministic timeline (fixed slot per item) drives the
- * composition. Narration: prerecorded voiceover when configured, else browser
- * speech synthesis, else silent (captions only). Record Mode adds a 3 / 2 / 1 /
- * Start countdown, optional full screen and Esc to exit. Presentation only.
+ * Shared narrated-sequence engine for the /demo product tour, the landing
+ * inline player and the /demo/pitch deck. A deterministic timeline (fixed slot
+ * per item) drives the composition.
+ *
+ * Voice hierarchy: 1. prerecorded voiceover (when configured it is the master
+ * clock, so scenes follow the recording's timing), 2. browser speech synthesis
+ * as a clearly labelled preview voice, 3. captions only.
+ *
+ * Record Mode is an explicit, separate state: 3 / 2 / 1 / Start countdown,
+ * optional full screen, Esc to exit, and it exits on its own shortly after the
+ * last item so it can never leak into normal viewing. Presentation only.
  */
 
 export type NarratedItem = { durationMs: number; narration: string };
@@ -17,8 +23,12 @@ export type SequenceStatus = "idle" | "countdown" | "playing" | "paused" | "ende
 export type VoiceSource = "audio" | "speech" | "none";
 
 export const RECORD_COUNTDOWN = ["3", "2", "1", "Start"] as const;
+/** Record Mode holds the final frame this long, then returns to normal viewing. */
+export const RECORD_END_HOLD_MS = 2500;
 const COUNTDOWN_STEP_MS = 1000;
 const TICK_MS = 100;
+/** Seeking into a scene later than this skips its (already started) spoken line. */
+const RESPEAK_WINDOW_MS = 1500;
 
 function speechSupported(): boolean {
   return (
@@ -36,6 +46,20 @@ export function sequenceStartMs(items: readonly NarratedItem[], index: number): 
   return items.slice(0, Math.max(0, index)).reduce((sum, item) => sum + item.durationMs, 0);
 }
 
+/** Timeline position -> item index + elapsed time inside that item. */
+export function locateInSequence(
+  items: readonly NarratedItem[],
+  positionMs: number
+): { index: number; elapsed: number } {
+  let rest = Math.max(0, positionMs);
+  for (let i = 0; i < items.length; i += 1) {
+    const d = items[i].durationMs;
+    if (rest < d || i === items.length - 1) return { index: i, elapsed: Math.min(rest, d) };
+    rest -= d;
+  }
+  return { index: 0, elapsed: 0 };
+}
+
 export type NarratedSequence = {
   status: SequenceStatus;
   index: number;
@@ -43,6 +67,7 @@ export type NarratedSequence = {
   position: number;
   totalMs: number;
   voiceOn: boolean;
+  volume: number;
   recordMode: boolean;
   countdownLabel: string | null;
   voiceSource: VoiceSource;
@@ -54,7 +79,9 @@ export type NarratedSequence = {
   pause: () => void;
   restart: () => void;
   jumpTo: (index: number) => void;
+  seek: (positionMs: number) => void;
   toggleVoice: () => void;
+  setVolume: (volume: number) => void;
   startRecordMode: () => void;
   exitRecordMode: () => void;
 };
@@ -63,16 +90,22 @@ export function useNarratedSequence({
   items,
   voiceoverSrc,
   overrunCapMs,
+  initialVoiceOn = true,
+  speechRate = 1,
 }: {
   items: readonly NarratedItem[];
   voiceoverSrc: string | null;
-  /** A spoken line may run past its slot by at most this much. */
+  /** A spoken preview line may run past its slot by at most this much. */
   overrunCapMs: number;
+  /** Landing player starts with voice off; the user turns it on. */
+  initialVoiceOn?: boolean;
+  speechRate?: number;
 }): NarratedSequence {
   const [status, setStatus] = useState<SequenceStatus>("idle");
   const [index, setIndex] = useState(0);
   const [elapsed, setElapsed] = useState(0);
-  const [voiceOn, setVoiceOn] = useState(true);
+  const [voiceOn, setVoiceOn] = useState(initialVoiceOn);
+  const [volume, setVolumeState] = useState(1);
   const [recordMode, setRecordMode] = useState(false);
   const [countdown, setCountdown] = useState(-1);
   const [audioFailed, setAudioFailed] = useState(false);
@@ -88,7 +121,8 @@ export function useNarratedSequence({
   const indexRef = useRef(0);
   const elapsedRef = useRef(0);
   const statusRef = useRef<SequenceStatus>("idle");
-  const voiceOnRef = useRef(true);
+  const voiceOnRef = useRef(initialVoiceOn);
+  const volumeRef = useRef(1);
   const sourceRef = useRef<VoiceSource>("none");
   const timersRef = useRef<number[]>([]);
   const enteredFullscreenRef = useRef(false);
@@ -130,33 +164,37 @@ export function useNarratedSequence({
     if (speechSupported()) window.speechSynthesis.cancel();
   }, []);
 
-  const speak = useCallback((text: string) => {
-    if (!speechSupported()) return;
-    const synth = window.speechSynthesis;
-    const token = ++speechTokenRef.current;
-    synth.cancel();
-    if (!text) {
-      speakingRef.current = false;
-      return;
-    }
-    const utterance = new SpeechSynthesisUtterance(text);
-    const voice = voiceRef.current;
-    if (voice) utterance.voice = voice;
-    utterance.lang = voice?.lang ?? "en-US";
-    utterance.rate = 1;
-    utterance.pitch = 1;
-    const done = () => {
-      if (speechTokenRef.current === token) speakingRef.current = false;
-    };
-    utterance.onend = done;
-    utterance.onerror = done;
-    speakingRef.current = true;
-    try {
-      synth.speak(utterance);
-    } catch {
-      done();
-    }
-  }, []);
+  const speak = useCallback(
+    (text: string) => {
+      if (!speechSupported()) return;
+      const synth = window.speechSynthesis;
+      const token = ++speechTokenRef.current;
+      synth.cancel();
+      if (!text || volumeRef.current <= 0) {
+        speakingRef.current = false;
+        return;
+      }
+      const utterance = new SpeechSynthesisUtterance(text);
+      const voice = voiceRef.current;
+      if (voice) utterance.voice = voice;
+      utterance.lang = voice?.lang ?? "en-US";
+      utterance.rate = speechRate;
+      utterance.pitch = 1;
+      utterance.volume = volumeRef.current;
+      const done = () => {
+        if (speechTokenRef.current === token) speakingRef.current = false;
+      };
+      utterance.onend = done;
+      utterance.onerror = done;
+      speakingRef.current = true;
+      try {
+        synth.speak(utterance);
+      } catch {
+        done();
+      }
+    },
+    [speechRate]
+  );
 
   /** Speech mode only: a prerecorded track already contains every line. */
   const narrate = useCallback(
@@ -171,6 +209,7 @@ export function useNarratedSequence({
     const audio = audioRef.current;
     if (!audio || sourceRef.current !== "audio") return;
     audio.muted = !voiceOnRef.current;
+    audio.volume = volumeRef.current;
     try {
       if (Math.abs(audio.currentTime - positionMs / 1000) > 0.3) audio.currentTime = positionMs / 1000;
     } catch {
@@ -200,15 +239,42 @@ export function useNarratedSequence({
     [narrate, syncAudio]
   );
 
-  /* ---------- deterministic timeline ---------- */
+  /* ---------- timeline (prerecorded audio is the master clock when present) ---------- */
   useEffect(() => {
     if (status !== "playing") return;
     let last = performance.now();
+    const finish = (list: readonly NarratedItem[]) => {
+      const lastIndex = list.length - 1;
+      indexRef.current = lastIndex;
+      elapsedRef.current = list[lastIndex].durationMs;
+      setIndex(lastIndex);
+      setElapsed(list[lastIndex].durationMs);
+      setStatus("ended");
+      statusRef.current = "ended";
+    };
     const id = window.setInterval(() => {
       const now = performance.now();
       const dt = now - last;
       last = now;
       const list = itemsRef.current;
+
+      const audio = audioRef.current;
+      if (sourceRef.current === "audio" && audio && !audio.paused && !audio.ended && audio.readyState >= 2) {
+        const pos = audio.currentTime * 1000;
+        if (pos >= sequenceTotalMs(list)) {
+          finish(list);
+          return;
+        }
+        const at = locateInSequence(list, pos);
+        if (at.index !== indexRef.current) {
+          indexRef.current = at.index;
+          setIndex(at.index);
+        }
+        elapsedRef.current = at.elapsed;
+        setElapsed(at.elapsed);
+        return;
+      }
+
       const item = list[indexRef.current];
       let next = elapsedRef.current + dt;
       if (next >= item.durationMs) {
@@ -224,10 +290,7 @@ export function useNarratedSequence({
           overrunRef.current = 0;
           const following = indexRef.current + 1;
           if (following >= list.length) {
-            elapsedRef.current = item.durationMs;
-            setElapsed(item.durationMs);
-            setStatus("ended");
-            statusRef.current = "ended";
+            finish(list);
             return;
           }
           indexRef.current = following;
@@ -258,13 +321,17 @@ export function useNarratedSequence({
     if (current === "paused") {
       setStatus("playing");
       statusRef.current = "playing";
-      if (speechSupported()) window.speechSynthesis.resume();
+      if (speakingRef.current) {
+        if (speechSupported()) window.speechSynthesis.resume();
+      } else if (elapsedRef.current < RESPEAK_WINDOW_MS) {
+        narrate(indexRef.current);
+      }
       syncAudio(sequenceStartMs(itemsRef.current, indexRef.current) + elapsedRef.current, true);
       return;
     }
     stopSpeech();
     startAt(current === "ended" ? 0 : indexRef.current);
-  }, [startAt, stopSpeech, syncAudio]);
+  }, [narrate, startAt, stopSpeech, syncAudio]);
 
   const restart = useCallback(() => {
     clearTimers();
@@ -296,15 +363,64 @@ export function useNarratedSequence({
     [startAt, stopSpeech, syncAudio]
   );
 
+  /** Progress-bar scrubbing. Paused/idle stays paused at the new position. */
+  const seek = useCallback(
+    (positionMs: number) => {
+      const list = itemsRef.current;
+      if (statusRef.current === "countdown" || list.length === 0) return;
+      const total = sequenceTotalMs(list);
+      const at = locateInSequence(list, Math.min(Math.max(0, positionMs), total - 1));
+      stopSpeech();
+      indexRef.current = at.index;
+      elapsedRef.current = at.elapsed;
+      overrunRef.current = 0;
+      setIndex(at.index);
+      setElapsed(at.elapsed);
+      const playing = statusRef.current === "playing";
+      if (!playing) {
+        setStatus("paused");
+        statusRef.current = "paused";
+      }
+      syncAudio(sequenceStartMs(list, at.index) + at.elapsed, playing);
+      if (playing && at.elapsed < RESPEAK_WINDOW_MS) narrate(at.index);
+    },
+    [narrate, stopSpeech, syncAudio]
+  );
+
   const toggleVoice = useCallback(() => {
     const on = !voiceOnRef.current;
     voiceOnRef.current = on;
     setVoiceOn(on);
     if (!on) stopSpeech();
-    if (audioRef.current) audioRef.current.muted = !on;
+    if (on && volumeRef.current <= 0) {
+      volumeRef.current = 1;
+      setVolumeState(1);
+    }
+    if (audioRef.current) {
+      audioRef.current.muted = !on;
+      audioRef.current.volume = volumeRef.current;
+    }
   }, [stopSpeech]);
 
-  /* ---------- Record Mode ---------- */
+  const setVolume = useCallback(
+    (value: number) => {
+      const v = Math.min(1, Math.max(0, value));
+      volumeRef.current = v;
+      setVolumeState(v);
+      if (v > 0 && !voiceOnRef.current) {
+        voiceOnRef.current = true;
+        setVoiceOn(true);
+      }
+      if (v <= 0) stopSpeech();
+      if (audioRef.current) {
+        audioRef.current.volume = v;
+        audioRef.current.muted = !voiceOnRef.current;
+      }
+    },
+    [stopSpeech]
+  );
+
+  /* ---------- Record Mode (explicit; never active during normal viewing) ---------- */
   const startRecordMode = useCallback(() => {
     clearTimers();
     stopSpeech();
@@ -373,6 +489,15 @@ export function useNarratedSequence({
     };
   }, [recordMode, exitRecordMode]);
 
+  // Previously Record Mode stayed on after the last item: the full-screen
+  // overlay kept covering the page (branding + controls) and the in-page frame
+  // stayed blank. Hold the end frame briefly, then return to normal viewing.
+  useEffect(() => {
+    if (!recordMode || status !== "ended") return;
+    const id = window.setTimeout(() => exitRecordMode(), RECORD_END_HOLD_MS);
+    return () => window.clearTimeout(id);
+  }, [recordMode, status, exitRecordMode]);
+
   useEffect(
     () => () => {
       for (const id of timersRef.current) window.clearTimeout(id);
@@ -382,7 +507,7 @@ export function useNarratedSequence({
   );
 
   const onAudioError = useCallback(() => {
-    // Configured voiceover missing or unplayable: fall back to speech synthesis.
+    // Configured voiceover missing or unplayable: fall back to the preview voice.
     setAudioFailed(true);
     sourceRef.current = speechSupported() ? "speech" : "none";
     if (statusRef.current === "playing") narrate(indexRef.current);
@@ -395,6 +520,7 @@ export function useNarratedSequence({
     position: sequenceStartMs(items, index) + elapsed,
     totalMs: sequenceTotalMs(items),
     voiceOn,
+    volume,
     recordMode,
     countdownLabel: countdown >= 0 ? RECORD_COUNTDOWN[countdown] : null,
     voiceSource: source,
@@ -406,7 +532,9 @@ export function useNarratedSequence({
     pause,
     restart,
     jumpTo,
+    seek,
     toggleVoice,
+    setVolume,
     startRecordMode,
     exitRecordMode,
   };

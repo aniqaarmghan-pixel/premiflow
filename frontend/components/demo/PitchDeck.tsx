@@ -236,19 +236,18 @@ function PitchStage({
         aria-hidden="true"
         className="absolute inset-0 bg-[radial-gradient(70%_60%_at_85%_0%,rgba(46,230,214,.16),transparent_60%),radial-gradient(60%_60%_at_0%_100%,rgba(124,140,255,.18),transparent_60%),linear-gradient(160deg,#050b16,#0b1d33)]"
       />
-      {!brand ? (
-        <div className="absolute left-[5cqw] right-[5cqw] top-[3cqw] flex items-center justify-between">
-          <DemoMark h={2} />
-          <span className="text-[1cqw] font-semibold tabular-nums text-white/50">
-            {String(index + 1).padStart(2, "0")} / {String(SLIDES.length).padStart(2, "0")}
-          </span>
-        </div>
-      ) : null}
+      {/* Persistent frame branding: shown on every slide, never tied to playback state. */}
+      <div className="absolute left-[5cqw] right-[5cqw] top-[2.4cqw] flex items-center justify-between">
+        {brand ? <span /> : <DemoMark h={2} />}
+        <span className="text-[1cqw] font-semibold tabular-nums text-white/50">
+          {String(index + 1).padStart(2, "0")} / {String(SLIDES.length).padStart(2, "0")}
+        </span>
+      </div>
 
       <div
         key={slide.id}
         className={`pf-demo-in absolute left-[5cqw] right-[5cqw] flex flex-col ${
-          brand ? "top-[4cqw] bottom-[11cqw]" : "top-[7.2cqw] bottom-[11.5cqw]"
+          brand ? "top-[5cqw] bottom-[11cqw]" : "top-[7.2cqw] bottom-[11.5cqw]"
         }`}
       >
         {!brand ? (

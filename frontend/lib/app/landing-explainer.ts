@@ -39,9 +39,10 @@ export const LANDING_EXPLAINER = {
 } as const;
 
 /* ------------------------------------------------------------------------- */
-/* Narrated product demo (/demo). The same recording becomes the landing      */
-/* explainer MP4 (MARKETPLACE_EXPLAINER_VIDEO=/media/premiflow-demo.mp4) and  */
-/* the Colosseum product-demo submission. Synthetic data only.                 */
+/* Narrated product demo: landing inline player + /demo. A product-operation  */
+/* walkthrough with synthetic data in PREMIFLOW UI. The same recording can    */
+/* become the landing MP4 (MARKETPLACE_EXPLAINER_VIDEO). No wallet, RPC or    */
+/* transactions: every on-screen action is a visual simulation.               */
 /* ------------------------------------------------------------------------- */
 
 export const PRODUCT_DEMO_ROUTE = "/demo";
@@ -49,27 +50,28 @@ export const PRODUCT_DEMO_ROUTE = "/demo";
 export type ProductDemoSceneId =
   | "intro"
   | "marketplace"
-  | "proposal"
-  | "escrow"
+  | "hire"
+  | "offer"
+  | "accept"
   | "models"
   | "work"
-  | "disputes"
-  | "fees"
-  | "close"
-  | "final";
+  | "payment"
+  | "changes"
+  | "dispute"
+  | "close";
 
 export type ProductDemoScene = {
   id: ProductDemoSceneId;
-  /** Short chip label for the scene list. */
+  /** Short label (studio scene list, accessibility). */
   label: string;
-  /** On-screen scene heading (empty for full-bleed brand scenes). */
-  heading: string;
   /** Fixed slot on the deterministic timeline. */
   durationMs: number;
-  /** Short on-screen caption (max ~2 lines). Empty = none (brand end card). */
+  /** Short on-screen caption (max ~2 lines). Empty = none (brand frames). */
   caption: string;
-  /** Spoken narration: explains the screen rather than reading the caption. */
+  /** Spoken narration: complements the screen instead of describing it. */
   narration: string;
+  /** True when the scene is an operated product screen (not a brand frame). */
+  productUi: boolean;
 };
 
 /** End card: exactly two lines. */
@@ -79,96 +81,102 @@ export const PRODUCT_DEMO_SCENES: readonly ProductDemoScene[] = [
   {
     id: "intro",
     label: "Intro",
-    heading: "",
-    durationMs: 8000,
-    caption: "A freelance marketplace with protected payments, built around Solana.",
-    narration:
-      "PREMIFLOW is a freelance marketplace where agreements and protected payments are built around Solana.",
+    durationMs: 4000,
+    caption: "",
+    narration: "PREMIFLOW. Freelance work, protected on Solana.",
+    productUi: false,
   },
   {
     id: "marketplace",
     label: "Marketplace",
-    heading: "One marketplace for both sides",
-    durationMs: 12000,
-    caption: "Find work or hire talent from the same account.",
+    durationMs: 9000,
+    caption: "Browse jobs, open the details, send a proposal.",
     narration:
-      "Employers can find talent, freelancers can find work, and both sides use the same marketplace and account experience.",
+      "Freelancers browse open jobs, open the details, check the budget and timeline, then send a proposal in a few clicks.",
+    productUi: true,
   },
   {
-    id: "proposal",
-    label: "Offer",
-    heading: "Select a proposal, then send a protected offer",
-    durationMs: 13000,
-    caption: "Pick a proposal, then Create & Send Offer with clear terms.",
+    id: "hire",
+    label: "Proposal & hire",
+    durationMs: 9000,
+    caption: "A proposal arrives. The employer hires into a protected offer.",
     narration:
-      "Once both sides agree, the employer creates and sends a protected offer with clear payment, schedule and review terms.",
+      "On the other side, employers see proposals arrive, compare talent and hire the best fit straight into a protected offer.",
+    productUi: true,
   },
   {
-    id: "escrow",
-    label: "Escrow",
-    heading: "Funds are secured before work begins",
-    durationMs: 13000,
-    caption: "The contract is funded before any work starts.",
+    id: "offer",
+    label: "Create offer",
+    durationMs: 10500,
+    caption: "Model, amount, schedule. One approval, and the offer is funded.",
     narration:
-      "Funds are placed into the contract workflow before work begins, so payment doesn't rely only on trust.",
+      "The offer wizard sets the payment model, amount and schedule. One approval in the wallet, and the offer is funded before work starts.",
+    productUi: true,
+  },
+  {
+    id: "accept",
+    label: "Freelancer accepts",
+    durationMs: 7000,
+    caption: "Accept, request changes or decline.",
+    narration: "Once funded, the freelancer can accept, request changes or decline.",
+    productUi: true,
   },
   {
     id: "models",
     label: "Payment models",
-    heading: "Four ways to work",
-    durationMs: 18000,
-    caption: "Fixed \u00b7 Milestones \u00b7 Streaming \u00b7 Hourly",
-    narration:
-      "PREMIFLOW supports four ways to work: Fixed payments, Milestones, Streaming payments over time, and Hourly sessions. Fixed and Milestones suit scoped deliverables, while Streaming and Hourly suit ongoing work.",
+    durationMs: 9000,
+    caption: "Fixed \u00b7 Milestone \u00b7 Streaming \u00b7 Hourly",
+    narration: "Work can be paid Fixed, by Milestone, through Streaming, or Hourly, on the same contract workflow.",
+    productUi: true,
   },
   {
     id: "work",
-    label: "Work & payment",
-    heading: "Submit, review, release",
-    durationMs: 12000,
-    caption: "Submit work, get it approved, withdraw approved earnings.",
+    label: "Submit & approve",
+    durationMs: 9500,
+    caption: "Submit the milestone. Review. Approve.",
     narration:
-      "The freelancer submits work, the employer reviews it, and approved earnings become available for withdrawal.",
+      "The freelancer submits the milestone with a quick update. The employer opens the submission, reviews it and approves.",
+    productUi: true,
   },
   {
-    id: "disputes",
-    label: "Disputes",
-    heading: "Disputes get a human decision",
-    durationMs: 14000,
-    caption: "Statements and evidence. AI summarizes; a human resolver decides.",
+    id: "payment",
+    label: "Payment",
+    durationMs: 8500,
+    caption: "$100 earned \u00b7 $3 PREMIFLOW platform fee (Free plan) \u00b7 $97 net",
     narration:
-      "If something goes wrong, both parties can provide statements and evidence. AI creates a neutral case summary, but a human resolver makes the final decision.",
+      "After approval, earned funds become available for withdrawal. The PREMIFLOW platform fee and net amount are shown clearly.",
+    productUi: true,
   },
   {
-    id: "fees",
-    label: "Pricing",
-    heading: "Your plan sets your PREMIFLOW platform fee",
-    durationMs: 12000,
-    caption: "PREMIFLOW platform fee by plan: Free 3%, Pro 1%, Premium 0%.",
+    id: "changes",
+    label: "Request changes",
+    durationMs: 9000,
+    caption: "Funded terms are never silently edited.",
     narration:
-      "Each participant's plan sets their own platform fee. Free starts at three percent, Pro at one percent, and Premium at zero percent for new contracts.",
+      "Need different terms? The freelancer requests changes, and the employer cancels and revises the offer. Funded terms are never silently edited.",
+    productUi: true,
+  },
+  {
+    id: "dispute",
+    label: "Dispute protection",
+    durationMs: 10000,
+    caption: "AI assists. A human resolver decides.",
+    narration:
+      "If a dispute occurs, both sides provide statements and evidence. AI prepares a neutral summary, while a human resolver makes the final decision.",
+    productUi: true,
   },
   {
     id: "close",
-    label: "Summary",
-    heading: "One Solana-powered workflow",
-    durationMs: 8000,
-    caption: "Discovery, protected agreements and flexible payments in one place.",
-    narration:
-      "PREMIFLOW combines marketplace discovery, protected agreements and flexible payments in one Solana-powered workflow.",
-  },
-  {
-    id: "final",
     label: "End card",
-    heading: "",
-    durationMs: 5000,
+    durationMs: 4500,
     caption: "",
     narration: "PREMIFLOW. Freelance work. Protected on Solana.",
+    productUi: false,
   },
 ];
 
-/** A spoken line may run past its slot by at most this much before the scene advances. */
-export const PRODUCT_DEMO_SPEECH_OVERRUN_CAP_MS = 4000;
+/** A spoken preview line may run past its slot by at most this much. */
+export const PRODUCT_DEMO_SPEECH_OVERRUN_CAP_MS = 1500;
 
 export function productDemoTotalMs(scenes: readonly ProductDemoScene[] = PRODUCT_DEMO_SCENES): number {
   return scenes.reduce((sum, s) => sum + s.durationMs, 0);
@@ -181,7 +189,12 @@ export function productDemoSceneStartMs(
   return scenes.slice(0, Math.max(0, index)).reduce((sum, s) => sum + s.durationMs, 0);
 }
 
-/** "1:55" style label. */
+/** Total spoken words in the product demo script. */
+export function productDemoWordCount(scenes: readonly ProductDemoScene[] = PRODUCT_DEMO_SCENES): number {
+  return scenes.reduce((sum, s) => sum + s.narration.trim().split(/\s+/).filter(Boolean).length, 0);
+}
+
+/** "1:30" style label. */
 export function formatDemoTime(ms: number): string {
   const total = Math.max(0, Math.round(ms / 1000));
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;

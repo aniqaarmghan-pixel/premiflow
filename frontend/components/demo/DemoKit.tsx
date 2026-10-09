@@ -133,6 +133,6 @@ export function RecordOverlay({ children }: { children: ReactNode }) {
 
 export function describeVoice(source: VoiceSource, voiceName: string | null, prerecordedLabel = "Prerecorded voiceover"): string {
   if (source === "audio") return prerecordedLabel;
-  if (source === "speech") return `Browser voice${voiceName ? `: ${voiceName}` : " (default)"}`;
+  if (source === "speech") return `Preview voice (browser${voiceName ? `: ${voiceName}` : " default"})`;
   return "Voice unavailable in this browser \u2014 captions only";
 }
