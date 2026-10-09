@@ -97,3 +97,13 @@ export const MARKETPLACE_DEMO_VOICEOVER: string | null = (() => {
   const src = (process.env.NEXT_PUBLIC_MARKETPLACE_DEMO_VOICEOVER || process.env.MARKETPLACE_DEMO_VOICEOVER || "").trim();
   return src && isSafeHeroMediaSrc(src) ? src : null;
 })();
+
+/**
+ * Optional prerecorded narration for the private /demo/pitch deck. Set
+ * MARKETPLACE_PITCH_VOICEOVER (or NEXT_PUBLIC_MARKETPLACE_PITCH_VOICEOVER) to
+ * "/media/premiflow-pitch-voiceover.mp3" once that file exists. Default: off.
+ */
+export const MARKETPLACE_PITCH_VOICEOVER: string | null = (() => {
+  const src = (process.env.NEXT_PUBLIC_MARKETPLACE_PITCH_VOICEOVER || process.env.MARKETPLACE_PITCH_VOICEOVER || "").trim();
+  return src && isSafeHeroMediaSrc(src) ? src : null;
+})();

@@ -17,6 +17,8 @@ const PUBLIC_EXACT: readonly string[] = [
   "/about",
   "/pricing",
   "/demo",
+  // Private pitch deck: reachable without sign-in but never linked; noindex.
+  "/demo/pitch",
   "/marketplace",
   "/marketplace/jobs",
   "/marketplace/gigs",

@@ -1,9 +1,7 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useState, type ReactNode } from "react";
 import {
   ArrowRight,
   BadgeCheck,
@@ -33,377 +31,57 @@ import {
   PRODUCT_DEMO_SCENES,
   PRODUCT_DEMO_SPEECH_OVERRUN_CAP_MS,
   formatDemoTime,
-  pickNarrationVoice,
   productDemoSceneStartMs,
-  productDemoTotalMs,
 } from "@/lib/app/landing-explainer";
 import { MARKETPLACE_DEMO_VOICEOVER } from "@/lib/app/marketplace-media";
 import { SUBSCRIPTION_PLANS } from "@/lib/app/subscription-plans";
+import { useNarratedSequence } from "@/lib/hooks/useNarratedSequence";
+import {
+  CaptionBand,
+  ControlButton,
+  CountdownOverlay,
+  DemoMark,
+  ProgressLine,
+  RecordOverlay,
+  describeVoice,
+} from "./DemoKit";
 
 /**
  * Narrated PREMIFLOW product demo (~1:55). A deterministic scene timeline
  * drives a 16:9 composition sized in container units (crisp at 1920x1080).
  * Narration: a prerecorded voiceover when configured, else browser speech
  * synthesis, else silent with captions. Presentation only: synthetic data,
- * no wallet, API, database or Solana calls.
+ * no wallet, API, database or Solana calls. Engine: useNarratedSequence.
  */
 
-type Status = "idle" | "countdown" | "playing" | "paused" | "ended";
-type VoiceSource = "audio" | "speech" | "none";
-
 const SCENES = PRODUCT_DEMO_SCENES;
-const TOTAL_MS = productDemoTotalMs();
-const TICK_MS = 100;
-const COUNTDOWN = ["3", "2", "1", "Start"] as const;
-const COUNTDOWN_STEP_MS = 1000;
-const MARK_SRC = "/brand/premiflow-mark.png";
-
-function speechSupported(): boolean {
-  return (
-    typeof window !== "undefined" &&
-    "speechSynthesis" in window &&
-    typeof window.SpeechSynthesisUtterance === "function"
-  );
-}
 
 export function ProductDemo() {
-  const [status, setStatus] = useState<Status>("idle");
-  const [index, setIndex] = useState(0);
-  const [elapsed, setElapsed] = useState(0);
-  const [voiceOn, setVoiceOn] = useState(true);
+  const seq = useNarratedSequence({
+    items: SCENES,
+    voiceoverSrc: MARKETPLACE_DEMO_VOICEOVER,
+    overrunCapMs: PRODUCT_DEMO_SPEECH_OVERRUN_CAP_MS,
+  });
   const [captionsOn, setCaptionsOn] = useState(true);
-  const [recordMode, setRecordMode] = useState(false);
-  const [countdown, setCountdown] = useState(-1);
-  const [audioFailed, setAudioFailed] = useState(false);
-  const [speechOk, setSpeechOk] = useState(false);
-  const [voiceName, setVoiceName] = useState<string | null>(null);
-
-  const audioRef = useRef<HTMLAudioElement>(null);
-  const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
-  const speakingRef = useRef(false);
-  const speechTokenRef = useRef(0);
-  const overrunRef = useRef(0);
-  const indexRef = useRef(0);
-  const elapsedRef = useRef(0);
-  const statusRef = useRef<Status>("idle");
-  const voiceOnRef = useRef(true);
-  const sourceRef = useRef<VoiceSource>("none");
-  const timersRef = useRef<number[]>([]);
-  const enteredFullscreenRef = useRef(false);
-
-  const voiceover = audioFailed ? null : MARKETPLACE_DEMO_VOICEOVER;
-  const source: VoiceSource = voiceover ? "audio" : speechOk ? "speech" : "none";
-
-  useEffect(() => {
-    sourceRef.current = source;
-  }, [source]);
-  useEffect(() => {
-    statusRef.current = status;
-  }, [status]);
-
-  /* ---------- voices (wait for voiceschanged; never fail without them) ---------- */
-  useEffect(() => {
-    if (!speechSupported()) return;
-    const synth = window.speechSynthesis;
-    const load = () => {
-      const voice = pickNarrationVoice(synth.getVoices());
-      voiceRef.current = voice;
-      setVoiceName(voice?.name ?? null);
-      setSpeechOk(true);
-    };
-    load();
-    synth.addEventListener("voiceschanged", load);
-    return () => {
-      synth.removeEventListener("voiceschanged", load);
-      synth.cancel();
-    };
-  }, []);
-
-  const stopSpeech = useCallback(() => {
-    speechTokenRef.current += 1;
-    speakingRef.current = false;
-    if (speechSupported()) window.speechSynthesis.cancel();
-  }, []);
-
-  const speak = useCallback((text: string) => {
-    if (!speechSupported()) return;
-    const synth = window.speechSynthesis;
-    const token = ++speechTokenRef.current;
-    synth.cancel();
-    if (!text) {
-      speakingRef.current = false;
-      return;
-    }
-    const utterance = new SpeechSynthesisUtterance(text);
-    const voice = voiceRef.current;
-    if (voice) utterance.voice = voice;
-    utterance.lang = voice?.lang ?? "en-US";
-    utterance.rate = 1;
-    utterance.pitch = 1;
-    const done = () => {
-      if (speechTokenRef.current === token) speakingRef.current = false;
-    };
-    utterance.onend = done;
-    utterance.onerror = done;
-    speakingRef.current = true;
-    try {
-      synth.speak(utterance);
-    } catch {
-      done();
-    }
-  }, []);
-
-  /** Speech mode only: the prerecorded track already contains every line. */
-  const narrate = useCallback(
-    (i: number) => {
-      if (!voiceOnRef.current || sourceRef.current !== "speech") return;
-      speak(SCENES[i]?.narration ?? "");
-    },
-    [speak]
-  );
-
-  const syncAudio = useCallback((positionMs: number, playIt: boolean) => {
-    const audio = audioRef.current;
-    if (!audio || sourceRef.current !== "audio") return;
-    audio.muted = !voiceOnRef.current;
-    try {
-      if (Math.abs(audio.currentTime - positionMs / 1000) > 0.3) audio.currentTime = positionMs / 1000;
-    } catch {
-      /* metadata not loaded yet; playback starts from 0 */
-    }
-    if (playIt) audio.play().catch(() => undefined);
-    else audio.pause();
-  }, []);
-
-  const clearTimers = useCallback(() => {
-    for (const id of timersRef.current) window.clearTimeout(id);
-    timersRef.current = [];
-  }, []);
-
-  const startAt = useCallback(
-    (i: number) => {
-      indexRef.current = i;
-      elapsedRef.current = 0;
-      overrunRef.current = 0;
-      setIndex(i);
-      setElapsed(0);
-      setStatus("playing");
-      statusRef.current = "playing";
-      syncAudio(productDemoSceneStartMs(i), true);
-      narrate(i);
-    },
-    [narrate, syncAudio]
-  );
-
-  /* ---------- deterministic timeline ---------- */
-  useEffect(() => {
-    if (status !== "playing") return;
-    let last = performance.now();
-    const id = window.setInterval(() => {
-      const now = performance.now();
-      const dt = now - last;
-      last = now;
-      const scene = SCENES[indexRef.current];
-      let next = elapsedRef.current + dt;
-      if (next >= scene.durationMs) {
-        const waitForSpeech =
-          sourceRef.current === "speech" &&
-          voiceOnRef.current &&
-          speakingRef.current &&
-          overrunRef.current < PRODUCT_DEMO_SPEECH_OVERRUN_CAP_MS;
-        if (waitForSpeech) {
-          overrunRef.current += dt;
-          next = scene.durationMs;
-        } else {
-          overrunRef.current = 0;
-          const following = indexRef.current + 1;
-          if (following >= SCENES.length) {
-            elapsedRef.current = scene.durationMs;
-            setElapsed(scene.durationMs);
-            setStatus("ended");
-            statusRef.current = "ended";
-            return;
-          }
-          indexRef.current = following;
-          elapsedRef.current = 0;
-          setIndex(following);
-          setElapsed(0);
-          narrate(following);
-          return;
-        }
-      }
-      elapsedRef.current = next;
-      setElapsed(next);
-    }, TICK_MS);
-    return () => window.clearInterval(id);
-  }, [status, narrate]);
-
-  const pause = useCallback(() => {
-    if (statusRef.current !== "playing") return;
-    setStatus("paused");
-    statusRef.current = "paused";
-    if (speechSupported()) window.speechSynthesis.pause();
-    audioRef.current?.pause();
-  }, []);
-
-  const play = useCallback(() => {
-    const current = statusRef.current;
-    if (current === "playing" || current === "countdown") return;
-    if (current === "paused") {
-      setStatus("playing");
-      statusRef.current = "playing";
-      if (speechSupported()) window.speechSynthesis.resume();
-      syncAudio(productDemoSceneStartMs(indexRef.current) + elapsedRef.current, true);
-      return;
-    }
-    stopSpeech();
-    startAt(current === "ended" ? 0 : indexRef.current);
-  }, [startAt, stopSpeech, syncAudio]);
-
-  const restart = useCallback(() => {
-    clearTimers();
-    stopSpeech();
-    setCountdown(-1);
-    startAt(0);
-  }, [clearTimers, startAt, stopSpeech]);
-
-  const jumpTo = useCallback(
-    (i: number) => {
-      stopSpeech();
-      if (statusRef.current === "playing") {
-        startAt(i);
-        return;
-      }
-      indexRef.current = i;
-      elapsedRef.current = 0;
-      overrunRef.current = 0;
-      setIndex(i);
-      setElapsed(0);
-      if (statusRef.current === "ended") {
-        setStatus("idle");
-        statusRef.current = "idle";
-      }
-      syncAudio(productDemoSceneStartMs(i), false);
-    },
-    [startAt, stopSpeech, syncAudio]
-  );
-
-  const toggleVoice = useCallback(() => {
-    const on = !voiceOnRef.current;
-    voiceOnRef.current = on;
-    setVoiceOn(on);
-    if (!on) stopSpeech();
-    if (audioRef.current) audioRef.current.muted = !on;
-  }, [stopSpeech]);
-
-  /* ---------- Colosseum Record Mode ---------- */
-  const startRecordMode = useCallback(() => {
-    clearTimers();
-    stopSpeech();
-    audioRef.current?.pause();
-    setRecordMode(true);
-    indexRef.current = 0;
-    elapsedRef.current = 0;
-    setIndex(0);
-    setElapsed(0);
-    setStatus("countdown");
-    statusRef.current = "countdown";
-    setCountdown(0);
-    const root = document.documentElement;
-    if (!document.fullscreenElement && typeof root.requestFullscreen === "function") {
-      root
-        .requestFullscreen()
-        .then(() => {
-          enteredFullscreenRef.current = true;
-        })
-        .catch(() => undefined);
-    }
-    COUNTDOWN.forEach((_, k) => {
-      if (k === 0) return;
-      timersRef.current.push(window.setTimeout(() => setCountdown(k), k * COUNTDOWN_STEP_MS));
-    });
-    timersRef.current.push(
-      window.setTimeout(() => {
-        setCountdown(-1);
-        startAt(0);
-      }, COUNTDOWN.length * COUNTDOWN_STEP_MS)
-    );
-  }, [clearTimers, startAt, stopSpeech]);
-
-  const exitRecordMode = useCallback(() => {
-    clearTimers();
-    setCountdown(-1);
-    setRecordMode(false);
-    if (statusRef.current === "countdown") {
-      setStatus("idle");
-      statusRef.current = "idle";
-    } else if (statusRef.current === "playing") {
-      pause();
-    }
-    if (enteredFullscreenRef.current && document.fullscreenElement) {
-      document.exitFullscreen().catch(() => undefined);
-    }
-    enteredFullscreenRef.current = false;
-  }, [clearTimers, pause]);
-
-  useEffect(() => {
-    if (!recordMode) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") exitRecordMode();
-    };
-    const onFullscreen = () => {
-      if (enteredFullscreenRef.current && !document.fullscreenElement) exitRecordMode();
-    };
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    window.addEventListener("keydown", onKey);
-    document.addEventListener("fullscreenchange", onFullscreen);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener("keydown", onKey);
-      document.removeEventListener("fullscreenchange", onFullscreen);
-    };
-  }, [recordMode, exitRecordMode]);
-
-  useEffect(
-    () => () => {
-      for (const id of timersRef.current) window.clearTimeout(id);
-      if (speechSupported()) window.speechSynthesis.cancel();
-    },
-    []
-  );
-
-  const onAudioError = useCallback(() => {
-    // Configured voiceover missing or unplayable: fall back to speech synthesis.
-    setAudioFailed(true);
-    const fallback: VoiceSource = speechSupported() ? "speech" : "none";
-    sourceRef.current = fallback;
-    if (statusRef.current === "playing") narrate(indexRef.current);
-  }, [narrate]);
+  const { status, index, elapsed, position, totalMs, voiceOn, recordMode, countdownLabel } = seq;
 
   const scene = SCENES[index];
-  const position = productDemoSceneStartMs(index) + elapsed;
   const stage = (
     <DemoStage
       index={index}
       t={elapsed}
       captionsOn={captionsOn}
       paused={status === "paused"}
-      countdownLabel={countdown >= 0 ? COUNTDOWN[countdown] : null}
-      progress={recordMode ? null : position / TOTAL_MS}
+      countdownLabel={countdownLabel}
+      progress={recordMode ? null : position / totalMs}
     />
   );
 
-  const voiceStatus =
-    source === "audio"
-      ? "Prerecorded voiceover"
-      : source === "speech"
-        ? `Browser voice${voiceName ? `: ${voiceName}` : " (default)"}`
-        : "Voice unavailable in this browser \u2014 captions only";
-
   return (
     <div className="mx-auto w-full min-w-0 max-w-6xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
-      {voiceover ? <audio ref={audioRef} src={voiceover} preload="auto" onError={onAudioError} hidden /> : null}
+      {seq.voiceover ? (
+        <audio ref={seq.audioRef} src={seq.voiceover} preload="auto" onError={seq.onAudioError} hidden />
+      ) : null}
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Product demo</p>
       <h1 className="mt-2 font-display text-2xl font-semibold tracking-[-0.03em] text-ink sm:text-4xl">
         See PREMIFLOW in under two minutes
@@ -417,32 +95,22 @@ export function ProductDemo() {
         {recordMode ? <div className="aspect-video w-full bg-[#050b16]" aria-hidden="true" /> : stage}
       </div>
 
-      {/* Portal to <body> so no transformed ancestor can trap the fixed overlay. */}
-      {recordMode
-        ? createPortal(
-            <div className="fixed inset-0 z-[2147483000] flex cursor-none items-center justify-center bg-black">
-              <div className="aspect-video" style={{ width: "min(100vw, 177.7778vh)" }}>
-                {stage}
-              </div>
-            </div>,
-            document.body
-          )
-        : null}
+      {recordMode ? <RecordOverlay>{stage}</RecordOverlay> : null}
 
       <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2" role="toolbar" aria-label="Demo controls">
         {status === "playing" ? (
-          <ControlButton onClick={pause} icon={<Pause size={16} aria-hidden="true" />} label="Pause" primary />
+          <ControlButton onClick={seq.pause} icon={<Pause size={16} aria-hidden="true" />} label="Pause" primary />
         ) : (
           <ControlButton
-            onClick={play}
+            onClick={seq.play}
             icon={<Play size={16} aria-hidden="true" />}
             label={status === "paused" ? "Resume" : "Play"}
             primary
           />
         )}
-        <ControlButton onClick={restart} icon={<RotateCcw size={16} aria-hidden="true" />} label="Restart" />
+        <ControlButton onClick={seq.restart} icon={<RotateCcw size={16} aria-hidden="true" />} label="Restart" />
         <ControlButton
-          onClick={toggleVoice}
+          onClick={seq.toggleVoice}
           pressed={voiceOn}
           icon={voiceOn ? <Volume2 size={16} aria-hidden="true" /> : <VolumeX size={16} aria-hidden="true" />}
           label={voiceOn ? "Voice On" : "Voice Off"}
@@ -454,16 +122,16 @@ export function ProductDemo() {
           label={captionsOn ? "Captions On" : "Captions Off"}
         />
         <ControlButton
-          onClick={startRecordMode}
+          onClick={seq.startRecordMode}
           icon={<Video size={16} aria-hidden="true" />}
           label="Colosseum Record Mode"
         />
         <span className="ml-auto text-xs tabular-nums text-ink-faint">
-          {formatDemoTime(position)} / ~{formatDemoTime(TOTAL_MS)}
+          {formatDemoTime(position)} / ~{formatDemoTime(totalMs)}
         </span>
       </div>
       <p className="mt-2 text-xs text-ink-faint" aria-live="polite">
-        {voiceOn ? voiceStatus : "Voice off \u2014 captions only"}
+        {voiceOn ? describeVoice(seq.voiceSource, seq.voiceName) : "Voice off \u2014 captions only"}
         {" \u00b7 "}Scene {index + 1} of {SCENES.length}: {scene.label}
       </p>
 
@@ -472,7 +140,7 @@ export function ProductDemo() {
           <li key={s.id}>
             <button
               type="button"
-              onClick={() => jumpTo(i)}
+              onClick={() => seq.jumpTo(i)}
               aria-current={i === index ? "step" : undefined}
               className={`min-h-9 rounded-full border px-3 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
                 i === index ? "border-accent bg-accent-soft text-accent" : "border-line text-ink-soft hover:bg-paper-2"
@@ -506,74 +174,7 @@ export function ProductDemo() {
   );
 }
 
-function ControlButton({
-  onClick,
-  icon,
-  label,
-  primary = false,
-  pressed,
-}: {
-  onClick: () => void;
-  icon: ReactNode;
-  label: string;
-  primary?: boolean;
-  pressed?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={pressed}
-      className={`inline-flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 ${
-        primary
-          ? "bg-[linear-gradient(135deg,#2ee6d6,#7c8cff)] text-[#04101f] hover:brightness-105"
-          : pressed === false
-            ? "border border-line bg-paper-2 text-ink-faint hover:text-ink"
-            : "border border-line bg-card text-ink hover:bg-paper-2"
-      }`}
-    >
-      {icon}
-      {label}
-    </button>
-  );
-}
-
 /* =============================== Composition =============================== */
-
-function DemoMark({ h, wordmark = true }: { h: number; wordmark?: boolean }) {
-  const img = (h * 512) / 114;
-  return (
-    <span className="inline-flex items-center" style={{ gap: `${h * 0.3}cqw` }}>
-      <span
-        aria-hidden="true"
-        className="relative inline-block shrink-0 overflow-hidden"
-        style={{ width: `${(h * 122) / 114}cqw`, height: `${h}cqw` }}
-      >
-        <Image
-          src={MARK_SRC}
-          alt=""
-          width={512}
-          height={512}
-          sizes="40vw"
-          priority
-          className="pointer-events-none absolute left-1/2 top-1/2 max-w-none"
-          style={{ width: `${img}cqw`, height: `${img}cqw`, transform: "translate(-50%, -50%)" }}
-        />
-      </span>
-      {wordmark ? (
-        <span
-          className="whitespace-nowrap font-extrabold leading-none"
-          style={{ fontSize: `${h * 0.62}cqw`, letterSpacing: "-0.02em" }}
-        >
-          <span className="text-white">PREMI</span>
-          <span style={{ color: "#3BB3D0" }}>FLOW</span>
-        </span>
-      ) : (
-        <span className="sr-only">PREMIFLOW</span>
-      )}
-    </span>
-  );
-}
 
 function DemoStage({
   index,
@@ -630,34 +231,9 @@ function DemoStage({
         </div>
       </div>
 
-      {captionsOn && scene.caption ? (
-        <div className="pointer-events-none absolute inset-x-[8cqw] bottom-[3.4cqw] flex justify-center">
-          <p
-            key={scene.id}
-            className="pf-demo-in max-w-[78cqw] rounded-[0.8cqw] bg-black/80 px-[1.8cqw] py-[0.8cqw] text-center text-[1.9cqw] font-semibold leading-[1.3] text-white shadow-[0_1cqw_3cqw_rgba(0,0,0,.4)]"
-          >
-            {scene.caption}
-          </p>
-        </div>
-      ) : null}
-
-      {progress !== null ? (
-        <span aria-hidden="true" className="absolute inset-x-0 bottom-0 h-[0.3cqw] bg-white/10">
-          <span
-            className="block h-full bg-[linear-gradient(90deg,#2ee6d6,#7c8cff)]"
-            style={{ width: `${Math.min(100, Math.max(0, progress * 100))}%` }}
-          />
-        </span>
-      ) : null}
-
-      {countdownLabel ? (
-        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-[#050b16]">
-          <DemoMark h={2.6} />
-          <span key={countdownLabel} className="pf-demo-count mt-[2cqw] text-[11cqw] font-extrabold leading-none text-white">
-            {countdownLabel}
-          </span>
-        </div>
-      ) : null}
+      {captionsOn && scene.caption ? <CaptionBand id={scene.id} text={scene.caption} /> : null}
+      {progress !== null ? <ProgressLine value={progress} /> : null}
+      {countdownLabel ? <CountdownOverlay label={countdownLabel} /> : null}
     </div>
   );
 }

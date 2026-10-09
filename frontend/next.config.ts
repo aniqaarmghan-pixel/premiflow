@@ -14,6 +14,8 @@ const nextConfig: NextConfig = {
     MARKETPLACE_EXPLAINER_POSTER: process.env.MARKETPLACE_EXPLAINER_POSTER ?? "",
     // Optional prerecorded /demo narration (e.g. /media/premiflow-voiceover.mp3).
     MARKETPLACE_DEMO_VOICEOVER: process.env.MARKETPLACE_DEMO_VOICEOVER ?? "",
+    // Optional prerecorded /demo/pitch narration (e.g. /media/premiflow-pitch-voiceover.mp3).
+    MARKETPLACE_PITCH_VOICEOVER: process.env.MARKETPLACE_PITCH_VOICEOVER ?? "",
   },
 };
 
