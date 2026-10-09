@@ -25,6 +25,7 @@ import {
   Package,
   ScrollText,
   Send,
+  Settings,
   Sparkles,
   Store,
   UserRound,
@@ -99,17 +100,56 @@ const NAV_GROUPS: ReadonlyArray<NavGroup> = [
     items: [
       { href: "/marketplace/profile", label: "Profile", icon: UserRound },
       { href: "/dashboard/reviews", label: "Reviews", icon: BadgeCheck },
-      { href: "/support", label: "Help & Support", icon: CircleHelp },
     ],
   },
   {
     title: "Discover",
-    items: [
-      { href: "/", label: "Marketplace", icon: Store },
-      { href: "/about", label: "About", icon: Info },
-    ],
+    items: [{ href: "/", label: "Marketplace", icon: Store }],
   },
 ];
+
+/**
+ * Pinned bottom utility area (desktop sidebar + mobile drawer): notification
+ * sound, Help & Support, Settings and About PREMIFLOW. Kept outside the
+ * scrolling nav so it can never be pushed out of view.
+ */
+function SidebarUtilities({ party, onNavigate }: { party: boolean; onNavigate?: () => void }) {
+  const pathname = usePathname();
+  const links: ReadonlyArray<NavItem> = [
+    ...(party
+      ? [
+          { href: "/support", label: "Help & Support", icon: CircleHelp },
+          // No dedicated settings page exists; profile holds the account settings.
+          { href: "/marketplace/profile", label: "Settings", icon: Settings },
+        ]
+      : []),
+    { href: "/about", label: "About PREMIFLOW", icon: Info },
+  ];
+  return (
+    <div className="border-t border-white/10 pt-2">
+      <ClientOnly>
+        <SoundPreference variant="sidebar" />
+      </ClientOnly>
+      <nav aria-label="Utilities" className="mt-0.5 flex flex-col gap-0.5">
+        {links.map((item) => {
+          const active = isDashboardNavActive(item.href, pathname);
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              onClick={onNavigate}
+              aria-current={active && item.label !== "Settings" ? "page" : undefined}
+              className="flex min-h-9 items-center gap-2 rounded-xl px-3 py-1.5 text-[13px] text-white/60 transition hover:bg-white/5 hover:text-white"
+            >
+              <item.icon size={15} aria-hidden="true" className="shrink-0" />
+              <span className="min-w-0 truncate">{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+    </div>
+  );
+}
 
 const RESOLVER_ICONS: Record<string, LucideIcon> = {
   "/admin": LayoutDashboard,
@@ -279,7 +319,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {desk === "party" ? <ExploreMarketplaceLink /> : null}
         </div>
         {/* Only this region scrolls; brand/switch/Explore stay pinned above it. */}
-        <div className="pf-rail -mx-1 mt-1 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-1 pb-[calc(6rem+env(safe-area-inset-bottom))]">
+        <div className="pf-rail -mx-1 mt-1 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-1 pb-3">
         <nav aria-label="Dashboard sections" className="mt-2 flex shrink-0 flex-col gap-0.5">
           {navGroups.flatMap((group) => [
             group.title ? (
@@ -319,12 +359,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             }),
           ])}
         </nav>
-        <div className="mt-auto shrink-0 space-y-3 rounded-2xl bg-white/5 px-3 py-3 lg:space-y-2 lg:py-2.5 text-[11px] leading-5 text-white/50">
-          <p>Value stays in the contract until work is verified.</p>
-          <ClientOnly>
-            <SoundPreference compact />
-          </ClientOnly>
         </div>
+        {/* Pinned below the scrolling nav: never clipped, always visible. */}
+        <div className="shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+          <SidebarUtilities party={desk === "party"} />
         </div>
         </div>
       </aside>
@@ -477,10 +515,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 }),
               ])}
               </nav>
-              <div className="mt-6 border-t border-white/10 pt-4">
-                <ClientOnly>
-                  <SoundPreference compact />
-                </ClientOnly>
+              <div className="mt-6">
+                <SidebarUtilities party={desk === "party"} onNavigate={() => setOpen(false)} />
               </div>
             </motion.div>
           </motion.div>
