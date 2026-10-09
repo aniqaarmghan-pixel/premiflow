@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
   env: {
     MARKETPLACE_EXPLAINER_VIDEO: process.env.MARKETPLACE_EXPLAINER_VIDEO ?? "",
     MARKETPLACE_EXPLAINER_POSTER: process.env.MARKETPLACE_EXPLAINER_POSTER ?? "",
+    // Optional prerecorded /demo narration (e.g. /media/premiflow-voiceover.mp3).
+    MARKETPLACE_DEMO_VOICEOVER: process.env.MARKETPLACE_DEMO_VOICEOVER ?? "",
   },
 };
 

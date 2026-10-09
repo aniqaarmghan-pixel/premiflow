@@ -16,6 +16,7 @@ const PUBLIC_EXACT: readonly string[] = [
   "/",
   "/about",
   "/pricing",
+  "/demo",
   "/marketplace",
   "/marketplace/jobs",
   "/marketplace/gigs",

@@ -86,3 +86,14 @@ export function resolveExplainerVideo(
 ): ExplainerVideoConfig | null {
   return resolveHeroVideo(config);
 }
+
+/**
+ * Optional prerecorded narration for the /demo product tour. Set
+ * MARKETPLACE_DEMO_VOICEOVER (or NEXT_PUBLIC_MARKETPLACE_DEMO_VOICEOVER) to
+ * "/media/premiflow-voiceover.mp3" after adding public/media/premiflow-voiceover.mp3.
+ * Unset (or the file fails to load) = browser speech synthesis / captions only.
+ */
+export const MARKETPLACE_DEMO_VOICEOVER: string | null = (() => {
+  const src = (process.env.NEXT_PUBLIC_MARKETPLACE_DEMO_VOICEOVER || process.env.MARKETPLACE_DEMO_VOICEOVER || "").trim();
+  return src && isSafeHeroMediaSrc(src) ? src : null;
+})();

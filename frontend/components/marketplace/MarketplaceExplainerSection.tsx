@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { BadgeCheck, Briefcase, CheckCircle2, FileText, Lock, Play, Store, Wallet, X } from "lucide-react";
 
-import { LANDING_EXPLAINER } from "@/lib/app/landing-explainer";
+import Link from "next/link";
+
+import { LANDING_EXPLAINER, PRODUCT_DEMO_ROUTE } from "@/lib/app/landing-explainer";
 import {
   MARKETPLACE_EXPLAINER_VIDEO,
   resolveExplainerVideo,
@@ -262,7 +264,15 @@ function InteractivePreview() {
           );
         })}
       </ol>
-      <p className="relative px-4 pb-4 pt-3 text-[11px] text-white/55 sm:px-5">{LANDING_EXPLAINER.previewNote}</p>
+      <p className="relative flex flex-wrap items-center justify-between gap-2 px-4 pb-4 pt-3 text-[11px] text-white/55 sm:px-5">
+        <span>{LANDING_EXPLAINER.previewNote}</span>
+        <Link
+          href={PRODUCT_DEMO_ROUTE}
+          className="inline-flex min-h-8 items-center rounded-full border border-white/15 px-3 font-semibold text-white/80 transition hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#2ee6d6]"
+        >
+          Watch the narrated demo
+        </Link>
+      </p>
     </div>
   );
 }

@@ -880,3 +880,44 @@ body {
     width: 100%;
   }
 }
+
+/* Narrated product demo (/demo): 16:9 composition sized in container units. */
+.pf-demo {
+  container-type: inline-size;
+}
+@keyframes pf-demo-in {
+  from {
+    opacity: 0;
+    transform: translateY(1cqw);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.pf-demo-in {
+  animation: pf-demo-in 550ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+@keyframes pf-demo-count {
+  from {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.pf-demo-count {
+  animation: pf-demo-count 500ms ease-out both;
+}
+.pf-demo-paused,
+.pf-demo-paused * {
+  animation-play-state: paused !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-demo-in,
+  .pf-demo-count {
+    animation: none !important;
+  }
+}
