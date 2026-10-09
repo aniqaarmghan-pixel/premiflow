@@ -25,7 +25,6 @@ import {
   Package,
   ScrollText,
   Send,
-  Settings,
   Sparkles,
   Store,
   UserRound,
@@ -110,7 +109,7 @@ const NAV_GROUPS: ReadonlyArray<NavGroup> = [
 
 /**
  * Pinned bottom utility area (desktop sidebar + mobile drawer): notification
- * sound, Help & Support, Settings and About PREMIFLOW. Kept outside the
+ * sound, Help & Support and About PREMIFLOW. Kept outside the
  * scrolling nav so it can never be pushed out of view.
  */
 function SidebarUtilities({ party, onNavigate }: { party: boolean; onNavigate?: () => void }) {
@@ -119,8 +118,6 @@ function SidebarUtilities({ party, onNavigate }: { party: boolean; onNavigate?: 
     ...(party
       ? [
           { href: "/support", label: "Help & Support", icon: CircleHelp },
-          // No dedicated settings page exists; profile holds the account settings.
-          { href: "/marketplace/profile", label: "Settings", icon: Settings },
         ]
       : []),
     { href: "/about", label: "About PREMIFLOW", icon: Info },
@@ -138,7 +135,7 @@ function SidebarUtilities({ party, onNavigate }: { party: boolean; onNavigate?: 
               key={item.label}
               href={item.href}
               onClick={onNavigate}
-              aria-current={active && item.label !== "Settings" ? "page" : undefined}
+              aria-current={active ? "page" : undefined}
               className="flex min-h-9 items-center gap-2 rounded-xl px-3 py-1.5 text-[13px] text-white/60 transition hover:bg-white/5 hover:text-white"
             >
               <item.icon size={15} aria-hidden="true" className="shrink-0" />
