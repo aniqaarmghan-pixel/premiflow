@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 
 import {
-  PRODUCT_DEMO_FINAL_LINE,
+  PRODUCT_DEMO_END_CARD,
   PRODUCT_DEMO_SCENES,
   PRODUCT_DEMO_SPEECH_OVERRUN_CAP_MS,
   formatDemoTime,
@@ -612,8 +612,7 @@ function SceneBody({ id, t }: { id: (typeof SCENES)[number]["id"]; t: number }) 
       return (
         <div className="flex h-full flex-col items-center justify-center">
           <DemoMark h={7} />
-          <p className="mt-[2.2cqw] text-[2.8cqw] font-semibold tracking-[-0.02em]">Freelance work. Protected on Solana.</p>
-          <span className="sr-only">{PRODUCT_DEMO_FINAL_LINE}</span>
+          <p className="mt-[2.2cqw] text-[2.8cqw] font-semibold tracking-[-0.02em]">{PRODUCT_DEMO_END_CARD[1]}</p>
           <div className="mt-[2.4cqw] flex gap-[1cqw]">
             <span className="rounded-full bg-[linear-gradient(135deg,#2ee6d6,#7c8cff)] px-[2cqw] py-[0.9cqw] text-[1.4cqw] font-bold text-[#04101f]">
               Find work

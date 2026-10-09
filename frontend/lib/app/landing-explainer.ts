@@ -72,7 +72,8 @@ export type ProductDemoScene = {
   narration: string;
 };
 
-export const PRODUCT_DEMO_FINAL_LINE = "PREMIFLOW \u2014 Freelance work. Protected on Solana.";
+/** End card: exactly two lines. */
+export const PRODUCT_DEMO_END_CARD = ["PREMIFLOW", "Freelance work. Protected on Solana."] as const;
 
 export const PRODUCT_DEMO_SCENES: readonly ProductDemoScene[] = [
   {
@@ -162,7 +163,7 @@ export const PRODUCT_DEMO_SCENES: readonly ProductDemoScene[] = [
     heading: "",
     durationMs: 5000,
     caption: "",
-    narration: "PREMIFLOW. Freelance work, protected on Solana.",
+    narration: "PREMIFLOW. Freelance work. Protected on Solana.",
   },
 ];
 
