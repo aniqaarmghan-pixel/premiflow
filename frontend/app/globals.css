@@ -823,6 +823,18 @@ body {
     max-height: 100dvh;
   }
 }
+/* Sidebar nav scroll region: thin, subtle scrollbar so overflow reads as scrollable. */
+.pf-sidebar-nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+.pf-sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+.pf-sidebar-nav::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+}
 
 /* Landing explainer: interactive product preview (CSS-only motion). */
 @keyframes pf-step-in {

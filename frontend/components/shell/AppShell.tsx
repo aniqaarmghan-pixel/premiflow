@@ -108,43 +108,35 @@ const NAV_GROUPS: ReadonlyArray<NavGroup> = [
 ];
 
 /**
- * Pinned bottom utility area (desktop sidebar + mobile drawer): notification
- * sound, Help & Support and About PREMIFLOW. Kept outside the
- * scrolling nav so it can never be pushed out of view.
+ * Help & Support and About PREMIFLOW: small links at the END of the scrollable
+ * nav list (desktop rail and mobile drawer). Rendered once per surface.
  */
-function SidebarUtilities({ party, onNavigate }: { party: boolean; onNavigate?: () => void }) {
+function SidebarHelpLinks({ party, onNavigate }: { party: boolean; onNavigate?: () => void }) {
   const pathname = usePathname();
   const links: ReadonlyArray<NavItem> = [
-    ...(party
-      ? [
-          { href: "/support", label: "Help & Support", icon: CircleHelp },
-        ]
-      : []),
+    ...(party ? [{ href: "/support", label: "Help & Support", icon: CircleHelp }] : []),
     { href: "/about", label: "About PREMIFLOW", icon: Info },
   ];
   return (
-    <div className="border-t border-white/10 pt-2">
-      <ClientOnly>
-        <SoundPreference variant="sidebar" />
-      </ClientOnly>
-      <nav aria-label="Utilities" className="mt-0.5 flex flex-col gap-0.5">
-        {links.map((item) => {
-          const active = isDashboardNavActive(item.href, pathname);
-          return (
-            <Link
-              key={item.label}
-              href={item.href}
-              onClick={onNavigate}
-              aria-current={active ? "page" : undefined}
-              className="flex min-h-9 items-center gap-2 rounded-xl px-3 py-1.5 text-[13px] text-white/60 transition hover:bg-white/5 hover:text-white"
-            >
-              <item.icon size={15} aria-hidden="true" className="shrink-0" />
-              <span className="min-w-0 truncate">{item.label}</span>
-            </Link>
-          );
-        })}
-      </nav>
-    </div>
+    <nav aria-label="Help and about" className="mt-3 flex shrink-0 flex-col gap-0.5 border-t border-white/10 pt-2">
+      {links.map((item) => {
+        const active = isDashboardNavActive(item.href, pathname);
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            onClick={onNavigate}
+            aria-current={active ? "page" : undefined}
+            className={`flex min-h-9 items-center gap-2 rounded-xl px-3 py-1.5 text-[13px] transition ${
+              active ? "bg-white/10 text-white" : "text-white/55 hover:bg-white/5 hover:text-white"
+            }`}
+          >
+            <item.icon size={15} aria-hidden="true" className={`shrink-0 ${active ? "text-cyan" : ""}`} />
+            <span className="min-w-0 truncate">{item.label}</span>
+          </Link>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -292,7 +284,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="pf-dashboard min-h-screen min-w-0 lg:grid lg:grid-cols-[224px_minmax(0,1fr)] 2xl:grid-cols-[240px_minmax(0,1fr)]">
       {/* The navy aside stretches with the grid row (never a white gap below it);
-          the inner column stays pinned to the viewport and only .pf-rail scrolls. */}
+          the inner column stays pinned to the viewport and only .pf-sidebar-nav scrolls. */}
       <aside className="pf-sidebar hidden bg-navy text-white lg:block lg:min-h-[100dvh] lg:self-stretch">
         <div className="pf-sidebar-inner flex flex-col px-3.5 pt-5 lg:sticky lg:top-0 lg:h-[100dvh] lg:overflow-hidden lg:px-3 lg:pt-4">
         <Link href={homeHref} className="block min-w-0 shrink-0 px-1">
@@ -316,7 +308,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {desk === "party" ? <ExploreMarketplaceLink /> : null}
         </div>
         {/* Only this region scrolls; brand/switch/Explore stay pinned above it. */}
-        <div className="pf-rail -mx-1 mt-1 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-1 pb-3">
+        <div className="pf-sidebar-nav -mx-1 mt-1 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-1 pb-3">
         <nav aria-label="Dashboard sections" className="mt-2 flex shrink-0 flex-col gap-0.5">
           {navGroups.flatMap((group) => [
             group.title ? (
@@ -356,10 +348,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             }),
           ])}
         </nav>
+        <SidebarHelpLinks party={desk === "party"} />
         </div>
-        {/* Pinned below the scrolling nav: never clipped, always visible. */}
-        <div className="shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-          <SidebarUtilities party={desk === "party"} />
+        {/* Compact sound card: a flex-none sibling BELOW the scroll region (not an
+            overlay), so the nav above always ends before it and never sits under it. */}
+        <div className="shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2">
+          <div className="rounded-xl bg-white/5">
+            <ClientOnly>
+              <SoundPreference variant="sidebar" />
+            </ClientOnly>
+          </div>
         </div>
         </div>
       </aside>
@@ -512,8 +510,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 }),
               ])}
               </nav>
-              <div className="mt-6">
-                <SidebarUtilities party={desk === "party"} onNavigate={() => setOpen(false)} />
+              <SidebarHelpLinks party={desk === "party"} onNavigate={() => setOpen(false)} />
+              <div className="mt-4 border-t border-white/10 pt-4">
+                <ClientOnly>
+                  <SoundPreference compact />
+                </ClientOnly>
               </div>
             </motion.div>
           </motion.div>
