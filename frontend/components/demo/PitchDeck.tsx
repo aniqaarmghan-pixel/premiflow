@@ -58,7 +58,12 @@ import { CaptionBand, ControlButton, CountdownOverlay, DemoMark, RecordOverlay, 
 
 const SLIDES = PITCH_SLIDES;
 
-export function PitchDeck() {
+/**
+ * studio=false: clean presentation view (/demo/pitch).
+ * studio=true: internal /demo/pitch/studio with Record Presentation, speaker
+ * notes, slide list, browser-voice details and script stats.
+ */
+export function PitchDeck({ studio = false }: { studio?: boolean } = {}) {
   const seq = useNarratedSequence({
     items: SLIDES,
     voiceoverSrc: MARKETPLACE_PITCH_VOICEOVER,
@@ -102,7 +107,9 @@ export function PitchDeck() {
       {seq.voiceover ? (
         <audio ref={seq.audioRef} src={seq.voiceover} preload="auto" onError={seq.onAudioError} hidden />
       ) : null}
-      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">Private pitch deck</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
+        {studio ? "Internal \u00b7 Pitch studio" : "Pitch presentation"}
+      </p>
       <h1 className="mt-2 font-display text-2xl font-semibold tracking-[-0.03em] text-ink sm:text-3xl">
         PREMIFLOW pitch presentation
       </h1>
@@ -148,25 +155,39 @@ export function PitchDeck() {
           icon={<FileText size={16} aria-hidden="true" />}
           label={captionsOn ? "Captions On" : "Captions Off"}
         />
-        <ControlButton
-          onClick={() => setNotesOn((v) => !v)}
-          pressed={notesOn}
-          icon={<StickyNote size={16} aria-hidden="true" />}
-          label="Speaker notes"
-        />
-        <ControlButton onClick={seq.startRecordMode} icon={<Video size={16} aria-hidden="true" />} label="Record Mode" />
+        {studio ? (
+          <>
+            <ControlButton
+              onClick={() => setNotesOn((v) => !v)}
+              pressed={notesOn}
+              icon={<StickyNote size={16} aria-hidden="true" />}
+              label="Speaker notes"
+            />
+            <ControlButton onClick={seq.startRecordMode} icon={<Video size={16} aria-hidden="true" />} label="Record Presentation" />
+          </>
+        ) : null}
       </div>
       <p className="mt-2 text-xs text-ink-faint" aria-live="polite">
         Slide {index + 1} of {SLIDES.length}: {slide.label}
         {" \u00b7 "}
-        {voiceOn ? describeVoice(seq.voiceSource, seq.voiceName) : "Voice off \u2014 captions only"}
-        {" \u00b7 "}
         <span className="tabular-nums">
-          {formatDemoTime(position)} / ~{formatDemoTime(totalMs)}
+          {formatDemoTime(position)} / {formatDemoTime(totalMs)}
         </span>
-        {" \u00b7 "}Keys: {"\u2190"} {"\u2192"} Home End, Esc exits Record Mode
+        {studio ? (
+          <>
+            {" \u00b7 "}
+            {voiceOn ? describeVoice(seq.voiceSource, seq.voiceName) : "Voice off \u2014 captions only"}
+            {" \u00b7 "}Keys: {"\u2190"} {"\u2192"} Home End, Esc exits Record Mode
+          </>
+        ) : (
+          <>
+            {" \u00b7 "}
+            {!voiceOn ? "Voice off" : seq.voiceSource === "audio" ? "Voiceover" : seq.voiceSource === "speech" ? "Preview voice" : "Captions only"}
+          </>
+        )}
       </p>
 
+      {studio ? (
       <ol className="mt-4 flex min-w-0 flex-wrap gap-1.5" aria-label="Slides">
         {SLIDES.map((s, i) => (
           <li key={s.id}>
@@ -183,8 +204,9 @@ export function PitchDeck() {
           </li>
         ))}
       </ol>
+      ) : null}
 
-      {notesOn ? (
+      {studio && notesOn ? (
         <section aria-label="Speaker notes" className="mt-5 rounded-[16px] border border-line bg-card p-4 text-sm leading-6">
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-faint">Script {"\u00b7"} {slide.label}</p>
           <p className="mt-1 text-ink">{slide.narration}</p>

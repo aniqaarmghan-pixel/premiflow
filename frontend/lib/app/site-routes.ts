@@ -19,6 +19,9 @@ const PUBLIC_EXACT: readonly string[] = [
   "/demo",
   // Private pitch deck: reachable without sign-in but never linked; noindex.
   "/demo/pitch",
+  // Internal recording studios: unlinked, noindex, 404 unless enabled (lib/app/demo-studio.ts).
+  "/demo/studio",
+  "/demo/pitch/studio",
   "/marketplace",
   "/marketplace/jobs",
   "/marketplace/gigs",
