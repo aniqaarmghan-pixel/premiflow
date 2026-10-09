@@ -32,7 +32,7 @@ import { SUBSCRIPTION_PLANS, planPriceLabel } from "@/lib/app/subscription-plans
 import { fetchFreelancers, searchGigs, searchJobs } from "@/lib/app/marketplace-client";
 import { useMarketplaceQuery } from "@/lib/hooks/useMarketplace";
 import { Aurora } from "@/components/site/Aurora";
-import { CategoryArt } from "@/components/site/CategoryArt";
+import { CategorySceneArt } from "@/components/site/CategorySceneArt";
 import { Reveal } from "@/components/site/Reveal";
 
 import { MarketplaceExplainerSection } from "./MarketplaceExplainerSection";
@@ -467,8 +467,8 @@ export function MarketplaceHome() {
                   href={searchPageHref({ category: c.slug })}
                   className="pf-card pf-glow-card group relative flex aspect-[4/3] min-w-0 flex-col justify-end overflow-hidden rounded-[22px] border border-line p-4 shadow-[var(--shadow)] sm:p-5"
                 >
-                  <CategoryArt slug={c.slug} className="pf-zoom absolute inset-0 h-full w-full" />
-                  <span aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(180deg,transparent_35%,rgba(4,10,20,.7))]" />
+                  <CategorySceneArt slug={c.slug} className="pf-zoom absolute inset-0 h-full w-full" />
+                  <span aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(180deg,transparent_30%,rgba(4,10,20,.35)_55%,rgba(4,10,20,.86))]" />
                   <span className="relative block font-semibold text-white sm:text-lg">{c.label}</span>
                   <span className="relative mt-1 hidden text-xs leading-5 text-white/75 sm:block">{c.blurb}</span>
                 </Link>

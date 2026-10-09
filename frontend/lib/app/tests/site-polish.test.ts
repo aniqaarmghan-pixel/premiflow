@@ -48,7 +48,7 @@ test("category art is original inline SVG with no external assets", () => {
   for (const slug of ["development", "web3", "design", "ai", "video", "marketing", "writing", "business"]) {
     assert.ok(art.includes(`case "${slug}"`), slug);
   }
-  assert.match(read("components/marketplace/MarketplaceHome.tsx"), /<CategoryArt slug=\{c\.slug\}/);
+  assert.match(read("components/marketplace/MarketplaceHome.tsx"), /<CategorySceneArt slug=\{c\.slug\}/);
   const parts = read("components/marketplace/MarketplaceParts.tsx");
   assert.match(parts, /<GigCoverArt title=\{gig\.title\} category=\{primary\}/);
   assert.match(parts, /pf-play/);
