@@ -25,19 +25,20 @@ export const PITCH_SPEECH_OVERRUN_CAP_MS = 2500;
 
 /**
  * Per-slide slots, scaled from the requested timing (12/18/17/20/20/23/14/22/
- * 24/18 s = 3:08) down to about 2:56 so the deck stays under 3:00. A slot is
- * never shorter than its spoken line plus PITCH_TRANSITION_HOLD_MS.
+ * 24/18 s = 3:08) down to about 2:57.5 so the deck stays under 3:00. The team
+ * slide got a longer line, so slides 3, 4, 5 and 9 give up spare hold time. A
+ * slot is never shorter than its spoken line plus PITCH_TRANSITION_HOLD_MS.
  */
 const PITCH_SLIDE_TARGET_MS: Record<PitchSlideId, number> = {
   title: 12_000,
   problem: 17_000,
-  solution: 15_500,
-  advantage: 18_500,
-  proof: 17_500,
+  solution: 13_500,
+  advantage: 17_000,
+  proof: 15_500,
   market: 25_000,
-  team: 13_500,
+  team: 21_500,
   gtm: 20_000,
-  funding: 21_000,
+  funding: 19_500,
   closing: 16_500,
 };
 
@@ -133,7 +134,7 @@ const STRUCTURE: ReadonlyArray<{ id: PitchSlideId; label: string; heading: strin
   { id: "advantage", label: "Competitive advantage", heading: "Why PREMIFLOW is different." },
   { id: "proof", label: "Product proof", heading: "A working product, not just a concept." },
   { id: "market", label: "Market opportunity", heading: "A large and growing freelance-platform market." },
-  { id: "team", label: "Team", heading: "Built by a team focused on execution." },
+  { id: "team", label: "Team", heading: "The team behind PREMIFLOW" },
   { id: "gtm", label: "Go-to-market", heading: "How PREMIFLOW enters the market." },
   { id: "funding", label: "Funding & use of funds", heading: "From working Devnet product to market launch." },
   { id: "closing", label: "Ambition", heading: "PREMIFLOW" },

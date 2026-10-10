@@ -707,50 +707,124 @@ function SlideBody({ id, t }: { id: (typeof SLIDES)[number]["id"]; t: number }) 
 
     case "team": {
       const people = [
-        { name: "Armghan Ashraf", initials: "AA" },
-        { name: "Miss Rabia Noor", initials: "RN" },
+        {
+          name: "Aniqa Armghan",
+          initials: "AA",
+          role: "Founder & Full-Stack Solana Developer",
+          badge: "Founder / Primary Builder",
+          background: null,
+          items: [
+            "Product vision and architecture",
+            "Full-stack development",
+            "Solana integration",
+            "Marketplace and contract workflows",
+            "Frontend and backend implementation",
+            "Product UX decisions",
+            "Testing and QA",
+            "Business-model implementation",
+            "Overall PREMIFLOW execution",
+          ],
+          line: "Founder and primary builder of PREMIFLOW \u2014 taking the product from concept to a working Solana Devnet application.",
+          until: 9000,
+        },
+        {
+          name: "Armghan Ashraf",
+          initials: "AA",
+          role: "Business & Financial Strategy Advisor",
+          badge: null,
+          background:
+            "16 years of professional experience across banking and telecommunications, including financial advisory, financial products, customer relationships, sales and business development.",
+          items: [
+            "Financial-product perspective",
+            "Payment and monetization strategy",
+            "Customer requirements",
+            "Business-model feedback",
+            "Marketplace and commercial strategy",
+            "Business development guidance",
+          ],
+          line: "Deep financial-services and customer-facing experience supporting PREMIFLOW\u2019s payment and marketplace strategy.",
+          until: 14500,
+        },
+        {
+          name: "Rabia Noor",
+          initials: "RN",
+          role: "CTO / Developer & DevOps Engineer",
+          badge: null,
+          background: null,
+          items: [
+            "Technical architecture support",
+            "Development",
+            "DevOps",
+            "Deployment workflows",
+            "Infrastructure",
+            "Reliability",
+            "Engineering support",
+            "Technical execution",
+          ],
+          line: "Engineering and DevOps capability supporting PREMIFLOW\u2019s technical delivery and infrastructure.",
+          until: Infinity,
+        },
       ];
+      const active = people.findIndex((p) => t < p.until);
       return (
-        <div className="grid h-full grid-cols-[1.25fr_1fr] gap-[2cqw]">
-          <div className="grid grid-cols-2 gap-[1.4cqw]">
-            {people.map((p, i) => (
-              <Appear
-                key={p.name}
-                at={i * 700}
-                t={t}
-                className="relative flex flex-col items-center justify-center overflow-hidden rounded-[1.4cqw] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,.07),rgba(255,255,255,.03))] p-[1.6cqw] text-center"
-              >
-                <span aria-hidden="true" className="absolute inset-x-0 top-0 h-[0.35cqw]" style={{ background: ACCENT }} />
-                <span
-                  aria-hidden="true"
-                  className="flex size-[9cqw] items-center justify-center rounded-full text-[3.2cqw] font-extrabold text-[#04101f] shadow-[0_1.2cqw_3cqw_-1cqw_rgba(46,230,214,.55)]"
-                  style={{ background: ACCENT }}
+        <div className="flex h-full flex-col gap-[0.9cqw]">
+          <p className="-mt-[0.8cqw] text-[1.45cqw] font-semibold text-white/70">Product, engineering and financial-domain experience.</p>
+          <div className="grid min-h-0 flex-1 grid-cols-[1.38fr_1fr_1fr] gap-[1.1cqw]">
+            {people.map((p, i) => {
+              const founder = i === 0;
+              return (
+                <Appear
+                  key={p.name}
+                  at={i * 600}
+                  t={t}
+                  className={`relative flex min-h-0 flex-col overflow-hidden rounded-[1.3cqw] border p-[1.2cqw] transition duration-500 ${
+                    founder
+                      ? "border-[#2ee6d6]/60 bg-[linear-gradient(165deg,rgba(46,230,214,.16),rgba(79,140,255,.08))]"
+                      : "border-white/10 bg-white/[0.05]"
+                  } ${i === active ? "shadow-[0_1.4cqw_3cqw_-1.4cqw_rgba(46,230,214,.55)]" : ""}`}
                 >
-                  {p.initials}
-                </span>
-                <p className="mt-[1.6cqw] text-[2cqw] font-bold tracking-[-0.01em]">{p.name}</p>
-                <p className="mt-[0.4cqw] text-[1.2cqw] font-semibold text-[#7ff3ea]">PREMIFLOW Team</p>
-              </Appear>
-            ))}
+                  <span aria-hidden="true" className="absolute inset-x-0 top-0 h-[0.3cqw]" style={{ background: founder ? ACCENT : "rgba(255,255,255,.18)" }} />
+                  <div className="flex items-center gap-[0.9cqw]">
+                    <span
+                      aria-hidden="true"
+                      className={`flex shrink-0 items-center justify-center rounded-full font-extrabold ${
+                        founder ? "size-[4.4cqw] text-[1.6cqw] text-[#04101f]" : "size-[3.4cqw] border border-white/20 bg-white/10 text-[1.2cqw] text-white"
+                      }`}
+                      style={founder ? { background: ACCENT } : undefined}
+                    >
+                      {p.initials}
+                    </span>
+                    <div className="min-w-0">
+                      <p className={`font-bold leading-tight tracking-[-0.01em] ${founder ? "text-[1.9cqw]" : "text-[1.55cqw]"}`}>{p.name}</p>
+                      <p className="mt-[0.15cqw] text-[1cqw] font-semibold leading-snug text-[#7ff3ea]">{p.role}</p>
+                    </div>
+                  </div>
+                  {p.badge ? (
+                    <span className="mt-[0.7cqw] inline-flex w-fit rounded-full px-[0.9cqw] py-[0.25cqw] text-[0.9cqw] font-bold text-[#04101f]" style={{ background: ACCENT }}>
+                      {p.badge}
+                    </span>
+                  ) : null}
+                  {p.background ? <p className="mt-[0.6cqw] text-[0.88cqw] leading-snug text-white/70">{p.background}</p> : null}
+                  <ul className="mt-[0.7cqw] flex flex-wrap content-start gap-[0.35cqw]">
+                    {p.items.map((x) => (
+                      <li key={x} className="rounded-full border border-white/12 bg-white/[0.06] px-[0.65cqw] py-[0.2cqw] text-[0.86cqw] font-semibold text-white/85">
+                        {x}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-auto border-t border-white/10 pt-[0.6cqw] text-[0.92cqw] font-medium italic leading-snug text-white/75">
+                    {"\u201c"}{p.line}{"\u201d"}
+                  </p>
+                </Appear>
+              );
+            })}
           </div>
-          <div className="flex flex-col justify-center gap-[1.6cqw]">
-            <Appear at={6000} t={t}>
-              <p className="text-[3.2cqw] font-extrabold leading-[1.1] tracking-[-0.025em]">
-                Small team.
-                <br />
-                Working product.
-                <br />
-                <span className="text-[#7ff3ea]">Execution first.</span>
-              </p>
-            </Appear>
-            <Appear at={3000} t={t} className="flex flex-wrap gap-[0.7cqw]">
-              {["Product", "Engineering", "Marketplace", "Web3", "Operations"].map((x) => (
-                <span key={x} className="rounded-full border border-white/15 bg-white/5 px-[1.2cqw] py-[0.45cqw] text-[1.2cqw] font-semibold text-white/85">
-                  {x}
-                </span>
-              ))}
-            </Appear>
-          </div>
+          <Appear at={15500} t={t} className="flex items-baseline justify-between gap-[1.4cqw]">
+            <p className="text-[1.65cqw] font-extrabold tracking-[-0.015em]">
+              Built by a founder-developer, <span className="text-[#7ff3ea]">supported by finance and engineering expertise.</span>
+            </p>
+            <p className="shrink-0 text-[1.05cqw] font-semibold text-white/60">From concept to a working Solana Devnet product.</p>
+          </Appear>
         </div>
       );
     }

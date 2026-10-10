@@ -63,9 +63,10 @@ export const PITCH_NARRATION: Record<PitchSlideId, PitchScript> = {
   },
   team: {
     narration:
-      "PREMIFLOW is being developed by Armghan Ashraf and Miss Rabia Noor. The team is focused on product execution, Web3 infrastructure and building a freelance experience that remains understandable for everyday users.",
-    caption: "Small team. Working product. Execution first.",
-    notes: "Names only. No titles, degrees, prior companies or years of experience.",
+      "PREMIFLOW was founded and primarily built by Aniqa Armghan, a full-stack Solana developer who leads the product from architecture to testing. Armghan Ashraf brings sixteen years in banking and telecommunications, guiding financial and commercial strategy. Rabia Noor, our CTO, supports development, DevOps and infrastructure.",
+    caption: "Founder-built, with finance and engineering support.",
+    notes:
+      "Aniqa Armghan is the founder and primary builder. Armghan Ashraf and Rabia Noor are supporting team members, not founders.",
   },
   gtm: {
     narration:
