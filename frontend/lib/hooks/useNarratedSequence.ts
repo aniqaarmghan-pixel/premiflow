@@ -93,6 +93,7 @@ export function useNarratedSequence({
   initialVoiceOn = true,
   speechRate = 1,
   autoAdvance = true,
+  voiceURI,
 }: {
   items: readonly NarratedItem[];
   voiceoverSrc: string | null;
@@ -103,6 +104,11 @@ export function useNarratedSequence({
   speechRate?: number;
   /** false: hold (paused) at the end of each item until play / next. Record Mode always advances. */
   autoAdvance?: boolean;
+  /**
+   * Preview-voice choice by SpeechSynthesisVoice.voiceURI. undefined / null or
+   * a voice the browser does not report: the automatic pickNarrationVoice choice.
+   */
+  voiceURI?: string | null;
 }): NarratedSequence {
   const [status, setStatus] = useState<SequenceStatus>("idle");
   const [index, setIndex] = useState(0);
@@ -130,6 +136,7 @@ export function useNarratedSequence({
   const timersRef = useRef<number[]>([]);
   const enteredFullscreenRef = useRef(false);
   const autoAdvanceRef = useRef(autoAdvance);
+  const voiceURIRef = useRef(voiceURI ?? null);
 
   const voiceover = audioFailed ? null : voiceoverSrc;
   const source: VoiceSource = voiceover ? "audio" : speechOk ? "speech" : "none";
@@ -149,22 +156,32 @@ export function useNarratedSequence({
   }, [status]);
 
   /* ---------- voices (wait for voiceschanged; never fail without them) ---------- */
+  const selectVoice = useCallback(() => {
+    if (!speechSupported()) return;
+    const voices = window.speechSynthesis.getVoices();
+    const wanted = voiceURIRef.current;
+    const voice = (wanted ? voices.find((v) => v.voiceURI === wanted) : undefined) ?? pickNarrationVoice(voices);
+    voiceRef.current = voice;
+    setVoiceName(voice?.name ?? null);
+    setSpeechOk(true);
+  }, []);
+
+  useEffect(() => {
+    voiceURIRef.current = voiceURI ?? null;
+    selectVoice();
+  }, [voiceURI, selectVoice]);
+
   useEffect(() => {
     if (!speechSupported()) return;
     const synth = window.speechSynthesis;
-    const load = () => {
-      const voice = pickNarrationVoice(synth.getVoices());
-      voiceRef.current = voice;
-      setVoiceName(voice?.name ?? null);
-      setSpeechOk(true);
-    };
+    const load = selectVoice;
     load();
     synth.addEventListener("voiceschanged", load);
     return () => {
       synth.removeEventListener("voiceschanged", load);
       synth.cancel();
     };
-  }, []);
+  }, [selectVoice]);
 
   const stopSpeech = useCallback(() => {
     speechTokenRef.current += 1;

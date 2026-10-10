@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
   ArrowRight,
   Briefcase,
@@ -13,13 +13,15 @@ import {
   Layers,
   Megaphone,
   MessageSquare,
-  Minus,
+  Mic,
+  Music,
   Pause,
   Play,
   Puzzle,
   Repeat,
   RotateCcw,
   ShieldAlert,
+  ShieldCheck,
   StickyNote,
   Store,
   UserRound,
@@ -31,54 +33,214 @@ import {
 } from "lucide-react";
 
 import { formatDemoTime } from "@/lib/app/landing-explainer";
-import { MARKETPLACE_PITCH_VOICEOVER, isSafeHeroMediaSrc } from "@/lib/app/marketplace-media";
+import { MARKETPLACE_PITCH_VOICEOVER } from "@/lib/app/marketplace-media";
 import {
-  PITCH_CLIP_SLOTS,
   PITCH_MAX_TOTAL_MS,
+  PITCH_MUSIC_DEFAULT_VOLUME,
+  PITCH_MUSIC_FADE_IN_MS,
+  PITCH_MUSIC_FADE_OUT_MS,
+  PITCH_MUSIC_PATH,
   PITCH_SCREENSHOT_PATHS,
   PITCH_SLIDES,
   PITCH_SPEECH_OVERRUN_CAP_MS,
   pitchSpeechMs,
   pitchTotalWords,
-  type PitchClipSlot,
   type PitchScreenSlot,
 } from "@/lib/app/pitch-deck";
 import type { PitchScreenshotMap } from "@/lib/app/pitch-screenshots-server";
-import { useNarratedSequence } from "@/lib/hooks/useNarratedSequence";
+import {
+  PITCH_RATE_DEFAULT,
+  PITCH_RATE_MAX,
+  PITCH_RATE_MIN,
+  PITCH_RATE_STORAGE_KEY,
+  PITCH_VOICE_SAMPLE,
+  PITCH_VOICE_STORAGE_KEY,
+  clampPitchRate,
+  englishVoices,
+  pickPitchVoice,
+} from "@/lib/app/pitch-voices";
+import { useNarratedSequence, type SequenceStatus } from "@/lib/hooks/useNarratedSequence";
 import { CaptionBand, ControlButton, CountdownOverlay, DemoMark, RecordOverlay, describeVoice } from "./DemoKit";
-import { PitchScreenshotsContext, ProductScreen, ScreenshotSlot } from "./PitchScreens";
+import { PitchScreenshotsContext, ScreenshotSlot, shotAspect } from "./PitchScreens";
 
 /**
- * PREMIFLOW pitch deck (/demo/pitch): 10 slides in one 16:9 composition for
- * live presenting and one-take screen recording (target 2:45-2:58, max 3:00).
- * Product proof uses real screenshots from public/media/pitch/ only; slide 3
- * falls back to the real app components with sample data. Presentation only.
+ * PREMIFLOW pitch deck (/demo/pitch): 11 slides in one 16:9 composition for
+ * live presenting and one-take screen recording (target 2:50-2:59, max 3:00).
+ * Product visuals are real screenshots from public/media/pitch/ only.
+ * Presentation only.
  */
 
 const SLIDES = PITCH_SLIDES;
+const REQUIRED_SHOTS = Object.keys(PITCH_SCREENSHOT_PATHS) as PitchScreenSlot[];
+const MUSIC_TICK_MS = 100;
+const MUSIC_STOP_FADE_MS = 1200;
+
+function speechAvailable(): boolean {
+  return typeof window !== "undefined" && "speechSynthesis" in window && typeof window.SpeechSynthesisUtterance === "function";
+}
+
+/** Studio only: English voices the browser reports (waits for voiceschanged). */
+function useEnglishVoices(enabled: boolean): SpeechSynthesisVoice[] {
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  useEffect(() => {
+    if (!enabled || !speechAvailable()) return;
+    const synth = window.speechSynthesis;
+    const load = () => setVoices(englishVoices(synth.getVoices()));
+    load();
+    synth.addEventListener("voiceschanged", load);
+    return () => synth.removeEventListener("voiceschanged", load);
+  }, [enabled]);
+  return voices;
+}
 
 /**
- * studio=false: clean presentation view (/demo/pitch).
+ * Studio only: optional looping background music under the narration. Fades in
+ * when playback starts, fades out over the last seconds and whenever playback
+ * stops. Narration (speech or prerecorded voiceover) stays at full volume.
+ */
+function usePitchMusic({
+  src,
+  on,
+  volume,
+  status,
+  position,
+  totalMs,
+}: {
+  src: string | null;
+  on: boolean;
+  volume: number;
+  status: SequenceStatus;
+  position: number;
+  totalMs: number;
+}) {
+  const ref = useRef<HTMLAudioElement | null>(null);
+  const state = useRef({ on, volume, status, position, totalMs });
+  useEffect(() => {
+    state.current = { on, volume, status, position, totalMs };
+  });
+  useEffect(() => {
+    const audio = ref.current;
+    if (!src || !audio) return;
+    audio.volume = 0;
+    const id = window.setInterval(() => {
+      const s = state.current;
+      const active = s.on && s.status === "playing";
+      const tail = Math.min(1, Math.max(0, (s.totalMs - s.position) / PITCH_MUSIC_FADE_OUT_MS));
+      const target = active ? s.volume * tail : 0;
+      const base = Math.max(s.volume, 0.01);
+      const current = audio.volume;
+      const next =
+        current < target
+          ? Math.min(target, current + (base * MUSIC_TICK_MS) / PITCH_MUSIC_FADE_IN_MS)
+          : Math.max(target, current - (base * MUSIC_TICK_MS) / MUSIC_STOP_FADE_MS);
+      audio.volume = Math.min(1, Math.max(0, next));
+      if (active && audio.paused) {
+        if (s.position < 1500) {
+          try {
+            audio.currentTime = 0;
+          } catch {
+            /* not loaded yet */
+          }
+        }
+        audio.play().catch(() => undefined);
+      } else if (!active && audio.volume <= 0.001 && !audio.paused) {
+        audio.pause();
+      }
+    }, MUSIC_TICK_MS);
+    return () => {
+      window.clearInterval(id);
+      audio.pause();
+    };
+  }, [src]);
+  return ref;
+}
+
+/**
+ * studio=false: clean presentation view (/demo/pitch), voice on/off only.
  * studio=true: internal /demo/pitch/studio with Record Presentation, Autoplay,
- * slide timing, narration script and speaker notes.
+ * voice selector, rate, preview, optional background music, slide timing,
+ * narration script and speaker notes.
  */
 export function PitchDeck({
   studio = false,
   screenshots = {},
-}: { studio?: boolean; screenshots?: PitchScreenshotMap } = {}) {
+  music = null,
+}: { studio?: boolean; screenshots?: PitchScreenshotMap; music?: string | null } = {}) {
   const [autoplay, setAutoplay] = useState(true);
   const [captionsOn, setCaptionsOn] = useState(true);
   const [notesOn, setNotesOn] = useState(true);
+
+  // Studio voice choice (persisted). Never assumes a voice exists.
+  const voices = useEnglishVoices(studio);
+  const [storedVoice, setStoredVoice] = useState<string | null>(null);
+  const [rate, setRate] = useState(PITCH_RATE_DEFAULT);
+  useEffect(() => {
+    if (!studio) return;
+    try {
+      setStoredVoice(window.localStorage.getItem(PITCH_VOICE_STORAGE_KEY));
+      const savedRate = window.localStorage.getItem(PITCH_RATE_STORAGE_KEY);
+      if (savedRate) setRate(clampPitchRate(Number(savedRate)));
+    } catch {
+      /* storage unavailable */
+    }
+  }, [studio]);
+  const selectedVoice = voices.find((v) => v.voiceURI === storedVoice) ?? pickPitchVoice(voices);
+  const selectedURI = selectedVoice?.voiceURI ?? null;
+  const chooseVoice = (uri: string) => {
+    setStoredVoice(uri);
+    try {
+      window.localStorage.setItem(PITCH_VOICE_STORAGE_KEY, uri);
+    } catch {
+      /* storage unavailable */
+    }
+  };
+  const chooseRate = (value: number) => {
+    const r = clampPitchRate(value);
+    setRate(r);
+    try {
+      window.localStorage.setItem(PITCH_RATE_STORAGE_KEY, String(r));
+    } catch {
+      /* storage unavailable */
+    }
+  };
+
   const seq = useNarratedSequence({
     items: SLIDES,
     voiceoverSrc: MARKETPLACE_PITCH_VOICEOVER,
     overrunCapMs: PITCH_SPEECH_OVERRUN_CAP_MS,
     // Record Mode always runs as one continuous take.
     autoAdvance: !studio || autoplay,
+    // Studio: selected voice and rate (Record Mode uses the same). Clean view: automatic choice.
+    voiceURI: studio ? selectedURI : undefined,
+    speechRate: studio ? rate : 1,
   });
   const { status, index, elapsed, position, totalMs, voiceOn, recordMode, countdownLabel, jumpTo, play } = seq;
   const slide = SLIDES[index];
   const manual = studio && !autoplay && !recordMode;
+
+  const [musicOn, setMusicOn] = useState(true);
+  const [musicVolume, setMusicVolume] = useState(PITCH_MUSIC_DEFAULT_VOLUME);
+  const musicSrc = studio ? music : null;
+  const musicRef = usePitchMusic({ src: musicSrc, on: musicOn, volume: musicVolume, status, position, totalMs });
+
+  const pauseSeq = seq.pause;
+  const previewVoice = useCallback(() => {
+    if (!speechAvailable()) return;
+    pauseSeq();
+    const synth = window.speechSynthesis;
+    synth.cancel();
+    if (synth.paused) synth.resume();
+    const u = new SpeechSynthesisUtterance(PITCH_VOICE_SAMPLE);
+    if (selectedVoice) {
+      u.voice = selectedVoice;
+      u.lang = selectedVoice.lang;
+    } else {
+      u.lang = "en-US";
+    }
+    u.rate = rate;
+    u.volume = 1;
+    synth.speak(u);
+  }, [pauseSeq, rate, selectedVoice]);
 
   /** Manual (Autoplay off): moving to a slide narrates it, then holds. */
   const go = (i: number) => {
@@ -116,7 +278,7 @@ export function PitchDeck({
     />
   );
 
-  const missingShots = PROOF_SHOTS.filter((x) => !screenshots[x.slot]);
+  const missingShots = REQUIRED_SHOTS.filter((s) => !screenshots[s]);
 
   return (
     <PitchScreenshotsContext.Provider value={screenshots}>
@@ -124,6 +286,7 @@ export function PitchDeck({
       {seq.voiceover ? (
         <audio ref={seq.audioRef} src={seq.voiceover} preload="auto" onError={seq.onAudioError} hidden />
       ) : null}
+      {musicSrc ? <audio ref={musicRef} src={musicSrc} loop preload="auto" hidden /> : null}
       <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">
         {studio ? "Internal \u00b7 Pitch studio" : "Pitch presentation"}
       </p>
@@ -204,6 +367,7 @@ export function PitchDeck({
             </span>
             {" \u00b7 "}
             {voiceOn ? describeVoice(seq.voiceSource, seq.voiceName) : "Voice off \u2014 captions only"}
+            {seq.voiceSource === "speech" && voiceOn ? ` \u00b7 rate ${rate.toFixed(2)}\u00d7` : ""}
             {" \u00b7 "}
             {autoplay ? "Autoplay: slides advance on their own" : "Autoplay off: each slide narrates, then waits for \u2192 / Next"}
             {" \u00b7 "}Keys: {"\u2190"} {"\u2192"} Home End, Esc exits Record Mode
@@ -215,6 +379,95 @@ export function PitchDeck({
           </>
         )}
       </p>
+
+      {studio ? (
+        <section aria-label="Voice and music" className="mt-4 grid min-w-0 gap-4 rounded-[16px] border border-line bg-card p-4 text-sm sm:grid-cols-2">
+          <div className="flex min-w-0 flex-col gap-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-faint">Voice</p>
+            {seq.voiceover ? (
+              <p className="text-xs text-ink-soft">
+                Prerecorded voiceover is configured and takes precedence. The browser voice below is only the fallback.
+              </p>
+            ) : null}
+            {voices.length > 0 ? (
+              <label className="flex min-w-0 flex-col gap-1 text-xs text-ink-soft">
+                Browser voice (English)
+                <select
+                  value={selectedURI ?? ""}
+                  onChange={(e) => chooseVoice(e.target.value)}
+                  className="min-h-9 w-full min-w-0 rounded-[10px] border border-line bg-card px-2 text-sm text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                  {voices.map((v) => (
+                    <option key={v.voiceURI} value={v.voiceURI}>
+                      {v.name} ({v.lang})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <p className="text-xs text-ink-soft">No English browser voices reported yet. Captions still work.</p>
+            )}
+            <label className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-ink-soft">
+              Speaking rate
+              <input
+                type="range"
+                min={PITCH_RATE_MIN}
+                max={PITCH_RATE_MAX}
+                step={0.05}
+                value={rate}
+                onChange={(e) => chooseRate(Number(e.target.value))}
+                className="w-40 accent-[#2ee6d6]"
+              />
+              <span className="tabular-nums text-ink">{rate.toFixed(2)}{"\u00d7"}</span>
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <ControlButton
+                onClick={previewVoice}
+                disabled={voices.length === 0}
+                icon={<Mic size={16} aria-hidden="true" />}
+                label="Preview Voice"
+              />
+            </div>
+            <p className="text-xs text-ink-faint">Saved in this browser. Play and Record Presentation use this voice and rate.</p>
+          </div>
+          <div className="flex min-w-0 flex-col gap-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-faint">Background music</p>
+            {musicSrc ? (
+              <>
+                <div className="flex flex-wrap gap-2">
+                  <ControlButton
+                    onClick={() => setMusicOn((v) => !v)}
+                    pressed={musicOn}
+                    icon={<Music size={16} aria-hidden="true" />}
+                    label={musicOn ? "Music On" : "Music Off"}
+                  />
+                </div>
+                <label className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-ink-soft">
+                  Music volume
+                  <input
+                    type="range"
+                    min={0}
+                    max={0.3}
+                    step={0.01}
+                    value={musicVolume}
+                    onChange={(e) => setMusicVolume(Math.min(0.3, Math.max(0, Number(e.target.value))))}
+                    className="w-40 accent-[#2ee6d6]"
+                  />
+                  <span className="tabular-nums text-ink">{Math.round(musicVolume * 100)}%</span>
+                </label>
+                <p className="text-xs text-ink-faint">
+                  Loops under the narration, fades in when playback starts and out at the end. Narration stays at full volume.
+                </p>
+              </>
+            ) : (
+              <p className="text-xs text-ink-soft">
+                Background music file not installed{" "}
+                <span className="font-mono text-ink-faint">(public{PITCH_MUSIC_PATH})</span>
+              </p>
+            )}
+          </div>
+        </section>
+      ) : null}
 
       {studio ? (
         <ol className="mt-4 flex min-w-0 flex-wrap gap-1.5" aria-label="Slides">
@@ -249,10 +502,8 @@ export function PitchDeck({
           </p>
           <p className="mt-2 text-xs text-ink-faint">
             {missingShots.length === 0
-              ? "All product-proof screenshots found in public/media/pitch/."
-              : `Product-proof screenshots still needed: ${missingShots
-                  .map((x) => `public${PITCH_SCREENSHOT_PATHS[x.slot]} (${x.capture})`)
-                  .join("; ")}.`}
+              ? "All 8 pitch screenshots found in public/media/pitch/."
+              : `Pitch screenshots missing: ${missingShots.map((s) => `public${PITCH_SCREENSHOT_PATHS[s]}`).join("; ")}.`}
           </p>
         </section>
       ) : null}
@@ -262,13 +513,6 @@ export function PitchDeck({
 }
 
 /* =============================== Composition =============================== */
-
-const REDUCED = "(prefers-reduced-motion: reduce)";
-function subscribeReduced(cb: () => void) {
-  const mq = window.matchMedia(REDUCED);
-  mq.addEventListener("change", cb);
-  return () => mq.removeEventListener("change", cb);
-}
 
 function PitchStage({
   index,
@@ -341,30 +585,21 @@ const ACCENT = "linear-gradient(135deg,#2ee6d6,#4f8cff)";
 const MODELS = ["Fixed", "Milestone", "Streaming", "Hourly"] as const;
 const ramp = (t: number, start: number, length: number) => Math.min(1, Math.max(0, (t - start) / length));
 
-/** Product-proof screenshots (real files only) and what to capture for each. */
-const PROOF_SHOTS: ReadonlyArray<{ slot: PitchScreenSlot; title: string; capture: string }> = [
-  { slot: "marketplace", title: "Marketplace", capture: "Marketplace / Find Work page with job cards" },
-  { slot: "offer", title: "Create & Send Offer", capture: "Create & Send Offer review step" },
-  { slot: "contract", title: "Active contract", capture: "Active contract with payment progress" },
-  { slot: "resolution", title: "Resolution Desk", capture: "Resolution Desk case with statements, evidence and AI case summary" },
-  { slot: "pricing", title: "Pricing", capture: "Pricing page with Free, Pro and Premium plans" },
-];
-
-function Appear({ at, t, children, className = "" }: { at: number; t: number; children: ReactNode; className?: string }) {
-  if (t < at) return <div className={`${className} invisible`} aria-hidden="true">{children}</div>;
-  return <div className={`pf-demo-in ${className}`}>{children}</div>;
-}
-
-/** Optional product-demo clip; falls back to the built-in visual. */
-function ClipSlot({ slot, children }: { slot: PitchClipSlot; children: ReactNode }) {
-  const src = PITCH_CLIP_SLOTS[slot];
-  const reduced = useSyncExternalStore(subscribeReduced, () => window.matchMedia(REDUCED).matches, () => true);
-  if (!src || !isSafeHeroMediaSrc(src)) return <>{children}</>;
-  return (
-    <div className="h-full overflow-hidden rounded-[1.2cqw] border border-white/15 bg-black">
-      <video src={src} muted loop playsInline autoPlay={!reduced} controls={reduced} preload="metadata" className="h-full w-full object-cover" />
-    </div>
-  );
+function Appear({
+  at,
+  t,
+  children,
+  className = "",
+  style,
+}: {
+  at: number;
+  t: number;
+  children: ReactNode;
+  className?: string;
+  style?: CSSProperties;
+}) {
+  if (t < at) return <div className={`${className} invisible`} style={style} aria-hidden="true">{children}</div>;
+  return <div className={`pf-demo-in ${className}`} style={style}>{children}</div>;
 }
 
 function DevnetPill() {
@@ -427,13 +662,11 @@ function ClosingSlide({ t }: { t: number }) {
           {"\u201c"}Our ambition is to make protected, flexible freelance agreements as easy to create as sending a proposal.{"\u201d"}
         </p>
       </Appear>
-      <Appear at={6500} t={t} className="mt-[2cqw] flex flex-col items-center gap-[1.1cqw]">
-        <p className="text-[1.6cqw] font-semibold text-white/80">One marketplace. Four payment models. A global way to work.</p>
-        <ModelChips size={1.2} />
-        <DevnetPill />
+      <Appear at={6500} t={t} className="mt-[2.2cqw]">
+        <p className="text-[1.9cqw] font-semibold text-white/85">One marketplace. Four ways to get paid. A global way to work.</p>
       </Appear>
-      <Appear at={11000} t={t} className="mt-[1.4cqw]">
-        <p className="text-[1.2cqw] font-semibold uppercase tracking-[0.24em] text-[#7ff3ea]/80">From first proposal to final payment</p>
+      <Appear at={11000} t={t} className="mt-[1.8cqw]">
+        <p className="text-[1.3cqw] font-semibold uppercase tracking-[0.24em] text-[#7ff3ea]/85">From first proposal to final payment</p>
       </Appear>
     </div>
   );
@@ -446,24 +679,6 @@ function Person({ icon: Icon, label }: { icon: typeof Briefcase; label: string }
         <Icon className="size-[2.4cqw] text-white" aria-hidden="true" />
       </span>
       <span className="text-[1.15cqw] font-semibold text-white/80">{label}</span>
-    </span>
-  );
-}
-
-type Support = "yes" | "varies";
-
-function Mark({ v, strong = false }: { v: Support; strong?: boolean }) {
-  if (v === "yes") {
-    return (
-      <span className={`inline-flex size-[1.8cqw] items-center justify-center rounded-full ${strong ? "bg-[#2ee6d6] text-[#04101f]" : "bg-white/15 text-white/85"}`}>
-        <CheckCircle2 className="size-[1.3cqw]" aria-hidden="true" />
-        <span className="sr-only">Commonly available</span>
-      </span>
-    );
-  }
-  return (
-    <span className="inline-flex items-center gap-[0.3cqw] text-[0.95cqw] font-semibold text-white/50">
-      <Minus className="size-[1cqw]" aria-hidden="true" /> Varies
     </span>
   );
 }
@@ -522,130 +737,109 @@ function SlideBody({ id, t }: { id: (typeof SLIDES)[number]["id"]; t: number }) 
     }
 
     case "solution": {
-      const flow = ["Discover", "Proposal", "Protected Offer", "Work", "Approval", "Payment"];
-      const lit = Math.min(flow.length, Math.floor(t / 1300) + 1);
-      const points = [
-        "Marketplace discovery",
-        "Protected contract funding",
-        "Four payment models",
-        "Work submission and review",
-        "Safe revisions",
-        "Dispute resolution",
-      ];
+      const flow = ["Discover", "Proposal", "Agree", "Fund", "Work", "Review / Record", "Collect", "Resolve when necessary"];
+      const lit = Math.min(flow.length, Math.floor(t / 1000) + 1);
       return (
-        <div className="flex h-full flex-col gap-[1.4cqw]">
-          <div className="flex items-center gap-[0.5cqw]">
+        <div className="flex h-full flex-col gap-[1.3cqw]">
+          <div className="flex items-stretch gap-[0.35cqw]">
             {flow.map((s, i) => (
-              <div key={s} className="flex flex-1 items-center gap-[0.5cqw]">
+              <div key={s} className="flex min-w-0 flex-1 items-center gap-[0.35cqw]">
                 <div
-                  className={`flex min-h-[3.8cqw] flex-1 items-center justify-center rounded-full border px-[0.8cqw] text-center text-[1.25cqw] font-semibold transition duration-500 ${
-                    i < lit ? "border-[#2ee6d6]/60 bg-[#2ee6d6]/12 text-white" : "border-white/10 text-white/35"
+                  className={`flex min-h-[3.6cqw] flex-1 items-center justify-center rounded-[0.9cqw] border px-[0.5cqw] text-center text-[1.05cqw] font-semibold leading-tight transition duration-500 ${
+                    i >= lit
+                      ? "border-white/10 text-white/35"
+                      : i === flow.length - 1
+                        ? "border-dashed border-[#8fb4ff]/60 bg-[#4f8cff]/12 text-white"
+                        : "border-[#2ee6d6]/60 bg-[#2ee6d6]/12 text-white"
                   }`}
                 >
                   {s}
                 </div>
-                {i < flow.length - 1 ? <ArrowRight className="size-[1.3cqw] shrink-0 text-white/40" aria-hidden="true" /> : null}
+                {i < flow.length - 1 ? <ArrowRight className="size-[1.1cqw] shrink-0 text-white/40" aria-hidden="true" /> : null}
               </div>
             ))}
           </div>
-          <div className="grid min-h-0 flex-1 grid-cols-[1fr_1fr_0.66fr] gap-[1.4cqw]">
-            <ProductScreen slot="marketplace" title="Marketplace" className="h-full" />
-            <ClipSlot slot="contract">
-              <ProductScreen slot="contract" title="Contract" className="h-full" />
-            </ClipSlot>
-            <ul className="flex flex-col justify-center gap-[0.7cqw]">
-              {points.map((p, i) => (
-                <Appear key={p} at={i * 500} t={t} className="flex items-center gap-[0.7cqw] rounded-[0.8cqw] bg-white/[0.06] px-[1cqw] py-[0.65cqw]">
-                  <CheckCircle2 className="size-[1.4cqw] shrink-0 text-[#2ee6d6]" aria-hidden="true" />
-                  <span className="text-[1.2cqw] font-semibold">{p}</span>
-                </Appear>
-              ))}
-            </ul>
+          <div className="flex min-h-0 flex-1 items-center gap-[1.6cqw]">
+            <Appear at={600} t={t} className="flex h-full min-w-0 flex-1 items-center">
+              <ScreenshotSlot
+                slot="why-premiflow"
+                title="How PREMIFLOW approaches the work"
+                className="max-h-full w-full"
+                style={{ aspectRatio: shotAspect("why-premiflow") }}
+              />
+            </Appear>
+            <Appear at={3500} t={t} className="flex w-[24cqw] shrink-0 flex-col gap-[1.4cqw]">
+              <p className="text-[2.6cqw] font-extrabold leading-[1.12] tracking-[-0.02em]">
+                One workspace <span className="text-[#7ff3ea]">from first proposal to final payment.</span>
+              </p>
+              <ModelChips size={0.95} />
+            </Appear>
           </div>
         </div>
       );
     }
 
-    case "advantage": {
-      // Generalized categories, not specific products. "varies" = support differs by provider.
-      const rows: ReadonlyArray<[string, Support, Support]> = [
-        ["Marketplace discovery", "yes", "varies"],
-        ["Protected programmable funding", "varies", "yes"],
-        ["Fixed payments", "yes", "yes"],
-        ["Milestone payments", "yes", "varies"],
-        ["Streaming payments", "varies", "varies"],
-        ["Hourly payments", "yes", "varies"],
-        ["Safe funded-offer revision", "varies", "varies"],
-        ["Integrated work review", "yes", "varies"],
-        ["AI-assisted dispute organization", "varies", "varies"],
-        ["Human final resolution", "yes", "varies"],
-        ["One connected workflow", "varies", "varies"],
-      ];
+    case "advantage":
       return (
-        <div className="grid h-full grid-cols-[1.75fr_1fr] gap-[1.8cqw]">
-          <div className="flex min-h-0 flex-col">
-            <div className="grid grid-cols-[1.7fr_1fr_1fr_1fr] items-end gap-x-[0.6cqw] pb-[0.6cqw] text-center text-[1cqw] font-bold uppercase leading-tight tracking-[0.1em] text-white/60">
-              <span />
-              <span>Traditional freelance marketplace</span>
-              <span>Basic crypto escrow</span>
-              <span className="rounded-t-[0.8cqw] bg-[#2ee6d6]/15 py-[0.5cqw] text-[#7ff3ea]">PREMIFLOW</span>
-            </div>
-            <div className="flex min-h-0 flex-1 flex-col">
-              {rows.map(([label, a, b], i) => (
-                <Appear
-                  key={label}
-                  at={i * 220}
-                  t={t}
-                  className="grid min-h-0 flex-1 grid-cols-[1.7fr_1fr_1fr_1fr] items-center gap-x-[0.6cqw] border-t border-white/10"
-                >
-                  <span className="text-[1.15cqw] font-semibold">{label}</span>
-                  <span className="flex justify-center"><Mark v={a} /></span>
-                  <span className="flex justify-center"><Mark v={b} /></span>
-                  <span className={`flex h-full items-center justify-center bg-[#2ee6d6]/10 ${i === rows.length - 1 ? "rounded-b-[0.8cqw]" : ""}`}>
-                    <Mark v="yes" strong />
-                  </span>
-                </Appear>
-              ))}
-            </div>
-            <p className="pt-[0.5cqw] text-[0.85cqw] text-white/45">
-              Generalized categories, not specific products. Varies = support differs by provider.
-            </p>
-          </div>
-          <div className="flex flex-col justify-center gap-[1.4cqw]">
-            <Appear at={5500} t={t} className="rounded-[1.4cqw] border border-[#2ee6d6]/50 bg-[linear-gradient(160deg,rgba(46,230,214,.16),rgba(79,140,255,.10))] p-[1.8cqw]">
-              <p className="text-[2.5cqw] font-extrabold leading-[1.12] tracking-[-0.02em]">
+        <div className="flex h-full gap-[1.4cqw]">
+          <div className="flex w-[56cqw] shrink-0 flex-col gap-[1.1cqw]">
+            <Appear at={0} t={t}>
+              <ScreenshotSlot
+                slot="competitive-advantage"
+                title="Traditional freelance workflow vs PREMIFLOW comparison"
+                className="w-full"
+                style={{ aspectRatio: shotAspect("competitive-advantage") }}
+              />
+            </Appear>
+            <Appear
+              at={3500}
+              t={t}
+              className="flex min-h-0 flex-1 flex-col justify-center gap-[0.5cqw] rounded-[1.2cqw] border border-[#2ee6d6]/50 bg-[linear-gradient(160deg,rgba(46,230,214,.16),rgba(79,140,255,.10))] px-[1.4cqw] py-[0.7cqw]"
+            >
+              <p className="text-[1.55cqw] font-extrabold leading-[1.15] tracking-[-0.015em]">
                 Marketplace <span className="text-[#7ff3ea]">+</span> flexible contracts <span className="text-[#7ff3ea]">+</span> protected settlement
               </p>
-            </Appear>
-            <Appear at={10500} t={t} className={`${CARD} flex flex-col gap-[0.9cqw]`}>
-              <p className="text-[1.6cqw] font-bold">Four payment models. One workflow.</p>
-              <ModelChips size={1} />
+              <div className="flex items-center justify-between gap-[1cqw]">
+                <p className="text-[1.1cqw] font-semibold text-white/80">Four ways to work. One connected workflow.</p>
+                <ModelChips size={0.85} />
+              </div>
             </Appear>
           </div>
+          <Appear at={8000} t={t} className="flex min-w-0 flex-1 flex-col gap-[0.9cqw]">
+            {/* The Why Solana half of the real why-solana.png (file unchanged; Why Web3 half outside the frame). */}
+            <ScreenshotSlot slot="why-solana" title="Why Solana" dark focus="left" className="w-full" style={{ aspectRatio: "650 / 485" }} />
+            <p className="text-[1.35cqw] font-semibold italic text-[#7ff3ea]">{"\u201c"}Web3 where it adds practical value.{"\u201d"}</p>
+          </Appear>
+        </div>
+      );
+
+    case "proof": {
+      const support: ReadonlyArray<{ slot: PitchScreenSlot; label: string }> = [
+        { slot: "create-offer", label: "Protected Offer" },
+        { slot: "streaming-contract", label: "Streaming" },
+        { slot: "hourly-contract", label: "Hourly" },
+        { slot: "resolution-desk", label: "Resolution" },
+      ];
+      return (
+        <div className="flex h-full flex-col gap-[0.8cqw]">
+          <div className="flex min-h-0 flex-1 gap-[1cqw]">
+            <Appear at={0} t={t} className="h-full shrink-0" style={{ aspectRatio: shotAspect("marketplace") }}>
+              <ScreenshotSlot slot="marketplace" title="Marketplace" className="h-full w-full" />
+            </Appear>
+            <div className="grid min-h-0 min-w-0 flex-1 grid-cols-2 grid-rows-2 gap-[1cqw]">
+              {support.map((x, i) => (
+                <Appear key={x.slot} at={700 + i * 500} t={t} className="min-h-0 min-w-0">
+                  <ScreenshotSlot slot={x.slot} title={x.label} label={x.label} className="h-full w-full" />
+                </Appear>
+              ))}
+            </div>
+          </div>
+          <p className="flex items-center justify-center gap-[0.6cqw] text-[1.05cqw] font-semibold leading-[1.4] text-[#7ff3ea]">
+            <span className="pf-preview-dot size-[0.55cqw] rounded-full bg-[#2ee6d6]" aria-hidden="true" /> Running on Solana Devnet
+          </p>
         </div>
       );
     }
-
-    case "proof":
-      return (
-        <div className="flex h-full flex-col gap-[1cqw]">
-          <div className="grid min-h-0 flex-1 grid-cols-[1.5fr_1fr_1fr] grid-rows-2 gap-[1cqw]">
-            {PROOF_SHOTS.map((x, i) => (
-              <Appear key={x.slot} at={i * 450} t={t} className={`min-h-0 ${i === 0 ? "row-span-2" : ""}`}>
-                <ScreenshotSlot slot={x.slot} title={x.title} className="h-full" />
-              </Appear>
-            ))}
-          </div>
-          <div className="flex items-center justify-center gap-[0.8cqw]">
-            {["Marketplace", "Protected contracts", "Four payment models", "Work review", "Resolution"].map((x, i) => (
-              <span key={x} className="flex items-center gap-[0.8cqw] text-[1.15cqw] font-semibold text-white/75">
-                {i > 0 ? <span className="text-[#2ee6d6]" aria-hidden="true">{"\u2022"}</span> : null}
-                {x}
-              </span>
-            ))}
-          </div>
-        </div>
-      );
 
     case "market": {
       const cards = [
@@ -837,7 +1031,7 @@ function SlideBody({ id, t }: { id: (typeof SLIDES)[number]["id"]; t: number }) 
         { icon: Handshake, name: "Performance & partnerships", items: ["Targeted digital ads", "Freelancer communities", "Web3 ecosystem partnerships", "Agency and startup partnerships"] },
       ];
       const funnel = ["Community", "First users", "Successful contracts", "Referrals", "Regional growth"];
-      const lit = Math.floor(ramp(t, 13000, 5000) * funnel.length);
+      const lit = Math.floor(ramp(t, 12000, 4000) * funnel.length);
       return (
         <div className="flex h-full flex-col gap-[1.2cqw]">
           <div className="grid min-h-0 flex-1 grid-cols-4 gap-[1.1cqw]">
@@ -952,6 +1146,75 @@ function SlideBody({ id, t }: { id: (typeof SLIDES)[number]["id"]; t: number }) 
                 {m}
               </span>
             ))}
+          </Appear>
+        </div>
+      );
+    }
+
+    case "stage": {
+      const areas = [
+        { icon: Store, name: "Marketplace", items: ["Jobs and talent discovery", "Proposals and hiring"] },
+        { icon: FileText, name: "Contracts", items: ["Fixed", "Milestone", "Streaming", "Hourly"] },
+        { icon: Wallet, name: "Payments", items: ["Protected funding", "Work approval", "Fees and subscriptions"] },
+        { icon: ShieldCheck, name: "Protection", items: ["Safe offer revision", "Resolution Desk", "AI summary + human resolver"] },
+        // No production deployment is documented in the repo, so this says "Web application", not "Deployed".
+        { icon: MessageSquare, name: "Product", items: ["Messages and notifications", "Web application"] },
+      ];
+      const steps = ["Concept", "Prototype", "Working Devnet Product", "Security & Validation", "Mainnet Readiness", "Market Launch"];
+      const here = 2;
+      return (
+        <div className="flex h-full flex-col gap-[1.3cqw]">
+          <p className="-mt-[0.6cqw] inline-flex w-fit items-center gap-[0.7cqw] rounded-full border border-[#2ee6d6]/50 bg-[#2ee6d6]/12 px-[1.3cqw] py-[0.45cqw] text-[1.2cqw] font-extrabold uppercase tracking-[0.18em] text-[#7ff3ea]">
+            <span className="pf-preview-dot size-[0.6cqw] rounded-full bg-[#2ee6d6]" aria-hidden="true" /> Working Solana Devnet product
+          </p>
+          <div className="grid min-h-0 flex-1 grid-cols-5 gap-[1cqw]">
+            {areas.map(({ icon: Icon, name, items }, i) => (
+              <Appear key={name} at={400 + i * 700} t={t} className={`${CARD} flex min-h-0 flex-col`}>
+                <span className="flex size-[3cqw] items-center justify-center rounded-[0.8cqw] bg-[#2ee6d6]/12">
+                  <Icon className="size-[1.7cqw] text-[#2ee6d6]" aria-hidden="true" />
+                </span>
+                <p className="mt-[0.9cqw] text-[1.35cqw] font-bold uppercase tracking-[0.08em]">{name}</p>
+                <ul className="mt-[0.8cqw] space-y-[0.55cqw]">
+                  {items.map((x) => (
+                    <li key={x} className="flex items-start gap-[0.5cqw] text-[1.1cqw] font-semibold leading-snug text-white/85">
+                      <CheckCircle2 className="mt-[0.15cqw] size-[1.15cqw] shrink-0 text-[#2ee6d6]" aria-hidden="true" />
+                      {x}
+                    </li>
+                  ))}
+                </ul>
+              </Appear>
+            ))}
+          </div>
+          <Appear at={6500} t={t}>
+            <ol className="grid grid-cols-6" aria-label="Project stage">
+              {steps.map((s, i) => (
+                <li key={s} className="flex flex-col items-center text-center" aria-current={i === here ? "step" : undefined}>
+                  <span
+                    className={`mb-[0.5cqw] rounded-full px-[0.8cqw] text-[0.85cqw] font-extrabold uppercase leading-[1.8cqw] tracking-[0.16em] text-[#04101f] ${i === here ? "" : "invisible"}`}
+                    style={i === here ? { background: ACCENT } : undefined}
+                    aria-hidden={i === here ? undefined : true}
+                  >
+                    You are here
+                  </span>
+                  <span className="relative flex h-[1.8cqw] w-full items-center justify-center">
+                    {i > 0 ? <span className={`absolute left-0 right-1/2 h-[0.2cqw] ${i <= here ? "bg-[#2ee6d6]" : "bg-white/15"}`} /> : null}
+                    {i < steps.length - 1 ? <span className={`absolute left-1/2 right-0 h-[0.2cqw] ${i < here ? "bg-[#2ee6d6]" : "bg-white/15"}`} /> : null}
+                    <span
+                      className={`relative rounded-full ${i === here ? "size-[1.8cqw] shadow-[0_0_0_0.45cqw_rgba(46,230,214,.25)]" : "size-[1cqw]"} ${
+                        i <= here ? "bg-[#2ee6d6]" : "border-[0.15cqw] border-white/30 bg-[#0b1d33]"
+                      }`}
+                    />
+                  </span>
+                  <span
+                    className={`mt-[0.6cqw] leading-tight ${
+                      i === here ? "text-[1.3cqw] font-extrabold text-white" : i < here ? "text-[1.1cqw] font-semibold text-white/70" : "text-[1.1cqw] font-semibold text-white/50"
+                    }`}
+                  >
+                    {s}
+                  </span>
+                </li>
+              ))}
+            </ol>
           </Appear>
         </div>
       );

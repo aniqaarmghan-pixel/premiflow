@@ -18,6 +18,7 @@ export type PitchSlideId =
   | "team"
   | "gtm"
   | "funding"
+  | "stage"
   | "closing";
 
 export type PitchScript = { narration: string; caption: string; notes: string };
@@ -38,21 +39,21 @@ export const PITCH_NARRATION: Record<PitchSlideId, PitchScript> = {
   solution: {
     narration:
       "PREMIFLOW connects the freelance lifecycle. Users discover opportunities, send proposals, create and fund protected agreements, manage work, approve progress and settle earnings through one connected experience.",
-    caption: "One connected freelance lifecycle.",
-    notes: "The two screens are the real PREMIFLOW components rendered with sample data (or real screenshots once added).",
+    caption: "Discover, agree, fund, work, review and collect in one place.",
+    notes: "Real About-page workflow screenshot (why-premiflow.png). Walk the path left to right.",
   },
   advantage: {
     narration:
-      "PREMIFLOW is not designed as only a marketplace or only an escrow tool. Its advantage is bringing discovery, protected funding, work management, four different payment models, safe contract revisions and dispute handling into one connected product.",
+      "PREMIFLOW is not designed as only a marketplace or only an escrow tool. Its advantage is bringing discovery, protected funding, work management, four different payment models, safe contract revisions and dispute handling into one connected product. Solana adds fast, low-cost settlement and transparent contract state.",
     caption: "Marketplace + flexible contracts + protected settlement.",
     notes:
-      "Columns are generalized categories, not specific products. 'Varies' means support differs by provider; never say other platforms lack a feature.",
+      "Real About-page comparison (traditional workflows vary; not a statement about any specific platform) plus the Why Solana card. Never say other platforms lack a feature.",
   },
   proof: {
     narration:
       "This is already a working Devnet product. PREMIFLOW includes marketplace discovery, protected offer creation, Fixed, Milestone, Streaming and Hourly contracts, work review, payments, revisions, notifications and a Resolution Desk.",
     caption: "Running on Solana Devnet today.",
-    notes: "Only real screenshots appear here. Empty slots show the file to capture into public/media/pitch/.",
+    notes: "Real Devnet screenshots only: Marketplace, Protected Offer, Streaming, Hourly, Resolution.",
   },
   market: {
     narration:
@@ -79,6 +80,12 @@ export const PITCH_NARRATION: Record<PitchSlideId, PitchScript> = {
       "To move from a working Devnet product toward a real market launch, our proposed pre-seed requirement is approximately five hundred thousand dollars. The largest investment would go into engineering, security and audits, followed by customer acquisition, compliance, infrastructure and strategic partnerships.",
     caption: "Proposed $500K pre-seed target.",
     notes: "A proposed future funding target. Nothing has been raised; do not imply committed investors.",
+  },
+  stage: {
+    narration:
+      "Today, PREMIFLOW is a working Solana Devnet product, with marketplace, contracts, payments and protection features in place. The next steps are security hardening and validation, mainnet readiness, and then market launch.",
+    caption: "Working Solana Devnet product today.",
+    notes: "Built today vs next steps. Nothing is on mainnet yet; security and validation come before mainnet readiness.",
   },
   closing: {
     narration:
