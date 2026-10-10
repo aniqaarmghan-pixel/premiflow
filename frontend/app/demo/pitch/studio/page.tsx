@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 
 import { PitchDeck } from "@/components/demo/PitchDeck";
 import { demoStudioEnabled } from "@/lib/app/demo-studio";
+import { findPitchScreenshots } from "@/lib/app/pitch-screenshots-server";
 
-// Read the studio gate at request time, not at build time.
+// Read the studio gate (and any newly added screenshots) at request time.
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
@@ -14,5 +15,5 @@ export const metadata: Metadata = {
 
 export default function Page() {
   if (!demoStudioEnabled()) notFound();
-  return <PitchDeck studio />;
+  return <PitchDeck studio screenshots={findPitchScreenshots()} />;
 }

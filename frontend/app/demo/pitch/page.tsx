@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { PitchDeck } from "@/components/demo/PitchDeck";
+import { findPitchScreenshots } from "@/lib/app/pitch-screenshots-server";
 
 export const metadata: Metadata = {
   title: "Pitch \u00b7 Premiflow",
@@ -8,5 +9,5 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <PitchDeck />;
+  return <PitchDeck screenshots={findPitchScreenshots()} />;
 }

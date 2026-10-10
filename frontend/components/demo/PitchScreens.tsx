@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Bell, CheckCircle2, FileText, Gavel, MessageSquare, Paperclip, Search, Send, Sparkles, Wallet } from "lucide-react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { Bell, CheckCircle2, FileText, Gavel, ImageIcon, MessageSquare, Paperclip, Search, Send, Sparkles, Wallet } from "lucide-react";
 
 import { StatusBadge } from "@/components/contracts/StatusBadge";
 import { TypeMotif } from "@/components/contracts/TypeMotif";
@@ -15,7 +15,7 @@ import { Progress } from "@/components/ui/Progress";
 import { formatMarketplaceAmount, PROPOSAL_STATUS_LABELS } from "@/lib/app/marketplace";
 import { CREATE_SEND_OFFER_LABEL } from "@/lib/app/milestone-create-plan";
 import { OFFER_REVISION_COPY } from "@/lib/app/offer-revision";
-import { pitchScreenshotSrc, type PitchScreenSlot } from "@/lib/app/pitch-deck";
+import { PITCH_SCREENSHOT_PATHS, pitchScreenshotSrc, type PitchScreenSlot } from "@/lib/app/pitch-deck";
 import { lockedCreatePayment } from "@/lib/app/premiflow";
 import { AI_CASE_SUMMARY_COPY } from "@/lib/app/resolution-center";
 import { PRICING_COPY, SUBSCRIPTION_PLANS, planDemoUsdtLabel, planPriceLabel } from "@/lib/app/subscription-plans";
@@ -29,6 +29,17 @@ import type { PublicJob } from "@/lib/server/marketplace/service";
  * sample data at desktop width and scaled into a non-interactive frame.
  * Nothing here signs, connects a wallet, or calls an API.
  */
+
+/** Real screenshots found in public/media/pitch/ by the pitch page (server side). */
+export const PitchScreenshotsContext = createContext<Partial<Record<PitchScreenSlot, string>>>({});
+
+const LOCAL_SHOT = /^\/media\/pitch\/[a-z0-9][a-z0-9-]*\.(png|webp|jpe?g)$/;
+
+function useScreenshot(slot: PitchScreenSlot): string | null {
+  const found = useContext(PitchScreenshotsContext)[slot];
+  if (found && LOCAL_SHOT.test(found)) return found;
+  return pitchScreenshotSrc(slot);
+}
 
 /* ------------------------------- scaling frame ------------------------------- */
 
@@ -70,7 +81,7 @@ export function ProductScreen({
   compact?: boolean;
   className?: string;
 }) {
-  const shot = pitchScreenshotSrc(slot);
+  const shot = useScreenshot(slot);
   return (
     <div
       aria-hidden="true"
@@ -94,6 +105,48 @@ export function ProductScreen({
         </Scaled>
       )}
     </div>
+  );
+}
+
+/**
+ * Product-proof slot: a real screenshot only. Without a file it shows a clean,
+ * labelled empty frame naming the screenshot to capture (never generated UI).
+ */
+export function ScreenshotSlot({
+  slot,
+  title,
+  className = "",
+}: {
+  slot: PitchScreenSlot;
+  title: string;
+  className?: string;
+}) {
+  const shot = useScreenshot(slot);
+  return (
+    <figure
+      className={`relative flex min-h-0 flex-col overflow-hidden rounded-[1cqw] border border-white/15 bg-[#0b1526] shadow-[0_1.4cqw_3.2cqw_rgba(0,0,0,.5)] ${className}`}
+    >
+      <div className="flex shrink-0 items-center gap-[0.35cqw] bg-[#0c1b2e] px-[0.8cqw] py-[0.4cqw]" aria-hidden="true">
+        <span className="size-[0.5cqw] rounded-full bg-[#ff5f57]" />
+        <span className="size-[0.5cqw] rounded-full bg-[#febc2e]" />
+        <span className="size-[0.5cqw] rounded-full bg-[#28c840]" />
+      </div>
+      {shot ? (
+        <div className="relative min-h-0 flex-1 overflow-hidden bg-[#f3f6fb]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={shot} alt={`PREMIFLOW ${title} screen`} className="absolute inset-0 h-full w-full object-cover object-top" />
+        </div>
+      ) : (
+        <div className="relative flex min-h-0 flex-1 flex-col items-center justify-center gap-[0.6cqw] border-[0.12cqw] border-dashed border-white/15 bg-[radial-gradient(80%_80%_at_50%_0%,rgba(46,230,214,.10),transparent_70%)] m-[0.7cqw] rounded-[0.7cqw] text-center">
+          <ImageIcon className="size-[2.2cqw] text-white/35" aria-hidden="true" />
+          <span className="text-[1.05cqw] font-semibold text-white/70">Screenshot slot</span>
+          <span className="font-mono text-[0.85cqw] text-white/40">public{PITCH_SCREENSHOT_PATHS[slot]}</span>
+        </div>
+      )}
+      <figcaption className="absolute bottom-[0.8cqw] left-[0.8cqw] rounded-full bg-[#050b16]/85 px-[0.9cqw] py-[0.3cqw] text-[0.95cqw] font-semibold text-white shadow-[0_0.4cqw_1cqw_rgba(0,0,0,.35)]">
+        {title}
+      </figcaption>
+    </figure>
   );
 }
 
