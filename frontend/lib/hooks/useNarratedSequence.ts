@@ -92,6 +92,7 @@ export function useNarratedSequence({
   overrunCapMs,
   initialVoiceOn = true,
   speechRate = 1,
+  autoAdvance = true,
 }: {
   items: readonly NarratedItem[];
   voiceoverSrc: string | null;
@@ -100,6 +101,8 @@ export function useNarratedSequence({
   /** Landing player starts with voice off; the user turns it on. */
   initialVoiceOn?: boolean;
   speechRate?: number;
+  /** false: hold (paused) at the end of each item until play / next. Record Mode always advances. */
+  autoAdvance?: boolean;
 }): NarratedSequence {
   const [status, setStatus] = useState<SequenceStatus>("idle");
   const [index, setIndex] = useState(0);
@@ -126,6 +129,7 @@ export function useNarratedSequence({
   const sourceRef = useRef<VoiceSource>("none");
   const timersRef = useRef<number[]>([]);
   const enteredFullscreenRef = useRef(false);
+  const autoAdvanceRef = useRef(autoAdvance);
 
   const voiceover = audioFailed ? null : voiceoverSrc;
   const source: VoiceSource = voiceover ? "audio" : speechOk ? "speech" : "none";
@@ -133,6 +137,10 @@ export function useNarratedSequence({
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
+
+  useEffect(() => {
+    autoAdvanceRef.current = autoAdvance || recordMode;
+  }, [autoAdvance, recordMode]);
   useEffect(() => {
     sourceRef.current = source;
   }, [source]);
@@ -293,6 +301,14 @@ export function useNarratedSequence({
             finish(list);
             return;
           }
+          if (!autoAdvanceRef.current) {
+            stopSpeech();
+            elapsedRef.current = item.durationMs;
+            setElapsed(item.durationMs);
+            setStatus("paused");
+            statusRef.current = "paused";
+            return;
+          }
           indexRef.current = following;
           elapsedRef.current = 0;
           setIndex(following);
@@ -305,7 +321,7 @@ export function useNarratedSequence({
       setElapsed(next);
     }, TICK_MS);
     return () => window.clearInterval(id);
-  }, [status, narrate, overrunCapMs]);
+  }, [status, narrate, overrunCapMs, stopSpeech]);
 
   const pause = useCallback(() => {
     if (statusRef.current !== "playing") return;

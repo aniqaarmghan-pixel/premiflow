@@ -4,75 +4,87 @@ import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react
 import {
   ArrowRight,
   BadgeCheck,
-  Bell,
   Briefcase,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
-  Clock,
-  Coins,
+  CreditCard,
+  Eye,
+  FileCode,
   FileText,
   Gavel,
-  Handshake,
   Layers,
-  LifeBuoy,
-  Lock,
   MessageSquare,
   Pause,
   Play,
+  Puzzle,
+  Receipt,
+  Repeat,
   RotateCcw,
-  Scale,
-  Search,
-  ShieldCheck,
+  ShieldAlert,
   Sparkles,
   StickyNote,
   Store,
-  Users,
+  UserRound,
   Video,
   Volume2,
   VolumeX,
   Wallet,
-  Waves,
   Zap,
 } from "lucide-react";
 
+import { TypeMotif } from "@/components/contracts/TypeMotif";
 import { formatDemoTime } from "@/lib/app/landing-explainer";
 import { MARKETPLACE_PITCH_VOICEOVER, isSafeHeroMediaSrc } from "@/lib/app/marketplace-media";
 import {
   PITCH_CLIP_SLOTS,
+  PITCH_SCREENSHOT_SLOTS,
   PITCH_SLIDES,
   PITCH_SPEECH_OVERRUN_CAP_MS,
   pitchTotalWords,
   type PitchClipSlot,
 } from "@/lib/app/pitch-deck";
-import { SUBSCRIPTION_PLANS, planPriceLabel } from "@/lib/app/subscription-plans";
+import { SUBSCRIPTION_PLANS } from "@/lib/app/subscription-plans";
 import { useNarratedSequence } from "@/lib/hooks/useNarratedSequence";
 import { CaptionBand, ControlButton, CountdownOverlay, DemoMark, RecordOverlay, describeVoice } from "./DemoKit";
+import { ProductScreen, Scaled } from "./PitchScreens";
 
 /**
- * Private PREMIFLOW pitch deck (/demo/pitch): 10 slides in one 16:9
- * composition for live presenting, screen recording, and later PPT/PDF
- * export. Reuses the /demo narration engine (voice, captions, Record Mode).
- * Presentation only; every product fact maps to the current codebase.
+ * PREMIFLOW pitch deck (/demo/pitch): 10 slides in one 16:9 composition for
+ * live presenting and one-take screen recording. Product visuals are real
+ * screenshots when configured (PITCH_SCREENSHOT_SLOTS) and otherwise the real
+ * app components rendered with sample data. Presentation only.
  */
 
 const SLIDES = PITCH_SLIDES;
 
 /**
  * studio=false: clean presentation view (/demo/pitch).
- * studio=true: internal /demo/pitch/studio with Record Presentation, speaker
- * notes, slide list, browser-voice details and script stats.
+ * studio=true: internal /demo/pitch/studio with Record Presentation, Autoplay,
+ * slide timing, narration script and speaker notes.
  */
 export function PitchDeck({ studio = false }: { studio?: boolean } = {}) {
+  const [autoplay, setAutoplay] = useState(true);
+  const [captionsOn, setCaptionsOn] = useState(true);
+  const [notesOn, setNotesOn] = useState(true);
   const seq = useNarratedSequence({
     items: SLIDES,
     voiceoverSrc: MARKETPLACE_PITCH_VOICEOVER,
     overrunCapMs: PITCH_SPEECH_OVERRUN_CAP_MS,
+    // Record Mode always runs as one continuous take.
+    autoAdvance: !studio || autoplay,
   });
-  const [captionsOn, setCaptionsOn] = useState(true);
-  const [notesOn, setNotesOn] = useState(true);
-  const { status, index, elapsed, position, totalMs, voiceOn, recordMode, countdownLabel, jumpTo } = seq;
+  const { status, index, elapsed, position, totalMs, voiceOn, recordMode, countdownLabel, jumpTo, play } = seq;
   const slide = SLIDES[index];
+  const manual = studio && !autoplay && !recordMode;
+
+  /** Manual (Autoplay off): moving to a slide narrates it, then holds. */
+  const go = (i: number) => {
+    if (i < 0 || i >= SLIDES.length) return;
+    const resume = manual && status === "paused";
+    jumpTo(i);
+    if (resume) play();
+  };
 
   // Keyboard: arrows / Page keys move between slides; Home / End jump.
   useEffect(() => {
@@ -80,16 +92,16 @@ export function PitchDeck({ studio = false }: { studio?: boolean } = {}) {
       const el = e.target as HTMLElement | null;
       if (el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName))) return;
       if (e.altKey || e.ctrlKey || e.metaKey) return;
-      if (e.key === "ArrowRight" || e.key === "PageDown") jumpTo(index + 1);
-      else if (e.key === "ArrowLeft" || e.key === "PageUp") jumpTo(index - 1);
-      else if (e.key === "Home") jumpTo(0);
-      else if (e.key === "End") jumpTo(SLIDES.length - 1);
+      if (e.key === "ArrowRight" || e.key === "PageDown") go(index + 1);
+      else if (e.key === "ArrowLeft" || e.key === "PageUp") go(index - 1);
+      else if (e.key === "Home") go(0);
+      else if (e.key === "End") go(SLIDES.length - 1);
       else return;
       e.preventDefault();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [index, jumpTo]);
+  });
 
   const stage = (
     <PitchStage
@@ -121,7 +133,7 @@ export function PitchDeck({ studio = false }: { studio?: boolean } = {}) {
 
       <div className="mt-4 flex min-w-0 flex-wrap items-center gap-2" role="toolbar" aria-label="Presentation controls">
         <ControlButton
-          onClick={() => jumpTo(index - 1)}
+          onClick={() => go(index - 1)}
           disabled={index === 0}
           icon={<ChevronLeft size={16} aria-hidden="true" />}
           label="Previous"
@@ -130,14 +142,14 @@ export function PitchDeck({ studio = false }: { studio?: boolean } = {}) {
           <ControlButton onClick={seq.pause} icon={<Pause size={16} aria-hidden="true" />} label="Pause" primary />
         ) : (
           <ControlButton
-            onClick={seq.play}
+            onClick={play}
             icon={<Play size={16} aria-hidden="true" />}
             label={status === "paused" ? "Resume" : "Play narrated"}
             primary
           />
         )}
         <ControlButton
-          onClick={() => jumpTo(index + 1)}
+          onClick={() => go(index + 1)}
           disabled={index === SLIDES.length - 1}
           icon={<ChevronRight size={16} aria-hidden="true" />}
           label="Next"
@@ -158,6 +170,12 @@ export function PitchDeck({ studio = false }: { studio?: boolean } = {}) {
         {studio ? (
           <>
             <ControlButton
+              onClick={() => setAutoplay((v) => !v)}
+              pressed={autoplay}
+              icon={<Repeat size={16} aria-hidden="true" />}
+              label={autoplay ? "Autoplay On" : "Autoplay Off"}
+            />
+            <ControlButton
               onClick={() => setNotesOn((v) => !v)}
               pressed={notesOn}
               icon={<StickyNote size={16} aria-hidden="true" />}
@@ -176,7 +194,13 @@ export function PitchDeck({ studio = false }: { studio?: boolean } = {}) {
         {studio ? (
           <>
             {" \u00b7 "}
+            <span className="tabular-nums">
+              Slide {formatDemoTime(Math.min(elapsed, slide.durationMs))} / {formatDemoTime(slide.durationMs)}
+            </span>
+            {" \u00b7 "}
             {voiceOn ? describeVoice(seq.voiceSource, seq.voiceName) : "Voice off \u2014 captions only"}
+            {" \u00b7 "}
+            {autoplay ? "Autoplay: slides advance on their own" : "Autoplay off: each slide narrates, then waits for \u2192 / Next"}
             {" \u00b7 "}Keys: {"\u2190"} {"\u2192"} Home End, Esc exits Record Mode
           </>
         ) : (
@@ -188,33 +212,36 @@ export function PitchDeck({ studio = false }: { studio?: boolean } = {}) {
       </p>
 
       {studio ? (
-      <ol className="mt-4 flex min-w-0 flex-wrap gap-1.5" aria-label="Slides">
-        {SLIDES.map((s, i) => (
-          <li key={s.id}>
-            <button
-              type="button"
-              onClick={() => jumpTo(i)}
-              aria-current={i === index ? "step" : undefined}
-              className={`min-h-9 rounded-full border px-3 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
-                i === index ? "border-accent bg-accent-soft text-accent" : "border-line text-ink-soft hover:bg-paper-2"
-              }`}
-            >
-              {i + 1}. {s.label}
-            </button>
-          </li>
-        ))}
-      </ol>
+        <ol className="mt-4 flex min-w-0 flex-wrap gap-1.5" aria-label="Slides">
+          {SLIDES.map((s, i) => (
+            <li key={s.id}>
+              <button
+                type="button"
+                onClick={() => go(i)}
+                aria-current={i === index ? "step" : undefined}
+                className={`min-h-9 rounded-full border px-3 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                  i === index ? "border-accent bg-accent-soft text-accent" : "border-line text-ink-soft hover:bg-paper-2"
+                }`}
+              >
+                {i + 1}. {s.label} <span className="font-normal tabular-nums opacity-70">{formatDemoTime(s.durationMs)}</span>
+              </button>
+            </li>
+          ))}
+        </ol>
       ) : null}
 
       {studio && notesOn ? (
         <section aria-label="Speaker notes" className="mt-5 rounded-[16px] border border-line bg-card p-4 text-sm leading-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-faint">Script {"\u00b7"} {slide.label}</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-ink-faint">Narration {"\u00b7"} {slide.label}</p>
           <p className="mt-1 text-ink">{slide.narration}</p>
           <p className="mt-3 text-xs font-semibold uppercase tracking-[0.16em] text-ink-faint">Notes</p>
           <p className="mt-1 text-ink-soft">{slide.notes}</p>
           <p className="mt-3 text-xs text-ink-faint">
-            Full script: {pitchTotalWords()} words, about {formatDemoTime(totalMs)} at a natural pace. Record Mode counts
-            down 3, 2, 1, plays every slide once with narration and captions, and ends on the closing slide.
+            Full script: {pitchTotalWords()} words, about {formatDemoTime(totalMs)} at 150 words per minute including
+            slide holds. Record Mode counts down 3, 2, 1, plays every slide once with narration and captions, and ends on
+            the closing slide. Screenshot slots in use:{" "}
+            {Object.values(PITCH_SCREENSHOT_SLOTS).filter(Boolean).length} of {Object.keys(PITCH_SCREENSHOT_SLOTS).length}{" "}
+            (drop PNG/WebP files in public/media/pitch/ and set PITCH_SCREENSHOT_SLOTS).
           </p>
         </section>
       ) : null}
@@ -256,7 +283,7 @@ function PitchStage({
     >
       <span
         aria-hidden="true"
-        className="absolute inset-0 bg-[radial-gradient(70%_60%_at_85%_0%,rgba(46,230,214,.16),transparent_60%),radial-gradient(60%_60%_at_0%_100%,rgba(124,140,255,.18),transparent_60%),linear-gradient(160deg,#050b16,#0b1d33)]"
+        className="absolute inset-0 bg-[radial-gradient(70%_60%_at_85%_0%,rgba(46,230,214,.16),transparent_60%),radial-gradient(60%_60%_at_0%_100%,rgba(79,140,255,.18),transparent_60%),linear-gradient(160deg,#050b16,#0b1d33)]"
       />
       {/* Persistent frame branding: shown on every slide, never tied to playback state. */}
       <div className="absolute left-[5cqw] right-[5cqw] top-[2.4cqw] flex items-center justify-between">
@@ -269,11 +296,11 @@ function PitchStage({
       <div
         key={slide.id}
         className={`pf-demo-in absolute left-[5cqw] right-[5cqw] flex flex-col ${
-          brand ? "top-[5cqw] bottom-[11cqw]" : "top-[7.2cqw] bottom-[11.5cqw]"
+          brand ? "top-[5cqw] bottom-[9cqw]" : "top-[6.6cqw] bottom-[11cqw]"
         }`}
       >
         {!brand ? (
-          <h2 className="mb-[1.8cqw] max-w-[80cqw] text-[3cqw] font-bold leading-[1.1] tracking-[-0.025em]">{slide.heading}</h2>
+          <h2 className="mb-[1.6cqw] max-w-[84cqw] text-[3.4cqw] font-bold leading-[1.08] tracking-[-0.03em]">{slide.heading}</h2>
         ) : null}
         <div className="relative min-h-0 flex-1">
           <SlideBody id={slide.id} t={t} />
@@ -285,7 +312,7 @@ function PitchStage({
       {showProgress ? (
         <div aria-hidden="true" className="absolute inset-x-[5cqw] bottom-[1.2cqw] flex gap-[0.4cqw]">
           {SLIDES.map((s, i) => (
-            <span key={s.id} className={`h-[0.25cqw] flex-1 rounded-full ${i <= index ? "bg-[#2ee6d6]" : "bg-white/15"}`} />
+            <span key={s.id} className={`h-[0.25cqw] flex-1 rounded-full transition-colors duration-500 ${i <= index ? "bg-[#2ee6d6]" : "bg-white/15"}`} />
           ))}
         </div>
       ) : null}
@@ -298,72 +325,55 @@ function PitchStage({
 /* ----------------------------- building blocks ----------------------------- */
 
 const CARD = "rounded-[1.2cqw] border border-white/10 bg-white/[0.06] p-[1.4cqw]";
-const ACCENT = "linear-gradient(135deg,#2ee6d6,#7c8cff)";
+const ACCENT = "linear-gradient(135deg,#2ee6d6,#4f8cff)";
+const MODELS = ["Fixed", "Milestone", "Streaming", "Hourly"] as const;
 
 function Appear({ at, t, children, className = "" }: { at: number; t: number; children: ReactNode; className?: string }) {
   if (t < at) return <div className={`${className} invisible`} aria-hidden="true">{children}</div>;
   return <div className={`pf-demo-in ${className}`}>{children}</div>;
 }
 
-function Chip({ children, tone = "cyan" }: { children: ReactNode; tone?: "cyan" | "muted" | "green" | "violet" }) {
-  const cls = {
-    cyan: "bg-[#2ee6d6]/15 text-[#7ff3ea]",
-    muted: "bg-white/10 text-white/75",
-    green: "bg-[#28c840]/15 text-[#5be37a]",
-    violet: "bg-[#7c8cff]/20 text-[#c3caff]",
-  }[tone];
-  return (
-    <span className={`inline-flex items-center gap-[0.4cqw] rounded-full px-[0.9cqw] py-[0.35cqw] text-[1.05cqw] font-semibold ${cls}`}>
-      {children}
-    </span>
-  );
-}
-
-function Bar({ value, tone = ACCENT }: { value: number; tone?: string }) {
-  return (
-    <span className="block h-[0.7cqw] w-full overflow-hidden rounded-full bg-white/10">
-      <span className="block h-full rounded-full" style={{ width: `${Math.min(100, Math.max(0, value * 100))}%`, background: tone }} />
-    </span>
-  );
-}
-
-function Line({ w, tone = "rgba(255,255,255,.22)" }: { w: number; tone?: string }) {
-  return <span className="block h-[0.55cqw] rounded-full" style={{ width: `${w}%`, background: tone }} />;
-}
-
-const ramp = (t: number, start: number, length: number) => Math.min(1, Math.max(0, (t - start) / length));
-
-/** Optional product-demo clip; falls back to the built-in mockup. */
+/** Optional product-demo clip; falls back to the built-in visual. */
 function ClipSlot({ slot, children }: { slot: PitchClipSlot; children: ReactNode }) {
   const src = PITCH_CLIP_SLOTS[slot];
   const reduced = useSyncExternalStore(subscribeReduced, () => window.matchMedia(REDUCED).matches, () => true);
   if (!src || !isSafeHeroMediaSrc(src)) return <>{children}</>;
   return (
     <div className="h-full overflow-hidden rounded-[1.2cqw] border border-white/15 bg-black">
-      <video
-        src={src}
-        muted
-        loop
-        playsInline
-        autoPlay={!reduced}
-        controls={reduced}
-        preload="metadata"
-        className="h-full w-full object-cover"
-      />
+      <video src={src} muted loop playsInline autoPlay={!reduced} controls={reduced} preload="metadata" className="h-full w-full object-cover" />
     </div>
   );
 }
 
-function WindowFrame({ title, children, className = "" }: { title: string; children: ReactNode; className?: string }) {
+function DevnetPill() {
   return (
-    <div className={`flex min-h-0 flex-col overflow-hidden rounded-[1.1cqw] border border-white/10 bg-[#0b1526] ${className}`}>
-      <div className="flex items-center gap-[0.4cqw] border-b border-white/10 px-[1cqw] py-[0.6cqw]">
-        <span className="size-[0.6cqw] rounded-full bg-[#ff5f57]" />
-        <span className="size-[0.6cqw] rounded-full bg-[#febc2e]" />
-        <span className="size-[0.6cqw] rounded-full bg-[#28c840]" />
-        <span className="ml-[0.6cqw] text-[0.95cqw] font-semibold text-white/70">{title}</span>
-      </div>
-      <div className="min-h-0 flex-1 p-[1cqw]">{children}</div>
+    <span className="inline-flex items-center gap-[0.6cqw] rounded-full border border-[#2ee6d6]/40 bg-[#2ee6d6]/10 px-[1.3cqw] py-[0.5cqw] text-[1.2cqw] font-semibold text-[#7ff3ea]">
+      <span className="pf-preview-dot size-[0.6cqw] rounded-full bg-[#2ee6d6]" aria-hidden="true" /> Running on Solana Devnet
+    </span>
+  );
+}
+
+function BrandSlide({ t, closing }: { t: number; closing: boolean }) {
+  return (
+    <div className="relative flex h-full flex-col items-center justify-center text-center">
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute left-1/2 top-[38%] size-[34cqw] -translate-x-1/2 -translate-y-1/2 rounded-full bg-[radial-gradient(circle,rgba(46,230,214,.18),transparent_65%)]"
+      />
+      <DemoMark h={closing ? 8.4 : 7.4} />
+      <p className="mt-[2.2cqw] text-[3.3cqw] font-bold tracking-[-0.025em]">Freelance work. Protected on Solana.</p>
+      <p className="mt-[0.8cqw] text-[1.7cqw] text-white/70">One freelance marketplace. Four ways to get paid.</p>
+      <Appear at={closing ? 600 : 1200} t={t} className="mt-[2cqw] flex items-center gap-[0.8cqw]">
+        {MODELS.map((m, i) => (
+          <span key={m} className="flex items-center gap-[0.8cqw]">
+            {i > 0 ? <span className="text-[1.4cqw] text-[#2ee6d6]" aria-hidden="true">{"\u2022"}</span> : null}
+            <span className="rounded-full border border-white/20 bg-white/5 px-[1.4cqw] py-[0.55cqw] text-[1.35cqw] font-semibold">{m}</span>
+          </span>
+        ))}
+      </Appear>
+      <Appear at={closing ? 1200 : 2200} t={t} className="mt-[1.8cqw]">
+        <DevnetPill />
+      </Appear>
     </div>
   );
 }
@@ -373,432 +383,325 @@ function WindowFrame({ title, children, className = "" }: { title: string; child
 function SlideBody({ id, t }: { id: (typeof SLIDES)[number]["id"]; t: number }) {
   switch (id) {
     case "title":
-      return (
-        <div className="flex h-full flex-col items-center justify-center text-center">
-          <DemoMark h={7} />
-          <p className="mt-[2.2cqw] text-[3cqw] font-semibold tracking-[-0.02em]">Freelance work. Protected on Solana.</p>
-          <p className="mt-[0.8cqw] text-[1.6cqw] text-white/70">One freelance marketplace. Four ways to get paid.</p>
-          <Appear at={1200} t={t} className="mt-[2.2cqw] flex gap-[1cqw]">
-            {["Fixed", "Milestone", "Streaming", "Hourly"].map((m) => (
-              <span key={m} className="rounded-full border border-white/20 bg-white/5 px-[1.4cqw] py-[0.6cqw] text-[1.3cqw] font-semibold">
-                {m}
-              </span>
-            ))}
-          </Appear>
-        </div>
-      );
+      return <BrandSlide t={t} closing={false} />;
+
     case "problem": {
-      const items = [
-        { icon: Handshake, title: "Trust between strangers", body: "Work often starts before either side knows the other." },
-        { icon: Lock, title: "Rigid payment structures", body: "One payment model rarely fits every kind of work." },
-        { icon: Clock, title: "Manual payment follow-up", body: "Freelancers spend time chasing what they are owed." },
-        { icon: Layers, title: "Fragmented tools", body: "Discovery, agreements and payments live in different places." },
-        { icon: Scale, title: "Difficult disputes", body: "Evidence is scattered and outcomes are hard to reach." },
+      const problems = [
+        { icon: Layers, text: "Hiring and payments often happen across separate tools" },
+        { icon: Wallet, text: "Freelancers worry about getting paid" },
+        { icon: ShieldAlert, text: "Employers worry about paying before acceptable work is delivered" },
+        { icon: Puzzle, text: "One payment structure does not fit every kind of freelance work" },
+      ];
+      const tools = [
+        { icon: Store, label: "Job board" },
+        { icon: MessageSquare, label: "Chat app" },
+        { icon: FileText, label: "Contract docs" },
+        { icon: CreditCard, label: "Payment app" },
       ];
       return (
-        <div className="grid h-full grid-cols-6 gap-[1.2cqw]">
-          {items.map(({ icon: Icon, title, body }, i) => (
-            <Appear key={title} at={i * 700} t={t} className={`${CARD} ${i < 3 ? "col-span-2" : "col-span-3"} flex flex-col`}>
-              <Icon className="size-[2.2cqw] text-[#2ee6d6]" aria-hidden="true" />
-              <p className="mt-[0.8cqw] text-[1.5cqw] font-bold">{title}</p>
-              <p className="mt-[0.3cqw] text-[1.15cqw] leading-snug text-white/65">{body}</p>
+        <div className="grid h-full grid-cols-[1.15fr_1fr] gap-[2cqw]">
+          <div className="grid grid-cols-2 grid-rows-2 gap-[1.2cqw]">
+            {problems.map(({ icon: Icon, text }, i) => (
+              <Appear key={text} at={i * 900} t={t} className={`${CARD} flex flex-col`}>
+                <span className="flex size-[3.4cqw] items-center justify-center rounded-[0.9cqw] bg-[#2ee6d6]/12">
+                  <Icon className="size-[1.9cqw] text-[#2ee6d6]" aria-hidden="true" />
+                </span>
+                <p className="mt-auto text-[1.55cqw] font-semibold leading-snug">{text}</p>
+              </Appear>
+            ))}
+          </div>
+          <div className={`${CARD} flex items-center justify-between gap-[1cqw]`}>
+            <Person icon={Briefcase} label="Employer" />
+            <div className="flex flex-1 flex-col gap-[1cqw]">
+              {tools.map(({ icon: Icon, label }, i) => (
+                <Appear key={label} at={500 + i * 600} t={t} className="flex items-center gap-[0.5cqw]">
+                  <span className="h-0 flex-1 border-t-[0.15cqw] border-dashed border-white/25" />
+                  <span className="flex items-center gap-[0.5cqw] rounded-full border border-white/15 bg-[#0c1b2e] px-[1cqw] py-[0.45cqw] text-[1.1cqw] font-semibold text-white/80">
+                    <Icon className="size-[1.2cqw] text-white/60" aria-hidden="true" /> {label}
+                  </span>
+                  <span className="h-0 w-[1.2cqw] border-t-[0.15cqw] border-dashed border-white/25" />
+                  <span className="text-[1cqw] font-bold text-[#ff8a8a]/80" aria-hidden="true">{"\u00d7"}</span>
+                  <span className="h-0 flex-1 border-t-[0.15cqw] border-dashed border-white/25" />
+                </Appear>
+              ))}
+            </div>
+            <Person icon={UserRound} label="Freelancer" />
+          </div>
+        </div>
+      );
+    }
+
+    case "solution": {
+      const flow = ["Discover", "Proposal", "Protected Offer", "Work", "Approval", "Payment"];
+      const lit = Math.min(flow.length, Math.floor(t / 1000) + 1);
+      const points = [
+        "Marketplace discovery",
+        "Clear contract terms",
+        "Protected funding",
+        "Flexible payment models",
+        "Work review",
+        "Dispute resolution",
+      ];
+      return (
+        <div className="flex h-full flex-col gap-[1.4cqw]">
+          <div className="flex items-center gap-[0.5cqw]">
+            {flow.map((s, i) => (
+              <div key={s} className="flex flex-1 items-center gap-[0.5cqw]">
+                <div
+                  className={`flex min-h-[3.8cqw] flex-1 items-center justify-center rounded-full border px-[0.8cqw] text-center text-[1.25cqw] font-semibold transition duration-500 ${
+                    i < lit ? "border-[#2ee6d6]/60 bg-[#2ee6d6]/12 text-white" : "border-white/10 text-white/35"
+                  }`}
+                >
+                  {s}
+                </div>
+                {i < flow.length - 1 ? <ArrowRight className="size-[1.3cqw] shrink-0 text-white/40" aria-hidden="true" /> : null}
+              </div>
+            ))}
+          </div>
+          <div className="grid min-h-0 flex-1 grid-cols-[1fr_1fr_0.62fr] gap-[1.4cqw]">
+            <ProductScreen slot="marketplace" title="Marketplace" className="h-full" />
+            <ClipSlot slot="contract">
+              <ProductScreen slot="contract" title="Contract" className="h-full" />
+            </ClipSlot>
+            <ul className="flex flex-col justify-center gap-[0.7cqw]">
+              {points.map((p, i) => (
+                <Appear key={p} at={i * 500} t={t} className="flex items-center gap-[0.7cqw] rounded-[0.8cqw] bg-white/[0.06] px-[1cqw] py-[0.65cqw]">
+                  <CheckCircle2 className="size-[1.4cqw] shrink-0 text-[#2ee6d6]" aria-hidden="true" />
+                  <span className="text-[1.2cqw] font-semibold">{p}</span>
+                </Appear>
+              ))}
+            </ul>
+          </div>
+        </div>
+      );
+    }
+
+    case "how": {
+      const steps = [
+        { label: "Find work or talent", slot: "marketplace", title: "Marketplace" },
+        { label: "Send or review proposal", slot: "proposals", title: "Proposals" },
+        { label: "Create & fund offer", slot: "offer", title: "Create contract" },
+        { label: "Freelancer accepts", slot: "accept", title: "Offer" },
+        { label: "Submit & review work", slot: "work", title: "Work review" },
+        { label: "Release or withdraw earnings", slot: "earnings", title: "Earnings" },
+      ] as const;
+      const active = Math.min(steps.length - 1, Math.floor(t / 1900));
+      return (
+        <div className="grid h-full grid-cols-3 grid-rows-2 gap-[1.2cqw]">
+          {steps.map((s, i) => (
+            <Appear
+              key={s.label}
+              at={i * 1500}
+              t={t}
+              className={`flex min-h-0 flex-col gap-[0.6cqw] rounded-[1.2cqw] border p-[0.8cqw] transition duration-500 ${
+                i === active ? "border-[#2ee6d6]/70 bg-[#2ee6d6]/10" : "border-white/10 bg-white/[0.04]"
+              }`}
+            >
+              <p className="flex items-center gap-[0.7cqw] text-[1.25cqw] font-bold">
+                <span className="flex size-[2cqw] shrink-0 items-center justify-center rounded-full text-[1.05cqw] text-[#04101f]" style={{ background: ACCENT }}>
+                  {i + 1}
+                </span>
+                {s.label}
+              </p>
+              <ProductScreen slot={s.slot} title={s.title} width={1100} compact className="min-h-0 flex-1" />
             </Appear>
           ))}
         </div>
       );
     }
-    case "solution": {
-      const steps = ["Find work / Hire talent", "Proposal", "Agree terms", "Protected contract", "Work", "Approval", "Payment"];
-      const shown = Math.min(steps.length, Math.floor(t / 900) + 1);
-      return (
-        <div className="flex h-full flex-col gap-[1.4cqw]">
-          <div className="flex items-stretch gap-[0.5cqw]">
-            {steps.map((s, i) => (
-              <div key={s} className="flex flex-1 items-center gap-[0.5cqw]">
-                <div
-                  className={`flex min-h-[4.6cqw] flex-1 items-center justify-center rounded-[0.9cqw] border px-[0.6cqw] text-center text-[1.05cqw] font-semibold leading-tight transition duration-500 ${
-                    i < shown
-                      ? i >= 3
-                        ? "border-[#2ee6d6]/60 bg-[#2ee6d6]/12 text-white"
-                        : "border-[#7c8cff]/50 bg-[#7c8cff]/12 text-white"
-                      : "border-white/10 text-white/30"
-                  }`}
-                >
-                  {s}
-                </div>
-                {i < steps.length - 1 ? <ArrowRight className="size-[1.2cqw] shrink-0 text-white/35" aria-hidden="true" /> : null}
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-7 gap-[0.5cqw] text-[1cqw] font-semibold">
-            <span className="col-span-3 rounded-full bg-[#7c8cff]/15 py-[0.4cqw] text-center text-[#c3caff]">Familiar marketplace UX</span>
-            <span className="col-span-4 rounded-full bg-[#2ee6d6]/15 py-[0.4cqw] text-center text-[#7ff3ea]">Funding and settlement on Solana</span>
-          </div>
-          <div className="grid min-h-0 flex-1 grid-cols-[3fr_2fr] gap-[1.4cqw]">
-            <ClipSlot slot="contract">
-              <WindowFrame title="Protected contract" className="h-full">
-                <div className="grid h-full grid-cols-2 gap-[1cqw]">
-                  <div className="space-y-[0.6cqw] text-[1.05cqw]">
-                    {[
-                      ["Payment model", "Milestone"],
-                      ["Total", "$2,400"],
-                      ["Schedule", "3 milestones"],
-                      ["Resolver", "Human resolver"],
-                    ].map(([k, v]) => (
-                      <p key={k} className="flex justify-between rounded-[0.6cqw] bg-white/5 px-[0.8cqw] py-[0.45cqw]">
-                        <span className="text-white/60">{k}</span>
-                        <span className="font-semibold">{v}</span>
-                      </p>
-                    ))}
-                  </div>
-                  <div className="flex flex-col justify-center gap-[0.8cqw]">
-                    <p className="text-[1.05cqw] text-white/60">Escrow</p>
-                    <Bar value={ramp(t, 3000, 3500)} />
-                    <Chip tone={ramp(t, 3000, 3500) >= 1 ? "green" : "muted"}>
-                      {ramp(t, 3000, 3500) >= 1 ? "Funded" : "Funding\u2026"}
-                    </Chip>
-                  </div>
-                </div>
-              </WindowFrame>
-            </ClipSlot>
-            <div className={`${CARD} flex flex-col justify-center`}>
-              <p className="text-[1.5cqw] font-bold leading-snug">Normal marketplace UX, Solana-powered funding and settlement.</p>
-              <p className="mt-[0.8cqw] text-[1.15cqw] leading-snug text-white/65">
-                Discovery, proposals and messaging work like the web apps people know. Contract funding and payment
-                release run on Solana.
-              </p>
-            </div>
-          </div>
-        </div>
-      );
-    }
+
     case "models": {
-      const stream = ramp(t, 1000, 9000);
+      const cards = [
+        { type: "Fixed", body: "One agreed payment for clearly scoped work.", at: 1800 },
+        { type: "Milestone", body: "Break larger projects into stages with staged progress and payment.", at: 4400 },
+        { type: "Streaming", body: "Earnings accrue over time for ongoing work.", at: 7000 },
+        { type: "Hourly", body: "Payment follows approved working time.", at: 10400 },
+      ] as const;
+      const active = cards.reduce((acc, c, i) => (t >= c.at ? i : acc), -1);
       return (
-        <div className="grid h-full grid-cols-4 gap-[1.2cqw]">
-          <Appear at={0} t={t} className={`${CARD} flex flex-col`}>
-            <FileText className="size-[2.2cqw] text-[#2ee6d6]" aria-hidden="true" />
-            <p className="mt-[0.8cqw] text-[1.7cqw] font-bold">Fixed</p>
-            <p className="text-[1.15cqw] text-white/65">One agreed payment.</p>
-            <div className="mt-auto rounded-[0.9cqw] border border-white/10 bg-white/5 p-[1cqw] text-center">
-              <p className="text-[2.4cqw] font-extrabold tracking-[-0.02em]">$900</p>
-              <Chip tone="green"><CheckCircle2 className="size-[1cqw]" aria-hidden="true" /> On approval</Chip>
-            </div>
-          </Appear>
-          <Appear at={600} t={t} className={`${CARD} flex flex-col`}>
-            <Layers className="size-[2.2cqw] text-[#7c8cff]" aria-hidden="true" />
-            <p className="mt-[0.8cqw] text-[1.7cqw] font-bold">Milestone</p>
-            <p className="text-[1.15cqw] text-white/65">Release payment stage by stage.</p>
-            <div className="mt-auto space-y-[0.6cqw]">
-              {["Design", "Build", "Launch"].map((m, i) => {
-                const done = t > 2500 + i * 2200;
-                return (
-                  <p key={m} className="flex items-center justify-between rounded-[0.6cqw] bg-white/5 px-[0.8cqw] py-[0.45cqw] text-[1.05cqw]">
-                    <span>{m}</span>
-                    {done ? <CheckCircle2 className="size-[1.2cqw] text-[#5be37a]" aria-hidden="true" /> : <span className="text-white/40">Pending</span>}
-                  </p>
-                );
-              })}
-            </div>
-          </Appear>
-          <Appear at={1200} t={t} className={`${CARD} flex flex-col`}>
-            <Waves className="size-[2.2cqw] text-[#2ee6d6]" aria-hidden="true" />
-            <p className="mt-[0.8cqw] text-[1.7cqw] font-bold">Streaming</p>
-            <p className="text-[1.15cqw] text-white/65">Earnings accrue over time.</p>
-            <div className="mt-auto">
-              <svg viewBox="0 0 200 90" className="h-[7cqw] w-full" aria-hidden="true">
-                <defs>
-                  <linearGradient id="pitch-stream" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0" stopColor="#7c8cff" />
-                    <stop offset="1" stopColor="#2ee6d6" />
-                  </linearGradient>
-                </defs>
-                <path d="M0 88 L200 10 L200 90 L0 90 Z" fill="url(#pitch-stream)" opacity="0.15" />
-                <path d="M0 88 L200 10" stroke="rgba(255,255,255,.15)" strokeWidth="2" fill="none" />
-                <path d={`M0 88 L${200 * stream} ${88 - 78 * stream}`} stroke="url(#pitch-stream)" strokeWidth="4" fill="none" strokeLinecap="round" />
-                <circle cx={200 * stream} cy={88 - 78 * stream} r="5" fill="#2ee6d6" />
-              </svg>
-              <p className="text-[1.05cqw] text-white/60">Accrued {Math.round(stream * 100)}%</p>
-            </div>
-          </Appear>
-          <Appear at={1800} t={t} className={`${CARD} flex flex-col`}>
-            <Clock className="size-[2.2cqw] text-[#7c8cff]" aria-hidden="true" />
-            <p className="mt-[0.8cqw] text-[1.7cqw] font-bold">Hourly</p>
-            <p className="text-[1.15cqw] text-white/65">Payment follows approved working time.</p>
-            <div className="mt-auto space-y-[0.45cqw] text-[1.05cqw]">
-              {[
-                ["Mon", 0.5, "2.5 h"],
-                ["Tue", 0.7, "3.5 h"],
-                ["Wed", 0.4, "2.0 h"],
-              ].map(([d, w, h], i) => (
-                <p key={d as string} className="flex items-center gap-[0.6cqw]">
-                  <span className="w-[2.6cqw] text-white/60">{d}</span>
-                  <span className="flex-1"><Bar value={(w as number) * ramp(t, 2500 + i * 1500, 1200)} tone="#7c8cff" /></span>
-                  <span className="w-[3.4cqw] text-right">{h}</span>
-                </p>
-              ))}
-              <Chip tone="green"><BadgeCheck className="size-[1cqw]" aria-hidden="true" /> Approved sessions</Chip>
-            </div>
-          </Appear>
+        <div className="grid h-full grid-cols-4 gap-[1.3cqw]">
+          {cards.map((c, i) => (
+            <Appear
+              key={c.type}
+              at={i * 350}
+              t={t}
+              className={`flex flex-col rounded-[1.3cqw] border p-[1.3cqw] transition duration-500 ${
+                i === active
+                  ? "border-[#2ee6d6]/70 bg-[linear-gradient(180deg,rgba(46,230,214,.14),rgba(255,255,255,.04))] shadow-[0_1.5cqw_3cqw_-1.5cqw_rgba(46,230,214,.5)]"
+                  : "border-white/10 bg-white/[0.05]"
+              }`}
+            >
+              <div className="overflow-hidden rounded-[0.9cqw] bg-white">
+                <Scaled width={240} className="aspect-[5/2]">
+                  <TypeMotif type={c.type} active={i === active} />
+                </Scaled>
+              </div>
+              <p className="mt-[1.4cqw] text-[1.1cqw] font-bold uppercase tracking-[0.2em] text-[#7ff3ea]">{c.type}</p>
+              <p className="mt-[0.6cqw] text-[1.6cqw] font-semibold leading-snug">{c.body}</p>
+            </Appear>
+          ))}
         </div>
       );
     }
-    case "product":
+
+    case "protection":
       return (
-        <div className="grid h-full grid-cols-[3fr_1fr] gap-[1.4cqw]">
-          <ClipSlot slot="product">
-            <div className="grid h-full grid-cols-2 grid-rows-2 gap-[1cqw]">
-              <WindowFrame title="Marketplace">
-                <div className="space-y-[0.5cqw]">
-                  <p className="flex items-center gap-[0.5cqw] rounded-full bg-white/5 px-[0.8cqw] py-[0.35cqw] text-[0.95cqw] text-white/50">
-                    <Search className="size-[1cqw]" aria-hidden="true" /> Search jobs, gigs, freelancers
-                  </p>
-                  {[["Anchor escrow program", "$2,400"], ["Next.js marketing site", "$900"]].map(([a, b]) => (
-                    <p key={a} className="flex justify-between rounded-[0.6cqw] bg-white/5 px-[0.8cqw] py-[0.4cqw] text-[1cqw]">
-                      <span className="truncate">{a}</span>
-                      <span className="font-semibold text-[#7ff3ea]">{b}</span>
-                    </p>
-                  ))}
-                </div>
-              </WindowFrame>
-              <WindowFrame title="Proposals">
-                <div className="space-y-[0.5cqw] text-[1cqw]">
-                  {[["Ava Chen", true], ["Sam Rivera", false], ["Kai Morgan", false]].map(([n, sel]) => (
-                    <p key={n as string} className={`flex items-center justify-between rounded-[0.6cqw] px-[0.8cqw] py-[0.4cqw] ${sel ? "bg-[#2ee6d6]/12 ring-1 ring-[#2ee6d6]/50" : "bg-white/5"}`}>
-                      <span>{n}</span>
-                      <span className={sel ? "font-semibold text-[#7ff3ea]" : "text-white/50"}>{sel ? "Selected" : "View"}</span>
-                    </p>
-                  ))}
-                </div>
-              </WindowFrame>
-              <WindowFrame title="Create & Send Offer">
-                <div className="space-y-[0.5cqw]">
-                  <Line w={70} />
-                  <Line w={55} />
-                  <Line w={62} />
-                  <span className="mt-[0.6cqw] inline-block rounded-full px-[1cqw] py-[0.4cqw] text-[0.95cqw] font-bold text-[#04101f]" style={{ background: ACCENT }}>
-                    Send protected offer
-                  </span>
-                </div>
-              </WindowFrame>
-              <WindowFrame title="Messages">
-                <div className="flex h-full flex-col gap-[0.5cqw] text-[0.95cqw]">
-                  <span className="max-w-[70%] self-start rounded-[0.8cqw] bg-white/10 px-[0.8cqw] py-[0.4cqw]">Milestone 1 is ready for review.</span>
-                  <span className="max-w-[70%] self-end rounded-[0.8cqw] bg-[#7c8cff]/40 px-[0.8cqw] py-[0.4cqw]">Looks good, approving now.</span>
-                  <span className="mt-auto inline-flex items-center gap-[0.4cqw] self-start text-white/60">
-                    <Bell className="size-[1cqw]" aria-hidden="true" /> Payment released
-                  </span>
-                </div>
-              </WindowFrame>
+        <div className="grid h-full grid-cols-[1fr_1.12fr] gap-[1.8cqw]">
+          <div className="flex min-h-0 flex-col gap-[1.2cqw]">
+            <div className={CARD}>
+              <p className="text-[1.05cqw] font-semibold uppercase tracking-[0.16em] text-white/55">Before acceptance, the freelancer can</p>
+              <div className="mt-[0.8cqw] flex gap-[0.7cqw]">
+                <span className="rounded-full px-[1.4cqw] py-[0.6cqw] text-[1.25cqw] font-bold text-[#04101f]" style={{ background: ACCENT }}>Accept</span>
+                <span className="rounded-full border border-white/35 px-[1.4cqw] py-[0.6cqw] text-[1.25cqw] font-bold">Request Changes</span>
+                <span className="rounded-full border border-white/15 px-[1.4cqw] py-[0.6cqw] text-[1.25cqw] font-semibold text-white/70">Decline</span>
+              </div>
             </div>
-          </ClipSlot>
-          <div className="flex flex-col gap-[0.6cqw]">
-            {[
-              [Store, "Jobs & gigs marketplace"],
-              [Users, "Freelancer discovery"],
-              [Briefcase, "Proposals"],
-              [ShieldCheck, "Protected contracts"],
-              [CheckCircle2, "Submission & review"],
-              [MessageSquare, "Messaging & notifications"],
-              [Coins, "Payment settlement"],
-              [Wallet, "Account & wallet support"],
-            ].map(([Icon, label], i) => {
-              const I = Icon as typeof Store;
-              return (
-                <Appear key={label as string} at={i * 450} t={t} className="flex items-center gap-[0.6cqw] rounded-[0.8cqw] bg-white/[0.06] px-[0.9cqw] py-[0.55cqw]">
-                  <I className="size-[1.3cqw] shrink-0 text-[#2ee6d6]" aria-hidden="true" />
-                  <span className="text-[1.05cqw] font-semibold">{label as string}</span>
-                </Appear>
-              );
-            })}
+            <Appear at={4200} t={t} className="flex items-center gap-[0.6cqw]">
+              {["Request Changes", "Cancel & Revise", "New protected offer"].map((s, i) => (
+                <span key={s} className="flex flex-1 items-center gap-[0.6cqw]">
+                  <span className={`flex min-h-[3.6cqw] flex-1 items-center justify-center rounded-[0.9cqw] border px-[0.6cqw] text-center text-[1.2cqw] font-semibold ${i === 2 ? "border-[#2ee6d6]/60 bg-[#2ee6d6]/12" : "border-white/15 bg-white/[0.05]"}`}>
+                    {s}
+                  </span>
+                  {i < 2 ? <ArrowRight className="size-[1.3cqw] shrink-0 text-white/40" aria-hidden="true" /> : null}
+                </span>
+              ))}
+            </Appear>
+            <Appear at={11500} t={t} className="mt-auto rounded-[1.3cqw] border border-[#2ee6d6]/50 bg-[#2ee6d6]/10 p-[1.5cqw]">
+              <p className="flex items-center gap-[0.8cqw] text-[1.1cqw] font-semibold text-white/70">
+                <Sparkles className="size-[1.4cqw] text-[#c3caff]" aria-hidden="true" /> Neutral case summary
+                <ArrowRight className="size-[1.2cqw] text-white/40" aria-hidden="true" />
+                <Gavel className="size-[1.4cqw] text-[#7ff3ea]" aria-hidden="true" /> Final decision
+              </p>
+              <p className="mt-[0.6cqw] text-[2.7cqw] font-extrabold leading-tight tracking-[-0.02em]">
+                AI assists. <span className="text-[#7ff3ea]">A human resolver decides.</span>
+              </p>
+            </Appear>
           </div>
+          <ProductScreen slot="resolution" title="Resolution Desk" className="h-full" />
         </div>
       );
-    case "protection": {
-      const points = [
-        "Contract funding follows the agreed terms",
-        "Each party submits a statement",
-        "Evidence files and message snapshots",
-        "Submitted evidence kept as immutable case records",
-        "Neutral AI case-summary assistance",
-        "A human resolver makes the final settlement decision",
+
+    case "solana": {
+      const items = [
+        { icon: Zap, label: "Fast transaction finality" },
+        { icon: Receipt, label: "Low transaction costs" },
+        { icon: FileCode, label: "Programmable on-chain agreements" },
+        { icon: Eye, label: "Transparent settlement state" },
       ];
       return (
-        <div className="grid h-full grid-cols-[1.1fr_1fr] gap-[1.8cqw]">
-          <div className="flex flex-col justify-center gap-[0.7cqw]">
-            {points.map((p, i) => (
-              <Appear key={p} at={i * 900} t={t} className="flex items-center gap-[0.8cqw] rounded-[0.9cqw] bg-white/[0.06] px-[1.1cqw] py-[0.7cqw]">
-                <span className="flex size-[2cqw] shrink-0 items-center justify-center rounded-full bg-[#2ee6d6]/15 text-[1cqw] font-bold text-[#7ff3ea]">
-                  {i + 1}
+        <div className="flex h-full flex-col gap-[1.6cqw]">
+          <div className="grid flex-1 grid-cols-4 gap-[1.3cqw]">
+            {items.map(({ icon: Icon, label }, i) => (
+              <Appear key={label} at={i * 700} t={t} className={`${CARD} flex flex-col`}>
+                <span className="flex size-[4.4cqw] items-center justify-center rounded-[1.1cqw] bg-[#2ee6d6]/12">
+                  <Icon className="size-[2.4cqw] text-[#2ee6d6]" aria-hidden="true" />
                 </span>
-                <span className="text-[1.25cqw] font-semibold">{p}</span>
+                <p className="mt-auto text-[1.9cqw] font-bold leading-snug tracking-[-0.01em]">{label}</p>
               </Appear>
             ))}
           </div>
-          <div className={`${CARD} flex flex-col items-center justify-center text-center`}>
-            <div className="flex items-center gap-[1.2cqw]">
-              <span className="flex flex-col items-center gap-[0.4cqw]">
-                <span className="flex size-[5cqw] items-center justify-center rounded-[1.2cqw] bg-[#7c8cff]/20">
-                  <Sparkles className="size-[2.6cqw] text-[#c3caff]" aria-hidden="true" />
-                </span>
-                <span className="text-[1.05cqw] text-white/70">AI summary</span>
-              </span>
-              <ArrowRight className="size-[2cqw] text-white/40" aria-hidden="true" />
-              <span className="flex flex-col items-center gap-[0.4cqw]">
-                <span className="flex size-[5cqw] items-center justify-center rounded-[1.2cqw] bg-[#2ee6d6]/20">
-                  <Gavel className="size-[2.6cqw] text-[#7ff3ea]" aria-hidden="true" />
-                </span>
-                <span className="text-[1.05cqw] text-white/70">Human resolver</span>
-              </span>
-            </div>
-            <p className="mt-[2cqw] text-[2.6cqw] font-extrabold leading-tight tracking-[-0.02em]">
-              AI assists.
-              <br />
-              <span className="text-[#7ff3ea]">A human resolver decides.</span>
-            </p>
-          </div>
+          <Appear at={3600} t={t}>
+            <p className="text-center text-[1.4cqw] text-white/70">The marketplace experience stays familiar for everyday users.</p>
+          </Appear>
         </div>
       );
     }
-    case "solana":
-      return (
-        <div className="grid h-full grid-cols-2 gap-[1.8cqw]">
-          <div className="grid grid-cols-2 gap-[1cqw]">
-            {[
-              [Zap, "Fast settlement"],
-              [Coins, "Low transaction costs"],
-              [Waves, "Fits frequent Streaming and Hourly payments"],
-              [BadgeCheck, "Verifiable funding and settlement actions"],
-            ].map(([Icon, label], i) => {
-              const I = Icon as typeof Zap;
-              return (
-                <Appear key={label as string} at={i * 700} t={t} className={`${CARD} flex flex-col justify-center`}>
-                  <I className="size-[2.4cqw] text-[#2ee6d6]" aria-hidden="true" />
-                  <p className="mt-[0.8cqw] text-[1.45cqw] font-bold leading-snug">{label as string}</p>
-                </Appear>
-              );
-            })}
-          </div>
-          <div className={`${CARD} flex flex-col`}>
-            <p className="text-[1.9cqw] font-bold">Blockchain where it adds value.</p>
-            <div className="mt-[1.2cqw] grid flex-1 grid-cols-2 gap-[1cqw]">
-              <div className="rounded-[1cqw] border border-[#7c8cff]/40 bg-[#7c8cff]/10 p-[1cqw]">
-                <p className="text-[1.1cqw] font-semibold uppercase tracking-[0.12em] text-[#c3caff]">Familiar web</p>
-                <ul className="mt-[0.6cqw] space-y-[0.4cqw] text-[1.2cqw]">
-                  {["Profiles", "Jobs & gigs", "Messages", "Support"].map((x) => <li key={x}>{x}</li>)}
-                </ul>
-              </div>
-              <div className="rounded-[1cqw] border border-[#2ee6d6]/40 bg-[#2ee6d6]/10 p-[1cqw]">
-                <p className="text-[1.1cqw] font-semibold uppercase tracking-[0.12em] text-[#7ff3ea]">On Solana</p>
-                <ul className="mt-[0.6cqw] space-y-[0.4cqw] text-[1.2cqw]">
-                  {["Contract funding", "Payment release", "Dispute settlement"].map((x) => <li key={x}>{x}</li>)}
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      );
+
     case "business":
       return (
         <div className="flex h-full flex-col gap-[1.2cqw]">
           <div className="grid flex-1 grid-cols-3 gap-[1.4cqw]">
-            {SUBSCRIPTION_PLANS.map((plan, i) => (
-              <Appear key={plan.tier} at={i * 800} t={t} className={`${CARD} flex flex-col ${i === 2 ? "border-[#2ee6d6]/60" : ""}`}>
-                <p className="text-[1.15cqw] font-semibold uppercase tracking-[0.16em] text-white/60">{plan.name}</p>
-                <p className="mt-[0.4cqw] text-[2.8cqw] font-extrabold tracking-[-0.02em]">
-                  {plan.monthlyUsd === 0 ? "$0" : planPriceLabel(plan, "Monthly")}
-                </p>
-                <p className="mt-auto text-[3.4cqw] font-extrabold leading-none text-[#7ff3ea]">{`${plan.feeBps / 100}%`}</p>
-                <p className="mt-[0.3cqw] text-[1.1cqw] text-white/65">
-                  {plan.monthlyUsd === 0 ? "Current launch PREMIFLOW platform fee" : "PREMIFLOW platform fee"}
-                </p>
-                {plan.annualUsd > 0 ? (
-                  <p className="mt-[0.4cqw] text-[1cqw] text-white/50">or {planPriceLabel(plan, "Annual")}</p>
-                ) : null}
-              </Appear>
-            ))}
+            {SUBSCRIPTION_PLANS.map((plan, i) => {
+              const free = plan.monthlyUsd === 0;
+              const top = plan.tier === "Premium";
+              return (
+                <Appear
+                  key={plan.tier}
+                  at={i * 700}
+                  t={t}
+                  className={`flex flex-col rounded-[1.3cqw] border p-[1.5cqw] ${
+                    top ? "border-[#2ee6d6]/60 bg-[linear-gradient(180deg,rgba(46,230,214,.12),rgba(255,255,255,.04))]" : "border-white/10 bg-white/[0.06]"
+                  }`}
+                >
+                  <p className="text-[1.15cqw] font-bold uppercase tracking-[0.2em] text-white/60">{plan.name}</p>
+                  <p className="mt-[0.5cqw] text-[2.3cqw] font-extrabold tracking-[-0.02em]">
+                    {free ? "$0 subscription" : `${plan.monthlyUsd} Demo USDT / month`}
+                  </p>
+                  <p className="text-[1.15cqw] text-white/55">{free ? "Included with every account" : `or ${plan.annualUsd} / year`}</p>
+                  <p className="mt-auto text-[4cqw] font-extrabold leading-none text-[#7ff3ea]">{`${plan.feeBps / 100}%`}</p>
+                  <p className="mt-[0.4cqw] text-[1.15cqw] text-white/70">
+                    {free ? "Current launch PREMIFLOW platform fee, per participant" : top ? "PREMIFLOW platform fee on new contracts" : "PREMIFLOW platform fee"}
+                  </p>
+                </Appear>
+              );
+            })}
           </div>
-          <div className="grid grid-cols-3 gap-[1cqw] text-[1.1cqw] text-white/75">
-            <p>Employer and freelancer each pay their own fee.</p>
-            <p>No separate employer or freelancer subscription.</p>
-            <p>One subscription applies to both hiring and working when using the subscribed wallet.</p>
-          </div>
-          <p className="text-[0.95cqw] text-white/45">
-            Current Devnet model. Each wallet&apos;s plan controls that participant&apos;s fee. Annual: pay for 10 months,
-            get 12. Devnet prices are paid in Demo USDT, a Devnet test asset.
+          <p className="text-[1.5cqw] font-semibold">Each participant&apos;s own plan determines their own fee.</p>
+          <p className="text-[1cqw] text-white/50">
+            Current Devnet pricing model. Demo USDT is a Devnet test asset. A plan belongs to the wallet that pays for it
+            and covers both hiring and working with that wallet.
           </p>
         </div>
       );
-    case "current": {
-      const items = [
-        "Marketplace",
-        "Jobs and proposals",
-        "Gigs",
-        "Freelancer profiles",
-        "Fixed contracts",
-        "Milestone contracts",
-        "Streaming contracts",
-        "Hourly contracts",
-        "Paid trials where supported",
-        "Protected payment workflow",
-        "Notifications",
-        "Help Desk",
-        "Resolution Desk",
-        "Dispute statements and evidence",
-        "Neutral AI case summary",
-        "Free / Pro / Premium fee model",
-        "Safe Cancel & Revise offers",
+
+    case "product": {
+      const tiles = [
+        { slot: "marketplace", title: "Marketplace", span: "col-span-2" },
+        { slot: "offer", title: "Create contract", span: "" },
+        { slot: "contract", title: "Contract detail", span: "" },
+        { slot: "messages", title: "Messages", span: "" },
+        { slot: "notifications", title: "Notifications", span: "" },
+        { slot: "resolution", title: "Resolution Desk", span: "col-span-2" },
+        { slot: "pricing", title: "Pricing", span: "" },
+      ] as const;
+      const facts = [
+        "Marketplace MVP",
+        "Fixed / Milestone / Streaming / Hourly",
+        "Protected funding",
+        "Work submission & approval",
+        "Safe offer revisions",
+        "Dispute evidence workflow",
+        "AI case summarization",
+        "Human resolver",
+        "Subscriptions & fees",
+        "Solana Devnet",
       ];
       return (
-        <div className="flex h-full flex-col gap-[1.2cqw]">
-          <div className="grid flex-1 grid-cols-3 content-start gap-[0.7cqw]">
-            {items.map((x, i) => (
-              <Appear key={x} at={i * 260} t={t} className="flex items-center gap-[0.6cqw] rounded-[0.8cqw] bg-white/[0.06] px-[0.9cqw] py-[0.55cqw]">
-                <CheckCircle2 className="size-[1.3cqw] shrink-0 text-[#5be37a]" aria-hidden="true" />
-                <span className="text-[1.15cqw] font-semibold">{x}</span>
+        <div className="grid h-full grid-cols-[1.75fr_1fr] gap-[1.6cqw]">
+          <ClipSlot slot="product">
+            <div className="grid h-full grid-cols-3 grid-rows-3 gap-[0.8cqw]">
+              {tiles.map((x, i) => (
+                <Appear key={x.title} at={i * 220} t={t} className={`min-h-0 ${x.span}`}>
+                  <ProductScreen slot={x.slot} title={x.title} width={x.span ? 1280 : 1000} compact className="h-full" />
+                </Appear>
+              ))}
+            </div>
+          </ClipSlot>
+          <div className="flex min-h-0 flex-col gap-[0.45cqw]">
+            {facts.map((f, i) => (
+              <Appear key={f} at={600 + i * 550} t={t} className="flex items-center gap-[0.6cqw] rounded-[0.7cqw] bg-white/[0.06] px-[0.9cqw] py-[0.42cqw]">
+                <BadgeCheck className="size-[1.3cqw] shrink-0 text-[#5be37a]" aria-hidden="true" />
+                <span className="text-[1.12cqw] font-semibold">{f}</span>
               </Appear>
             ))}
-          </div>
-          <div className="flex items-center gap-[1cqw]">
-            <Chip tone="cyan">
-              <span className="pf-preview-dot size-[0.6cqw] rounded-full bg-[#2ee6d6]" aria-hidden="true" /> Running on Solana Devnet
-            </Chip>
-            <Chip tone="muted">
-              <LifeBuoy className="size-[1cqw]" aria-hidden="true" /> Sample data in this presentation
-            </Chip>
           </div>
         </div>
       );
     }
+
     case "closing":
     default:
-      return (
-        <div className="grid h-full grid-cols-1 items-center">
-          <div className={`flex h-full items-center ${PITCH_CLIP_SLOTS.closing ? "justify-between gap-[3cqw]" : "justify-center"}`}>
-            <div className={`flex flex-col ${PITCH_CLIP_SLOTS.closing ? "items-start text-left" : "items-center text-center"}`}>
-              <p className="text-[4.4cqw] font-extrabold leading-none tracking-[-0.03em]">Work differently.</p>
-              <p className="mt-[1.4cqw] max-w-[60cqw] text-[1.6cqw] leading-snug text-white/75">
-                PREMIFLOW brings marketplace discovery, flexible work agreements and protected Solana payments into one
-                workflow.
-              </p>
-              <div className="mt-[2cqw] flex gap-[1cqw]">
-                <span className="rounded-full px-[2cqw] py-[0.9cqw] text-[1.4cqw] font-bold text-[#04101f]" style={{ background: ACCENT }}>
-                  Find Work
-                </span>
-                <span className="rounded-full border border-white/30 px-[2cqw] py-[0.9cqw] text-[1.4cqw] font-bold">Hire Talent</span>
-              </div>
-              <div className="mt-[3cqw] flex flex-col items-center gap-[0.8cqw]">
-                <DemoMark h={3.6} />
-                <p className="text-[1.5cqw] font-semibold text-white/80">Freelance work. Protected on Solana.</p>
-              </div>
-            </div>
-            {PITCH_CLIP_SLOTS.closing ? (
-              <div className="h-[70%] w-[40%]">
-                <ClipSlot slot="closing">{null}</ClipSlot>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      );
+      return <BrandSlide t={t} closing />;
   }
+}
+
+function Person({ icon: Icon, label }: { icon: typeof Briefcase; label: string }) {
+  return (
+    <span className="flex shrink-0 flex-col items-center gap-[0.6cqw]">
+      <span className="flex size-[5.2cqw] items-center justify-center rounded-full border border-white/15 bg-[linear-gradient(135deg,rgba(46,230,214,.2),rgba(79,140,255,.2))]">
+        <Icon className="size-[2.4cqw] text-white" aria-hidden="true" />
+      </span>
+      <span className="text-[1.15cqw] font-semibold text-white/80">{label}</span>
+    </span>
+  );
 }

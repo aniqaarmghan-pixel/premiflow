@@ -1,7 +1,12 @@
 /**
  * /demo/pitch deck structure (presentation only). Speaker script lives in
- * pitch-narration.ts. Clip slots accept a local "/media/....mp4" (or https)
- * path from the separate product demo; null shows the built-in mockup.
+ * pitch-narration.ts.
+ *
+ * Media drop-in slots:
+ * - PITCH_SCREENSHOT_SLOTS: real PREMIFLOW screenshots (PNG/WebP/JPEG) saved
+ *   under public/media/pitch/, e.g. marketplace: "/media/pitch/marketplace.png".
+ *   null renders the real app components with sample data instead.
+ * - PITCH_CLIP_SLOTS: optional muted product-demo clips ("/media/....mp4").
  */
 import { PITCH_NARRATION, type PitchSlideId } from "@/lib/app/pitch-narration";
 
@@ -9,8 +14,9 @@ export const PITCH_ROUTE = "/demo/pitch";
 
 /** Words per minute used to estimate slide timing from the script. */
 export const PITCH_WORDS_PER_MINUTE = 150;
-const PITCH_SLIDE_PAUSE_MS = 600;
-const PITCH_MIN_SLIDE_MS = 7000;
+/** Hold after each spoken line (also covers the slide transition). */
+const PITCH_SLIDE_HOLD_MS = 3000;
+const PITCH_MIN_SLIDE_MS = 9000;
 
 export const PITCH_SPEECH_OVERRUN_CAP_MS = 2500;
 
@@ -22,6 +28,60 @@ export const PITCH_CLIP_SLOTS: Record<PitchClipSlot, string | null> = {
   product: null,
   closing: null,
 };
+
+export type PitchScreenSlot =
+  | "marketplace"
+  | "proposals"
+  | "offer"
+  | "accept"
+  | "work"
+  | "earnings"
+  | "contract"
+  | "resolution"
+  | "messages"
+  | "notifications"
+  | "pricing";
+
+/** Suggested file for each screenshot slot (16:10 or 16:9 crop, top-aligned). */
+export const PITCH_SCREENSHOT_PATHS: Record<PitchScreenSlot, string> = {
+  marketplace: "/media/pitch/marketplace.png",
+  proposals: "/media/pitch/proposals.png",
+  offer: "/media/pitch/create-offer.png",
+  accept: "/media/pitch/accept-offer.png",
+  work: "/media/pitch/work-review.png",
+  earnings: "/media/pitch/earnings.png",
+  contract: "/media/pitch/contract-detail.png",
+  resolution: "/media/pitch/resolution-desk.png",
+  messages: "/media/pitch/messages.png",
+  notifications: "/media/pitch/notifications.png",
+  pricing: "/media/pitch/pricing.png",
+};
+
+/**
+ * Set a slot to its PITCH_SCREENSHOT_PATHS entry once the real screenshot is
+ * saved in public/media/pitch/. null = real-component render with sample data.
+ */
+export const PITCH_SCREENSHOT_SLOTS: Record<PitchScreenSlot, string | null> = {
+  marketplace: null,
+  proposals: null,
+  offer: null,
+  accept: null,
+  work: null,
+  earnings: null,
+  contract: null,
+  resolution: null,
+  messages: null,
+  notifications: null,
+  pricing: null,
+};
+
+const SCREENSHOT_SRC = /^\/media\/pitch\/[a-z0-9][a-z0-9-]*\.(png|webp|jpe?g)$/;
+
+/** Local, same-origin screenshot paths under /media/pitch/ only. */
+export function pitchScreenshotSrc(slot: PitchScreenSlot): string | null {
+  const src = PITCH_SCREENSHOT_SLOTS[slot];
+  return src && SCREENSHOT_SRC.test(src) ? src : null;
+}
 
 export type PitchSlide = {
   id: PitchSlideId;
@@ -39,20 +99,20 @@ export function wordCount(text: string): number {
 
 export function pitchSlideDurationMs(narration: string): number {
   const speechMs = Math.round((wordCount(narration) / PITCH_WORDS_PER_MINUTE) * 60000);
-  return Math.max(PITCH_MIN_SLIDE_MS, speechMs + PITCH_SLIDE_PAUSE_MS);
+  return Math.max(PITCH_MIN_SLIDE_MS, speechMs + PITCH_SLIDE_HOLD_MS);
 }
 
 const STRUCTURE: ReadonlyArray<{ id: PitchSlideId; label: string; heading: string }> = [
   { id: "title", label: "Title", heading: "PREMIFLOW" },
-  { id: "problem", label: "Problem", heading: "Freelance work needs better payment coordination." },
-  { id: "solution", label: "Solution", heading: "Marketplace discovery meets protected contracts." },
-  { id: "models", label: "Payment models", heading: "One platform. Four ways to work." },
-  { id: "product", label: "Product", heading: "Built for the full freelance lifecycle." },
-  { id: "protection", label: "Protection", heading: "Protection without hiding the human decision." },
+  { id: "problem", label: "The problem", heading: "Freelance work still runs on fragmented trust." },
+  { id: "solution", label: "The solution", heading: "One protected freelance workflow." },
+  { id: "how", label: "How it works", heading: "How it works" },
+  { id: "models", label: "Four ways to get paid", heading: "Contracts that match the work." },
+  { id: "protection", label: "Protection & disputes", heading: "Protection without silent contract changes." },
   { id: "solana", label: "Why Solana", heading: "Why Solana?" },
-  { id: "business", label: "Business model", heading: "Simple plans for both sides of the marketplace." },
-  { id: "current", label: "Current product", heading: "More than a prototype." },
-  { id: "closing", label: "Closing", heading: "Work differently." },
+  { id: "business", label: "Business model", heading: "Simple aligned monetization." },
+  { id: "product", label: "Product today", heading: "A working product, not just a concept." },
+  { id: "closing", label: "Closing", heading: "PREMIFLOW" },
 ];
 
 export const PITCH_SLIDES: readonly PitchSlide[] = STRUCTURE.map((s) => {
@@ -62,4 +122,8 @@ export const PITCH_SLIDES: readonly PitchSlide[] = STRUCTURE.map((s) => {
 
 export function pitchTotalWords(slides: readonly PitchSlide[] = PITCH_SLIDES): number {
   return slides.reduce((sum, s) => sum + wordCount(s.narration), 0);
+}
+
+export function pitchTotalMs(slides: readonly PitchSlide[] = PITCH_SLIDES): number {
+  return slides.reduce((sum, s) => sum + s.durationMs, 0);
 }
