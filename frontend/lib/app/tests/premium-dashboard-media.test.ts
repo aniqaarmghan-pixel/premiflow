@@ -225,15 +225,12 @@ test("dashboard renders the command center from real hooks only", () => {
 
 /* ---------- Shell: Explore CTA, sidebar, bottom nav ---------- */
 
-test("Explore Marketplace stays in the drawer only; desktop sidebar uses Discover -> Marketplace", () => {
+test("No duplicate Explore Marketplace CTA; sidebar and drawer use Discover -> Marketplace", () => {
   const shell = read("components/shell/AppShell.tsx");
-  assert.match(shell, /function ExploreMarketplaceLink/);
-  assert.equal((shell.match(/<ExploreMarketplaceLink/g) ?? []).length, 1);
-  assert.equal(shell.indexOf("<ExploreMarketplaceLink />"), -1);
+  assert.doesNotMatch(shell, /ExploreMarketplaceLink/);
   assert.match(shell, /\{ href: "\/", label: "Marketplace", icon: Store \}/);
-  const drawerCta = shell.indexOf("<ExploreMarketplaceLink onNavigate");
-  const drawerNav = shell.indexOf('<nav aria-label="Dashboard" ');
-  assert.ok(drawerCta > 0 && drawerCta < drawerNav);
+  assert.match(shell, /function SidebarScrollArea/);
+  assert.match(shell, /pointer-events-none absolute inset-x-0 bottom-0/);
   const css = read("app/globals.css");
   assert.match(css, /\.pf-rail\s*\{\s*-ms-overflow-style: none;/);
   assert.match(css, /\.pf-rail::-webkit-scrollbar \{\s*display: none;/);

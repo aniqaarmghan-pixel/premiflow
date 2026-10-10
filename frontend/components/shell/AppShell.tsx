@@ -10,7 +10,6 @@ import {
   Briefcase,
   CheckCircle2,
   CircleHelp,
-  Compass,
   FilePlus2,
   Gavel,
   History,
@@ -106,6 +105,51 @@ const NAV_GROUPS: ReadonlyArray<NavGroup> = [
     items: [{ href: "/", label: "Marketplace", icon: Store }],
   },
 ];
+
+/**
+ * Desktop nav scroll region. The scrollbar stays visually hidden; a subtle
+ * navy fade appears at the bottom only while more items sit below the fold
+ * (scrollHeight - scrollTop - clientHeight > 4px). The fade is aria-hidden and
+ * pointer-events-none, so it never blocks the links underneath it.
+ */
+function SidebarScrollArea({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [more, setMore] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setMore(el.scrollHeight - el.scrollTop - el.clientHeight > 4);
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    const ro = typeof ResizeObserver === "function" ? new ResizeObserver(update) : null;
+    if (ro) {
+      ro.observe(el);
+      for (const child of Array.from(el.children)) ro.observe(child);
+    }
+    return () => {
+      el.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+      ro?.disconnect();
+    };
+  }, []);
+  return (
+    <div className="relative -mx-1 mt-1 flex min-h-0 flex-1 flex-col">
+      <div
+        ref={ref}
+        className="pf-sidebar-nav flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-1 pb-3"
+      >
+        {children}
+      </div>
+      <span
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-navy to-transparent transition-opacity duration-300 ${
+          more ? "opacity-100" : "opacity-0"
+        }`}
+      />
+    </div>
+  );
+}
 
 /**
  * Help & Support and About PREMIFLOW: small links at the END of the scrollable
@@ -307,7 +351,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ) : null}
         </div>
         {/* Only this region scrolls; brand/switch stay pinned above it. */}
-        <div className="pf-sidebar-nav -mx-1 mt-1 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-1 pb-3">
+        <SidebarScrollArea>
         <nav aria-label="Dashboard sections" className="mt-2 flex shrink-0 flex-col gap-0.5">
           {navGroups.flatMap((group) => [
             group.title ? (
@@ -348,7 +392,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           ])}
         </nav>
         <SidebarHelpLinks party={desk === "party"} />
-        </div>
+        </SidebarScrollArea>
         {/* Compact sound card: a flex-none sibling BELOW the scroll region (not an
             overlay), so the nav above always ends before it and never sits under it. */}
         <div className="shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-2">
@@ -477,7 +521,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   }}
                 />
               ) : null}
-              {desk === "party" ? <ExploreMarketplaceLink onNavigate={() => setOpen(false)} /> : null}
               <nav aria-label="Dashboard" className="mt-2 flex flex-col">
               {navGroups.flatMap((group) => [
                 group.title ? (
@@ -558,24 +601,5 @@ function SessionUnavailable({ onRetry }: { onRetry: () => void }) {
         </button>
       </div>
     </div>
-  );
-}
-
-/** First, most prominent dashboard action: the public marketplace. */
-function ExploreMarketplaceLink({ onNavigate }: { onNavigate?: () => void }) {
-  return (
-    <Link
-      href="/"
-      onClick={onNavigate}
-      className="group mt-4 flex min-h-12 min-w-0 items-center gap-3 rounded-2xl bg-[linear-gradient(135deg,#2ee6d6,#7c8cff)] px-3.5 py-2.5 text-sm font-semibold text-[#04101f] shadow-[0_14px_30px_-16px_rgba(46,230,214,.9)] transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-navy"
-    >
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-white/35">
-        <Compass size={17} aria-hidden="true" />
-      </span>
-      <span className="min-w-0">
-        <span className="block truncate">Explore Marketplace</span>
-        <span className="block truncate text-[11px] font-medium text-[#04101f]/70">Jobs, gigs and freelancers</span>
-      </span>
-    </Link>
   );
 }

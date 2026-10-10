@@ -43,7 +43,7 @@ test("server admin: dedicated Admin workspace on /admin, Help Desk and /resolver
   assert.match(shell, /useAppAdminStatus\(user\?\.id \?\? null\)/);
   assert.match(shell, /router\.replace\(target\)/);
   assert.match(shell, /desk === "party" \? \(\s*<DashboardBottomNav/);
-  assert.match(shell, /desk === "party" \? <ExploreMarketplaceLink/);
+  assert.doesNotMatch(shell, /ExploreMarketplaceLink/);
   assert.doesNotMatch(shell, /Exit Admin Center|exitAdmin/);
 });
 
