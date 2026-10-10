@@ -823,17 +823,16 @@ body {
     max-height: 100dvh;
   }
 }
-/* Sidebar nav scroll region: thin, subtle scrollbar so overflow reads as scrollable. */
+/* Sidebar nav scroll region: still scrolls (wheel, touch, keyboard focus), but
+   the scrollbar itself is visually hidden. */
 .pf-sidebar-nav {
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 .pf-sidebar-nav::-webkit-scrollbar {
-  width: 6px;
-}
-.pf-sidebar-nav::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.18);
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 /* Landing explainer: interactive product preview (CSS-only motion). */

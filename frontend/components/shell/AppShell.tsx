@@ -305,9 +305,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {workspace.canSwitch && desk === "party" ? (
             <WorkspaceSwitch onToggle={switchWorkspace} />
           ) : null}
-          {desk === "party" ? <ExploreMarketplaceLink /> : null}
         </div>
-        {/* Only this region scrolls; brand/switch/Explore stay pinned above it. */}
+        {/* Only this region scrolls; brand/switch stay pinned above it. */}
         <div className="pf-sidebar-nav -mx-1 mt-1 flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain px-1 pb-3">
         <nav aria-label="Dashboard sections" className="mt-2 flex shrink-0 flex-col gap-0.5">
           {navGroups.flatMap((group) => [

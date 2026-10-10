@@ -225,13 +225,12 @@ test("dashboard renders the command center from real hooks only", () => {
 
 /* ---------- Shell: Explore CTA, sidebar, bottom nav ---------- */
 
-test("Explore Marketplace is the first prominent sidebar and drawer action", () => {
+test("Explore Marketplace stays in the drawer only; desktop sidebar uses Discover -> Marketplace", () => {
   const shell = read("components/shell/AppShell.tsx");
   assert.match(shell, /function ExploreMarketplaceLink/);
-  assert.equal((shell.match(/<ExploreMarketplaceLink/g) ?? []).length, 2);
-  const sidebarCta = shell.indexOf("<ExploreMarketplaceLink />");
-  const sidebarNav = shell.indexOf('aria-label="Dashboard sections"');
-  assert.ok(sidebarCta > 0 && sidebarCta < sidebarNav);
+  assert.equal((shell.match(/<ExploreMarketplaceLink/g) ?? []).length, 1);
+  assert.equal(shell.indexOf("<ExploreMarketplaceLink />"), -1);
+  assert.match(shell, /\{ href: "\/", label: "Marketplace", icon: Store \}/);
   const drawerCta = shell.indexOf("<ExploreMarketplaceLink onNavigate");
   const drawerNav = shell.indexOf('<nav aria-label="Dashboard" ');
   assert.ok(drawerCta > 0 && drawerCta < drawerNav);
