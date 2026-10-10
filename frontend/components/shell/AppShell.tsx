@@ -171,7 +171,7 @@ function SidebarHelpLinks({ party, onNavigate }: { party: boolean; onNavigate?: 
             href={item.href}
             onClick={onNavigate}
             aria-current={active ? "page" : undefined}
-            className={`flex min-h-9 items-center gap-2 rounded-xl px-3 py-1.5 text-[13px] transition ${
+            className={`pf-sidebar-help-link flex min-h-9 items-center gap-2 rounded-xl px-3 py-1.5 text-[13px] transition ${
               active ? "bg-white/10 text-white" : "text-white/55 hover:bg-white/5 hover:text-white"
             }`}
           >
@@ -334,7 +334,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Link href={homeHref} className="block min-w-0 shrink-0 px-1">
           <BrandMark light size={44} wordmarkFontSize="1.32rem" />
           <p
-            className="mt-3"
+            className="pf-sidebar-tagline mt-3"
             style={{
               fontSize: 13,
               fontWeight: 500,
@@ -357,7 +357,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             group.title ? (
               <p
                 key={`g-${group.title}`}
-                className="px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35 lg:pt-3"
+                className="pf-sidebar-group px-3 pb-1 pt-4 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/35 lg:pt-3"
               >
                 {group.title}
               </p>
@@ -370,7 +370,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.href}
                 href={item.href}
                 aria-current={active ? "page" : undefined}
-                className={`relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition ${
+                className={`pf-sidebar-link relative flex items-center gap-2 rounded-xl px-3 py-2 text-sm transition ${
                   active ? "text-white" : "text-white/60 hover:bg-white/5 hover:text-white"
                 }`}
               >

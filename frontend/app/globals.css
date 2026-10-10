@@ -834,6 +834,36 @@ body {
   height: 0;
   display: none;
 }
+/* Laptop heights: tighten desktop sidebar rows so Account, Discover ->
+   Marketplace, Help and About stay in view (or a short scroll away) above the
+   compact sound card. Desktop sidebar only; the mobile drawer is unchanged. */
+@media (min-width: 1024px) and (max-height: 1000px) {
+  .pf-sidebar-inner .pf-sidebar-link {
+    padding-top: 0.375rem;
+    padding-bottom: 0.375rem;
+  }
+  .pf-sidebar-inner .pf-sidebar-group {
+    padding-top: 0.5rem;
+  }
+}
+@media (min-width: 1024px) and (max-height: 800px) {
+  .pf-sidebar-inner .pf-sidebar-tagline {
+    display: none;
+  }
+  .pf-sidebar-inner .pf-sidebar-link {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+  .pf-sidebar-inner .pf-sidebar-group {
+    padding-top: 0.375rem;
+    padding-bottom: 0.125rem;
+  }
+  .pf-sidebar-inner .pf-sidebar-help-link {
+    min-height: 2rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+}
 
 /* Landing explainer: interactive product preview (CSS-only motion). */
 @keyframes pf-step-in {

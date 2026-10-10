@@ -229,6 +229,9 @@ test("No duplicate Explore Marketplace CTA; sidebar and drawer use Discover -> M
   const shell = read("components/shell/AppShell.tsx");
   assert.doesNotMatch(shell, /ExploreMarketplaceLink/);
   assert.match(shell, /\{ href: "\/", label: "Marketplace", icon: Store \}/);
+  assert.equal((shell.match(/label: "Marketplace"/g) ?? []).length, 1);
+  assert.ok(shell.indexOf('title: "Discover"') > shell.indexOf('title: "Account"'));
+  assert.match(read("app/globals.css"), /\.pf-sidebar-inner \.pf-sidebar-link/);
   assert.match(shell, /function SidebarScrollArea/);
   assert.match(shell, /pointer-events-none absolute inset-x-0 bottom-0/);
   const css = read("app/globals.css");
