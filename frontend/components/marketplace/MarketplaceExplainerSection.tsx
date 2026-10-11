@@ -1,26 +1,25 @@
 "use client";
 
-import { useRef, useState } from "react";
 import { CheckCircle2 } from "lucide-react";
 
 import { LANDING_EXPLAINER } from "@/lib/app/landing-explainer";
-import {
-  MARKETPLACE_EXPLAINER_VIDEO,
-  resolveExplainerVideo,
-  type ExplainerVideoConfig,
-} from "@/lib/app/marketplace-media";
-import { PlayOverlay, ProductDemoPlayer, useProductDemo } from "@/components/demo/ProductDemoPlayer";
+import { MARKETPLACE_EXPLAINER_VIDEO, resolveExplainerVideo } from "@/lib/app/marketplace-media";
 import { Reveal } from "@/components/site/Reveal";
 
+/** Final recorded product demo shown on the landing page (public/premiflow-demo-final.mp4). */
+const LANDING_DEMO_VIDEO_SRC = "/premiflow-demo-final.mp4";
+
 /**
- * Landing explainer: the 16:9 area IS the player. Nothing plays until the
- * visitor clicks the centred Play button, and playback stays in place.
- * - MARKETPLACE_EXPLAINER_VIDEO set: the real MP4 plays inline (HTML5 video).
- * - Not set: the live narrated product demo plays inline (voice off by
- *   default, with a visible voice/volume control). Never autoplays with sound.
+ * Landing explainer: the 16:9 area is a normal HTML5 video player for the final
+ * demo recording (controls, no autoplay, audio not muted). A configured
+ * MARKETPLACE_EXPLAINER_VIDEO still overrides the file. The live animated demo
+ * stays available on /demo and /demo/studio.
  */
 export function MarketplaceExplainerSection() {
-  const video = resolveExplainerVideo(MARKETPLACE_EXPLAINER_VIDEO);
+  const configured = resolveExplainerVideo(MARKETPLACE_EXPLAINER_VIDEO);
+  const src = configured?.src ?? LANDING_DEMO_VIDEO_SRC;
+  const type = configured?.type ?? "video/mp4";
+  const poster = configured?.poster;
 
   return (
     <section className="bg-paper py-16 sm:py-24" aria-labelledby="pf-explainer">
@@ -45,57 +44,22 @@ export function MarketplaceExplainerSection() {
             ))}
           </ul>
         </Reveal>
-        <Reveal delay={100}>{video ? <InlineVideoPlayer video={video} /> : <InlineLiveDemo />}</Reveal>
+        <Reveal delay={100}>
+          <div className="pf-demo relative aspect-video w-full min-w-0 overflow-hidden rounded-[20px] border border-line bg-black shadow-[var(--shadow)]">
+            <video
+              className="h-full w-full"
+              controls
+              playsInline
+              preload="metadata"
+              poster={poster}
+              aria-label={LANDING_EXPLAINER.modalTitle}
+            >
+              <source src={src} type={type} />
+              Your browser cannot play this video.
+            </video>
+          </div>
+        </Reveal>
       </div>
     </section>
-  );
-}
-
-/* ------------------------- Live product demo (no MP4) ------------------------- */
-
-function InlineLiveDemo() {
-  // Voice starts off on the landing page; the control bar has a visible voice toggle and volume.
-  const demo = useProductDemo({ initialVoiceOn: false });
-  return <ProductDemoPlayer demo={demo} />;
-}
-
-/* ------------------------------ Real MP4 inline ------------------------------ */
-
-function previewSrc(src: string): string {
-  return src.includes("#") ? src : `${src}#t=0.1`;
-}
-
-function InlineVideoPlayer({ video }: { video: ExplainerVideoConfig }) {
-  const ref = useRef<HTMLVideoElement>(null);
-  const [started, setStarted] = useState(false);
-
-  const start = () => {
-    setStarted(true);
-    const el = ref.current;
-    if (!el) return;
-    // Started by an explicit click, so sound is allowed; fall back to muted if the browser refuses.
-    el.muted = false;
-    el.play().catch(() => {
-      el.muted = true;
-      el.play().catch(() => undefined);
-    });
-  };
-
-  return (
-    <div className="pf-demo relative aspect-video w-full min-w-0 overflow-hidden rounded-[20px] border border-line bg-black shadow-[var(--shadow)]">
-      <video
-        ref={ref}
-        className="h-full w-full"
-        controls={started}
-        playsInline
-        preload="metadata"
-        poster={video.poster}
-        aria-label={LANDING_EXPLAINER.modalTitle}
-      >
-        <source src={previewSrc(video.src)} type={video.type ?? "video/mp4"} />
-        Your browser cannot play this video.
-      </video>
-      {!started ? <PlayOverlay onPlay={start} label="Product demo" ariaLabel={LANDING_EXPLAINER.playLabel} /> : null}
-    </div>
   );
 }
